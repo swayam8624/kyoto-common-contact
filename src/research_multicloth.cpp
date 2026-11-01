@@ -187,6 +187,8 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   budgetSum+=region.budget;
  }
  metrics.meanRegionBudget=regions_.empty()?0:budgetSum/regions_.size();
+ metrics.regionGuards.clear();
+ for(const auto& region:regions_)metrics.regionGuards.push_back(region.unionEnvelope);
  output_.clear();
  // Each region-pair cache has a separate certificate. Invalidating region R
  // rebuilds ONLY pair blocks incident to R; unaffected blocks are reused.
@@ -380,6 +382,7 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
     for(int j=0;j<3;++j)positions_[mesh.ids[j]]=add(positions_[mesh.ids[j]],
        mul(correction,mesh.w[j]*inverseMasses_[mesh.ids[j]]));
     ++metrics_.contacts;++metrics_.sphereContacts;
+    metrics_.contactPairs.push_back(pair);
    }
    continue;
   }
@@ -417,6 +420,7 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
     mul(fallback,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
   if(respond(bestA,bestB,d,n,kThickness)){
    ++metrics_.contacts;++metrics_.interSheetContacts;
+   metrics_.contactPairs.push_back(pair);
   }
  }
 }
@@ -482,6 +486,7 @@ void MultiCloth::step(){
    metrics_.broadMs+=std::chrono::duration<double,std::milli>(Clock::now()-queryStart).count();
    ++metrics_.queryCount;metrics_.pairs=pairs.size();
   }
+  metrics_.candidatePairs=pairs;
   if(auditing_&&(iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)){
    std::vector<Bounds> exact;
    exact.reserve(bounds.size());
@@ -502,6 +507,9 @@ void MultiCloth::step(){
   metrics_.lastEvent="GLOBAL_GUARD_REUSE";
  }
  if(policy_==Policy::RebuildSAP)metrics_.lastEvent="FULL_SAP_REBUILD";
+ std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
+ metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
+                             metrics_.contactPairs.end());
  metrics_.stepMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
 }
 } // namespace ccp::research

@@ -27,7 +27,8 @@ struct Metrics {
   double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
-  std::vector<Pair> candidatePairs;
+  std::vector<Pair> candidatePairs,contactPairs;
+  std::vector<Bounds> regionGuards;
 };
 class RegionalCandidates {
 public:
