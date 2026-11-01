@@ -479,9 +479,14 @@ void MultiCloth::step(){
                                      true,globalMetrics);
    pairs=actual;
   }else{
-   for(auto& b:bounds){b.min=sub(b.min,{kMargin*.5,kMargin*.5,kMargin*.5});
-                      b.max=add(b.max,{kMargin*.5,kMargin*.5,kMargin*.5});}
-   pairs=live::candidates(bounds,true,&metrics_.broadAabbTests);
+   // Pad only the query copy. The independent brute-force oracle below
+   // starts from RAW geometry bounds and must not pad a second time.
+   auto paddedBounds=bounds;
+   for(auto& box:paddedBounds){
+    box.min=sub(box.min,{kMargin*.5,kMargin*.5,kMargin*.5});
+    box.max=add(box.max,{kMargin*.5,kMargin*.5,kMargin*.5});
+   }
+   pairs=live::candidates(paddedBounds,true,&metrics_.broadAabbTests);
   }
   if(policy_!=Policy::RegionalCertified){
    metrics_.broadMs+=std::chrono::duration<double,std::milli>(Clock::now()-queryStart).count();
