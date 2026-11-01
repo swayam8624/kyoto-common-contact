@@ -19,7 +19,7 @@ jobs:
       - name: Unit and contract tests
         run: ctest --test-dir build --output-on-failure
       - name: Long-running cloth stability diagnostic
-        run: ./build/ccp_cloth_stability_probe 260
+        run: ./build/ccp_cloth_stability_probe 480
       - name: Candidate-driven paired benchmark
         run: |
           mkdir -p output/native
