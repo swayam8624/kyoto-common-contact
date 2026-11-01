@@ -7,6 +7,7 @@
 #include <GL/gl.h>
 #endif
 #include "ccp/live_cloth.hpp"
+#include "ccp/research_multicloth.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -58,6 +59,8 @@ void sphere(std::vector<Vertex>&v,V center,double radius){const int rings=24,sli
 struct EvidenceBar { std::string scene,algorithm; double meanMs{},extraCandidates{}; };
 struct App {
  ccp::live::ClothSimulation sim;
+ ccp::research::MultiCloth multi{3,2};
+ bool multiMode=false,multiAudit=false;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
  int stage=1,evidenceScene=4;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
@@ -126,11 +129,57 @@ void loadEvidence(App& a) {
  }
  pushInspectorEvent(a,"EVIDENCE: LOCAL CSV "+std::string(a.broadphaseResults.empty()?"MISSING":"LOADED"));
 }
-void fitScene(App&a,GLFWwindow*w){V lo=a.sim.positions().front(),hi=lo;for(V p:a.sim.positions()){lo={std::min(lo.x,p.x),std::min(lo.y,p.y),std::min(lo.z,p.z)};hi={std::max(hi.x,p.x),std::max(hi.y,p.y),std::max(hi.z,p.z)};}V c=a.sim.sphereCenter();double r=a.sim.sphereRadius();lo={std::min(lo.x,c.x-r),std::min(lo.y,c.y-r),std::min(0.,lo.z)};hi={std::max(hi.x,c.x+r),std::max(hi.y,c.y+r),std::max(hi.z,c.z+r)};a.target=mul(add(lo,hi),.5);double radius=std::sqrt(dot(sub(hi,lo),sub(hi,lo)))*.5;int width,height;glfwGetFramebufferSize(w,&width,&height);double asp=(width-350.*height/920)/height;double angle=std::min(.35,std::atan(std::tan(.35)*asp));a.distance=(radius+.12)/std::sin(angle)*1.13;a.yaw=-.93;a.pitch=.40;}
+void fitScene(App&a,GLFWwindow*w){
+ const auto& points=a.multiMode?a.multi.positions():a.sim.positions();
+ V lo=points.front(),hi=lo;
+ for(V p:points){
+  lo={std::min(lo.x,p.x),std::min(lo.y,p.y),std::min(lo.z,p.z)};
+  hi={std::max(hi.x,p.x),std::max(hi.y,p.y),std::max(hi.z,p.z)};
+ }
+ const auto includeSphere=[&](V p,double r){
+  lo={std::min(lo.x,p.x-r),std::min(lo.y,p.y-r),std::min(0.0,lo.z)};
+  hi={std::max(hi.x,p.x+r),std::max(hi.y,p.y+r),std::max(hi.z,p.z+r)};
+ };
+ if(a.multiMode)for(const auto& b:a.multi.spheres())includeSphere(b.center,b.radius);
+ else includeSphere(a.sim.sphereCenter(),a.sim.sphereRadius());
+ a.target=mul(add(lo,hi),.5);
+ const double radius=std::sqrt(dot(sub(hi,lo),sub(hi,lo)))*.5;
+ int width,height;glfwGetFramebufferSize(w,&width,&height);
+ const double aspect=(width-350.*height/920)/height;
+ const double angle=std::min(.35,std::atan(std::tan(.35)*aspect));
+ a.distance=(radius+.12)/std::sin(angle)*1.13;
+ a.yaw=-.93;a.pitch=.40;
+}
 double stateHash(App&a){double hash=0;for(auto p:a.sim.positions())hash+=p.x*.37+p.y*.71+p.z*1.13;return hash;}
 void logEvent(App&a,const std::string&event){auto&s=a.sim.stats();std::ostringstream line;line<<"LIVE "<<event<<" frame="<<s.frame<<" broad="<<(s.sap?"SAP":"EXHAUSTIVE")<<" response="<<s.collisions<<" guarded="<<s.guardedReuse<<" margin="<<a.sim.queryRequest().margin<<" candidates="<<s.candidateCount<<" minGap="<<s.minGap<<" stateHash="<<std::setprecision(14)<<stateHash(a)<<'\n';std::cerr<<line.str();a.events<<line.str();a.events.flush();a.trace.flush();
  pushInspectorEvent(a,event+" F"+std::to_string(s.frame));}
-void stepSimulation(App&a){a.sim.step();auto&s=a.sim.stats();auto q=a.sim.queryRequest();a.trace<<s.frame<<','<<(s.sap?"SAP":"EXHAUSTIVE")<<','<<s.collisions<<','<<(s.guardedReuse?"GUARDED":"REBUILD")<<','<<q.margin<<','<<q.displacementBudget<<','<<s.queryBuilds<<','<<s.queryReuses<<','<<s.candidateCount<<','<<s.proximityCount<<','<<std::setprecision(14)<<s.minGap<<','<<s.broadMs<<','<<s.narrowMs<<','<<s.oracleMs<<','<<s.diagnosticMs<<','<<s.solverMs<<','<<s.preciseTests<<','<<s.oracleTests<<','<<s.oracleChecked<<','<<s.stepMs<<','<<(s.oracleChecked?std::to_string(s.oracleMisses):"NA")<<','<<stateHash(a)<<','<<s.cacheDecision<<'\n';if(s.frame%30==0)a.trace.flush();
+std::string number(double d,int precision);
+void stepSimulation(App&a){
+ if(a.multiMode){
+  a.multi.step();
+  const auto& m=a.multi.metrics();
+  if(m.oracleMisses)a.paused=true;
+  if(a.multi.frame()==1||a.multi.frame()%6==0||m.oracleMisses){
+   std::ostringstream line;
+   line<<"F"<<a.multi.frame()<<" "
+       <<(a.multi.policy()==ccp::research::Policy::RegionalCertified?"REGIONAL":
+          a.multi.policy()==ccp::research::Policy::GlobalGuard?"GLOBAL":"SAP")
+       <<" PAIRS "<<m.pairs<<" CONTACTS "<<m.contacts
+       <<" INTER "<<m.interSheetContacts<<" SPHERE "<<m.sphereContacts;
+   pushInspectorEvent(a,line.str());
+   std::ostringstream event;
+   event<<"REGION DIRTY "<<m.dirtyRegions<<" BLOCKS "<<m.regionalPairRebuilds
+        <<"/"<<m.regionalPairReuses<<" REJECTED "<<m.cachedPairsRejected;
+   pushInspectorEvent(a,event.str());
+   std::ostringstream cost;
+   cost<<"BROAD "<<number(m.broadMs,3)<<"ms PRECISE "
+       <<number(m.narrowMs,3)<<"ms STEP "<<number(m.stepMs,3)<<"ms";
+   pushInspectorEvent(a,cost.str());
+   a.events<<line.str()<<'\n';
+  }
+  return;
+ }
+ a.sim.step();auto&s=a.sim.stats();auto q=a.sim.queryRequest();a.trace<<s.frame<<','<<(s.sap?"SAP":"EXHAUSTIVE")<<','<<s.collisions<<','<<(s.guardedReuse?"GUARDED":"REBUILD")<<','<<q.margin<<','<<q.displacementBudget<<','<<s.queryBuilds<<','<<s.queryReuses<<','<<s.candidateCount<<','<<s.proximityCount<<','<<std::setprecision(14)<<s.minGap<<','<<s.broadMs<<','<<s.narrowMs<<','<<s.oracleMs<<','<<s.diagnosticMs<<','<<s.solverMs<<','<<s.preciseTests<<','<<s.oracleTests<<','<<s.oracleChecked<<','<<s.stepMs<<','<<(s.oracleChecked?std::to_string(s.oracleMisses):"NA")<<','<<stateHash(a)<<','<<s.cacheDecision<<'\n';if(s.frame%30==0)a.trace.flush();
  if(s.frame==1 || s.frame%15==0 || s.queryBuilds>0 || a.paused) {
   std::ostringstream event;
   event<<"F"<<s.frame<<" "<<s.cacheDecision<<" "<<s.queryBuilds<<"B/"<<s.queryReuses<<"R";
@@ -145,7 +194,37 @@ void stepSimulation(App&a){a.sim.step();auto&s=a.sim.stats();auto q=a.sim.queryR
   pushInspectorEvent(a,ids.str());
  }
  if(s.oracleMisses){a.paused=true;logEvent(a,"ORACLE_FAILURE");}}
-void key(GLFWwindow*w,int key,int,int action,int){if(action!=GLFW_PRESS)return;auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(key==GLFW_KEY_ESCAPE)glfwSetWindowShouldClose(w,1);if(key==GLFW_KEY_SPACE)a.paused=!a.paused;if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}if(key==GLFW_KEY_R){bool mode=a.sim.stats().sap,collide=a.sim.stats().collisions;auto request=a.sim.queryRequest();a.sim.reset();a.sim.setQueryRequest(request);a.sim.setBroadPhase(mode);a.sim.setCollisions(collide);a.cutaway=false;fitScene(a,w);}if(key==GLFW_KEY_F)fitScene(a,w);if(key==GLFW_KEY_B)a.sim.setBroadPhase(!a.sim.stats().sap);if(key==GLFW_KEY_C)a.sim.setCollisions(!a.sim.stats().collisions);if(key==GLFW_KEY_V)a.sim.setOracleEnabled(!a.sim.oracleEnabled());
+void key(GLFWwindow*w,int key,int,int action,int){
+ if(action!=GLFW_PRESS)return;
+ auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
+ if(key==GLFW_KEY_ESCAPE){glfwSetWindowShouldClose(w,1);return;}
+ if(key==GLFW_KEY_K){
+  a.multiMode=!a.multiMode;
+  a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
+  pushInspectorEvent(a,a.multiMode?"DYNAMIC 3-SHEET SCENE":"SINGLE CLOTH BASELINE");
+  fitScene(a,w);return;
+ }
+ if(a.multiMode){
+  if(key==GLFW_KEY_SPACE)a.paused=!a.paused;
+  else if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}
+  else if(key==GLFW_KEY_R){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());fitScene(a,w);}
+  else if(key==GLFW_KEY_L){a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());fitScene(a,w);}
+  else if(key==GLFW_KEY_O){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);fitScene(a,w);}
+  else if(key==GLFW_KEY_Q){
+   using P=ccp::research::Policy;
+   a.multi.setPolicy(a.multi.policy()==P::RebuildSAP?P::GlobalGuard:
+                     a.multi.policy()==P::GlobalGuard?P::RegionalCertified:P::RebuildSAP);
+   pushInspectorEvent(a,"CHANGED BROAD PHASE POLICY");
+  } else if(key==GLFW_KEY_A){
+   a.multiAudit=!a.multiAudit;a.multi.setAuditing(a.multiAudit);
+   pushInspectorEvent(a,a.multiAudit?"EXHAUSTIVE COVERAGE AUDIT ON":"COVERAGE AUDIT OFF");
+  } else if(key==GLFW_KEY_W)a.wire=!a.wire;
+  else if(key==GLFW_KEY_F)fitScene(a,w);
+  else if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
+  else if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;
+  return;
+ }
+if(key==GLFW_KEY_SPACE)a.paused=!a.paused;if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}if(key==GLFW_KEY_R){bool mode=a.sim.stats().sap,collide=a.sim.stats().collisions;auto request=a.sim.queryRequest();a.sim.reset();a.sim.setQueryRequest(request);a.sim.setBroadPhase(mode);a.sim.setCollisions(collide);a.cutaway=false;fitScene(a,w);}if(key==GLFW_KEY_F)fitScene(a,w);if(key==GLFW_KEY_B)a.sim.setBroadPhase(!a.sim.stats().sap);if(key==GLFW_KEY_C)a.sim.setCollisions(!a.sim.stats().collisions);if(key==GLFW_KEY_V)a.sim.setOracleEnabled(!a.sim.oracleEnabled());
 if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
 if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%5;a.inspectorScroll=0;}if(key==GLFW_KEY_Q){auto q=a.sim.queryRequest();q.updatePolicy=q.updatePolicy==ccp::live::UpdatePolicy::GuardedReuse?ccp::live::UpdatePolicy::RebuildEveryIteration:ccp::live::UpdatePolicy::GuardedReuse;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_M){auto q=a.sim.queryRequest();q.margin=q.margin<.03?.05:q.margin<.08?.10:.02;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_W)a.wire=!a.wire;if(key==GLFW_KEY_X)a.cutaway=!a.cutaway;if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;logEvent(a,"KEY "+std::to_string(key));}
 void mouse(GLFWwindow*w,int button,int action,int){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(button==GLFW_MOUSE_BUTTON_LEFT){a.drag=action==GLFW_PRESS;glfwGetCursorPos(w,&a.lastX,&a.lastY);}}
@@ -278,7 +357,7 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
 int main(int argc,char**argv){try{
  const auto runtimeDir=std::filesystem::temp_directory_path()/"ccp-native-lab";std::filesystem::create_directories(runtimeDir);
  int captureSteps=-1;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string();bool closeCapture=false;App a;
- for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
+ for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth")a.multiMode=true;else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
  glfwSetErrorCallback([](int,const char*e){std::cerr<<"GLFW "<<e<<'\n';});if(!glfwInit())throw std::runtime_error("glfwInit failed");glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
 #ifdef __APPLE__
  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GL_TRUE);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
@@ -295,16 +374,98 @@ int main(int argc,char**argv){try{
  double previous=glfwGetTime(),accumulator=0,renderFps=0,fpsStart=previous;int fpsFrames=0;int rendered=0;M lightVP=product(ortho(-3.8,3.8,-3.8,3.8,.1,18),look({4,-3,7},{0,0,.8},{0,0,1}));
  while(!glfwWindowShouldClose(w)){
   double now=glfwGetTime(),elapsed=now-previous;previous=now;fpsFrames++;if(now-fpsStart>=.5){renderFps=fpsFrames/(now-fpsStart);fpsFrames=0;fpsStart=now;}glfwPollEvents();if(!a.paused){accumulator+=std::min(elapsed,.05);int budget=0;while(accumulator>=1./120&&budget++<6){advance();accumulator-=1./120;}}else accumulator=0;
-  int width,height;glfwGetFramebufferSize(w,&width,&height);if(width<10||height<10)continue;float scale=height/920.f,panel=350*scale,viewport=width-panel;auto&pos=a.sim.positions();auto&tris=a.sim.triangles();auto&s=a.sim.stats();std::vector<V> normals(pos.size());for(auto tri:tris){V n=cross(sub(pos[tri[1]],pos[tri[0]]),sub(pos[tri[2]],pos[tri[0]]));for(int id:tri)normals[id]=add(normals[id],n);}for(auto&n:normals)n=norm(n);std::vector<bool>cand(tris.size()),near(tris.size());for(int id:s.candidateTriangles)if(id>=0&&id<(int)cand.size())cand[id]=true;for(int id:s.contactTriangles)if(id>=0&&id<(int)near.size())near[id]=true;
-  std::vector<Vertex>solid,overlay;V floor{.54,.59,.63};triangle(solid,{-5,-5,0},{5,-5,0},{5,5,0},floor);triangle(solid,{-5,-5,0},{5,5,0},{-5,5,0},floor);sphere(solid,a.sim.sphereCenter(),a.sim.sphereRadius());
-  for(size_t i=0;i<tris.size();i++){auto t=tris[i];V center=mul(add(add(pos[t[0]],pos[t[1]]),pos[t[2]]),1./3);if(a.cutaway&&center.x>0&&center.y<.2)continue;V color{.025,.24,.31};if(a.stage==3)color=cand[i]?V{.88,.38,.055}:V{.33,.39,.43};if(a.stage==4)color=near[i]?V{.045,.51,.25}:V{.33,.39,.43};for(int id:t)vertex(solid,pos[id],normals[id],color);if(a.wire)for(int j=0;j<3;j++)segment(overlay,add(pos[t[j]],mul(normals[t[j]],.001)),add(pos[t[(j+1)%3]],mul(normals[t[(j+1)%3]],.001)),{.07,.13,.15});}
-  if(a.stage>=2){V c=a.sim.sphereCenter();double r=a.sim.sphereRadius()+a.sim.queryRequest().margin*.5;box(overlay,sub(c,{r,r,r}),add(c,{r,r,r}),{.16,.45,.94});if(a.stage==2){int shown=0;for(const auto& bound:s.queryBounds){if(bound.id==(int)tris.size())continue;if(shown++>=40)break;box(overlay,bound.min,bound.max,{.87,.48,.12});}}}
+  int width,height;glfwGetFramebufferSize(w,&width,&height);if(width<10||height<10)continue;float scale=height/920.f,panel=350*scale,viewport=width-panel;const auto&pos=a.multiMode?a.multi.positions():a.sim.positions();
+  const auto&tris=a.multiMode?a.multi.triangles():a.sim.triangles();
+  const auto&s=a.sim.stats();
+  std::vector<V> normals(pos.size());for(auto tri:tris){V n=cross(sub(pos[tri[1]],pos[tri[0]]),sub(pos[tri[2]],pos[tri[0]]));for(int id:tri)normals[id]=add(normals[id],n);}for(auto&n:normals)n=norm(n);std::vector<bool>cand(tris.size()),near(tris.size());if(a.multiMode){
+   for(const auto pair:a.multi.metrics().candidatePairs){
+    if(pair.a>=0&&pair.a<(int)cand.size())cand[pair.a]=true;
+    if(pair.b>=0&&pair.b<(int)cand.size())cand[pair.b]=true;
+   }
+   for(const auto pair:a.multi.metrics().contactPairs){
+    if(pair.a>=0&&pair.a<(int)near.size())near[pair.a]=true;
+    if(pair.b>=0&&pair.b<(int)near.size())near[pair.b]=true;
+   }
+  }else{
+   for(int id:s.candidateTriangles)if(id>=0&&id<(int)cand.size())cand[id]=true;
+   for(int id:s.contactTriangles)if(id>=0&&id<(int)near.size())near[id]=true;
+  }
+  std::vector<Vertex>solid,overlay;V floor{.54,.59,.63};triangle(solid,{-5,-5,0},{5,-5,0},{5,5,0},floor);triangle(solid,{-5,-5,0},{5,5,0},{-5,5,0},floor);if(a.multiMode){
+   for(const auto& b:a.multi.spheres())sphere(solid,b.center,b.radius);
+  }else sphere(solid,a.sim.sphereCenter(),a.sim.sphereRadius());
+  for(size_t i=0;i<tris.size();i++){auto t=tris[i];V center=mul(add(add(pos[t[0]],pos[t[1]]),pos[t[2]]),1./3);if(a.cutaway&&center.x>0&&center.y<.2)continue;V color{.025,.24,.31};
+    if(a.multiMode){
+      const auto sheet=a.multi.triangleSheets()[i];
+      const std::array<V,3> sheetColors={V{.04,.31,.47},V{.68,.30,.13},V{.23,.55,.34}};
+      color=sheetColors[std::clamp(sheet,0,2)];
+    }
+    if(a.stage==3)color=cand[i]?V{.88,.38,.055}:V{.33,.39,.43};if(a.stage==4)color=near[i]?V{.045,.51,.25}:V{.33,.39,.43};for(int id:t)vertex(solid,pos[id],normals[id],color);if(a.wire)for(int j=0;j<3;j++)segment(overlay,add(pos[t[j]],mul(normals[t[j]],.001)),add(pos[t[(j+1)%3]],mul(normals[t[(j+1)%3]],.001)),{.07,.13,.15});}
+  if(a.stage>=2){
+   if(a.multiMode){
+    if(a.stage==2){
+     int shown=0;
+     for(const auto& bound:a.multi.metrics().regionGuards){
+      if(shown++>=60)break;
+      box(overlay,bound.min,bound.max,{.72,.40,.12});
+     }
+    }
+   }else{
+    V c=a.sim.sphereCenter();double r=a.sim.sphereRadius()+a.sim.queryRequest().margin*.5;
+    box(overlay,sub(c,{r,r,r}),add(c,{r,r,r}),{.16,.45,.94});
+    if(a.stage==2){int shown=0;for(const auto& bound:s.queryBounds){
+      if(bound.id==(int)tris.size())continue;
+      if(shown++>=40)break;
+      box(overlay,bound.min,bound.max,{.87,.48,.12});
+    }}
+   }
+  }
 
   V eye=add(a.target,{a.distance*std::cos(a.pitch)*std::cos(a.yaw),a.distance*std::cos(a.pitch)*std::sin(a.yaw),a.distance*std::sin(a.pitch)});M vp=product(perspective(.70f,viewport/height,.05,40),look(eye,a.target,{0,0,1}));glEnable(GL_DEPTH_TEST);glEnable(GL_POLYGON_OFFSET_FILL);glPolygonOffset(1,1);glViewport(0,0,2048,2048);glBindFramebuffer(GL_FRAMEBUFFER,fbo);glClear(GL_DEPTH_BUFFER_BIT);glUseProgram(depth);glUniformMatrix4fv(glGetUniformLocation(depth,"vp"),1,GL_FALSE,lightVP.a);uploadDraw(vao,buffer,solid,GL_TRIANGLES);glBindFramebuffer(GL_FRAMEBUFFER,0);glDisable(GL_POLYGON_OFFSET_FILL);glViewport(0,0,width,height);glClearColor(.79,.82,.84,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glViewport(0,0,(int)viewport,height);glUseProgram(surface);glUniformMatrix4fv(glGetUniformLocation(surface,"vp"),1,GL_FALSE,vp.a);glUniformMatrix4fv(glGetUniformLocation(surface,"lightVP"),1,GL_FALSE,lightVP.a);glUniform3f(glGetUniformLocation(surface,"eye"),eye.x,eye.y,eye.z);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,shadow);glUniform1i(glGetUniformLocation(surface,"shadowMap"),0);uploadDraw(vao,buffer,solid,GL_TRIANGLES);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,vp.a);uploadDraw(vao,buffer,overlay,GL_LINES);
-  glDisable(GL_DEPTH_TEST);glViewport(0,0,width,height);std::vector<Vertex>hud;glyphVertices.clear();V ink{.14,.19,.24},muted{.39,.45,.50},blue{.12,.37,.71},green{.06,.48,.27},red{.75,.17,.12};rect(hud,viewport,0,panel,height,{.965,.97,.975});rect(hud,0,0,viewport,78*scale,{.96,.97,.975});text(hud,"CCP NATIVE / LIVE C++",28*scale,22*scale,2.7*scale,ink);text(hud,"LIVE C++ SOLVER -> SHARED QUERY -> PRECISE CONTACT",28*scale,52*scale,1.55*scale,muted);
+  glDisable(GL_DEPTH_TEST);glViewport(0,0,width,height);std::vector<Vertex>hud;glyphVertices.clear();V ink{.14,.19,.24},muted{.39,.45,.50},blue{.12,.37,.71},green{.06,.48,.27},red{.75,.17,.12};rect(hud,viewport,0,panel,height,{.965,.97,.975});rect(hud,0,0,viewport,78*scale,{.96,.97,.975});text(hud,a.multiMode?"CCP RESEARCH / MOVING 3D CLOTH":"CCP NATIVE / LIVE C++",
+       28*scale,22*scale,2.7*scale,ink);
+  text(hud,a.multiMode?"REGIONAL BROAD PHASE / MULTIPLE INTERACTING CLOTH SHEETS":
+       "LIVE C++ SOLVER -> SHARED QUERY -> PRECISE CONTACT",
+       28*scale,52*scale,1.55*scale,muted);
   float x=viewport+22*scale,y=27*scale;auto label=[&](std::string str,V color=V{.14,.19,.24},float sz=1.9){text(hud,str,x,y,sz*scale,color);y+=26*scale;};auto gap=[&](){y+=11*scale;};
+  if(a.multiMode){
+   const auto& m=a.multi.metrics();
+   const std::string policy=a.multi.policy()==ccp::research::Policy::RegionalCertified?
+      "REGIONAL CERTIFIED":a.multi.policy()==ccp::research::Policy::GlobalGuard?
+      "GLOBAL GUARDED SAP":"FULL SAP REBUILD";
+   label(a.paused?"PAUSED / N TO STEP":"RUNNING / SPACE PAUSES",a.paused?muted:green);
+   gap();label("MULTICLOTH / LIVE CONTACT",blue,1.7);
+   label("SHEETS "+std::to_string(a.multi.sheetCount())+
+         " / MOVING BALLS "+std::to_string(a.multi.sphereCount()),blue,1.6);
+   label("Q POLICY: "+policy,blue,1.5);
+   label("L SHEETS / O BALLS / R RESET",blue,1.4);
+   label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
+   label("FRAME "+std::to_string(a.multi.frame()));
+   label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
+   label("INTERSHEET CONTACTS "+std::to_string(m.interSheetContacts),green,1.5);
+   label("SPHERE CONTACTS "+std::to_string(m.sphereContacts),green,1.5);
+   label("REGIONS REBUILT "+std::to_string(m.dirtyRegions),ink,1.45);
+   label("PAIR BLOCKS REBUILT "+std::to_string(m.regionalPairRebuilds),ink,1.45);
+   label("PAIR BLOCKS REUSED "+std::to_string(m.regionalPairReuses),ink,1.45);
+   label("EXTRA GUARD PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.25);
+   label("REGION BUDGET "+number(m.meanRegionBudget,4),muted,1.5);
+   label("PRECISE TESTS "+std::to_string(m.preciseTests),muted,1.5);
+   gap();
+   label("BROAD CPU "+number(m.broadMs)+" MS",muted,1.6);
+   label("PRECISE CPU "+number(m.narrowMs)+" MS",muted,1.6);
+   label("FULL STEP "+number(m.stepMs)+" MS",muted,1.65);
+   label(m.oracleChecked?"A PAIR COVERAGE CHECKED":"A ORACLE UNCHECKED",m.oracleChecked?green:muted,1.4);
+   label("RESEARCH DEMO / NO CCD",red,1.35);
+   gap();
+   label("1 GEOMETRY / 2 REGION GUARDS",blue,1.4);
+   label("3 AABB CANDIDATES / 4 CONTACTS",blue,1.35);
+   label("G SCROLLABLE RESEARCH LOG",blue,1.35);
+   label("SPACE PAUSE / N STEP / F FRAME",muted,1.3);
+   label("K SWITCH TO ORIGINAL CLOTH",muted,1.3);
+  } else {
   label(a.paused?"PAUSED / N TO STEP":"RUNNING / SPACE PAUSES",a.paused?muted:green);gap();label("REQUEST-AWARE BROAD PHASE",blue,1.7);label(s.guardedReuse?"Q: GUARDED ENVELOPE REUSE":"Q: REBUILD EVERY ITERATION",blue,1.65);label("M: QUERY MARGIN "+number(a.sim.queryRequest().margin,2),blue,1.7);label(s.sap?"B: SWEEP AND PRUNE":"B: EXHAUSTIVE REFERENCE",blue,1.7);label("BUILDS "+std::to_string(s.queryBuilds)+" / REUSES "+std::to_string(s.queryReuses),s.guardedReuse?green:muted,1.8);label(s.collisions?"C: COLLISION RESPONSE ON":"C: COLLISION RESPONSE OFF",s.collisions?green:red,1.6);label("FRAME "+std::to_string(s.frame));label("CANDIDATES "+std::to_string(s.candidateCount));label("WITHIN MARGIN "+std::to_string(s.proximityCount));label(s.oracleChecked?"V: ORACLE MISSES "+std::to_string(s.oracleMisses):"V: ORACLE NOT CHECKED",s.oracleMisses?red:(s.oracleChecked?green:muted),1.65);label(std::isfinite(s.minGap)?"MIN GAP "+number(s.minGap,4):"MIN GAP / STEP TO EVALUATE",ink,1.7);gap();label("CPU STEP "+number(s.stepMs)+" MS",muted,1.8);label("BROAD "+number(s.broadMs)+" MS",muted,1.8);label("PRECISE "+number(s.narrowMs)+" MS / "+std::to_string(s.preciseTests)+" TESTS",muted,1.45);label("ORACLE "+number(s.oracleMs)+" MS",muted,1.45);label("DISPLAY DIAG "+number(s.diagnosticMs)+" MS",muted,1.4);label(renderFps>0?"RENDER FPS "+number(renderFps,1):"RENDER FPS WARMUP",muted,1.7);gap();label("INSPECTION",blue,1.7);label((a.stage==1?"+ ":"  ")+std::string("1 GEOMETRY"));label((a.stage==2?"+ ":"  ")+std::string("2 CERTIFIED BOUNDS"));label((a.stage==3?"+ ":"  ")+std::string("3 CANDIDATES"));label((a.stage==4?"+ ":"  ")+std::string("4 PRECISE PROXIMITY"));label("F FRAME / R RESET / V ORACLE",muted,1.5);label(a.cutaway?"X VISUAL CUTAWAY ON":"X VISUAL CUTAWAY OFF",muted,1.6);label("W WIRE / DRAG ORBIT / ZOOM",muted,1.5);
  label("G LOG + CHARTS / H NEXT SCENE",blue,1.3);gap();label("FIXED DT 1/120 SECOND",muted,1.55);label("DEMO XPBD / NO SELF CONTACT",muted,1.45);if(a.stage==2)label("BOUNDS OVERLAY CAPPED AT 40",muted,1.35);
+   label("K: OPEN DYNAMIC MULTICLOTH",blue,1.35);
+  }
 
   text(hud,a.cutaway?"VISUAL CUTAWAY / PHYSICS USES FULL MESH":"LIVE STATE / NO FILE PLAYBACK",26*scale,height-27*scale,1.6*scale,ink);M ui=ortho(0,width,height,0,-1,1);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);uploadDraw(vao,buffer,hud,GL_TRIANGLES);
   glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(fontProgram);glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,fontTexture);glUniform1i(glGetUniformLocation(fontProgram,"atlas"),0);uploadDraw(vao,buffer,glyphVertices,GL_TRIANGLES);glDisable(GL_BLEND);
