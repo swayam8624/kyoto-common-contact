@@ -28,3 +28,7 @@ docs/MULTICLOTH_RESULTS.md
 output/native/patch-sweep.csv
 output/native/patch-sweep.svg
 docs/PATCH_CALIBRATION.md
+
+output/native/online-controller-trace.csv
+output/native/online-controller-trace.svg
+docs/ONLINE_CONTROLLER_RESULTS.md

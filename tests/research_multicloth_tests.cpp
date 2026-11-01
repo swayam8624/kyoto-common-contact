@@ -1,6 +1,7 @@
 #include "ccp/research_multicloth.hpp"
 #include <cmath>
 #include <algorithm>
+#include <map>
 #include <limits>
 #include <iostream>
 #include <stdexcept>
@@ -182,6 +183,92 @@ int main(){
   try{patchCandidate.setPatchCellSpan(5);}
   catch(const std::invalid_argument&){invalidSpanRejected=true;}
   require(invalidSpanRejected,"invalid patch cell span accepted");
+
+  // The online controller must genuinely SPLIT and MERGE disjoint patches
+  // in response to measured candidate work and confirmed contact activity.
+  // This controlled signal test is separate from the real-physics test:
+  // it proves the state machine can respond to changing contact regimes.
+  {
+   OnlinePartitioner controller;
+   controller.reset(2);
+   require(controller.patches().size()==8,"online initial 6x6 patch topology");
+   std::size_t splits=0,merges=0,strategySwitches=0;
+   for(int frame=1;frame<=160;++frame){
+    std::map<int,RegionWork> signals;
+    for(const auto& patch:controller.patches()){
+     auto& w=signals[OnlinePartitioner::stableId(patch)];
+     if(frame<=66){
+      w.aabbChecks=1100;
+      w.cachedChecks=240;
+      w.candidateTouches=85;
+      w.contactCorrections=22;
+      w.invalidations=2;
+     }
+    }
+    std::vector<Bounds> guards;
+    // Initial dense patches: all union boxes overlap. Later separate them
+    // to exercise runtime flat/hierarchical strategy feedback.
+    for(std::size_t i=0;i<controller.patches().size();++i){
+     const double x=frame<=66?0.:double(i)*8.;
+     guards.push_back({int(i),{x,0,0},{x+1.,1,1},1u,2u,true});
+    }
+    const auto update=controller.observe(frame,signals,guards,1.8,5);
+    splits+=update.splits;merges+=update.merges;
+    strategySwitches+=update.strategySwitches;
+    require(update.patches==controller.patches().size(),
+            "online patch count in telemetry incorrect");
+    bool coverage[2][12][12]={};
+    for(const auto& patch:controller.patches()){
+     for(int y=patch.y;y<patch.y+patch.span;++y)
+      for(int x=patch.x;x<patch.x+patch.span;++x){
+       require(!coverage[patch.sheet][y][x],"online patch overlap");
+       coverage[patch.sheet][y][x]=true;
+       require(controller.regionForCell(patch.sheet,x,y)==
+               OnlinePartitioner::stableId(patch),"online cell ID incorrect");
+      }
+    }
+    for(int sheet=0;sheet<2;++sheet)
+     for(int y=0;y<12;++y)for(int x=0;x<12;++x)
+      require(coverage[sheet][y][x],"online patch cover has a hole");
+   }
+   require(splits>0,"online controller never split contact-heavy patches");
+   require(merges>0,"online controller never merged quiet sibling patches");
+   require(strategySwitches>0,"online controller never changed search strategy");
+  }
+
+  // Against a real physically coupled 3-cloth SAP oracle, changing the
+  // patch partition may NEVER change the precise contact path's outcome.
+  // The simulated obstacle and anchor motion remains active throughout.
+  {
+   MultiCloth exact(3,2,Policy::RebuildSAP);
+   MultiCloth adapted(3,2,Policy::OnlineContactAware);
+   exact.setAuditing(true);
+   adapted.setAuditing(true);
+   std::size_t onlineSplits=0,onlineMerges=0,onlineModeSwitches=0;
+   for(int frame=0;frame<96;++frame){
+    exact.step();adapted.step();
+    const auto& stats=adapted.metrics();
+    onlineSplits+=stats.onlineSplits;
+    onlineMerges+=stats.onlineMerges;
+    onlineModeSwitches+=stats.onlineStrategySwitches;
+    require(stats.onlinePatches>0,"online controller has no patches");
+    require(std::isfinite(stats.onlineDecisionMs),
+            "online decision time invalid");
+    require(exact.positions().size()==adapted.positions().size(),
+            "online controller changed particle topology");
+    for(std::size_t i=0;i<exact.positions().size();++i){
+     const auto a=exact.positions()[i],b=adapted.positions()[i];
+     const double d=std::sqrt((a.x-b.x)*(a.x-b.x)+
+                              (a.y-b.y)*(a.y-b.y)+
+                              (a.z-b.z)*(a.z-b.z));
+     if(d>1e-8)throw std::runtime_error(
+       "online adaptive broad phase changed physical trajectory");
+    }
+   }
+   require(onlineSplits>0,
+           "three-cloth simulation never exercised online patch splits");
+   (void)onlineMerges;(void)onlineModeSwitches;
+  }
 
   std::cout<<"Region certification, local invalidation, moving 1/2/3 cloths, "
               "real inter-sheet contacts, and paired SAP state equivalence PASS\n";

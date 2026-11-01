@@ -7,6 +7,7 @@
 // candidate is a region-selective, certificate-checked candidate *policy*;
 // novelty beyond existing BVH/fat-bound techniques requires literature proof.
 #include "ccp/live_cloth.hpp"
+#include "ccp/online_partitioner.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -17,7 +18,7 @@ namespace ccp::research {
 using Vec3 = live::Vec3;
 using Bounds = live::Bounds;
 using Pair = live::Pair;
-enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified };
+enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware };
 struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
 struct Metrics {
@@ -25,18 +26,22 @@ struct Metrics {
               sphereContacts{}, broadAabbTests{}, regionalPairRebuilds{},
               regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{},
               regionTopLevelTests{}, regionTopLevelOverlaps{}, regionPairsSkipped{},
-              regionCacheEvictions{};
-  double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{};
+              regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
+              onlineStrategySwitches{};
+  double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
+         onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
   std::vector<Pair> candidatePairs,contactPairs;
   std::vector<Bounds> regionGuards;
+  std::map<int,RegionWork> regionWork;
 };
 class RegionalCandidates {
 public:
   const std::vector<Pair>& query(const std::vector<Primitive>& items, double margin,
                                  bool adaptive, Metrics& metrics,
-                                 bool hierarchicalRegionSweep=false);
+                                 bool hierarchicalRegionSweep=false,
+                                 bool collectFeedback=false);
   void reset();
 private:
   struct Region {
@@ -66,6 +71,8 @@ public:
   // triangle/particle identities and the caller-owned solver do not change.
   void setPatchCellSpan(int cells);
   int patchCellSpan() const {return patchCellSpan_;}
+  bool onlineEnabled() const {return policy_==Policy::OnlineContactAware;}
+  const OnlinePartitioner& onlineController() const {return online_;}
   void setAuditing(bool enable);
   bool hierarchicalRegions() const { return hierarchicalRegions_; }
   const std::vector<Vec3>& positions() const {return positions_;}
@@ -92,6 +99,8 @@ private:
   std::vector<Constraint> constraints_;
   std::vector<Sphere> spheres_;
   RegionalCandidates regional_;
+  OnlinePartitioner online_;
+  void assignOnlineRegionIds();
   live::BroadPhaseService global_;
   Metrics metrics_;
   void updateSpheres(double t);

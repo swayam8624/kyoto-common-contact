@@ -265,10 +265,20 @@ void stepSimulation(App&a){
    a.historyInterContacts.erase(a.historyInterContacts.begin());
    a.historyBroadMs.erase(a.historyBroadMs.begin());
   }
+  if(m.onlineSplits||m.onlineMerges||m.onlineStrategySwitches){
+   std::ostringstream changed;
+   changed<<"ONLINE FRAME "<<a.multi.frame()
+          <<" SPLIT "<<m.onlineSplits<<" MERGE "<<m.onlineMerges
+          <<" MODE-SWITCH "<<m.onlineStrategySwitches
+          <<" PATCHES "<<m.onlinePatches
+          <<" HEAT "<<number(m.onlineContactHeat,1);
+   pushInspectorEvent(a,changed.str());
+  }
   if(a.multi.frame()==1||a.multi.frame()%6==0||m.oracleMisses){
    std::ostringstream line;
    line<<"F"<<a.multi.frame()<<" "
-       <<(a.multi.policy()==ccp::research::Policy::RegionalCertified?"REGIONAL":
+       <<(a.multi.policy()==ccp::research::Policy::OnlineContactAware?"ONLINE":
+          a.multi.policy()==ccp::research::Policy::RegionalCertified?"REGIONAL":
           a.multi.policy()==ccp::research::Policy::GlobalGuard?"GLOBAL":"SAP")
        <<" PAIRS "<<m.pairs<<" CONTACTS "<<m.contacts
        <<" INTER "<<m.interSheetContacts<<" SPHERE "<<m.sphereContacts;
@@ -277,7 +287,8 @@ void stepSimulation(App&a){
    event<<"REGION DIRTY "<<m.dirtyRegions<<" BLOCKS "<<m.regionalPairRebuilds
         <<"/"<<m.regionalPairReuses<<" REJECTED "<<m.cachedPairsRejected;
    event<<" FRONTIER "<<m.regionTopLevelOverlaps
-        <<" SKIPPED "<<m.regionPairsSkipped;
+        <<" SKIPPED "<<m.regionPairsSkipped
+        <<" PATCHES "<<m.onlinePatches;
    pushInspectorEvent(a,event.str());
    std::ostringstream cost;
    cost<<"BROAD "<<number(m.broadMs,3)<<"ms PRECISE "
@@ -323,23 +334,32 @@ void key(GLFWwindow*w,int key,int,int action,int){
   else if(key==GLFW_KEY_Q){
    using P=ccp::research::Policy;
    a.multi.setPolicy(a.multi.policy()==P::RebuildSAP?P::GlobalGuard:
-                     a.multi.policy()==P::GlobalGuard?P::RegionalCertified:P::RebuildSAP);
+                     a.multi.policy()==P::GlobalGuard?P::RegionalCertified:
+                     a.multi.policy()==P::RegionalCertified?P::OnlineContactAware:P::RebuildSAP);
    pushInspectorEvent(a,"CHANGED BROAD PHASE POLICY");
   } else if(key==GLFW_KEY_A){
    a.multiAudit=!a.multiAudit;a.multi.setAuditing(a.multiAudit);
    pushInspectorEvent(a,a.multiAudit?"EXHAUSTIVE COVERAGE AUDIT ON":"COVERAGE AUDIT OFF");
+  } else if(key==GLFW_KEY_T){
+   using P=ccp::research::Policy;
+   a.multi.setPolicy(a.multi.onlineEnabled()?P::RegionalCertified:P::OnlineContactAware);
+   pushInspectorEvent(a,a.multi.onlineEnabled()?"ONLINE SPLIT/MERGE ON":"ONLINE CONTROL OFF");
   } else if(key==GLFW_KEY_Z){
+   if(a.multi.onlineEnabled())a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
    a.multiAdaptive=!a.multiAdaptive;
    a.multi.setAdaptive(a.multiAdaptive);
    pushInspectorEvent(a,a.multiAdaptive?"ADAPTIVE REGION BUDGET":"FIXED REGION BUDGET");
   } else if(key==GLFW_KEY_J){
+   if(a.multi.onlineEnabled())a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
    a.multiHierarchy=!a.multiHierarchy;
    a.multi.setHierarchicalRegions(a.multiHierarchy);
    pushInspectorEvent(a,a.multiHierarchy?"TWO-TIER REGION FRONTIER":"ALL-REGION-PAIRS ABLATION");
   } else if(key==GLFW_KEY_Y){
+   if(a.multi.onlineEnabled())a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
    loadEvidence(a);
    applyCalibratedPatch(a);
   } else if(key==GLFW_KEY_P){
+   if(a.multi.onlineEnabled())a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
    const std::array<int,6> spans={1,2,3,4,6,12};
    const auto it=std::find(spans.begin(),spans.end(),a.multi.patchCellSpan());
    const std::size_t next=(std::size_t(it-spans.begin())+1)%spans.size();
@@ -403,17 +423,23 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("FRAME "+std::to_string(a.multi.frame())+" / "+
      std::to_string(a.multi.sheetCount())+" SHEETS",124,ink);
  line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount())+
-      " / PATCH "+std::to_string(a.multi.patchCellSpan()),150);
+      (a.multi.onlineEnabled()?" / ONLINE PATCHES "+std::to_string(m.onlinePatches):
+       " / FIXED PATCH "+std::to_string(a.multi.patchCellSpan())),150,ink,1.17);
  line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
  line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
  line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
  line("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),254,ink,1.20);
+ line("LIVE SPLITS "+std::to_string(m.onlineSplits)+" MERGES "+
+      std::to_string(m.onlineMerges)+" SWITCHES "+
+      std::to_string(m.onlineStrategySwitches),380,teal,1.19);
  line("PAIR BLOCK BUILDS "+std::to_string(m.regionalPairRebuilds),280);
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
  line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
  line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
       " / SKIPPED "+std::to_string(m.regionPairsSkipped),404,ink,1.18);
+ line("ONLINE WORK "+number(m.onlineMeasuredWork,0)+
+      " HEAT "+number(m.onlineContactHeat,0),415,teal,1.12);
  line(m.oracleChecked?"EXHAUSTIVE AABB COVERAGE VERIFIED":"ORACLE NOT CHECKED",385,
       m.oracleChecked?teal:amber,1.26);
  heading("SCROLLABLE LIVE EVENT TRACE",427);
@@ -423,11 +449,11 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  heading("MEASURED 1/2/3 CLOTH COMPARISON",774);
  line("SAME FORCES + PRECISE SOLVER",799,muted,1.18);
  line("BENCHMARKED ON THIS MACHINE",821,muted,1.20);
- const std::array<std::string,6> policies={
+ const std::array<std::string,7> policies={
   "sap_rebuild","global_guarded","region_fixed","region_adaptive",
-  "region_sweep_fixed","region_sweep_adaptive"};
- const std::array<V,6> colors={
-  amber,blue,{.53,.36,.69},teal,{.17,.47,.69},{.14,.42,.34}};
+  "region_sweep_fixed","region_sweep_adaptive","online_contact_work"};
+ const std::array<V,7> colors={
+  amber,blue,{.53,.36,.69},teal,{.17,.47,.69},{.14,.42,.34},{.83,.33,.14}};
  double maximum=0;
  for(const auto& row:a.multiResults)
   if(row.sheets==a.multi.sheetCount())maximum=std::max(maximum,row.stepMs);
@@ -628,7 +654,9 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
 int main(int argc,char**argv){try{
  const auto runtimeDir=std::filesystem::temp_directory_path()/"ccp-native-lab";std::filesystem::create_directories(runtimeDir);
  int captureSteps=-1;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string();bool closeCapture=false;App a;
- for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth"){a.multiMode=true;a.multi.setHierarchicalRegions(true);}else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
+ for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth"){a.multiMode=true;a.multi.setHierarchicalRegions(true);}
+  else if(arg=="--online"){a.multiMode=true;a.multi.setPolicy(ccp::research::Policy::OnlineContactAware);}
+  else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
  glfwSetErrorCallback([](int,const char*e){std::cerr<<"GLFW "<<e<<'\n';});if(!glfwInit())throw std::runtime_error("glfwInit failed");glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
 #ifdef __APPLE__
  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GL_TRUE);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
@@ -701,13 +729,15 @@ int main(int argc,char**argv){try{
   if(a.multiMode){
    const auto& m=a.multi.metrics();
    const std::string policy=a.multi.policy()==ccp::research::Policy::RegionalCertified?
-      "REGIONAL CERTIFIED":a.multi.policy()==ccp::research::Policy::GlobalGuard?
+      "REGIONAL CERTIFIED":a.multi.policy()==ccp::research::Policy::OnlineContactAware?
+      "ONLINE CONTACT-AWARE":a.multi.policy()==ccp::research::Policy::GlobalGuard?
       "GLOBAL GUARDED SAP":"FULL SAP REBUILD";
    label(a.paused?"PAUSED / N TO STEP":"RUNNING / SPACE PAUSES",a.paused?muted:green);
    gap();label("MULTICLOTH / LIVE CONTACT",blue,1.7);
    label("SHEETS "+std::to_string(a.multi.sheetCount())+
          " / MOVING BALLS "+std::to_string(a.multi.sphereCount()),blue,1.6);
    label("Q POLICY: "+policy,blue,1.5);
+   label("T: ONLINE PARTITION CONTROLLER",green,1.25);
    label("L SHEETS / O BALLS / R RESET",blue,1.4);
    label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
    label(a.multiHierarchy?"J: TWO-TIER REGION SWEEP":"J: FLAT REGION-PAIR ABLATION",blue,1.22);
@@ -724,6 +754,13 @@ int main(int argc,char**argv){try{
    label("PAIR BLOCKS REUSED "+std::to_string(m.regionalPairReuses),ink,1.45);
    label("EXTRA GUARD PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.25);
    label("REGION BUDGET "+number(m.meanRegionBudget,4),muted,1.5);
+   if(a.multi.onlineEnabled()){
+    label("LIVE PATCHES "+std::to_string(m.onlinePatches),green,1.42);
+    label("SPLIT "+std::to_string(m.onlineSplits)+
+          " / MERGE "+std::to_string(m.onlineMerges)+
+          " / SWITCH "+std::to_string(m.onlineStrategySwitches),green,1.27);
+    label("CONTROL COST "+number(m.onlineDecisionMs,3)+" MS",muted,1.28);
+   }
    label("PATCH PAIRS SKIPPED "+std::to_string(m.regionPairsSkipped),muted,1.35);
    label("PRECISE TESTS "+std::to_string(m.preciseTests),muted,1.5);
    gap();
