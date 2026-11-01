@@ -203,8 +203,8 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
  const auto& stats=a.sim.stats();
  line("FRAME "+std::to_string(stats.frame)+" / "+stats.cacheDecision,119,teal,1.30);
  line("BUILDS "+std::to_string(stats.queryBuilds)+"  REUSES "+std::to_string(stats.queryReuses),145);
- line("CANDIDATE PAIRS "+std::to_string(stats.candidateCount),171);
- line("PRECISE TESTS THIS STEP "+std::to_string(stats.preciseTests),197);
+ line("FINAL-QUERY CANDIDATES "+std::to_string(stats.candidateCount),171);
+ line("PRECISE TESTS / 8 ITER "+std::to_string(stats.preciseTests),197);
  line("WITHIN MARGIN "+std::to_string(stats.proximityCount),223);
  line("ORACLE "+std::string(stats.oracleChecked?"CHECKED":"NOT CHECKED"),249,stats.oracleChecked?teal:amber);
  heading("LIVE PAIR + CACHE EVENTS",291);
