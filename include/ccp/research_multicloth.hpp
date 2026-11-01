@@ -31,6 +31,8 @@ struct Metrics {
   double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
          maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
   std::size_t velocityClamps{};
+         maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
+  std::size_t velocityClamps{};
          onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
