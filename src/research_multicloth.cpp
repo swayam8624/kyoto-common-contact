@@ -322,7 +322,8 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
                  triangleRegions_[i],triangleSheets_[i]});
  }
  for(std::size_t i=0;i<spheres_.size();++i){
-  const auto p=spheres_[i].center,r=spheres_[i].radius;
+  const Vec3 p=spheres_[i].center;
+  const double r=spheres_[i].radius;
   out.push_back({{int(triangles_.size()+i),sub(p,{r,r,r}),add(p,{r,r,r}),
                  sphereCat,clothMask,true},sheets_*100+int(i),-1});
  }
