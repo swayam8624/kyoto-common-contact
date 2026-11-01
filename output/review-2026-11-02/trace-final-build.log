@@ -1,0 +1,7 @@
+[ 28%] Built target ccp_live
+[ 42%] Building CXX object CMakeFiles/ccp_multicloth.dir/src/research_multicloth.cpp.o
+[ 57%] Linking CXX static library libccp_multicloth.a
+[ 71%] Built target ccp_multicloth
+[ 85%] Building CXX object CMakeFiles/ccp_online_trace.dir/apps/online_controller_trace.cpp.o
+[100%] Linking CXX executable ccp_online_trace
+[100%] Built target ccp_online_trace

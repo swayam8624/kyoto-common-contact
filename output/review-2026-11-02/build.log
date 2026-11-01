@@ -1,0 +1,80 @@
+[  5%] Built target ccp_live
+[ 17%] Built target mesh_bounds_query
+[ 17%] Built target ccp_core
+[ 23%] Built target common_bounds_demo
+[ 29%] Built target ccp_tests
+[ 35%] Built target ccp_live_tests
+[ 41%] Built target ccp_live_benchmark
+[ 44%] Building CXX object CMakeFiles/ccp_multicloth.dir/src/research_multicloth.cpp.o
+[ 50%] Built target ccp_service
+[ 52%] Linking CXX static library libccp_multicloth.a
+[ 55%] Built target ccp_multicloth
+[ 61%] Building CXX object CMakeFiles/ccp_cloth_stability_probe.dir/apps/cloth_stability_probe.cpp.o
+[ 61%] Building CXX object CMakeFiles/ccp_online_trace.dir/apps/online_controller_trace.cpp.o
+[ 64%] Building CXX object CMakeFiles/ccp_multicloth_benchmark.dir/apps/multicloth_benchmark.cpp.o
+[ 67%] Building CXX object CMakeFiles/ccp_native.dir/native/main.cpp.o
+[ 70%] Linking CXX executable ccp_cloth_stability_probe
+[ 70%] Built target ccp_cloth_stability_probe
+[ 73%] Linking CXX executable ccp_online_trace
+[ 76%] Building CXX object CMakeFiles/ccp_native.dir/native/font_atlas.cpp.o
+[ 76%] Built target ccp_online_trace
+[ 82%] Linking CXX executable ccp_multicloth_benchmark
+[ 82%] Building CXX object CMakeFiles/ccp_patch_sweep.dir/apps/patch_granularity_benchmark.cpp.o
+[ 82%] Built target ccp_multicloth_benchmark
+[ 85%] Building CXX object CMakeFiles/ccp_broadphase_leaderboard.dir/apps/broadphase_leaderboard.cpp.o
+[ 88%] Building CXX object CMakeFiles/ccp_multicloth_tests.dir/tests/research_multicloth_tests.cpp.o
+In file included from /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/apps/broadphase_leaderboard.cpp:8:
+In file included from /opt/homebrew/include/bullet/btBulletCollisionCommon.h:22:
+In file included from /opt/homebrew/include/bullet/BulletCollision/CollisionDispatch/btCollisionWorld.h:77:
+/opt/homebrew/include/bullet/LinearMath/btVector3.h:68:55: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+   68 | const float32x4_t ATTRIBUTE_ALIGNED16(btvMzeroMask) = (float32x4_t){-0.0f, -0.0f, -0.0f, -0.0f};
+      |                                                       ^
+/opt/homebrew/include/bullet/LinearMath/btVector3.h:69:52: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+   69 | const int32x4_t ATTRIBUTE_ALIGNED16(btvFFF0Mask) = (int32x4_t){static_cast<int32_t>(0xFFFFFFFF),
+      |                                                    ^
+/opt/homebrew/include/bullet/LinearMath/btVector3.h:71:51: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+   71 | const int32x4_t ATTRIBUTE_ALIGNED16(btvAbsMask) = (int32x4_t){0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF};
+      |                                                   ^
+/opt/homebrew/include/bullet/LinearMath/btVector3.h:72:52: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+   72 | const int32x4_t ATTRIBUTE_ALIGNED16(btv3AbsMask) = (int32x4_t){0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x0};
+      |                                                    ^
+/opt/homebrew/include/bullet/LinearMath/btVector3.h:737:37: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+  737 |                 static const uint32x4_t xyzMask = (const uint32x4_t){static_cast<uint32_t>(-1), static_cast<uint32_t>(-1), static_cast<uint32_t>(-1), 0};
+      |                                                   ^
+In file included from /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/apps/broadphase_leaderboard.cpp:8:
+In file included from /opt/homebrew/include/bullet/btBulletCollisionCommon.h:22:
+In file included from /opt/homebrew/include/bullet/BulletCollision/CollisionDispatch/btCollisionWorld.h:78:
+In file included from /opt/homebrew/include/bullet/LinearMath/btTransform.h:18:
+/opt/homebrew/include/bullet/LinearMath/btMatrix3x3.h:390:35: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+  390 |                 static const uint32x2_t zMask = (const uint32x2_t){static_cast<uint32_t>(-1), 0};
+      |                                                 ^
+/opt/homebrew/include/bullet/LinearMath/btMatrix3x3.h:1069:34: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+ 1069 |         static const uint32x2_t zMask = (const uint32x2_t){static_cast<uint32_t>(-1), 0};
+      |                                         ^
+/opt/homebrew/include/bullet/LinearMath/btMatrix3x3.h:1130:36: warning: compound literals are a C99-specific feature [-Wc99-extensions]
+ 1130 |         static const uint32x4_t xyzMask = (const uint32x4_t){static_cast<uint32_t>(-1), static_cast<uint32_t>(-1), static_cast<uint32_t>(-1), 0};
+      |                                           ^
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:18:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   18 |    {{{0},{0,0,0},{.25,.25,.25},1u,2u,true},0,0},
+      |      ^~~
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:19:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   19 |    {{{1},{.2,0,0},{.5,.25,.25},2u,1u,true},1,1},
+      |      ^~~
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:20:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   20 |    {{{2},{4,4,4},{4.3,4.3,4.3},1u,2u,true},2,0}
+      |      ^~~
+[ 91%] Linking CXX executable ccp_patch_sweep
+[ 91%] Built target ccp_patch_sweep
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/apps/broadphase_leaderboard.cpp:45:6: warning: unused function 'overlap' [-Wunused-function]
+   45 | bool overlap(const Bounds& a,const Bounds& b) {
+      |      ^~~~~~~
+3 warnings generated.
+[ 94%] Linking CXX executable ccp_multicloth_tests
+[ 94%] Built target ccp_multicloth_tests
+9 warnings generated.
+[ 97%] Linking CXX executable ccp_broadphase_leaderboard
+ld: warning: ignoring duplicate libraries: 'libccp_live.a'
+[ 97%] Built target ccp_broadphase_leaderboard
+[100%] Linking CXX executable ccp_native.app/Contents/MacOS/ccp_native
+ld: warning: ignoring duplicate libraries: 'libccp_live.a'
+[100%] Built target ccp_native

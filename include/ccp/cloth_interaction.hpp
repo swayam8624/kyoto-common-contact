@@ -34,10 +34,16 @@ struct Hit {
 // Consistent with the native viewer's perspective(.70f,...), look(eye,target,z).
 inline Ray cameraRay(double pixelX,double pixelY,double viewportWidth,double viewportHeight,
                      Vec3 eye,Vec3 target,double verticalFovRadians=.70) {
- if(!(viewportWidth>0&&viewportHeight>0&&verticalFovRadians>0&&verticalFovRadians<3.0))
+ if(!(std::isfinite(pixelX)&&std::isfinite(pixelY)&&std::isfinite(viewportWidth)&&
+      std::isfinite(viewportHeight)&&std::isfinite(verticalFovRadians)&&
+      viewportWidth>0&&viewportHeight>0&&verticalFovRadians>0&&verticalFovRadians<3.0&&
+      std::isfinite(eye.x)&&std::isfinite(eye.y)&&std::isfinite(eye.z)&&
+      std::isfinite(target.x)&&std::isfinite(target.y)&&std::isfinite(target.z)))
   throw std::invalid_argument("invalid perspective viewport");
  const Vec3 forward=unit(minus(target,eye));
- const Vec3 right=unit(cross(forward,{0,0,1}));
+ const Vec3 worldUp=std::abs(dot(forward,{0,0,1}))>.999
+   ? Vec3{0,1,0}:Vec3{0,0,1};
+ const Vec3 right=unit(cross(forward,worldUp));
  const Vec3 up=cross(right,forward);
  const double half=std::tan(verticalFovRadians*.5);
  const double nx=(2.*pixelX/viewportWidth-1.)*half*viewportWidth/viewportHeight;
@@ -73,6 +79,11 @@ inline std::optional<Hit> pickTriangleRay(const Ray& ray,
 // Keep the grab in a camera-facing plane through the original picked point,
 // rather than projecting onto the floor (which makes vertical folds impossible).
 inline std::optional<Vec3> intersectDragPlane(Ray ray,Vec3 point,Vec3 normal){
+ if(!(std::isfinite(ray.origin.x)&&std::isfinite(ray.origin.y)&&std::isfinite(ray.origin.z)&&
+      std::isfinite(ray.direction.x)&&std::isfinite(ray.direction.y)&&std::isfinite(ray.direction.z)&&
+      std::isfinite(point.x)&&std::isfinite(point.y)&&std::isfinite(point.z)&&
+      std::isfinite(normal.x)&&std::isfinite(normal.y)&&std::isfinite(normal.z)))
+  return std::nullopt;
  const double d=dot(ray.direction,normal);
  if(std::abs(d)<1e-8)return std::nullopt;
  const double distance=dot(minus(point,ray.origin),normal)/d;

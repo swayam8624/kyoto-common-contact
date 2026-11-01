@@ -3,6 +3,7 @@
 # Historical tracked evidence is intentionally preserved. These rules prevent
 # *new* local dependencies, caches and raw framebuffer captures being added.
 **/node_modules/
+**/node_modules
 **/__pycache__/
 **/*.pyc
 **/*.dylib
@@ -32,3 +33,19 @@ docs/PATCH_CALIBRATION.md
 output/native/online-controller-trace.csv
 output/native/online-controller-trace.svg
 docs/ONLINE_CONTROLLER_RESULTS.md
+
+# Dated research deliveries: keep source, final decks and review evidence,
+# but leave disposable presentation exports and raw framebuffers local.
+/.presentation-review-2026-11-02/*.pptx
+/.presentation-review-2026-11-02/*.inspect.ndjson
+/.presentation-review-2026-11-02/*.log
+/.presentation-review-2026-11-02/contact-*.png
+/.presentation-review-2026-11-02/renders/
+/.presentation-review-2026-11-02/final-renders*/
+/.presentation-refine-2026-11-02/*.pptx
+/.presentation-refine-2026-11-02/*.inspect.ndjson
+/.presentation-refine-2026-11-02/*.log
+/.presentation-refine-2026-11-02/contact-*.png
+/.presentation-refine-2026-11-02/renders/
+/.presentation-refine-2026-11-02/final-renders*/
+/output/review-2026-11-02/**/*.ppm

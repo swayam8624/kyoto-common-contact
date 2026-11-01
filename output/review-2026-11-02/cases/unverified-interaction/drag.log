@@ -1,0 +1,5 @@
+NATIVE_GPU Apple M2 Pro OPENGL 4.1 Metal - 91.7
+RUNTIME_LOGS "/var/folders/hv/srlg7lv11zb9dm3jnh4mvy640000gn/T/ccp-native-lab"
+NATIVE_CONFIG mode=multicloth clothCount=3 selfCollision=1 policy=ONLINE trace=/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/review-2026-11-02/cases/drag.csv
+LIVE CAPTURE_STATE mode=MULTICLOTH frame=160 cloths=3 policy=ONLINE selfCollision=1 candidates=15831 contacts=3390 selfContacts=0 selfPiercings=0 interContacts=3129 spheres=261 grab=0 grabError=0 stepMs=14.260542 stateHash=955.83038888628
+GPU_FRAMEBUFFER_CAPTURE /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/review-2026-11-02/cases/drag.ppm size=2960x1840

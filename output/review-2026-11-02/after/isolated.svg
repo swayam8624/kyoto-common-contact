@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1710" viewBox="0 0 1200 1710">
+<rect width="1200" height="1710" fill="#f9fbfd"/>
+<text x="42" y="48" font-family="Arial,sans-serif" fill="#16283c" font-size="28" font-weight="bold">3D Broad-Phase: Identical Bounds, Independent Baselines</text>
+<text x="42" y="76" font-family="Arial,sans-serif" fill="#536475" font-size="16">Actual Bullet DBVT (upstream library) · SAP · Local and hierarchical region candidates</text>
+<text x="42" y="100" font-family="Arial,sans-serif" fill="#536475" font-size="13">Mean CPU full-query time in ms (lower is better); results are for this machine; final scene uses actual simulated cloth geometry</text>
+<text x="42" y="145" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Sparse256</text>
+<rect x="260" y="148" width="265.26" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="161" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="161" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.08612 ms</text>
+<rect x="260" y="170" width="46.15" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="183" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="183" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.01498 ms</text>
+<rect x="260" y="192" width="630.00" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="205" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="205" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.20454 ms</text>
+<rect x="260" y="214" width="273.55" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="227" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="227" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.08881 ms</text>
+<rect x="260" y="236" width="61.03" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="249" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="249" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.01981 ms</text>
+<rect x="260" y="258" width="468.85" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="271" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="271" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.15222 ms</text>
+<rect x="260" y="280" width="461.14" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="293" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="293" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.14971 ms</text>
+<rect x="260" y="302" width="500.89" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="315" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="315" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.16262 ms</text>
+<rect x="260" y="324" width="505.50" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="337" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="337" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.16412 ms</text>
+<text x="42" y="403" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Clustered512</text>
+<rect x="260" y="406" width="392.11" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="419" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="419" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.61261 ms</text>
+<rect x="260" y="428" width="112.25" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="441" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="441" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.17537 ms</text>
+<rect x="260" y="450" width="322.99" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="463" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="463" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.50461 ms</text>
+<rect x="260" y="472" width="361.71" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="485" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="485" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.56510 ms</text>
+<rect x="260" y="494" width="162.23" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="507" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="507" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.25345 ms</text>
+<rect x="260" y="516" width="615.06" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="529" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="529" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.96092 ms</text>
+<rect x="260" y="538" width="605.48" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="551" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="551" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.94596 ms</text>
+<rect x="260" y="560" width="625.75" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="573" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="573" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.97762 ms</text>
+<rect x="260" y="582" width="630.00" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="595" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="595" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.98426 ms</text>
+<text x="42" y="661" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Dense256</text>
+<rect x="260" y="664" width="13.24" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="677" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="677" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.16503 ms</text>
+<rect x="260" y="686" width="125.30" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="699" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="699" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.56127 ms</text>
+<rect x="260" y="708" width="630.00" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="721" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="721" font-family="Arial,sans-serif" font-size="13" fill="#16283c">7.85014 ms</text>
+<rect x="260" y="730" width="328.67" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="743" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="743" font-family="Arial,sans-serif" font-size="13" fill="#16283c">4.09539 ms</text>
+<rect x="260" y="752" width="126.82" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="765" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="765" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.58018 ms</text>
+<rect x="260" y="774" width="96.10" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="787" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="787" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.19741 ms</text>
+<rect x="260" y="796" width="93.51" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="809" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="809" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.16516 ms</text>
+<rect x="260" y="818" width="92.95" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="831" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="831" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.15822 ms</text>
+<rect x="260" y="840" width="91.44" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="853" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="853" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.13938 ms</text>
+<text x="42" y="919" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Sheets2</text>
+<rect x="260" y="922" width="41.61" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="935" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="935" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.24612 ms</text>
+<rect x="260" y="944" width="54.15" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="957" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="957" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.32026 ms</text>
+<rect x="260" y="966" width="630.00" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="979" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="979" font-family="Arial,sans-serif" font-size="13" fill="#16283c">3.72613 ms</text>
+<rect x="260" y="988" width="163.67" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="1001" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="1001" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.96803 ms</text>
+<rect x="260" y="1010" width="4.63" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="1023" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="1023" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.02738 ms</text>
+<rect x="260" y="1032" width="55.86" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="1045" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="1045" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.33037 ms</text>
+<rect x="260" y="1054" width="53.31" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="1067" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="1067" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.31532 ms</text>
+<rect x="260" y="1076" width="56.70" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="1089" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="1089" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.33538 ms</text>
+<rect x="260" y="1098" width="52.98" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="1111" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="1111" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.31337 ms</text>
+<text x="42" y="1177" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Sheets3</text>
+<rect x="260" y="1180" width="38.49" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="1193" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="1193" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.53208 ms</text>
+<rect x="260" y="1202" width="49.31" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="1215" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="1215" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.68162 ms</text>
+<rect x="260" y="1224" width="630.00" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="1237" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="1237" font-family="Arial,sans-serif" font-size="13" fill="#16283c">8.70912 ms</text>
+<rect x="260" y="1246" width="131.22" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="1259" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="1259" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.81404 ms</text>
+<rect x="260" y="1268" width="4.29" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="1281" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="1281" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.05926 ms</text>
+<rect x="260" y="1290" width="41.34" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="1303" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="1303" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.57149 ms</text>
+<rect x="260" y="1312" width="42.39" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="1325" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="1325" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.58596 ms</text>
+<rect x="260" y="1334" width="42.05" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="1347" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="1347" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.58135 ms</text>
+<rect x="260" y="1356" width="41.01" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="1369" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="1369" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.56690 ms</text>
+<text x="42" y="1435" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Simulated Cloths3</text>
+<rect x="260" y="1438" width="97.88" height="16" rx="3" fill="#b88b50"/>
+<text x="42" y="1451" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Exhaustive Aabb</text>
+<text x="910" y="1451" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.82849 ms</text>
+<rect x="260" y="1460" width="55.17" height="16" rx="3" fill="#4a82bb"/>
+<text x="42" y="1473" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Sweep Prune</text>
+<text x="910" y="1473" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.46696 ms</text>
+<rect x="260" y="1482" width="630.00" height="16" rx="3" fill="#9c79c6"/>
+<text x="42" y="1495" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT</text>
+<text x="910" y="1495" font-family="Arial,sans-serif" font-size="13" fill="#16283c">5.33272 ms</text>
+<rect x="260" y="1504" width="136.28" height="16" rx="3" fill="#497fba"/>
+<text x="42" y="1517" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Bullet DBVT Dynamic</text>
+<text x="910" y="1517" font-family="Arial,sans-serif" font-size="13" fill="#16283c">1.15358 ms</text>
+<rect x="260" y="1526" width="27.66" height="16" rx="3" fill="#238a80"/>
+<text x="42" y="1539" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Guarded SAP</text>
+<text x="910" y="1539" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.23416 ms</text>
+<rect x="260" y="1548" width="47.93" height="16" rx="3" fill="#b06d98"/>
+<text x="42" y="1561" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Fixed</text>
+<text x="910" y="1561" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.40567 ms</text>
+<rect x="260" y="1570" width="54.86" height="16" rx="3" fill="#246b62"/>
+<text x="42" y="1583" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Adaptive</text>
+<text x="910" y="1583" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.46441 ms</text>
+<rect x="260" y="1592" width="45.09" height="16" rx="3" fill="#4f8fb8"/>
+<text x="42" y="1605" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Fixed</text>
+<text x="910" y="1605" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.38166 ms</text>
+<rect x="260" y="1614" width="48.90" height="16" rx="3" fill="#3b6f53"/>
+<text x="42" y="1627" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">Region Sweep Adaptive</text>
+<text x="910" y="1627" font-family="Arial,sans-serif" font-size="13" fill="#16283c">0.41388 ms</text>
+<text x="42" y="1690" font-family="Arial,sans-serif" font-size="13" fill="#536475">Guarded reuse may emit conservative extra pairs. This chart measures broad phase only; NO simulated cloth-cloth response.</text>
+</svg>

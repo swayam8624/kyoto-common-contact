@@ -73,6 +73,7 @@ struct App {
  ccp::research::MultiCloth multi{3,2};
  bool multiMode=false,multiAudit=false,multiAdaptive=true,multiHierarchy=true;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
+ bool captureOnKey=false,captureRequested=false,stabilityFailure=false;
   bool clothMouseGrab=false;
   V dragOrigin{},dragPlaneNormal{};
  int stage=1,evidenceScene=5;
@@ -246,14 +247,46 @@ void fitScene(App&a,GLFWwindow*w){
  a.target=mul(add(lo,hi),.5);
  const double radius=std::sqrt(dot(sub(hi,lo),sub(hi,lo)))*.5;
  int width,height;glfwGetFramebufferSize(w,&width,&height);
- const double aspect=(width-350.*height/920)/height;
+ const double aspect=std::max(1.0,width-350.*height/920)/std::max(1,height);
  const double angle=std::min(.35,std::atan(std::tan(.35)*aspect));
  a.distance=(radius+.12)/std::sin(angle)*1.13;
  a.yaw=-.93;a.pitch=.40;
 }
 double stateHash(App&a){double hash=0;for(auto p:a.sim.positions())hash+=p.x*.37+p.y*.71+p.z*1.13;return hash;}
-void logEvent(App&a,const std::string&event){auto&s=a.sim.stats();std::ostringstream line;line<<"LIVE "<<event<<" frame="<<s.frame<<" broad="<<(s.sap?"SAP":"EXHAUSTIVE")<<" response="<<s.collisions<<" guarded="<<s.guardedReuse<<" margin="<<a.sim.queryRequest().margin<<" candidates="<<s.candidateCount<<" minGap="<<s.minGap<<" stateHash="<<std::setprecision(14)<<stateHash(a)<<'\n';std::cerr<<line.str();a.events<<line.str();a.events.flush();a.trace.flush();
- pushInspectorEvent(a,event+" F"+std::to_string(s.frame));}
+const char* policyName(ccp::research::Policy policy){
+ return policy==ccp::research::Policy::OnlineContactAware?"ONLINE":
+        policy==ccp::research::Policy::RegionalCertified?"REGIONAL":
+        policy==ccp::research::Policy::GlobalGuard?"GLOBAL":"SAP";
+}
+double multiStateHash(const App& a){
+ double hash=0;
+ for(const auto p:a.multi.positions())hash+=p.x*.37+p.y*.71+p.z*1.13;
+ return hash;
+}
+void logEvent(App&a,const std::string&event){
+ std::ostringstream line;
+ line<<"LIVE "<<event<<std::setprecision(14);
+ if(a.multiMode){
+  const auto& m=a.multi.metrics();
+  line<<" mode=MULTICLOTH frame="<<a.multi.frame()
+      <<" cloths="<<a.multi.sheetCount()<<" policy="<<policyName(a.multi.policy())
+      <<" selfCollision="<<a.multi.selfCollisions()<<" candidates="<<m.pairs
+      <<" contacts="<<m.contacts<<" selfContacts="<<m.selfContacts
+      <<" selfPiercings="<<m.selfCrossings<<" interContacts="<<m.interSheetContacts
+      <<" spheres="<<m.sphereContacts<<" grab="<<a.multi.grabbing()
+      <<" grabError="<<m.grabError<<" stepMs="<<m.stepMs
+      <<" stateHash="<<multiStateHash(a);
+ }else{
+  const auto& s=a.sim.stats();
+  line<<" mode=SINGLE frame="<<s.frame<<" broad="<<(s.sap?"SAP":"EXHAUSTIVE")
+      <<" response="<<s.collisions<<" guarded="<<s.guardedReuse
+      <<" margin="<<a.sim.queryRequest().margin<<" candidates="<<s.candidateCount
+      <<" minGap="<<s.minGap<<" stateHash="<<stateHash(a);
+ }
+ line<<'\n';std::cerr<<line.str();a.events<<line.str();a.events.flush();a.trace.flush();
+ pushInspectorEvent(a,event+" F"+
+   std::to_string(a.multiMode?a.multi.frame():a.sim.stats().frame));
+}
 std::string number(double d,int precision);
 void stepSimulation(App&a){
  if(a.multiMode){
@@ -261,9 +294,13 @@ void stepSimulation(App&a){
   const auto& m=a.multi.metrics();
   if(m.oracleMisses)a.paused=true;
   // Never let a numerical explosion continue invisibly in the viewer.
-  if(m.maxFrameParticleTravel>.8||m.maxStructuralEdgeStretch>2.6||
+  const bool finiteState=std::all_of(a.multi.positions().begin(),a.multi.positions().end(),
+    [](V p){return std::isfinite(p.x)&&std::isfinite(p.y)&&std::isfinite(p.z);});
+  if(!finiteState||!std::isfinite(m.maxFrameParticleTravel)||
+     !std::isfinite(m.maxStructuralEdgeStretch)||!std::isfinite(m.maxWorldCoordinate)||
+     m.maxFrameParticleTravel>.8||m.maxStructuralEdgeStretch>2.6||
      m.maxWorldCoordinate>5.0){
-   a.paused=true;
+   a.paused=true;a.stabilityFailure=true;
    pushInspectorEvent(a,"PHYSICS STABILITY LIMIT: PAUSED");
    pushInspectorEvent(a,"FRAME TRAVEL "+number(m.maxFrameParticleTravel,3)+
      " EDGE STRETCH "+number(m.maxStructuralEdgeStretch,2));
@@ -285,6 +322,15 @@ void stepSimulation(App&a){
           <<" HEAT "<<number(m.onlineContactHeat,1);
    pushInspectorEvent(a,changed.str());
   }
+  const char* policy=policyName(a.multi.policy());
+  a.trace<<a.multi.frame()<<','<<policy<<','<<a.multi.sheetCount()<<','
+      <<a.multi.selfCollisions()<<','<<m.pairs<<','<<m.contacts<<','
+      <<m.selfContacts<<','<<m.selfCrossings<<','<<m.interSheetContacts<<','
+      <<m.sphereContacts<<','<<a.multi.grabbing()<<','<<m.grabError<<','
+      <<m.oracleChecked<<','<<m.oracleMisses<<','
+      <<m.preciseTests<<','<<m.broadMs<<','<<m.narrowMs<<','<<m.stepMs<<','
+      <<m.onlineSplits<<','<<m.onlineMerges<<','<<multiStateHash(a)<<'\n';
+  if(a.multi.frame()%30==0||m.oracleMisses)a.trace.flush();
   if(a.multi.frame()==1||a.multi.frame()%6==0||m.oracleMisses){
    std::ostringstream line;
    line<<"F"<<a.multi.frame()<<" "
@@ -330,8 +376,10 @@ void key(GLFWwindow*w,int key,int,int action,int){
  if(action!=GLFW_PRESS)return;
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  if(key==GLFW_KEY_ESCAPE){glfwSetWindowShouldClose(w,1);return;}
+ if(key==GLFW_KEY_F12&&a.captureOnKey){a.captureRequested=true;return;}
  if(key==GLFW_KEY_K){
   a.multi.endGrab();a.clothMouseGrab=false;a.drag=false;
+  if(a.multiMode)a.multiHierarchy=a.multi.hierarchicalRegions();
   a.multiMode=!a.multiMode;
   a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();
   a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
@@ -347,7 +395,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
      "SELF COLLISION ENABLED":"SELF COLLISION DISABLED");
   }
   else if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}
-  else if(key==GLFW_KEY_R){a.clothMouseGrab=false;a.drag=false;
+  else if(key==GLFW_KEY_R){a.clothMouseGrab=false;a.drag=false;a.stabilityFailure=false;
     a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
   else if(key==GLFW_KEY_L){a.clothMouseGrab=false;a.drag=false;
     a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
@@ -373,7 +421,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
    pushInspectorEvent(a,a.multiAdaptive?"ADAPTIVE REGION BUDGET":"FIXED REGION BUDGET");
   } else if(key==GLFW_KEY_J){
    if(a.multi.onlineEnabled())a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
-   a.multiHierarchy=!a.multiHierarchy;
+   a.multiHierarchy=!a.multi.hierarchicalRegions();
    a.multi.setHierarchicalRegions(a.multiHierarchy);
    pushInspectorEvent(a,a.multiHierarchy?"TWO-TIER REGION FRONTIER":"ALL-REGION-PAIRS ABLATION");
   } else if(key==GLFW_KEY_Y){
@@ -402,6 +450,7 @@ if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%6;a.inspectorScroll=0;}i
 ccp::interaction::Ray rayForCursor(const App& a,GLFWwindow* w,double x,double y){
  int width=0,height=0;glfwGetWindowSize(w,&width,&height);
  const double viewport=std::max(1.0,width-350.0*height/920.0);
+ height=std::max(height,1);
  const V eye=add(a.target,{
    a.distance*std::cos(a.pitch)*std::cos(a.yaw),
    a.distance*std::cos(a.pitch)*std::sin(a.yaw),
@@ -426,8 +475,8 @@ void mouse(GLFWwindow*w,int button,int action,int mods){
  if(button==GLFW_MOUSE_BUTTON_RIGHT){a.drag=true;return;}
  if(button!=GLFW_MOUSE_BUTTON_LEFT)return;
  int width=0,height=0;glfwGetWindowSize(w,&width,&height);
- const double viewport=width-350.0*height/920.0;
- if(a.lastX>=viewport)return; // do not pick through the right inspector
+ const double viewport=std::max(1.0,width-350.0*height/920.0);
+ if(a.lastX>=viewport){logEvent(a,"MOUSE_PANEL");return;} // do not pick through the right inspector
  // Right-drag or Shift-left drag orbits the camera.
  if(!a.multiMode||(mods&GLFW_MOD_SHIFT)){a.drag=true;return;}
  const auto ray=rayForCursor(a,w,a.lastX,a.lastY);
@@ -437,10 +486,11 @@ void mouse(GLFWwindow*w,int button,int action,int mods){
   a.clothMouseGrab=true;
   a.dragOrigin=hit->position;
   a.dragPlaneNormal=norm(sub(a.target,ray.origin));
+  logEvent(a,"MOUSE_GRAB triangle="+std::to_string(hit->triangle)+" cursor="+std::to_string(a.lastX)+","+std::to_string(a.lastY));
   pushInspectorEvent(a,"MOUSE GRABBED SHEET "+
     std::to_string(a.multi.triangleSheets()[hit->triangle]+1)+
     " TRIANGLE "+std::to_string(hit->triangle));
- }else a.drag=true; // empty background still rotates the camera
+ }else {a.drag=true;logEvent(a,"MOUSE_MISS cursor="+std::to_string(a.lastX)+","+std::to_string(a.lastY));} // empty background still rotates the camera
 }
 void cursor(GLFWwindow*w,double x,double y){
  auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
@@ -479,7 +529,22 @@ const char*tfs=R"(#version 330 core
 in vec2 UV;in vec3 C;uniform sampler2D atlas;out vec4 frag;void main(){frag=vec4(C,texture(atlas,UV).a);})";
 std::string number(double d,int precision=3){std::ostringstream s;s<<std::fixed<<std::setprecision(precision)<<d;return s.str();}
 void uploadDraw(GLuint vao,GLuint buffer,const std::vector<Vertex>&v,GLenum type){glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,buffer);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(Vertex),v.data(),GL_DYNAMIC_DRAW);glDrawArrays(type,0,(GLsizei)v.size());}
-void capture(int w,int h,const std::string&path){std::vector<unsigned char> pixels(w*h*3);glPixelStorei(GL_PACK_ALIGNMENT,1);glReadBuffer(GL_BACK);glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());std::ofstream out(path,std::ios::binary);out<<"P6\n"<<w<<' '<<h<<"\n255\n";for(int y=h-1;y>=0;y--)out.write(reinterpret_cast<char*>(pixels.data()+y*w*3),w*3);std::cout<<"GPU_FRAMEBUFFER_CAPTURE "<<path<<'\n';}
+void capture(int w,int h,const std::string&path){
+ if(w<=0||h<=0)throw std::runtime_error("cannot capture an empty framebuffer");
+ const auto rowBytes=static_cast<std::size_t>(w)*3;
+ std::vector<unsigned char> pixels(rowBytes*static_cast<std::size_t>(h));
+ glPixelStorei(GL_PACK_ALIGNMENT,1);glReadBuffer(GL_BACK);
+ glFinish();glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());
+ std::ofstream out(path,std::ios::binary);
+ if(!out)throw std::runtime_error("cannot open capture output: "+path);
+ out<<"P6\n"<<w<<' '<<h<<"\n255\n";
+ for(int y=h-1;y>=0;y--)
+  out.write(reinterpret_cast<const char*>(pixels.data()+static_cast<std::size_t>(y)*rowBytes),
+            static_cast<std::streamsize>(rowBytes));
+ out.close();
+ if(!out)throw std::runtime_error("failed writing capture output: "+path);
+ std::cout<<"GPU_FRAMEBUFFER_CAPTURE "<<path<<" size="<<w<<'x'<<h<<'\n';
+}
 
 
 // All charts are generated exclusively from measured C++ CSVs. No fabricated
@@ -740,10 +805,63 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
 }
 int main(int argc,char**argv){try{
  const auto runtimeDir=std::filesystem::temp_directory_path()/"ccp-native-lab";std::filesystem::create_directories(runtimeDir);
- int captureSteps=-1;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string();bool closeCapture=false;App a;
- for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth"){a.multiMode=true;a.multi.setHierarchicalRegions(true);}
-  else if(arg=="--online"){a.multiMode=true;a.multi.setPolicy(ccp::research::Policy::OnlineContactAware);}
-  else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
+ int captureSteps=-1,clothCount=3,sphereCount=2;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string(),multiPolicy="regional",selfCollisionOption="on";bool closeCapture=false,multiRequested=false,captureStepsProvided=false,baselineRequested=false,policyExplicit=false;App a;
+ auto optionValue=[&](int& index,const std::string& option)->std::string{
+  if(index+1>=argc)throw std::invalid_argument("missing value for "+option);
+  return argv[++index];
+ };
+ auto integerValue=[&](int& index,const std::string& option)->int{
+  const auto value=optionValue(index,option);
+  std::size_t consumed=0;
+  const int parsed=std::stoi(value,&consumed);
+  if(consumed!=value.size())throw std::invalid_argument("invalid integer for "+option+": "+value);
+  return parsed;
+ };
+ for(int i=1;i<argc;i++){
+  const std::string arg=argv[i];
+  if(arg=="--help"||arg=="-h"){
+   std::cout<<"Usage: ccp_native [--multicloth] [--cloth-count 1..3] [--sphere-count 1..2] [--policy sap|global|regional|online] [--self-collision on|off] [--capture-after FRAMES] [--capture PATH] [--capture-on-key] [--trace PATH] [--exit-after-capture] [--stage 1..4] [--cutaway] [--paused] [--baseline] [--reference]\n";
+   return 0;
+  }
+  if(arg=="--multicloth"){multiRequested=true;a.multiHierarchy=true;}
+  else if(arg=="--online"){multiRequested=true;multiPolicy="online";policyExplicit=true;}
+  else if(arg=="--policy"){multiPolicy=optionValue(i,arg);multiRequested=true;policyExplicit=true;}
+  else if(arg=="--cloth-count") {clothCount=integerValue(i,arg);multiRequested=true;}
+  else if(arg=="--sphere-count") {sphereCount=integerValue(i,arg);multiRequested=true;}
+  else if(arg=="--self-collision"){selfCollisionOption=optionValue(i,arg);multiRequested=true;}
+  else if(arg=="--paused")a.paused=true;
+  else if(arg=="--baseline"){baselineRequested=true;auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}
+  else if(arg=="--reference")a.sim.setBroadPhase(false);
+  else if(arg=="--trace")tracePath=optionValue(i,arg);
+  else if(arg=="--capture-after"){captureSteps=integerValue(i,arg);captureStepsProvided=true;}
+  else if(arg=="--capture")capturePath=optionValue(i,arg);
+  else if(arg=="--capture-on-key")a.captureOnKey=true;
+  else if(arg=="--exit-after-capture")closeCapture=true;
+  else if(arg=="--stage")a.stage=integerValue(i,arg);
+  else if(arg=="--cutaway")a.cutaway=true;
+  else throw std::invalid_argument("unknown option: "+arg+" (use --help)");
+ }
+ if(clothCount<1||clothCount>3)throw std::invalid_argument("--cloth-count must be 1, 2 or 3");
+ if(sphereCount<1||sphereCount>2)throw std::invalid_argument("--sphere-count must be 1 or 2");
+ if(multiPolicy!="sap"&&multiPolicy!="global"&&multiPolicy!="regional"&&multiPolicy!="online")
+  throw std::invalid_argument("--policy must be sap, global, regional or online");
+ if(selfCollisionOption!="on"&&selfCollisionOption!="off")
+  throw std::invalid_argument("--self-collision must be on or off");
+ if(captureStepsProvided&&captureSteps<0)throw std::invalid_argument("--capture-after must be a non-negative frame count");
+ if(a.stage<1||a.stage>4)throw std::invalid_argument("--stage must be between 1 and 4");
+ if(a.captureOnKey&&capturePath.empty())throw std::invalid_argument("--capture-on-key requires --capture PATH");
+ if(closeCapture&&capturePath.empty())throw std::invalid_argument("--exit-after-capture requires --capture PATH");
+ a.multiMode=multiRequested;
+ if(multiRequested){
+  a.multi=ccp::research::MultiCloth(clothCount,sphereCount,
+    multiPolicy=="online"?ccp::research::Policy::OnlineContactAware:
+    multiPolicy=="global"?ccp::research::Policy::GlobalGuard:
+    multiPolicy=="sap"?ccp::research::Policy::RebuildSAP:
+    ccp::research::Policy::RegionalCertified);
+  if(baselineRequested&&!policyExplicit)a.multi.setPolicy(ccp::research::Policy::RebuildSAP);
+  a.multi.setSelfCollisions(selfCollisionOption=="on");
+  a.multi.setHierarchicalRegions(a.multiHierarchy);
+ }
  glfwSetErrorCallback([](int,const char*e){std::cerr<<"GLFW "<<e<<'\n';});if(!glfwInit())throw std::runtime_error("glfwInit failed");glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
 #ifdef __APPLE__
  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GL_TRUE);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
@@ -751,12 +869,19 @@ int main(int argc,char**argv){try{
  glfwWindowHint(GLFW_SAMPLES,4);auto*w=glfwCreateWindow(1480,920,"CCP Native - LIVE C++ common broad phase",nullptr,nullptr);if(!w)throw std::runtime_error("Native OpenGL window creation failed");glfwMakeContextCurrent(w);glfwSwapInterval(1);glfwSetWindowUserPointer(w,&a);glfwSetKeyCallback(w,key);glfwSetMouseButtonCallback(w,mouse);glfwSetCursorPosCallback(w,cursor);glfwSetScrollCallback(w,scroll);
  std::cout<<"NATIVE_GPU "<<glGetString(GL_RENDERER)<<" OPENGL "<<glGetString(GL_VERSION)<<'\n';
  GLuint surface=program(vs,fs),depth=program(dvs,dfs),lines=program(lvs,lfs),fontProgram=program(tvs,tfs),vao,buffer;glGenVertexArrays(1,&vao);glGenBuffers(1,&buffer);glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,buffer);for(int i=0;i<3;i++){glEnableVertexAttribArray(i);glVertexAttribPointer(i,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(i*3*sizeof(float)));}
- int aw,ah;unsigned char*atlas=ccpFontAtlas(&aw,&ah,fontAdvance);GLuint fontTexture;glGenTextures(1,&fontTexture);glBindTexture(GL_TEXTURE_2D,fontTexture);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,aw,ah,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas);std::free(atlas);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+ int aw=0,ah=0;unsigned char*atlas=ccpFontAtlas(&aw,&ah,fontAdvance);if(!atlas||aw<=0||ah<=0)throw std::runtime_error("CoreText font atlas creation failed");GLuint fontTexture;glGenTextures(1,&fontTexture);glBindTexture(GL_TEXTURE_2D,fontTexture);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,aw,ah,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas);std::free(atlas);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
  GLuint fbo,shadow;glGenFramebuffers(1,&fbo);glGenTextures(1,&shadow);glBindTexture(GL_TEXTURE_2D,shadow);glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,2048,2048,0,GL_DEPTH_COMPONENT,GL_FLOAT,nullptr);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_BORDER);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_BORDER);float white[4]={1,1,1,1};glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,white);glBindFramebuffer(GL_FRAMEBUFFER,fbo);glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadow,0);glDrawBuffer(GL_NONE);glReadBuffer(GL_NONE);if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("Shadow framebuffer incomplete");glBindFramebuffer(GL_FRAMEBUFFER,0);
- a.trace.open(tracePath);a.events.open(runtimeDir/"native_events.log",std::ios::app);if(!a.trace||!a.events)throw std::runtime_error("Cannot open runtime diagnostic logs");std::cout<<"RUNTIME_LOGS "<<runtimeDir<<std::endl;a.trace<<"frame,broadphase,response,policy,margin,displacementBudget,builds,reuses,candidates,proximity,minGap,broadMs,narrowMs,oracleMs,diagnosticMs,otherMs,preciseTests,oracleTests,oracleChecked,stepMs,oracleMisses,positionHash,cacheDecision\n";
+ a.trace.open(tracePath);a.events.open(runtimeDir/"native_events.log",std::ios::app);if(!a.trace||!a.events)throw std::runtime_error("Cannot open runtime diagnostic logs");std::cout<<"RUNTIME_LOGS "<<runtimeDir<<std::endl;
+ if(a.multiMode)a.trace<<"frame,policy,clothCount,selfCollision,candidates,contacts,selfContacts,selfPiercings,interContacts,sphereContacts,grab,grabError,oracleChecked,oracleMisses,preciseTests,broadMs,preciseMs,stepMs,onlineSplits,onlineMerges,positionHash\n";
+ else a.trace<<"frame,broadphase,response,policy,margin,displacementBudget,builds,reuses,candidates,proximity,minGap,broadMs,narrowMs,oracleMs,diagnosticMs,otherMs,preciseTests,oracleTests,oracleChecked,stepMs,oracleMisses,positionHash,cacheDecision\n";
+ std::cout<<"NATIVE_CONFIG mode="<<(a.multiMode?"multicloth":"single")
+   <<" clothCount="<<(a.multiMode?a.multi.sheetCount():1)
+   <<" selfCollision="<<(a.multiMode?a.multi.selfCollisions():false)
+   <<" policy="<<(a.multiMode?policyName(a.multi.policy()):"live-cloth")
+   <<" trace="<<tracePath<<std::endl;
  loadEvidence(a);
  auto advance=[&](){stepSimulation(a);};fitScene(a,w);
- if(captureSteps>=0){for(int i=0;i<captureSteps;i++)advance();a.paused=true;logEvent(a,"CAPTURE_STATE");}
+ if(captureSteps>=0){for(int i=0;i<captureSteps;i++){advance();if(a.stabilityFailure)throw std::runtime_error("Capture aborted: physical stability limit exceeded");}a.paused=true;logEvent(a,"CAPTURE_STATE");}
  double previous=glfwGetTime(),accumulator=0,renderFps=0,fpsStart=previous;int fpsFrames=0;int rendered=0;M lightVP=product(ortho(-3.8,3.8,-3.8,3.8,.1,18),look({4,-3,7},{0,0,.8},{0,0,1}));
  while(!glfwWindowShouldClose(w)){
   double now=glfwGetTime(),elapsed=now-previous;previous=now;fpsFrames++;if(now-fpsStart>=.5){renderFps=fpsFrames/(now-fpsStart);fpsFrames=0;fpsStart=now;}glfwPollEvents();if(!a.paused){accumulator+=std::min(elapsed,.05);int budget=0;while(accumulator>=1./120&&budget++<6){advance();accumulator-=1./120;}}else accumulator=0;
@@ -839,53 +964,40 @@ int main(int argc,char**argv){try{
    label("SHEETS "+std::to_string(a.multi.sheetCount())+
          " / MOVING BALLS "+std::to_string(a.multi.sphereCount()),blue,1.6);
    label("Q POLICY: "+policy,blue,1.5);
-   label("T: ONLINE PARTITION CONTROLLER",green,1.25);
-   label("L SHEETS / O BALLS / R RESET",blue,1.4);
-   label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
-   label(a.multiHierarchy?"J: TWO-TIER REGION SWEEP":"J: FLAT REGION-PAIR ABLATION",blue,1.22);
-   label("Y: APPLY MEASURED CALIBRATION",blue,1.18);
-   label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
-         std::to_string(a.multi.patchCellSpan()),blue,1.22);
-   label(a.multi.selfCollisions()?
-         "S SELF COLLISION ON / TOGGLE":"S SELF COLLISION OFF / TOGGLE",green,1.28);
-   label("LEFT GRAB CLOTH / RIGHT ORBIT",blue,1.24);
-   label("SHIFT + LEFT ALSO ORBITS",muted,1.20);
-   label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
-   label("FRAME "+std::to_string(a.multi.frame()));
-   label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
+   label(a.multi.hierarchicalRegions()?"TWO-TIER REGION SWEEP":"FLAT REGION-PAIR SEARCH",blue,1.35);
+   label(a.multi.selfCollisions()?"S: SELF CONTACT ON":"S: SELF CONTACT OFF",green,1.4);
+   gap();
+   label("FRAME "+std::to_string(a.multi.frame())+" / PAIRS "+std::to_string(m.pairs),ink,1.6);
    label("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),green,1.38);
-   label("SELF CORRECTIONS "+std::to_string(m.selfContacts)+
-         " / PIERCINGS "+std::to_string(m.selfCrossings),green,1.30);
-   if(a.multi.grabbing())label("GRAB ERROR "+number(m.grabError,3)+" M",blue,1.30);
    label("SPHERE CORRECTIONS "+std::to_string(m.sphereContacts),green,1.42);
-   label("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),ink,1.26);
-   label("PAIR BLOCKS REBUILT "+std::to_string(m.regionalPairRebuilds),ink,1.45);
-   label("PAIR BLOCKS REUSED "+std::to_string(m.regionalPairReuses),ink,1.45);
-   label("EXTRA GUARD PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.25);
-   label("REGION BUDGET "+number(m.meanRegionBudget,4),muted,1.5);
+   label("SELF CORRECTIONS "+std::to_string(m.selfContacts)+
+         " / PIERCINGS "+std::to_string(m.selfCrossings),green,1.28);
+   if(a.multi.grabbing())label("GRAB ERROR "+number(m.grabError,3),blue,1.4);
+   gap();
    if(a.multi.onlineEnabled()){
-    label("LIVE PATCHES "+std::to_string(m.onlinePatches),green,1.42);
-    label("SPLIT "+std::to_string(m.onlineSplits)+
+    label("LIVE REGION LEAVES "+std::to_string(m.onlinePatches),green,1.45);
+    label("STEP SPLIT "+std::to_string(m.onlineSplits)+
           " / MERGE "+std::to_string(m.onlineMerges)+
-          " / SWITCH "+std::to_string(m.onlineStrategySwitches),green,1.27);
-    label("CONTROL COST "+number(m.onlineDecisionMs,3)+" MS",muted,1.28);
+          " / SWITCH "+std::to_string(m.onlineStrategySwitches),green,1.2);
+    label("CONTROLLER "+number(m.onlineDecisionMs,3)+" MS",muted,1.3);
    }
-   label("PATCH PAIRS SKIPPED "+std::to_string(m.regionPairsSkipped),muted,1.35);
+   label("BLOCK BUILDS / REUSES "+std::to_string(m.regionalPairRebuilds)+
+         " / "+std::to_string(m.regionalPairReuses),ink,1.3);
+   label("STALE PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.3);
    label("PRECISE TESTS "+std::to_string(m.preciseTests),muted,1.5);
    gap();
    label("BROAD CPU "+number(m.broadMs)+" MS",muted,1.6);
    label("PRECISE CPU "+number(m.narrowMs)+" MS",muted,1.6);
-   label("FULL STEP "+number(m.stepMs)+" MS",muted,1.65);
-   label("MAX EDGE STRETCH "+number(m.maxStructuralEdgeStretch,2)+"X",green,1.30);
-   label("FRAME PARTICLE TRAVEL "+number(m.maxFrameParticleTravel,3),green,1.23);
-   label(m.oracleChecked?"A PAIR COVERAGE CHECKED":"A ORACLE UNCHECKED",m.oracleChecked?green:muted,1.4);
-   label("RESEARCH DEMO / NO CCD",red,1.35);
+   label("FULL STEP "+number(m.stepMs)+" MS",ink,1.65);
+   label("MAX EDGE STRETCH "+number(m.maxStructuralEdgeStretch,2)+"X",green,1.3);
+   label("FRAME TRAVEL "+number(m.maxFrameParticleTravel,3),green,1.3);
+   label(m.oracleChecked?"A: COVERAGE CHECKED":"A: ORACLE UNCHECKED",m.oracleChecked?green:muted,1.4);
+   label("DISCRETE CONTACT / NO CCD",red,1.3);
    gap();
-   label("1 GEOMETRY / 2 REGION GUARDS",blue,1.4);
-   label("3 AABB CANDIDATES / 4 CONTACTS",blue,1.35);
-   label("G SCROLLABLE RESEARCH LOG",blue,1.35);
-   label("SPACE PAUSE / N STEP / F FRAME",muted,1.3);
-   label("K SWITCH TO ORIGINAL CLOTH",muted,1.3);
+   label("LEFT GRAB / RIGHT ORBIT",blue,1.3);
+   label("Q POLICY / T ONLINE / R RESET",blue,1.2);
+   label("1-4 INSPECT / G DETAIL LOG",blue,1.3);
+   label("SPACE PAUSE / N STEP / F FRAME",muted,1.2);
   } else {
   label(a.paused?"PAUSED / N TO STEP":"RUNNING / SPACE PAUSES",a.paused?muted:green);gap();label("REQUEST-AWARE BROAD PHASE",blue,1.7);label(s.guardedReuse?"Q: GUARDED ENVELOPE REUSE":"Q: REBUILD EVERY ITERATION",blue,1.65);label("M: QUERY MARGIN "+number(a.sim.queryRequest().margin,2),blue,1.7);label(s.sap?"B: SWEEP AND PRUNE":"B: EXHAUSTIVE REFERENCE",blue,1.7);label("BUILDS "+std::to_string(s.queryBuilds)+" / REUSES "+std::to_string(s.queryReuses),s.guardedReuse?green:muted,1.8);label(s.collisions?"C: COLLISION RESPONSE ON":"C: COLLISION RESPONSE OFF",s.collisions?green:red,1.6);label("FRAME "+std::to_string(s.frame));label("CANDIDATES "+std::to_string(s.candidateCount));label("WITHIN MARGIN "+std::to_string(s.proximityCount));label(s.oracleChecked?"V: ORACLE MISSES "+std::to_string(s.oracleMisses):"V: ORACLE NOT CHECKED",s.oracleMisses?red:(s.oracleChecked?green:muted),1.65);label(std::isfinite(s.minGap)?"MIN GAP "+number(s.minGap,4):"MIN GAP / STEP TO EVALUATE",ink,1.7);gap();label("CPU STEP "+number(s.stepMs)+" MS",muted,1.8);label("BROAD "+number(s.broadMs)+" MS",muted,1.8);label("PRECISE "+number(s.narrowMs)+" MS / "+std::to_string(s.preciseTests)+" TESTS",muted,1.45);label("ORACLE "+number(s.oracleMs)+" MS",muted,1.45);label("DISPLAY DIAG "+number(s.diagnosticMs)+" MS",muted,1.4);label(renderFps>0?"RENDER FPS "+number(renderFps,1):"RENDER FPS WARMUP",muted,1.7);gap();label("INSPECTION",blue,1.7);label((a.stage==1?"+ ":"  ")+std::string("1 GEOMETRY"));label((a.stage==2?"+ ":"  ")+std::string("2 CERTIFIED BOUNDS"));label((a.stage==3?"+ ":"  ")+std::string("3 CANDIDATES"));label((a.stage==4?"+ ":"  ")+std::string("4 PRECISE PROXIMITY"));label("F FRAME / R RESET / V ORACLE",muted,1.5);label(a.cutaway?"X VISUAL CUTAWAY ON":"X VISUAL CUTAWAY OFF",muted,1.6);label("W WIRE / DRAG ORBIT / ZOOM",muted,1.5);
  label("G LOG + CHARTS / H NEXT SCENE",blue,1.3);gap();label("FIXED DT 1/120 SECOND",muted,1.55);label("DEMO XPBD / NO SELF CONTACT",muted,1.45);if(a.stage==2)label("BOUNDS OVERLAY CAPPED AT 40",muted,1.35);
@@ -898,7 +1010,13 @@ int main(int argc,char**argv){try{
   glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(fontProgram);glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,fontTexture);glUniform1i(glGetUniformLocation(fontProgram,"atlas"),0);uploadDraw(vao,buffer,glyphVertices,GL_TRIANGLES);glDisable(GL_BLEND);
   if(a.evidenceMode)
    drawEvidencePane(a,viewport,panel,scale,width,height,vao,buffer,lines,fontProgram,fontTexture,ui);
-  if(!capturePath.empty()&&rendered>=45&&renderFps>0){capture(width,height,capturePath);a.trace.flush();capturePath.clear();if(closeCapture)glfwSetWindowShouldClose(w,1);}glfwSwapBuffers(w);rendered++;
+  if(!capturePath.empty()&&renderFps>0&&
+     (a.captureOnKey?a.captureRequested:rendered>=45)){
+   capture(width,height,capturePath);a.trace.flush();
+   if(a.captureOnKey)a.captureRequested=false;else capturePath.clear();
+   if(closeCapture)glfwSetWindowShouldClose(w,1);
+  }
+  glfwSwapBuffers(w);rendered++;
  }
  a.trace.flush();glfwDestroyWindow(w);glfwTerminate();return 0;
  }catch(const std::exception&e){std::cerr<<"NATIVE_ERROR "<<e.what()<<'\n';glfwTerminate();return 1;}}

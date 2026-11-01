@@ -1,0 +1,27 @@
+FRAME 1 abs 2.45379 travel 0.00364 delta 0.00364 stretch 1.00933 minZ 2.02379 contacts 0 broadMs 2.86446
+FRAME 20 abs 2.43621 travel 0.25427 delta 0.02258 stretch 1.05601 minZ 1.79759 contacts 0 broadMs 1.84471
+FRAME 40 abs 2.43813 travel 0.90600 delta 0.04558 stretch 1.05476 minZ 1.22160 contacts 2783 broadMs 4.54908
+FRAME 60 abs 2.43390 travel 1.88645 delta 0.05660 stretch 1.07855 minZ 0.56806 contacts 4702 broadMs 4.37546
+FRAME 80 abs 2.42377 travel 1.95347 delta 0.01149 stretch 1.05315 minZ 0.59392 contacts 3989 broadMs 4.11550
+FRAME 100 abs 2.40837 travel 2.07513 delta 0.01422 stretch 1.04755 minZ 0.54034 contacts 3273 broadMs 3.61963
+FRAME 120 abs 2.39290 travel 2.12865 delta 0.01548 stretch 1.05680 minZ 0.46320 contacts 2933 broadMs 3.94208
+FRAME 140 abs 2.37935 travel 2.10578 delta 0.00929 stretch 1.06425 minZ 0.44658 contacts 3135 broadMs 3.92487
+FRAME 160 abs 2.36557 travel 2.13601 delta 0.00660 stretch 1.05700 minZ 0.42979 contacts 3129 broadMs 4.20642
+FRAME 180 abs 2.34659 travel 2.15814 delta 0.00750 stretch 1.06497 minZ 0.38508 contacts 3206 broadMs 4.53450
+FRAME 200 abs 2.31987 travel 2.15295 delta 0.00738 stretch 1.05888 minZ 0.35692 contacts 3874 broadMs 4.30492
+FRAME 220 abs 2.29121 travel 2.14278 delta 0.00425 stretch 1.05825 minZ 0.32915 contacts 4090 broadMs 4.25863
+FRAME 240 abs 2.27059 travel 2.14480 delta 0.00627 stretch 1.05268 minZ 0.31030 contacts 4512 broadMs 4.18154
+FRAME 260 abs 2.24454 travel 2.11177 delta 0.00781 stretch 1.06757 minZ 0.30982 contacts 3999 broadMs 4.49542
+FRAME 280 abs 2.23882 travel 2.04993 delta 0.00766 stretch 1.09896 minZ 0.32518 contacts 3822 broadMs 4.72867
+FRAME 300 abs 2.23923 travel 1.97343 delta 0.00990 stretch 1.07059 minZ 0.34098 contacts 4211 broadMs 4.40579
+FRAME 320 abs 2.24574 travel 1.85987 delta 0.01322 stretch 1.06718 minZ 0.37838 contacts 4617 broadMs 4.26746
+FRAME 340 abs 2.25796 travel 1.72183 delta 0.01172 stretch 1.07197 minZ 0.45219 contacts 4843 broadMs 4.30008
+FRAME 360 abs 2.27511 travel 1.81886 delta 0.01540 stretch 1.07257 minZ 0.56852 contacts 4633 broadMs 4.26554
+FRAME 380 abs 2.29616 travel 1.97291 delta 0.01440 stretch 1.06907 minZ 0.45284 contacts 3935 broadMs 4.45700
+FRAME 400 abs 2.31981 travel 2.17348 delta 0.01766 stretch 1.06354 minZ 0.27310 contacts 3483 broadMs 4.32837
+FRAME 420 abs 2.34459 travel 2.34143 delta 0.01486 stretch 1.05677 minZ 0.10802 contacts 3713 broadMs 4.89858
+FRAME 440 abs 2.36897 travel 2.38686 delta 0.01489 stretch 1.04949 minZ 0.07805 contacts 3591 broadMs 4.48154
+FRAME 460 abs 2.39147 travel 2.45390 delta 0.02393 stretch 1.05726 minZ 0.04000 contacts 3574 broadMs 4.31012
+FRAME 480 abs 2.41068 travel 2.53008 delta 0.03243 stretch 1.06401 minZ 0.04000 contacts 3113 broadMs 5.14096
+MAX abs 2.45379 travel 2.53008 frameDelta 0.08324 structuralStretch 1.14950 minZ 0.04000 interSheetCorrections 1721760 velocityClamps 12105
+LONG_RUN_CLOTH_STABILITY_PASS

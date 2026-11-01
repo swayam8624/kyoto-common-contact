@@ -57,6 +57,10 @@ bool contains(const Bounds& e,const Bounds& b){
  e.min.x<=b.min.x&&e.min.y<=b.min.y&&e.min.z<=b.min.z&&
  e.max.x>=b.max.x&&e.max.y>=b.max.y&&e.max.z>=b.max.z;
 }
+bool finiteBounds(const Bounds& b){
+ return std::isfinite(b.min.x)&&std::isfinite(b.min.y)&&std::isfinite(b.min.z)&&
+        std::isfinite(b.max.x)&&std::isfinite(b.max.y)&&std::isfinite(b.max.z);
+}
 Bounds unite(const Bounds& a,const Bounds& b){
  Bounds result=a;
  result.min={std::min(a.min.x,b.min.x),std::min(a.min.y,b.min.y),std::min(a.min.z,b.min.z)};
@@ -193,7 +197,10 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
  std::vector<Bounds> current;current.reserve(items.size());
  std::unordered_map<int,int> byId;byId.reserve(items.size()*2);
  for(std::size_t i=0;i<items.size();++i){
-  current.push_back(expand(items[i].box,margin*0.5));byId[items[i].box.id]=static_cast<int>(i);
+  const Bounds padded=expand(items[i].box,margin*0.5);
+  if(!finiteBounds(padded))
+   throw std::invalid_argument("padded broad-phase AABB overflows finite coordinates");
+  current.push_back(padded);byId[items[i].box.id]=static_cast<int>(i);
  }
  double budgetSum=0;
  for(auto& region:regions_){
@@ -220,11 +227,19 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
      std::clamp(0.016+2.8*region.motionEwma,0.016,0.075):0.045;
    region.budget=adaptive?
      std::clamp(motionBudget/(1+1.2*region.previousInflation),0.010,0.075):0.045;
-   region.envelopes.clear();region.previous.clear();
+   std::vector<Bounds> envelopes;
+   envelopes.reserve(region.itemIndices.size());
    for(int idx:region.itemIndices){
     const auto& raw=current[static_cast<std::size_t>(idx)];
-    region.envelopes.push_back(expand(raw,items[static_cast<std::size_t>(idx)].box.movable?region.budget:0.0));
+    const Bounds envelope=expand(raw,
+      items[static_cast<std::size_t>(idx)].box.movable?region.budget:0.0);
+    if(!finiteBounds(envelope))
+     throw std::invalid_argument("regional guard expansion overflows finite coordinates");
+    envelopes.push_back(envelope);
    }
+   // Commit a rebuilt certificate only after every member has a finite guard.
+   region.envelopes=std::move(envelopes);
+   region.previous.clear();
    ++metrics.dirtyRegions;
    if(collectFeedback)++metrics.regionWork[region.id].invalidations;
   } else {
@@ -364,7 +379,9 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   }
  }
  std::sort(output_.begin(),output_.end());
- output_.erase(std::unique(output_.begin(),output_.end()),output_.end());
+ // Each primitive belongs to exactly one region, and each unordered region
+ // pair is visited once. The cached block is itself sorted/unique at build
+ // time, so concatenated output cannot contain duplicates.
  metrics.pairs=output_.size();++metrics.queryCount;
  if(metrics.lastEvent!="REGION_TOPOLOGY_OR_REQUEST_REBUILD")
   metrics.lastEvent=metrics.dirtyRegions?"LOCAL_REGION_REBUILDS":"CERTIFIED_REGION_REUSE";
@@ -627,8 +644,6 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
   return true;
  };
  struct Weighted {std::array<int,3> ids{-1,-1,-1};std::array<double,3> w{};Vec3 p{};};
- const auto position=[&](const Weighted& x){Vec3 p{};for(int j=0;j<3;++j)
-   if(x.ids[j]>=0)p=add(p,mul(positions_[x.ids[j]],x.w[j]));return p;};
  const auto respond=[&](const Weighted& a,const Weighted& b,double distance,Vec3 n,double threshold){
   if(distance>=threshold)return false;
   double denom=0;
@@ -692,7 +707,7 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
    const Vec3 delta=sub(q.p,ball.center);const double d=norm(delta);
    // All three mesh vertices are dynamic unless explicitly pinned; the
    // sphere is a kinematic obstacle and receives no positional correction.
-   Weighted mesh=weightedTri(ti,q.w,q.p),fixed;
+   Weighted mesh=weightedTri(ti,q.w,q.p);
    Vec3 n=d>1e-10?mul(delta,1.0/d):normalized(cross(
                  sub(positions_[t[1]],positions_[t[0]]),
                  sub(positions_[t[2]],positions_[t[0]])));

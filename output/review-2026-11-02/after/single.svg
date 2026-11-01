@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="930" height="480" viewBox="0 0 930 480">
+<rect width="930" height="480" fill="#fafbfc"/>
+<text x="40" y="53" font-family="Arial,sans-serif" font-size="27" font-weight="bold" fill="#1b293a">Measured candidate-driven cloth pipeline</text>
+<text x="40" y="85" font-family="Arial,sans-serif" font-size="15" fill="#536476">Release build · 5 paired trials · oracle preflight outside timing · display diagnostics included</text>
+<text x="40" y="143" font-family="Arial,sans-serif" font-size="20" fill="#1b293a">baseline rebuild</text>
+<rect x="40" y="161" width="610.00" height="48" rx="7" fill="#b87916"/>
+<text x="670" y="194" font-family="Arial,sans-serif" font-size="23" font-weight="bold" fill="#1b293a">2.1946 ms</text>
+<text x="41" y="237" font-family="Arial,sans-serif" font-size="14" fill="#536476">p95 2.5232 ms · mean broad 1.5695 ms · mean precise 0.1093 ms</text>
+<text x="40" y="278" font-family="Arial,sans-serif" font-size="20" fill="#1b293a">guarded reuse</text>
+<rect x="40" y="296" width="257.28" height="48" rx="7" fill="#18877f"/>
+<text x="670" y="329" font-family="Arial,sans-serif" font-size="23" font-weight="bold" fill="#1b293a">0.9256 ms</text>
+<text x="41" y="372" font-family="Arial,sans-serif" font-size="14" fill="#536476">p95 1.1256 ms · mean broad 0.3142 ms · mean precise 0.1032 ms</text>
+<text x="40" y="447" font-family="Arial,sans-serif" font-size="15" fill="#536476">Single synthetic scene only. GPU rendering excluded. Full final-frame diagnostic scan remains timed.</text>
+</svg>

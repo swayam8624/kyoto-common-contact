@@ -1,0 +1,99 @@
+{
+  "three_cloth": {
+    "sap_rebuild": {
+      "mean": 9.669609288666667,
+      "min": 9.615027327,
+      "max": 9.776939962,
+      "broad": 4.134053147666666,
+      "narrow": 5.069556955333333,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    },
+    "global_guarded": {
+      "mean": 8.288561679333334,
+      "min": 8.245117,
+      "max": 8.314515192,
+      "broad": 2.4182115129999997,
+      "narrow": 5.381017006666667,
+      "candidates": 21269.134615385,
+      "interCorrections": 2187.980769231
+    },
+    "region_fixed": {
+      "mean": 8.797210987333335,
+      "min": 8.619048808,
+      "max": 8.927523212,
+      "broad": 3.133904403666667,
+      "narrow": 5.099661826666667,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    },
+    "region_adaptive": {
+      "mean": 8.696019493333333,
+      "min": 8.613441538,
+      "max": 8.816302038,
+      "broad": 3.0397764486666667,
+      "narrow": 5.086266557666666,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    },
+    "region_sweep_fixed": {
+      "mean": 8.868184230666666,
+      "min": 8.698395846,
+      "max": 9.043931,
+      "broad": 3.1746166666666666,
+      "narrow": 5.119688256333333,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    },
+    "region_sweep_adaptive": {
+      "mean": 8.656034980666666,
+      "min": 8.492728404,
+      "max": 8.809030365,
+      "broad": 2.9936715063333335,
+      "narrow": 5.101277795,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    },
+    "online_contact_work": {
+      "mean": 8.902088083333334,
+      "min": 8.713555115,
+      "max": 9.025251577,
+      "broad": 3.2375960960000003,
+      "narrow": 5.094730288333333,
+      "candidates": 11523.038461538,
+      "interCorrections": 2187.980769231
+    }
+  },
+  "trace": [
+    {
+      "trial": 1,
+      "splits": 12,
+      "merges": 0,
+      "switches": 4,
+      "auditedFrames": 11,
+      "maxError": 0.0,
+      "onlineMean": 12.57239077027027,
+      "sapMean": 13.756218452702702
+    },
+    {
+      "trial": 2,
+      "splits": 12,
+      "merges": 0,
+      "switches": 4,
+      "auditedFrames": 11,
+      "maxError": 0.0,
+      "onlineMean": 12.299589493243243,
+      "sapMean": 13.417994094594594
+    },
+    {
+      "trial": 3,
+      "splits": 12,
+      "merges": 0,
+      "switches": 4,
+      "auditedFrames": 11,
+      "maxError": 0.0,
+      "onlineMean": 13.495508202702702,
+      "sapMean": 14.847087810810812
+    }
+  ]
+}

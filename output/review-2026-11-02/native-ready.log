@@ -1,0 +1,24 @@
+NATIVE_GPU Apple M2 Pro OPENGL 4.1 Metal - 91.7
+RUNTIME_LOGS "/var/folders/hv/srlg7lv11zb9dm3jnh4mvy640000gn/T/ccp-native-lab"
+NATIVE_CONFIG mode=multicloth clothCount=3 selfCollision=1 policy=ONLINE trace=/var/folders/hv/srlg7lv11zb9dm3jnh4mvy640000gn/T/ccp-native-lab/native_trace.csv
+LIVE MOUSE_MISS cursor=417.230469,338.125000 mode=MULTICLOTH frame=54 cloths=3 policy=ONLINE selfCollision=1 candidates=16236 contacts=5783 selfContacts=0 selfPiercings=0 interContacts=5399 spheres=384 grab=0 grabError=0 stepMs=14.833458 stateHash=1071.7311235756
+LIVE MOUSE_GRAB triangle=623 cursor=752.273438,559.585938 mode=MULTICLOTH frame=7202 cloths=3 policy=GLOBAL selfCollision=1 candidates=26937 contacts=2852 selfContacts=0 selfPiercings=0 interContacts=2727 spheres=125 grab=1 grabError=0 stepMs=11.533875 stateHash=1018.012784643
+LIVE KEY 32 mode=SINGLE frame=157 broad=SAP response=1 guarded=1 margin=0.05 candidates=716 minGap=0.019975944239642 stateHash=725.90157697968
+LIVE KEY 84 mode=SINGLE frame=157 broad=SAP response=1 guarded=1 margin=0.05 candidates=716 minGap=0.019975944239642 stateHash=725.90157697968
+LIVE KEY 32 mode=SINGLE frame=157 broad=SAP response=1 guarded=1 margin=0.05 candidates=716 minGap=0.019975944239642 stateHash=725.90157697968
+LIVE KEY 32 mode=SINGLE frame=605 broad=SAP response=1 guarded=1 margin=0.05 candidates=89 minGap=0.15766971842269 stateHash=233.35099126913
+LIVE KEY 32 mode=SINGLE frame=605 broad=SAP response=1 guarded=1 margin=0.05 candidates=89 minGap=0.15766971842269 stateHash=233.35099126913
+LIVE KEY 32 mode=SINGLE frame=915 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.29749873238369 stateHash=241.18763369892
+LIVE KEY 88 mode=SINGLE frame=915 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.29749873238369 stateHash=241.18763369892
+LIVE KEY 32 mode=SINGLE frame=915 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.29749873238369 stateHash=241.18763369892
+LIVE KEY 32 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 50 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 51 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 50 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 51 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 52 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 53 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 52 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 51 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 50 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846
+LIVE KEY 49 mode=SINGLE frame=969 broad=SAP response=1 guarded=1 margin=0.05 candidates=50 minGap=0.30078788179687 stateHash=241.34102685846

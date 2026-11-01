@@ -1,0 +1,22 @@
+-- External 3D broad-phase benchmark: Bullet DBVT enabled
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/build
+[ 23%] Built target ccp_core
+[ 23%] Built target mesh_bounds_query
+[ 23%] Built target ccp_live
+[ 23%] Built target common_bounds_demo
+[ 29%] Built target ccp_service
+[ 35%] Built target ccp_live_tests
+[ 41%] Built target ccp_live_benchmark
+[ 50%] Built target ccp_multicloth
+[ 55%] Built target ccp_tests
+[ 67%] Built target ccp_multicloth_benchmark
+[ 67%] Built target ccp_online_trace
+[ 70%] Building CXX object CMakeFiles/ccp_native.dir/native/main.cpp.o
+[ 76%] Built target ccp_cloth_stability_probe
+[ 82%] Built target ccp_patch_sweep
+[ 88%] Built target ccp_broadphase_leaderboard
+[ 94%] Built target ccp_multicloth_tests
+[ 97%] Linking CXX executable ccp_native.app/Contents/MacOS/ccp_native
+[100%] Built target ccp_native

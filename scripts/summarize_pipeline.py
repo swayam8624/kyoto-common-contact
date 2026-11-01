@@ -14,18 +14,35 @@ import sys
 if len(sys.argv)!=3:raise SystemExit("usage: summarize_pipeline.py BENCH.csv OUTPUT.svg")
 src,dst=map(Path,sys.argv[1:])
 with src.open(newline="") as fp: rows=list(csv.DictReader(fp))
-fields=("policy","stepMs","broadMs","narrowMs","diagnosticMs","otherMs","preciseTests")
+fields=("trial","frame","policy","stepMs","broadMs","narrowMs","diagnosticMs","otherMs","preciseTests")
+numeric_fields=fields[3:]
 if not rows or not all(x in rows[0] for x in fields):
     raise SystemExit("Missing measured downstream metrics")
 groups={"baseline_rebuild":[],"guarded_reuse":[]}
+paired={}
+seen=set()
 for row in rows:
-    if row["policy"] in groups:groups[row["policy"]].append(row)
+    if row["policy"] not in groups:raise SystemExit("Unexpected benchmark policy")
+    try:trial,frame=int(row["trial"]),int(row["frame"])
+    except (TypeError,ValueError):raise SystemExit("Invalid trial/frame identity")
+    if str(trial)!=row["trial"] or str(frame)!=row["frame"]:
+        raise SystemExit("Trial/frame identities must be integers")
+    key=(trial,frame,row["policy"])
+    if key in seen:raise SystemExit("Duplicate timed sample "+str(key))
+    seen.add(key)
+    paired.setdefault((trial,frame),set()).add(row["policy"])
+    groups[row["policy"]].append(row)
 if not all(groups.values()):raise SystemExit("Missing paired policy")
+expected={(trial,frame) for trial in range(5) for frame in range(30,300)}
+if set(paired)!=expected or any(policies!={"baseline_rebuild","guarded_reuse"}
+                                 for policies in paired.values()):
+    raise SystemExit("Expected 5 paired trials × frames 30..299 for both policies")
 stats={}
 for key,data in groups.items():
     vals={}
-    for field in fields[1:]:
-        observations=[float(r[field]) for r in data]
+    for field in numeric_fields:
+        try:observations=[float(r[field]) for r in data]
+        except (TypeError,ValueError):raise SystemExit("Invalid recorded "+field)
         if not all(math.isfinite(v) and v>=0 for v in observations):
             raise SystemExit("Invalid recorded "+field)
         vals[field]=statistics.mean(observations)

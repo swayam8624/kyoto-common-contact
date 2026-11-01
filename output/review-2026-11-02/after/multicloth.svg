@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 1180" width="1260" height="1180">
+<rect width="1260" height="1180" fill="#f8fbfd"/>
+<text x="35" y="44" fill="#132a3c" font-family="Arial,sans-serif" font-size="27" font-weight="bold">Actual continuously moving, physically interacting cloths</text>
+<text x="35" y="70" fill="#516578" font-family="Arial,sans-serif" font-size="14">Same XPBD-style solver, same geometry and forces. Real inter-sheet contact correction. Lower is better.</text>
+<text x="35" y="91" fill="#516578" font-family="Arial,sans-serif" font-size="13">CPU milliseconds, warm-up excluded · every recorded trajectory compared against full SAP</text>
+<text x="35" y="127" fill="#1b3144" font-family="Arial,sans-serif" font-weight="bold" font-size="20">1 cloth sheet + 2 moving spheres</text>
+<text x="35" y="169" fill="#365063" font-family="Arial,sans-serif" font-size="14">SAP full rebuild</text>
+<rect x="300" y="156" width="610.0" height="23" rx="4" fill="#b47c3d"/>
+<text x="945" y="173" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.913 ms</text>
+<text x="1060" y="173" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.659</text>
+<text x="35" y="203" fill="#365063" font-family="Arial,sans-serif" font-size="14">Global guarded SAP</text>
+<rect x="300" y="190" width="365.5" height="23" rx="4" fill="#667b9a"/>
+<text x="945" y="207" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.547 ms</text>
+<text x="1060" y="207" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.304</text>
+<text x="35" y="237" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional fixed budget</text>
+<rect x="300" y="224" width="465.1" height="23" rx="4" fill="#8c77ba"/>
+<text x="945" y="241" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.696 ms</text>
+<text x="1060" y="241" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.466</text>
+<text x="35" y="271" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional adaptive budget</text>
+<rect x="300" y="258" width="454.3" height="23" rx="4" fill="#1c8e86"/>
+<text x="945" y="275" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.680 ms</text>
+<text x="1060" y="275" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.448</text>
+<text x="35" y="305" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (fixed)</text>
+<rect x="300" y="292" width="474.1" height="23" rx="4" fill="#468ac6"/>
+<text x="945" y="309" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.710 ms</text>
+<text x="1060" y="309" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.475</text>
+<text x="35" y="339" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (adaptive)</text>
+<rect x="300" y="326" width="454.5" height="23" rx="4" fill="#236c65"/>
+<text x="945" y="343" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.681 ms</text>
+<text x="1060" y="343" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.451</text>
+<text x="35" y="373" fill="#365063" font-family="Arial,sans-serif" font-size="14">Online contact-work partitioner</text>
+<rect x="300" y="360" width="489.2" height="23" rx="4" fill="#dd6a37"/>
+<text x="945" y="377" fill="#142c40" font-family="Arial,sans-serif" font-size="14">0.732 ms</text>
+<text x="1060" y="377" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 0.493</text>
+<text x="35" y="453" fill="#1b3144" font-family="Arial,sans-serif" font-weight="bold" font-size="20">2 cloth sheets + 2 moving spheres</text>
+<text x="35" y="495" fill="#365063" font-family="Arial,sans-serif" font-size="14">SAP full rebuild</text>
+<rect x="300" y="482" width="610.0" height="23" rx="4" fill="#b47c3d"/>
+<text x="945" y="499" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.396 ms</text>
+<text x="1060" y="499" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.956</text>
+<text x="35" y="529" fill="#365063" font-family="Arial,sans-serif" font-size="14">Global guarded SAP</text>
+<rect x="300" y="516" width="513.0" height="23" rx="4" fill="#667b9a"/>
+<text x="945" y="533" fill="#142c40" font-family="Arial,sans-serif" font-size="14">3.696 ms</text>
+<text x="1060" y="533" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.127</text>
+<text x="35" y="563" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional fixed budget</text>
+<rect x="300" y="550" width="565.2" height="23" rx="4" fill="#8c77ba"/>
+<text x="945" y="567" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.072 ms</text>
+<text x="1060" y="567" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.620</text>
+<text x="35" y="597" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional adaptive budget</text>
+<rect x="300" y="584" width="563.7" height="23" rx="4" fill="#1c8e86"/>
+<text x="945" y="601" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.062 ms</text>
+<text x="1060" y="601" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.560</text>
+<text x="35" y="631" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (fixed)</text>
+<rect x="300" y="618" width="575.2" height="23" rx="4" fill="#468ac6"/>
+<text x="945" y="635" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.145 ms</text>
+<text x="1060" y="635" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.663</text>
+<text x="35" y="665" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (adaptive)</text>
+<rect x="300" y="652" width="565.3" height="23" rx="4" fill="#236c65"/>
+<text x="945" y="669" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.074 ms</text>
+<text x="1060" y="669" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.589</text>
+<text x="35" y="699" fill="#365063" font-family="Arial,sans-serif" font-size="14">Online contact-work partitioner</text>
+<rect x="300" y="686" width="567.8" height="23" rx="4" fill="#dd6a37"/>
+<text x="945" y="703" fill="#142c40" font-family="Arial,sans-serif" font-size="14">4.091 ms</text>
+<text x="1060" y="703" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 1.604</text>
+<text x="35" y="779" fill="#1b3144" font-family="Arial,sans-serif" font-weight="bold" font-size="20">3 cloth sheets + 2 moving spheres</text>
+<text x="35" y="821" fill="#365063" font-family="Arial,sans-serif" font-size="14">SAP full rebuild</text>
+<rect x="300" y="808" width="610.0" height="23" rx="4" fill="#b47c3d"/>
+<text x="945" y="825" fill="#142c40" font-family="Arial,sans-serif" font-size="14">9.617 ms</text>
+<text x="1060" y="825" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 4.121</text>
+<text x="35" y="855" fill="#365063" font-family="Arial,sans-serif" font-size="14">Global guarded SAP</text>
+<rect x="300" y="842" width="523.0" height="23" rx="4" fill="#667b9a"/>
+<text x="945" y="859" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.245 ms</text>
+<text x="1060" y="859" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 2.403</text>
+<text x="35" y="889" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional fixed budget</text>
+<rect x="300" y="876" width="546.7" height="23" rx="4" fill="#8c77ba"/>
+<text x="945" y="893" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.619 ms</text>
+<text x="1060" y="893" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 3.086</text>
+<text x="35" y="923" fill="#365063" font-family="Arial,sans-serif" font-size="14">Regional adaptive budget</text>
+<rect x="300" y="910" width="546.4" height="23" rx="4" fill="#1c8e86"/>
+<text x="945" y="927" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.613 ms</text>
+<text x="1060" y="927" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 3.001</text>
+<text x="35" y="957" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (fixed)</text>
+<rect x="300" y="944" width="551.7" height="23" rx="4" fill="#468ac6"/>
+<text x="945" y="961" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.698 ms</text>
+<text x="1060" y="961" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 3.117</text>
+<text x="35" y="991" fill="#365063" font-family="Arial,sans-serif" font-size="14">Two-tier region sweep (adaptive)</text>
+<rect x="300" y="978" width="538.7" height="23" rx="4" fill="#236c65"/>
+<text x="945" y="995" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.493 ms</text>
+<text x="1060" y="995" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 2.951</text>
+<text x="35" y="1025" fill="#365063" font-family="Arial,sans-serif" font-size="14">Online contact-work partitioner</text>
+<rect x="300" y="1012" width="552.7" height="23" rx="4" fill="#dd6a37"/>
+<text x="945" y="1029" fill="#142c40" font-family="Arial,sans-serif" font-size="14">8.714 ms</text>
+<text x="1060" y="1029" fill="#516578" font-family="Arial,sans-serif" font-size="12">BP 3.155</text>
+<text x="35" y="1140" fill="#516578" font-family="Arial,sans-serif" font-size="13">Regional certification is an experimental combination, not established publication novelty. No CCD or self-contact is claimed.</text>
+<text x="35" y="1163" fill="#516578" font-family="Arial,sans-serif" font-size="13">Interpret alongside candidate counts, work rejected by revalidation, and the independent Bullet DBVT comparison.</text>
+</svg>

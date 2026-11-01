@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1250 845" width="1250" height="845">
+<rect width="1250" height="845" fill="#f9fbfd"/>
+<text x="30" y="44" fill="#193146" font-family="Arial,sans-serif" font-size="26" font-weight="bold">Patch Granularity: Earlier Calibration, Later Evaluation</text>
+<text x="30" y="72" fill="#53677b" font-family="Arial,sans-serif" font-size="15">Three genuinely interacting cloth sheets. Same forces and precise solver; candidate sets audited.</text>
+<text x="30" y="99" fill="#53677b" font-family="Arial,sans-serif" font-size="14">Bar lengths: mean complete CPU-step time during held-out later frames (lower is better).</text>
+<text x="30" y="153" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 3x3 cells</text>
+<rect x="330" y="138" width="188.92" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="155" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.1001 ms</text>
+<text x="30" y="197" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 3x3 cells</text>
+<rect x="330" y="182" width="193.20" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="199" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.3286 ms</text>
+<text x="30" y="241" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 4x4 cells</text>
+<rect x="330" y="226" width="193.32" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="243" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.3353 ms</text>
+<text x="30" y="285" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 4x4 cells</text>
+<rect x="330" y="270" width="193.45" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="287" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.3424 ms</text>
+<text x="30" y="329" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 2x2 cells</text>
+<rect x="330" y="314" width="198.00" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="331" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.5855 ms</text>
+<text x="30" y="373" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 6x6 cells</text>
+<rect x="330" y="358" width="200.29" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="375" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.7079 ms</text>
+<text x="30" y="417" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 6x6 cells</text>
+<rect x="330" y="402" width="203.02" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="419" fill="#18334a" font-family="Arial,sans-serif" font-size="15">10.8536 ms</text>
+<text x="30" y="461" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 2x2 cells</text>
+<rect x="330" y="446" width="207.43" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="463" fill="#18334a" font-family="Arial,sans-serif" font-size="15">11.0894 ms</text>
+<text x="30" y="505" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 12x12 cells</text>
+<rect x="330" y="490" width="209.75" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="507" fill="#18334a" font-family="Arial,sans-serif" font-size="15">11.2134 ms</text>
+<text x="30" y="549" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 12x12 cells</text>
+<rect x="330" y="534" width="210.02" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="551" fill="#18334a" font-family="Arial,sans-serif" font-size="15">11.2280 ms</text>
+<text x="30" y="593" fill="#33495d" font-family="Arial,sans-serif" font-size="14">two tier · 1x1 cells</text>
+<rect x="330" y="578" width="280.38" height="23" rx="3" fill="#26867e"/>
+<text x="1045" y="595" fill="#18334a" font-family="Arial,sans-serif" font-size="15">14.9897 ms</text>
+<text x="30" y="637" fill="#33495d" font-family="Arial,sans-serif" font-size="14">all region pairs · 1x1 cells</text>
+<rect x="330" y="622" width="690.00" height="23" rx="3" fill="#8d77b1"/>
+<text x="1045" y="639" fill="#18334a" font-family="Arial,sans-serif" font-size="15">36.8885 ms</text>
+<text x="30" y="711" fill="#193146" font-family="Arial,sans-serif" font-size="17">SAP evaluation reference: 11.4213 ms / step</text>
+<text x="30" y="740" fill="#193146" font-family="Arial,sans-serif" font-size="17">Calibration-selected: two_tier, span 12 · evaluation 11.2134 ms (+1.8% relative to SAP)</text>
+<text x="30" y="786" fill="#53677b" font-family="Arial,sans-serif" font-size="13">SAP is an eligible fallback. A single timing run is noisy; this does not establish independent-scene generalization.</text>
+<text x="30" y="813" fill="#53677b" font-family="Arial,sans-serif" font-size="13">No online region splitter/merger or publication-level novelty is claimed.</text>
+</svg>

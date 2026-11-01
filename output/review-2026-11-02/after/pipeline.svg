@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 510" width="1100" height="510">
+<rect width="1100" height="510" fill="#f9fbfd"/>
+<text x="36" y="51" font-family="Arial,sans-serif" font-size="26" fill="#183044" font-weight="bold">Measured cascade: Candidate discovery to full CPU step</text>
+<text x="36" y="79" font-family="Arial,sans-serif" font-size="15" fill="#526477">Paired XPBD-style cloth experiment; exact candidate-driven narrow phase; 1,350 steps per policy</text>
+<text x="36" y="136" fill="#1c2b3d" font-family="Arial,sans-serif" font-size="19">Baseline Rebuild</text>
+<rect x="36.000" y="152" width="643.675" height="37" fill="#427db9"/>
+<rect x="679.675" y="152" width="44.810" height="37" fill="#b38a42"/>
+<rect x="724.485" y="152" width="8.039" height="37" fill="#9477c4"/>
+<rect x="732.524" y="152" width="203.476" height="37" fill="#318b7b"/>
+<text x="36" y="214" font-family="Arial,sans-serif" fill="#3d5064" font-size="14">Mean 2.19456 ms · 5358.2 candidate-driven precise tests / step</text>
+<text x="36" y="284" fill="#1c2b3d" font-family="Arial,sans-serif" font-size="19">Guarded Reuse</text>
+<rect x="36.000" y="300" width="128.851" height="37" fill="#427db9"/>
+<rect x="164.851" y="300" width="42.319" height="37" fill="#b38a42"/>
+<rect x="207.170" y="300" width="7.179" height="37" fill="#9477c4"/>
+<rect x="214.349" y="300" width="201.244" height="37" fill="#318b7b"/>
+<text x="36" y="362" font-family="Arial,sans-serif" fill="#3d5064" font-size="14">Mean 0.92560 ms · 5857.9 candidate-driven precise tests / step</text>
+<rect x="36" y="430" width="15" height="15" fill="#427db9"/>
+<text x="61" y="442" font-family="Arial,sans-serif" fill="#445569" font-size="13">Broad phase</text>
+<rect x="556" y="430" width="15" height="15" fill="#b38a42"/>
+<text x="581" y="442" font-family="Arial,sans-serif" fill="#445569" font-size="13">Precise candidate tests + response</text>
+<rect x="36" y="456" width="15" height="15" fill="#9477c4"/>
+<text x="61" y="468" font-family="Arial,sans-serif" fill="#445569" font-size="13">Final global visualization diagnostics</text>
+<rect x="556" y="456" width="15" height="15" fill="#318b7b"/>
+<text x="581" y="468" font-family="Arial,sans-serif" fill="#445569" font-size="13">Other: constraints / integration / bounds</text>
+</svg>

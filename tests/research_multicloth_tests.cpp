@@ -56,6 +56,8 @@ int main(){
    const auto flat=flatFrontier.query(scene,.025,false,flatStats,false);
    const auto swept=hierarchicalFrontier.query(scene,.025,false,sweptStats,true);
    require(flat==swept,"hierarchical region sweep differs from flat region scan");
+   require(std::adjacent_find(swept.begin(),swept.end())==swept.end(),
+           "multi-region candidate output contains a duplicate pair");
    std::vector<Bounds> padded;
    for(const auto& primitive:scene) {
     auto b=primitive.box;
@@ -89,6 +91,20 @@ int main(){
    try{(void)validated.query({nan},.05,true,m,true);}
    catch(const std::invalid_argument&){rejected=true;}
    require(rejected,"nonfinite primitive bound was not rejected");
+
+   // Finite raw inputs are not sufficient: padding may overflow before the
+   // AABBs reach the cache. Reject this call without retaining an infinite
+   // envelope that could be mistaken for a valid certificate later.
+   Primitive huge{{7,{1.6e308,0,0},{1.7e308,1,1},1u,2u,true},0,0};
+   rejected=false;
+   try{(void)validated.query({huge},std::numeric_limits<double>::max(),true,m,true);}
+   catch(const std::invalid_argument&){rejected=true;}
+   require(rejected,"overflowing padded AABB was not rejected");
+   Metrics recovered;
+   const auto finiteResult=validated.query({huge},.01,true,recovered,true);
+   require(finiteResult.empty()&&recovered.regionGuards.size()==1&&
+           std::isfinite(recovered.regionGuards[0].max.x),
+           "rejected overflow query poisoned later finite certificates");
   }
 
   // Actual dynamic cloth with cross-sheet positional contact corrections.
@@ -313,6 +329,17 @@ int main(){
    namespace pick=ccp::interaction;
    const std::vector<Vec3> vertices={{-1,0,1},{1,0,1},{0,0,3}};
    const std::vector<std::array<int,3>> faces={{0,1,2}};
+   bool invalidCameraRejected=false;
+   try { (void)pick::cameraRay(std::numeric_limits<double>::quiet_NaN(),300,800,600,
+                               {0,-5,2},{0,0,2}); }
+   catch(const std::invalid_argument&) { invalidCameraRejected=true; }
+   require(invalidCameraRejected,"nonfinite picking coordinates were accepted");
+   const auto topDown=pick::cameraRay(400,300,800,600,{0,0,5},{0,0,0});
+   require(std::isfinite(topDown.direction.x)&&topDown.direction.z<-.999,
+           "top-down picking basis is degenerate");
+   require(!pick::intersectDragPlane({{0,0,0},{1,0,0}},
+               {0,0,1},{0,0,std::numeric_limits<double>::infinity()}),
+           "nonfinite drag-plane normal was accepted");
    const auto center=pick::cameraRay(400,300,800,600,{0,-5,2},{0,0,2});
    const auto hit=pick::pickTriangleRay(center,vertices,faces);
    require(hit.has_value(),"camera center ray failed to pick cloth triangle");

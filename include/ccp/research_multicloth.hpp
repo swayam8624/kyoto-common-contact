@@ -21,6 +21,12 @@ using Pair = live::Pair;
 enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware };
 struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
+// Snapshot of the last completed physical timestep. Most counters accumulate
+// across its five solver queries; pairs/candidatePairs describe the LAST query.
+// Contact counters count successful correction applications, not unique contacts.
+// stepMs is complete CPU wall time (including an enabled periodic oracle and
+// online decisions), excluding rendering. oracleMisses is evidence only when
+// oracleChecked is true. Online edits are selected at step end for the next query.
 struct Metrics {
   std::size_t queryCount{}, pairs{}, preciseTests{}, contacts{}, interSheetContacts{},
               sphereContacts{}, selfContacts{},selfCandidatePairs{}, selfPreciseTests{}, selfCrossings{},
@@ -39,8 +45,14 @@ struct Metrics {
   std::vector<Bounds> regionGuards;
   std::map<int,RegionWork> regionWork;
 };
+// Per-region candidate certificates. Inputs are raw geometric boxes: query()
+// applies margin/2 padding. The returned reference is invalidated by the next
+// query/reset. This service is stateful and must not be shared across threads
+// without external synchronization; it does not perform continuous queries.
 class RegionalCandidates {
 public:
+  // Rejects negative/non-finite margins, duplicate primitive IDs, invalid
+  // AABBs, and any finite input whose padding or guard expansion overflows.
   const std::vector<Pair>& query(const std::vector<Primitive>& items, double margin,
                                  bool adaptive, Metrics& metrics,
                                  bool hierarchicalRegionSweep=false,
@@ -125,7 +137,6 @@ private:
   std::vector<int> triangleSheets_,triangleRegions_,pinned_;
   std::vector<Constraint> constraints_;
   std::vector<Sphere> spheres_;
-  std::size_t selfTopologyExclusions_{};
   bool nonlocalSelfPair(int first,int second) const;
   void projectGrab(std::vector<Vec3>& nonphysicalDisplacements);
   RegionalCandidates regional_;

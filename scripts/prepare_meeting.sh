@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 # Reproducible Kyoto meeting readiness: fail before printing a success report.
-set -eu
+set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 # The comparative study must use the real Bullet 3D broadphase, never a fake

@@ -1,0 +1,3 @@
+import fs from 'node:fs/promises';import{PresentationFile,FileBlob}from'@oai/artifact-tool';
+const root='/Users/swayamsingal/Desktop/Programming/kyoto-common-contact';const p=await PresentationFile.importPptx(await FileBlob.load(root+'/output/Online_Common_Broad_Phase_Research_Layout_Final.pptx'));
+await fs.mkdir(root+'/.presentation-refine-2026-11-02/final-renders',{recursive:true});for(let i=0;i<p.slides.items.length;i++){const b=await p.export({slide:p.slides.items[i],format:'png',scale:1});await fs.writeFile(root+`/.presentation-refine-2026-11-02/final-renders/slide-${String(i+1).padStart(2,'0')}.png`,new Uint8Array(await b.arrayBuffer()));}console.log('Reimported and rendered',p.slides.items.length,'slides');

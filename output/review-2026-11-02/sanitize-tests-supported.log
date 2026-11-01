@@ -1,0 +1,11 @@
+Test project /tmp/ccp-review-sanitized
+    Start 2: moving_multicloth_regional_coverage
+1/3 Test #2: moving_multicloth_regional_coverage ...   Passed  383.32 sec
+    Start 4: live_cloth_contracts
+2/3 Test #4: live_cloth_contracts ..................   Passed   76.47 sec
+    Start 5: ccp_core_contracts
+3/3 Test #5: ccp_core_contracts ....................   Passed    0.03 sec
+
+100% tests passed out of 3
+
+Total Test time (real) = 459.82 sec

@@ -15,21 +15,43 @@ if len(sys.argv) != 4:
 src, svg_path, md_path = map(pathlib.Path, sys.argv[1:])
 with src.open(newline="") as stream:
     rows = list(csv.DictReader(stream))
-required = {"policy", "stepMs", "broadMs", "narrowMs", "oracleMs",
+required = {"trial", "frame", "policy", "stepMs", "broadMs", "narrowMs", "oracleMs",
             "diagnosticMs", "preciseTests", "oracleMisses"}
 if not rows or not required.issubset(rows[0]):
     raise SystemExit("CSV lacks required columns or rows")
 groups = {}
+paired = {}
+seen = set()
 for row in rows:
     if row["oracleMisses"] != "NA":
         raise SystemExit("Timed run incorrectly claims exhaustive validation")
     label = row["policy"]
+    if label not in {"baseline_rebuild", "guarded_reuse"}:
+        raise SystemExit("Unexpected benchmark policy: " + label)
+    try:
+        trial, frame = int(row["trial"]), int(row["frame"])
+    except (TypeError, ValueError):
+        raise SystemExit("Invalid trial/frame identity")
+    if str(trial) != row["trial"] or str(frame) != row["frame"]:
+        raise SystemExit("Trial/frame identities must be integers")
+    key = (trial, frame, label)
+    if key in seen:
+        raise SystemExit("Duplicate timed sample: " + str(key))
+    seen.add(key)
+    paired.setdefault((trial, frame), set()).add(label)
     groups.setdefault(label, []).append(row)
 if set(groups) != {"baseline_rebuild", "guarded_reuse"}:
     raise SystemExit("Both paired policies are required")
+expected = {(trial, frame) for trial in range(5) for frame in range(30, 300)}
+if set(paired) != expected or any(policies != {"baseline_rebuild", "guarded_reuse"}
+                                   for policies in paired.values()):
+    raise SystemExit("Expected 5 paired trials × frames 30..299 for both policies")
 
 def measures(records, name):
-    values = [float(r[name]) for r in records]
+    try:
+        values = [float(r[name]) for r in records]
+    except (TypeError, ValueError):
+        raise SystemExit(f"Invalid metric {name}")
     if not all(math.isfinite(v) and v >= 0 for v in values):
         raise SystemExit(f"Invalid metric {name}")
     return values

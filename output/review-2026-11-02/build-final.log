@@ -1,0 +1,31 @@
+[ 11%] Built target ccp_core
+[ 11%] Built target mesh_bounds_query
+[ 17%] Built target common_bounds_demo
+[ 23%] Built target ccp_live
+[ 35%] Built target ccp_tests
+[ 35%] Built target ccp_service
+[ 47%] Built target ccp_live_tests
+[ 47%] Built target ccp_live_benchmark
+[ 55%] Built target ccp_multicloth
+[ 73%] Built target ccp_multicloth_benchmark
+[ 73%] Built target ccp_cloth_stability_probe
+[ 73%] Built target ccp_online_trace
+[ 76%] Building CXX object CMakeFiles/ccp_native.dir/native/main.cpp.o
+[ 79%] Building CXX object CMakeFiles/ccp_multicloth_tests.dir/tests/research_multicloth_tests.cpp.o
+[ 88%] Built target ccp_patch_sweep
+[ 91%] Built target ccp_broadphase_leaderboard
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:18:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   18 |    {{{0},{0,0,0},{.25,.25,.25},1u,2u,true},0,0},
+      |      ^~~
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:19:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   19 |    {{{1},{.2,0,0},{.5,.25,.25},2u,1u,true},1,1},
+      |      ^~~
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/tests/research_multicloth_tests.cpp:20:6: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   20 |    {{{2},{4,4,4},{4.3,4.3,4.3},1u,2u,true},2,0}
+      |      ^~~
+3 warnings generated.
+[ 94%] Linking CXX executable ccp_multicloth_tests
+[ 94%] Built target ccp_multicloth_tests
+[ 97%] Linking CXX executable ccp_native.app/Contents/MacOS/ccp_native
+ld: warning: ignoring duplicate libraries: 'libccp_live.a'
+[100%] Built target ccp_native

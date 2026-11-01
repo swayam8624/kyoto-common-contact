@@ -16,6 +16,7 @@ policies=["sap_rebuild","global_guarded","region_fixed","region_adaptive",
           "region_sweep_fixed","region_sweep_adaptive","online_contact_work"]
 expected={(s,p) for s in (1,2,3) for p in policies}
 data={}
+measured_frames=set()
 required=("sheets","policy","frames","meanBroadMs","meanNarrowMs",
           "meanStepMs","meanCandidates","meanInterContacts",
           "meanRegionBuilds","meanRegionReuses","meanRejected","meanPreciseTests",
@@ -26,6 +27,11 @@ for r in rows:
  if any(x not in r for x in required):raise SystemExit("Missing required C++ benchmark field")
  key=(int(r["sheets"]),r["policy"])
  if key in data:raise SystemExit("Duplicate row "+str(key))
+ try:frame_count=int(r["frames"])
+ except (TypeError,ValueError):raise SystemExit("Invalid measured frame count "+str(key))
+ if str(frame_count)!=r["frames"] or frame_count<=0:
+  raise SystemExit("Measured frame count must be a positive integer "+str(key))
+ measured_frames.add(frame_count)
  for field in required:
   if field in ("sheets","policy"):continue
   v=float(r[field])
@@ -33,6 +39,8 @@ for r in rows:
  if float(r["maxPositionError"])>=1e-7:raise SystemExit("Physical solver divergence: "+str(key))
  data[key]=r
 if set(data)!=expected:raise SystemExit("Missing policies or scenes: "+str(expected-set(data)))
+if len(measured_frames)!=1:
+ raise SystemExit("All scene/policy rows must use the same measured frame count")
 for s in (2,3):
  for p in policies:
   if float(data[s,p]["meanInterContacts"])<=0:

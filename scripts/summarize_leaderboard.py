@@ -23,16 +23,35 @@ if not rows or not expected.issubset(rows[0]):
 cases=["sparse256","clustered512","dense256","sheets2","sheets3","simulated_cloths3"]
 algos=["exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap","region_fixed","region_adaptive","region_sweep_fixed","region_sweep_adaptive"]
 by_key={}
+primitive_counts={}
 for row in rows:
     key=(row["scene"],row["algorithm"])
+    if row["scene"] not in cases or row["algorithm"] not in algos:
+        raise SystemExit(f"unknown benchmark case: {key}")
     if key in by_key:raise SystemExit(f"duplicate benchmark result: {key}")
-    if int(row["misses"])!=0:raise SystemExit(f"required contact candidate missed: {key}")
-    for field in ["meanMs","medianMs","p95Ms","meanCandidates","meanExtraCandidates"]:
-        if not math.isfinite(float(row[field])) or float(row[field])<0:
+    try:
+        primitives,samples,misses=(int(row[field]) for field in ("primitives","samples","misses"))
+        counts={field:int(row[field]) for field in ("builds","reuses","updates")}
+        values={field:float(row[field]) for field in
+                ("meanMs","medianMs","p95Ms","meanCandidates","meanExtraCandidates")}
+    except (TypeError,ValueError):
+        raise SystemExit(f"invalid numeric benchmark field: {key}")
+    if any(str(value)!=row[field] for value,field in
+           ((primitives,"primitives"),(samples,"samples"),(misses,"misses"),
+            *((counts[field],field) for field in counts))):
+        raise SystemExit(f"integer fields must be recorded as integers: {key}")
+    if primitives<=0 or samples!=32 or any(value<0 for value in counts.values()):
+        raise SystemExit(f"invalid dimensions or sample count: {key}")
+    if misses!=0:raise SystemExit(f"required contact candidate missed: {key}")
+    for field,value in values.items():
+        if not math.isfinite(value) or value<0:
             raise SystemExit(f"invalid {field}: {key}")
+    primitive_counts.setdefault(row["scene"],set()).add(primitives)
     by_key[key]=row
 if set(by_key)!={(s,a) for s in cases for a in algos}:
     raise SystemExit("Comparative matrix incomplete; never silently omit baselines")
+if any(len(values)!=1 for values in primitive_counts.values()):
+    raise SystemExit("Algorithms in a scene must use the same primitive count")
 
 for path in (svg_file,md_file):path.parent.mkdir(parents=True,exist_ok=True)
 def num(v,d=4):return f"{float(v):.{d}f}"

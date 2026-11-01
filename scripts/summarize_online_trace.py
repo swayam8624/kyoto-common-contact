@@ -25,9 +25,20 @@ for i,row in enumerate(rows):
     if int(row["frame"])!=i+1:
         raise SystemExit(f"missing/duplicate trace frame {i+1}")
     for k in required:
-        x=float(row[k])
+        try:x=float(row[k])
+        except (TypeError,ValueError):raise SystemExit(f"invalid {k} at frame {i+1}")
         if not math.isfinite(x) or x<0:
             raise SystemExit(f"nonfinite/negative {k} at frame {i+1}")
+    for k in ("frame","onlinePatches","onlineSplits","onlineMerges",
+              "onlineStrategySwitches","onlineHierarchy","contactCorrections",
+              "interSheetCorrections","onlineCandidates","sapCandidates",
+              "regionDirty","regionBuilds","regionReuses","coarseSkip",
+              "coverageChecked"):
+        value=float(row[k])
+        if not value.is_integer():
+            raise SystemExit(f"noninteger {k} at frame {i+1}")
+    if int(row["coverageChecked"]) not in (0,1):
+        raise SystemExit(f"invalid coverage flag at frame {i+1}")
     if float(row["maxPositionError"])>=1e-8:
         raise SystemExit("online changed physical trajectory")
     if int(row["onlinePatches"])==0:

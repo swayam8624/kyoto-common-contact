@@ -28,7 +28,7 @@ int main(int argc,char** argv){
         "maxPositionError,coverageChecked\n";
   MultiCloth online(3,2,Policy::OnlineContactAware),sap(3,2,Policy::RebuildSAP);
   std::size_t totalSplits=0,totalMerges=0,totalSwitches=0,checked=0;
-  double totalOnline=0,totalSap=0;
+  double totalOnline=0,totalSap=0,maxParticleError=0;
   for(int frame=1;frame<=frames;++frame){
    // The periodic oracle is independent from production queries and runs
    // identically on both policies. Both solvers execute the same fixed
@@ -44,6 +44,7 @@ int main(int argc,char** argv){
     const auto dx=a[i].x-b[i].x,dy=a[i].y-b[i].y,dz=a[i].z-b[i].z;
     worst=std::max(worst,std::sqrt(dx*dx+dy*dy+dz*dz));
    }
+   maxParticleError=std::max(maxParticleError,worst);
    if(worst>=1e-8)throw std::runtime_error(
       "online lost physical equivalence at frame "+std::to_string(frame));
    const auto& m=online.metrics(),n=sap.metrics();
@@ -72,7 +73,7 @@ int main(int argc,char** argv){
            <<" independentlyAuditedFrames="<<checked
            <<" avgStepOnlineMs="<<totalOnline/double(frames-12)
            <<" avgStepSAPMs="<<totalSap/double(frames-12)
-           <<" maxParticleError=0\n";
+           <<" maxParticleError="<<maxParticleError<<'\n';
  }catch(const std::exception& e){
   std::cerr<<"ONLINE PHYSICS TRACE FAILED: "<<e.what()<<'\n';
   return 1;

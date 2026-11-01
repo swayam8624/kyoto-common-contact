@@ -1,0 +1,6 @@
+[ 25%] Built target ccp_live
+[ 62%] Built target ccp_multicloth
+[ 75%] Building CXX object CMakeFiles/ccp_native.dir/native/main.cpp.o
+[ 87%] Linking CXX executable ccp_native.app/Contents/MacOS/ccp_native
+ld: warning: ignoring duplicate libraries: 'libccp_live.a'
+[100%] Built target ccp_native

@@ -26,6 +26,7 @@ expected={(span,frontier,phase) for span,frontier in variants
           for phase in ("calibration","evaluation")}
 expected|={(0,"sap_rebuild",phase) for phase in ("calibration","evaluation")}
 data={}
+frame_counts={"calibration":set(),"evaluation":set()}
 for row in rows:
     if not all(field in row for field in fields):
         raise SystemExit("patch experiment missing required columns")
@@ -37,11 +38,17 @@ for row in rows:
         except (TypeError,ValueError):raise SystemExit(f"invalid {field} in {key}")
         if not math.isfinite(value) or value<0:
             raise SystemExit(f"invalid {field} in {key}")
+    frame_count=float(row["frames"])
+    if not frame_count.is_integer() or frame_count<=0:
+        raise SystemExit(f"invalid frame count in {key}")
+    frame_counts[row["phase"]].add(int(frame_count))
     if float(row["maxPositionError"])>=1e-8:
         raise SystemExit(f"solver position divergence in {key}")
     data[key]=row
 if set(data)!=expected:
     raise SystemExit(f"incomplete patch-size experiment {expected-set(data)}")
+if any(len(counts)!=1 for counts in frame_counts.values()):
+    raise SystemExit("all variants must have matching calibration/evaluation frame counts")
 
 # Include the reference SAP as a fallback: profiling must never be forced
 # to choose an expensive regional configuration in a sparse workload.

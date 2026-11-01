@@ -1,0 +1,19 @@
+Test project /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/build
+    Start 1: evidence_csv_contracts
+1/7 Test #1: evidence_csv_contracts ................   Passed    0.77 sec
+    Start 2: moving_multicloth_regional_coverage
+2/7 Test #2: moving_multicloth_regional_coverage ...   Passed   10.68 sec
+    Start 3: published_3d_broadphase_coverage
+3/7 Test #3: published_3d_broadphase_coverage ......   Passed    0.22 sec
+    Start 4: live_cloth_contracts
+4/7 Test #4: live_cloth_contracts ..................   Passed    2.15 sec
+    Start 5: ccp_core_contracts
+5/7 Test #5: ccp_core_contracts ....................   Passed    0.00 sec
+    Start 6: common_bounds_contract
+6/7 Test #6: common_bounds_contract ................   Passed    0.00 sec
+    Start 7: mesh_bounds_query_contract
+7/7 Test #7: mesh_bounds_query_contract ............   Passed    0.00 sec
+
+100% tests passed out of 7
+
+Total Test time (real) =  13.84 sec

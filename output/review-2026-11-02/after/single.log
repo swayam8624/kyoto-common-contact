@@ -1,0 +1,6 @@
+Independent oracle preflight: 300 paired steps, zero required-pair misses.
+TIMING MODE: exhaustive oracle disabled; final global display diagnostics remain measured.
+Measured paired CPU cloth diagnostics; first 30 frames per trial were advanced but excluded from timing summaries and CSV.
+baseline_rebuild meanStepMs=2.19456 maxStepMs=2.69983 p95StepMs=2.52325 generatorCalls=12150 reuses=0
+guarded_reuse meanStepMs=0.9256 maxStepMs=1.56262 p95StepMs=1.12558 generatorCalls=600 reuses=11550
+maxPositionError=0 measuredFramesPerPolicy=1350
