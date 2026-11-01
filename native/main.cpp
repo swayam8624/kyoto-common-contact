@@ -292,6 +292,8 @@ void stepSimulation(App&a){
           a.multi.policy()==ccp::research::Policy::RegionalCertified?"REGIONAL":
           a.multi.policy()==ccp::research::Policy::GlobalGuard?"GLOBAL":"SAP")
        <<" PAIRS "<<m.pairs<<" CONTACTS "<<m.contacts
+       <<" SELF "<<m.selfContacts<<" PIERCINGS "<<m.selfCrossings
+       <<" GRAB "<<(a.multi.grabbing()?"ON":"OFF")
        <<" INTER "<<m.interSheetContacts<<" SPHERE "<<m.sphereContacts;
    pushInspectorEvent(a,line.str());
    std::ostringstream event;
@@ -505,8 +507,10 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
       (a.multi.onlineEnabled()?" / ONLINE PATCHES "+std::to_string(m.onlinePatches):
        " / FIXED PATCH "+std::to_string(a.multi.patchCellSpan())),150,ink,1.17);
  line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
- line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
- line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
+ line("INTERSHEET "+std::to_string(m.interSheetContacts)+
+      " / SELF "+std::to_string(m.selfContacts),202,teal);
+ line("PAIRS "+std::to_string(m.pairs)+
+      " / SELF PIERCINGS "+std::to_string(m.selfCrossings),228,ink,1.15);
  line("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),254,ink,1.20);
  line("LIVE SPLITS "+std::to_string(m.onlineSplits)+" MERGES "+
       std::to_string(m.onlineMerges)+" SWITCHES "+
@@ -515,6 +519,8 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
  line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
+ line("MOUSE GRAB "+std::string(a.multi.grabbing()?"ACTIVE":"READY")+
+      " / ERROR "+number(m.grabError,3),345,teal,1.15);
  line("PHYSICAL STRAIN "+number(m.maxStructuralEdgeStretch,3)+
       " FRAME DELTA "+number(m.maxFrameParticleTravel,3),366,teal,1.12);
  line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
@@ -780,6 +786,21 @@ int main(int argc,char**argv){try{
       color=sheetColors[std::clamp(sheet,0,2)];
     }
     if(a.stage==3)color=cand[i]?V{.88,.38,.055}:V{.33,.39,.43};if(a.stage==4)color=near[i]?V{.045,.51,.25}:V{.33,.39,.43};for(int id:t)vertex(solid,pos[id],normals[id],color);if(a.wire)for(int j=0;j<3;j++)segment(overlay,add(pos[t[j]],mul(normals[t[j]],.001)),add(pos[t[(j+1)%3]],mul(normals[t[(j+1)%3]],.001)),{.07,.13,.15});}
+  if(a.multiMode&&a.multi.grabbing()){
+   // Gold cross: mass-weighted picked surface point; cyan cross: cursor
+   // target. The segment shows attachment compliance and solver lag.
+   const V picked=a.multi.grabPoint(),goal=a.multi.grabTarget();
+   const V gold{.98,.72,.08},cyan{.05,.60,.93};
+   for(int axis=0;axis<3;++axis){
+    V o{};
+    if(axis==0)o.x=.075;
+    if(axis==1)o.y=.075;
+    if(axis==2)o.z=.075;
+    segment(overlay,sub(picked,o),add(picked,o),gold);
+    segment(overlay,sub(goal,mul(o,.55)),add(goal,mul(o,.55)),cyan);
+   }
+   segment(overlay,picked,goal,{.93,.81,.14});
+  }
   if(a.stage>=2){
    if(a.multiMode){
     if(a.stage==2){
@@ -825,10 +846,17 @@ int main(int argc,char**argv){try{
    label("Y: APPLY MEASURED CALIBRATION",blue,1.18);
    label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
          std::to_string(a.multi.patchCellSpan()),blue,1.22);
+   label(a.multi.selfCollisions()?
+         "S SELF COLLISION ON / TOGGLE":"S SELF COLLISION OFF / TOGGLE",green,1.28);
+   label("LEFT GRAB CLOTH / RIGHT ORBIT",blue,1.24);
+   label("SHIFT + LEFT ALSO ORBITS",muted,1.20);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
    label("FRAME "+std::to_string(a.multi.frame()));
    label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
    label("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),green,1.38);
+   label("SELF CORRECTIONS "+std::to_string(m.selfContacts)+
+         " / PIERCINGS "+std::to_string(m.selfCrossings),green,1.30);
+   if(a.multi.grabbing())label("GRAB ERROR "+number(m.grabError,3)+" M",blue,1.30);
    label("SPHERE CORRECTIONS "+std::to_string(m.sphereContacts),green,1.42);
    label("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),ink,1.26);
    label("PAIR BLOCKS REBUILT "+std::to_string(m.regionalPairRebuilds),ink,1.45);
@@ -864,7 +892,9 @@ int main(int argc,char**argv){try{
    label("K: OPEN DYNAMIC MULTICLOTH",blue,1.35);
   }
 
-  text(hud,a.cutaway?"VISUAL CUTAWAY / PHYSICS USES FULL MESH":"LIVE STATE / NO FILE PLAYBACK",26*scale,height-27*scale,1.6*scale,ink);M ui=ortho(0,width,height,0,-1,1);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);uploadDraw(vao,buffer,hud,GL_TRIANGLES);
+  text(hud,a.multiMode?"LEFT GRAB CLOTH | RIGHT / SHIFT-LEFT ORBIT | S SELF COLLISION":
+    (a.cutaway?"VISUAL CUTAWAY / PHYSICS USES FULL MESH":"LIVE STATE / NO FILE PLAYBACK"),
+    26*scale,height-27*scale,1.30*scale,ink);M ui=ortho(0,width,height,0,-1,1);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);uploadDraw(vao,buffer,hud,GL_TRIANGLES);
   glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(fontProgram);glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,fontTexture);glUniform1i(glGetUniformLocation(fontProgram,"atlas"),0);uploadDraw(vao,buffer,glyphVertices,GL_TRIANGLES);glDisable(GL_BLEND);
   if(a.evidenceMode)
    drawEvidencePane(a,viewport,panel,scale,width,height,vao,buffer,lines,fontProgram,fontTexture,ui);
