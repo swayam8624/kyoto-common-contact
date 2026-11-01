@@ -28,7 +28,8 @@ double percentile95(std::vector<double> values) {
 
 void validateStep(const ccp::live::ClothSimulation& sim, const char* policy) {
     const auto& s=sim.stats();
-    if(s.oracleMisses!=0) throw std::runtime_error(std::string(policy)+" reported a proximity oracle miss");
+    if(s.oracleChecked && s.oracleMisses!=0)
+        throw std::runtime_error(std::string(policy)+" reported a proximity oracle miss");
     if(!std::isfinite(s.stepMs) || !std::isfinite(s.broadMs) || !std::isfinite(s.narrowMs) ||
        !std::isfinite(s.minGap))
         throw std::runtime_error(std::string(policy)+" reported a nonfinite diagnostic");
@@ -51,8 +52,10 @@ double comparePositions(const ccp::live::ClothSimulation& a, const ccp::live::Cl
 void writeRow(std::ofstream& csv,int trial,int frame,const char* policy,
               const ccp::live::Stats& s) {
     csv<<trial<<','<<frame<<','<<policy<<','<<s.stepMs<<','<<s.broadMs<<','<<s.narrowMs<<','
+       <<s.oracleMs<<','<<s.diagnosticMs<<','<<s.solverMs<<','
        <<s.queryBuilds<<','<<s.queryReuses<<','<<s.pairTests<<','<<s.candidateCount<<','
-       <<s.proximityCount<<','<<s.minGap<<','<<s.oracleMisses<<'\n';
+       <<s.proximityCount<<','<<s.preciseTests<<','<<s.diagnosticTests<<','
+       <<s.minGap<<','<<(s.oracleChecked?std::to_string(s.oracleMisses):"NA")<<'\n';
 }
 
 void printSummary(const char* name,const Summary& s) {
@@ -71,9 +74,27 @@ int main(int argc,char** argv) {
         if(argc!=2) throw std::runtime_error("usage: live_benchmark <output.csv>");
         std::ofstream csv(argv[1]);
         if(!csv) throw std::runtime_error(std::string("cannot open output CSV: ")+argv[1]);
-        csv<<"trial,frame,policy,stepMs,broadMs,narrowMs,builds,reuses,pairTests,candidates,proximity,minGap,oracleMisses\n";
+        csv<<"trial,frame,policy,stepMs,broadMs,narrowMs,oracleMs,diagnosticMs,otherMs,builds,reuses,pairTests,candidates,proximity,preciseTests,diagnosticTests,minGap,oracleMisses\n";
         csv<<std::setprecision(12);
 
+        // Fully checked preflight is outside the timed comparisons.
+        // Disabling an oracle never implies zero misses.
+        {
+            ccp::live::ClothSimulation checkedRebuild,checkedReuse;
+            checkedRebuild.setQueryRequest({0.05,0.04,ccp::live::UpdatePolicy::RebuildEveryIteration});
+            checkedReuse.setQueryRequest({0.05,0.04,ccp::live::UpdatePolicy::GuardedReuse});
+            for(int frame=0;frame<kFrames;++frame) {
+                checkedRebuild.step(); checkedReuse.step();
+                validateStep(checkedRebuild,"oracle_preflight_rebuild");
+                validateStep(checkedReuse,"oracle_preflight_reuse");
+                if(!checkedRebuild.stats().oracleChecked || !checkedReuse.stats().oracleChecked)
+                    throw std::runtime_error("preflight did not execute exhaustive oracle");
+                if(comparePositions(checkedRebuild,checkedReuse)>=1e-9)
+                    throw std::runtime_error("preflight solver states diverged");
+            }
+            std::cout<<"Independent oracle preflight: "<<kFrames
+                     <<" paired steps, zero required-pair misses.\n";
+        }
         Summary baseline,guarded;
         baseline.stepMs.reserve(kTrials*(kFrames-kWarmupFrames));
         guarded.stepMs.reserve(kTrials*(kFrames-kWarmupFrames));
@@ -84,6 +105,8 @@ int main(int argc,char** argv) {
             rebuildSim.setQueryRequest({request.margin,request.displacementBudget,
                                         ccp::live::UpdatePolicy::RebuildEveryIteration});
             guardedSim.setQueryRequest(request);
+            rebuildSim.setOracleEnabled(false);
+            guardedSim.setOracleEnabled(false);
             for(int frame=0;frame<kFrames;++frame) {
                 if(trial%2==0) {
                     rebuildSim.step(); guardedSim.step();
@@ -106,6 +129,7 @@ int main(int argc,char** argv) {
         }
         csv.close();
         if(!csv) throw std::runtime_error("failed while writing output CSV");
+        std::cout<<"TIMING MODE: exhaustive oracle disabled; final global display diagnostics remain measured.\n";
         std::cout<<"Measured paired CPU cloth diagnostics; first "<<kWarmupFrames
                  <<" frames per trial were advanced but excluded from timing summaries and CSV.\n";
         printSummary("baseline_rebuild",baseline);

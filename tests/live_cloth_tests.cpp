@@ -142,6 +142,24 @@ int main() {
 
         ClothSimulation idle;
         require(idle.positions().size()==625 && idle.triangles().size()==1152,"25 by 25 live cloth topology");
+        // Verify that the independent exhaustive oracle cannot affect physics.
+        ClothSimulation production, verified;
+        production.setOracleEnabled(false);
+        require(!production.oracleEnabled() && verified.oracleEnabled(),"oracle toggle explicit");
+        for(int frame=0;frame<120;++frame) {
+            production.step(); verified.step();
+            require(!production.stats().oracleChecked && production.stats().oracleTests==0,
+                    "unchecked run must not claim zero omissions");
+            require(verified.stats().oracleChecked && verified.stats().oracleMisses==0,
+                    "independent oracle covers required candidate pairs");
+            require(production.stats().preciseTests<=production.triangles().size()*8,
+                    "candidate-driven narrow phase limits precise checks");
+            for(std::size_t i=0;i<production.positions().size();++i)
+                require(distance(production.positions()[i],verified.positions()[i])<1e-9,
+                        "oracle cannot change the physical trajectory");
+        }
+        require(production.stats().diagnosticTests==production.triangles().size(),
+                "final global diagnostic scan counted separately");
         require(idle.stats().frame==0,"reset starts at frame zero");
 
         ClothSimulation sapSim, bruteSim;
