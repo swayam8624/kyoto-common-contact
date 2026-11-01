@@ -36,3 +36,16 @@ groups approach. Candidate lines represent broad-phase possibilities;
 confirmed-contact links contribute to the island graph. Distinct group
 colors can merge at actual cross-group contact. This is a **separate C++
 rigid-sphere impulse solver**, not a hidden island implementation of XPBD cloth.
+
+
+## New main research demo: the geometry genuinely keeps changing
+
+Run `./open_multicloth_demo.sh`, not the earlier static sphere fixture.
+Default is three moving deformable sheets and two moving spheres. The cloths
+are physically coupled by experimental discrete inter-sheet feature contact
+corrections. Press L for 1/2/3 cloths, Q to compare full SAP versus global
+guarded SAP versus local region certification, G for a scrollable live cache
+log and continuous candidate/contact time-series, A for exhaustive broad-phase
+pair auditing, and 1/2/3/4 for stages. This is an actual simulated scene,
+not a prerecorded movie. The exact scope and limitations are in
+`docs/MULTICLOTH_CONTRACT.md`.
