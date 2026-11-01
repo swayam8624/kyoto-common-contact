@@ -74,6 +74,7 @@ struct App {
  std::vector<std::string> recentEvents;
  std::vector<EvidenceBar> broadphaseResults;
  std::vector<MultiBenchRow> multiResults;
+ std::vector<double> historyCandidates,historyInterContacts,historyBroadMs;
  double rebuildMean=std::numeric_limits<double>::quiet_NaN();
  double guardedMean=std::numeric_limits<double>::quiet_NaN();
  double rebuildBroad{},guardedBroad{},rebuildNarrow{},guardedNarrow{};
@@ -184,6 +185,14 @@ void stepSimulation(App&a){
   a.multi.step();
   const auto& m=a.multi.metrics();
   if(m.oracleMisses)a.paused=true;
+  a.historyCandidates.push_back(double(m.pairs));
+  a.historyInterContacts.push_back(double(m.interSheetContacts));
+  a.historyBroadMs.push_back(m.broadMs);
+  if(a.historyCandidates.size()>160){
+   a.historyCandidates.erase(a.historyCandidates.begin());
+   a.historyInterContacts.erase(a.historyInterContacts.begin());
+   a.historyBroadMs.erase(a.historyBroadMs.begin());
+  }
   if(a.multi.frame()==1||a.multi.frame()%6==0||m.oracleMisses){
    std::ostringstream line;
    line<<"F"<<a.multi.frame()<<" "
@@ -225,6 +234,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
  if(key==GLFW_KEY_ESCAPE){glfwSetWindowShouldClose(w,1);return;}
  if(key==GLFW_KEY_K){
   a.multiMode=!a.multiMode;
+  a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();
   a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
   pushInspectorEvent(a,a.multiMode?"DYNAMIC 3-SHEET SCENE":"SINGLE CLOTH BASELINE");
   fitScene(a,w);return;
@@ -232,9 +242,9 @@ void key(GLFWwindow*w,int key,int,int action,int){
  if(a.multiMode){
   if(key==GLFW_KEY_SPACE)a.paused=!a.paused;
   else if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}
-  else if(key==GLFW_KEY_R){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());fitScene(a,w);}
-  else if(key==GLFW_KEY_L){a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());fitScene(a,w);}
-  else if(key==GLFW_KEY_O){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);fitScene(a,w);}
+  else if(key==GLFW_KEY_R){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_L){a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_O){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
   else if(key==GLFW_KEY_Q){
    using P=ccp::research::Policy;
    a.multi.setPolicy(a.multi.policy()==P::RebuildSAP?P::GlobalGuard:
@@ -262,7 +272,7 @@ void scroll(GLFWwindow*w,double,double dy){
  // Mouse wheel over right inspector scrolls benchmark evidence; over the
  // 3D viewport it still zooms the camera.
  if(a.evidenceMode&&a.lastX>windowWidth-panelWidth) {
-  a.inspectorScroll=std::clamp(a.inspectorScroll-dy*65.0,0.0,800.0);
+  a.inspectorScroll=std::clamp(a.inspectorScroll-dy*65.0,0.0,950.0);
  } else a.distance=std::clamp(a.distance-dy*.3,2.2,12.);
 }
 extern "C" unsigned char* ccpFontAtlas(int*,int*,float*);
@@ -283,7 +293,7 @@ void capture(int w,int h,const std::string&path){std::vector<unsigned char> pixe
 // "research speedups" or animations are displayed in this evidence inspector.
 void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,int width,int height,
  GLuint vao,GLuint buffer,GLuint lines,GLuint fontProgram,GLuint fontTexture,const M& ui){
- std::vector<Vertex> mesh;glyphVertices.clear();
+ std::vector<Vertex> mesh,spark;glyphVertices.clear();
  const float x=viewport+14*scale,scroll=float(a.inspectorScroll*scale),maxBar=panel-28*scale;
  const V ink{.12,.17,.23},muted{.37,.44,.52},blue{.13,.37,.68},teal{.05,.50,.41},amber{.72,.42,.13},red{.75,.22,.19};
  rect(mesh,viewport,0,panel,height,{.969,.976,.987});
@@ -353,10 +363,31 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("NEW TESTABLE CLAIM: BETTER",1514,teal,1.17);
  line("TOTAL CONTACT WORK + NO MISSES",1537,teal,1.17);
  line("NOT CCD / NOT IPC OR OGC",1568,red,1.18);
+ heading("CONTACT DENSITY / TIME SERIES",1603);
+ line("TEAL: INTER-SHEET / BLUE: CANDIDATES",1626,muted,1.08);
+ if(a.historyCandidates.size()>1){
+  const auto maxC=*std::max_element(a.historyCandidates.begin(),a.historyCandidates.end());
+  const auto maxI=*std::max_element(a.historyInterContacts.begin(),a.historyInterContacts.end());
+  const double width=std::max(10.0f,maxBar-4*scale);
+  const double base=1714.0*scale-scroll;
+  const double heightRange=68.0*scale;
+  for(std::size_t i=1;i<a.historyCandidates.size();++i){
+   const double ax=x+width*double(i-1)/double(a.historyCandidates.size()-1);
+   const double bx=x+width*double(i)/double(a.historyCandidates.size()-1);
+   auto plot=[&](const std::vector<double>& data,double maxValue,V color){
+    const double ay=base-heightRange*data[i-1]/std::max(1.0,maxValue);
+    const double by=base-heightRange*data[i]/std::max(1.0,maxValue);
+    segment(spark,{ax,ay,0},{bx,by,0},color);
+   };
+   plot(a.historyCandidates,maxC,blue);
+   plot(a.historyInterContacts,maxI,teal);
+  }
+ }
  glEnable(GL_SCISSOR_TEST);glScissor((int)viewport,0,(int)panel,height);
  glUseProgram(lines);
  glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);
  uploadDraw(vao,buffer,mesh,GL_TRIANGLES);
+ uploadDraw(vao,buffer,spark,GL_LINES);
  glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
  glUseProgram(fontProgram);
  glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);
