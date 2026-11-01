@@ -67,6 +67,8 @@ struct App {
  std::vector<EvidenceBar> broadphaseResults;
  double rebuildMean=std::numeric_limits<double>::quiet_NaN();
  double guardedMean=std::numeric_limits<double>::quiet_NaN();
+ double rebuildBroad{},guardedBroad{},rebuildNarrow{},guardedNarrow{};
+ double rebuildPrecise{},guardedPrecise{};
 };
 void pushInspectorEvent(App& a,const std::string& event) {
  a.recentEvents.push_back(event);
@@ -92,19 +94,35 @@ void loadEvidence(App& a) {
  {
   std::ifstream input(base/"live_benchmark-postfix.csv");
   std::string line;std::getline(input,line);
-  double buildSum=0,reuseSum=0;int buildCount=0,reuseCount=0;
+  double buildSum=0,reuseSum=0,buildBroad=0,reuseBroad=0;
+  double buildNarrow=0,reuseNarrow=0,buildPrecise=0,reusePrecise=0;
+  int buildCount=0,reuseCount=0;
   while(std::getline(input,line)) {
    std::stringstream row(line);std::vector<std::string> cells;std::string field;
    while(std::getline(row,field,','))cells.push_back(field);
    if(cells.size()<5)continue;
    try {
     const double ms=std::stod(cells[3]);
-    if(cells[2]=="baseline_rebuild"){buildSum+=ms;++buildCount;}
-    if(cells[2]=="guarded_reuse"){reuseSum+=ms;++reuseCount;}
+    if(cells[2]=="baseline_rebuild"){
+     buildSum+=ms;buildBroad+=std::stod(cells[4]);buildNarrow+=std::stod(cells[5]);
+     buildPrecise+=std::stod(cells[14]);++buildCount;
+    }
+    if(cells[2]=="guarded_reuse"){
+     reuseSum+=ms;reuseBroad+=std::stod(cells[4]);reuseNarrow+=std::stod(cells[5]);
+     reusePrecise+=std::stod(cells[14]);++reuseCount;
+    }
    }catch(const std::exception&){}
   }
-  if(buildCount>0)a.rebuildMean=buildSum/buildCount;
-  if(reuseCount>0)a.guardedMean=reuseSum/reuseCount;
+  if(buildCount>0){
+   a.rebuildMean=buildSum/buildCount;
+   a.rebuildBroad=buildBroad/buildCount;a.rebuildNarrow=buildNarrow/buildCount;
+   a.rebuildPrecise=buildPrecise/buildCount;
+  }
+  if(reuseCount>0){
+   a.guardedMean=reuseSum/reuseCount;
+   a.guardedBroad=reuseBroad/reuseCount;a.guardedNarrow=reuseNarrow/reuseCount;
+   a.guardedPrecise=reusePrecise/reuseCount;
+  }
  }
  pushInspectorEvent(a,"EVIDENCE: LOCAL CSV "+std::string(a.broadphaseResults.empty()?"MISSING":"LOADED"));
 }
@@ -227,14 +245,16 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
   line("NO PUBLISHED BASELINE CSV",947,amber);
   line("INSTALL BULLET; RUN MEETING PREP",974);
  }
- heading("DOWNSTREAM / WHY THIS MATTERS",1263);
- line("BROAD "+number(stats.broadMs,3)+" MS",1291);
- line("PRECISE "+number(stats.narrowMs,3)+" MS",1315);
- line("ORACLE "+number(stats.oracleMs,3)+" MS",1339);
- line("DISPLAY "+number(stats.diagnosticMs,3)+" MS",1363);
- line("STEP "+number(stats.stepMs,3)+" MS",1387);
- line("MORE CACHED PAIRS CAN MEAN MORE",1420,muted,1.15);
- line("PRECISE WORK. NEVER CLAIM FREE SPEEDUP.",1442,muted,1.12);
+ heading("DOWNSTREAM / REAL MEASURED CASCADE",1263);
+ if(std::isfinite(a.rebuildMean)&&std::isfinite(a.guardedMean)) {
+  line("MEAN REBUILD / GUARDED",1290,blue,1.18);
+  line("BROAD  "+number(a.rebuildBroad,3)+" / "+number(a.guardedBroad,3)+" MS",1315,ink,1.22);
+  line("PRECISE "+number(a.rebuildNarrow,3)+" / "+number(a.guardedNarrow,3)+" MS",1340,ink,1.22);
+  line("TESTS "+number(a.rebuildPrecise,0)+" / "+number(a.guardedPrecise,0),1365,ink,1.22);
+  line("STEP  "+number(a.rebuildMean,3)+" / "+number(a.guardedMean,3)+" MS",1390,ink,1.22);
+ }
+ line("EXTRA CACHED PAIRS MAY INCREASE",1420,muted,1.13);
+ line("PRECISE TESTS. NOT FREE SPEEDUP.",1442,muted,1.12);
  heading("NOVELTY / RESEARCH BOUNDARY",1490);
  line("NOT NOVEL: SAP, BVH, FAT AABBS",1520,muted,1.18);
  line("HYPOTHESIS: METHOD-AWARE CERTIFIED",1544,teal,1.18);

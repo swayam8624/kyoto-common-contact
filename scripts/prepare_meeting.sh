@@ -11,6 +11,7 @@ ctest --test-dir build --output-on-failure
 mkdir -p output/native
 ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv | tee output/native/benchmark-postfix-summary.txt
 python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
+python3 scripts/summarize_pipeline.py output/native/live_benchmark-postfix.csv output/native/cascade.svg
 python3 scripts/export_supporting_replays.py
 ./build/ccp_broadphase_leaderboard output/native/broadphase-leaderboard.csv
 python3 scripts/summarize_leaderboard.py output/native/broadphase-leaderboard.csv output/native/broadphase-leaderboard.svg docs/BROADPHASE_RESULTS.md
