@@ -23,7 +23,9 @@ struct Primitive { Bounds box; int region{}, sheet{}; };
 struct Metrics {
   std::size_t queryCount{}, pairs{}, preciseTests{}, contacts{}, interSheetContacts{},
               sphereContacts{}, broadAabbTests{}, regionalPairRebuilds{},
-              regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{};
+              regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{},
+              regionTopLevelTests{}, regionTopLevelOverlaps{}, regionPairsSkipped{},
+              regionCacheEvictions{};
   double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
@@ -33,7 +35,8 @@ struct Metrics {
 class RegionalCandidates {
 public:
   const std::vector<Pair>& query(const std::vector<Primitive>& items, double margin,
-                                 bool adaptive, Metrics& metrics);
+                                 bool adaptive, Metrics& metrics,
+                                 bool hierarchicalRegionSweep=false);
   void reset();
 private:
   struct Region {
@@ -57,7 +60,9 @@ public:
   void step();
   void setPolicy(Policy policy);
   void setAdaptive(bool adaptive);
+  void setHierarchicalRegions(bool enabled);
   void setAuditing(bool enable);
+  bool hierarchicalRegions() const { return hierarchicalRegions_; }
   const std::vector<Vec3>& positions() const {return positions_;}
   const std::vector<std::array<int,3>>& triangles() const {return triangles_;}
   const std::vector<int>& triangleSheets() const {return triangleSheets_;}
@@ -74,7 +79,7 @@ private:
   struct Constraint {int a{},b{};double length{},compliance{},lambda{};};
   int sheets_{3},balls_{2},frame_{};
   Policy policy_{Policy::RegionalCertified};
-  bool adaptive_{true},auditing_{false};
+  bool adaptive_{true},auditing_{false},hierarchicalRegions_{false};
   std::vector<Vec3> positions_,previous_,initialPins_;
   std::vector<double> inverseMasses_;
   std::vector<std::array<int,3>> triangles_;

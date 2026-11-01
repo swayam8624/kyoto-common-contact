@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 namespace ccp::research {
 namespace {
@@ -120,7 +121,7 @@ void RegionalCandidates::reset(){
  knownIds_.clear();knownRegions_.clear();previousMargin_=-1;
 }
 const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>& items,
- double margin,bool adaptive,Metrics& metrics){
+ double margin,bool adaptive,Metrics& metrics,bool hierarchicalRegionSweep){
  const auto start=Clock::now();
  if(!std::isfinite(margin)||margin<0)throw std::invalid_argument("invalid region query margin");
  // Caller supplies unique stable primitive IDs. A topology change invalidates
@@ -128,8 +129,20 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
  std::vector<int> ids,groupIds;
  ids.reserve(items.size());groupIds.reserve(items.size());
  std::map<int,std::vector<int>> partition;
+ std::unordered_set<int> uniqueIds;
+ uniqueIds.reserve(items.size()*2);
  for(std::size_t i=0;i<items.size();++i){
-  ids.push_back(items[i].box.id);groupIds.push_back(items[i].region);
+  const auto& b=items[i].box;
+  // A certified pair cache needs unique stable IDs and finite AABBs.
+  // Otherwise an ID-to-index map can silently hide a necessary pair.
+  if(!uniqueIds.insert(b.id).second)
+   throw std::invalid_argument("duplicate broad-phase primitive ID");
+  const double values[]={b.min.x,b.min.y,b.min.z,b.max.x,b.max.y,b.max.z};
+  for(double v:values)if(!std::isfinite(v))
+   throw std::invalid_argument("non-finite broad-phase AABB coordinate");
+  if(b.min.x>b.max.x||b.min.y>b.max.y||b.min.z>b.max.z)
+   throw std::invalid_argument("inverted broad-phase AABB");
+  ids.push_back(b.id);groupIds.push_back(items[i].region);
   partition[items[i].region].push_back(static_cast<int>(i));
  }
  if(ids!=knownIds_||groupIds!=knownRegions_||margin!=previousMargin_){
@@ -191,12 +204,66 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
  metrics.regionGuards.clear();
  for(const auto& region:regions_)metrics.regionGuards.push_back(region.unionEnvelope);
  output_.clear();
- // Each region-pair cache has a separate certificate. Invalidating region R
- // rebuilds ONLY pair blocks incident to R; unaffected blocks are reused.
- // Final exact-current-AABB filtering removes historical guard false positives
- // without executing any method-specific narrow phase.
- for(std::size_t i=0;i<regions_.size();++i)
- for(std::size_t j=i;j<regions_.size();++j){
+ // Hierarchical alternative to the original O(R^2) scan of ALL region
+ // pairs. First prune candidate PATCH PAIRS by sweeping union-envelope
+ // intervals; only the surviving patch pairs enter the cached primitive
+ // pair stage. The input envelopes contain every current padded AABB, so
+ // this coarse pruning cannot remove a required primitive overlap.
+ //
+ // The original all-pairs scan stays available as an explicit ablation.
+ using RegionPair=std::pair<std::size_t,std::size_t>;
+ std::vector<RegionPair> activeRegionPairs;
+ const std::size_t regionCount=regions_.size();
+ const std::size_t possibleBlocks=regionCount*(regionCount+1)/2;
+ if(hierarchicalRegionSweep){
+  std::vector<std::size_t> order(regionCount);
+  std::iota(order.begin(),order.end(),std::size_t{0});
+  std::sort(order.begin(),order.end(),[&](std::size_t a,std::size_t b){
+   const double x=regions_[a].unionEnvelope.min.x;
+   const double y=regions_[b].unionEnvelope.min.x;
+   return x==y?a<b:x<y;
+  });
+  for(std::size_t i=0;i<order.size();++i){
+   const auto a=order[i];
+   activeRegionPairs.emplace_back(a,a); // conservative even for one patch
+   for(std::size_t j=i+1;j<order.size();++j){
+    const auto b=order[j];
+    ++metrics.regionTopLevelTests;
+    // Sorting means every later minimum-X lies beyond A's maximum-X.
+    if(regions_[b].unionEnvelope.min.x>regions_[a].unionEnvelope.max.x)
+     break;
+    if(!overlap(regions_[a].unionEnvelope,regions_[b].unionEnvelope))
+     continue;
+    activeRegionPairs.emplace_back(std::min(a,b),std::max(a,b));
+   }
+  }
+  std::sort(activeRegionPairs.begin(),activeRegionPairs.end());
+ }else{
+  activeRegionPairs.reserve(possibleBlocks);
+  for(std::size_t i=0;i<regionCount;++i)
+   for(std::size_t j=i;j<regionCount;++j)
+    activeRegionPairs.emplace_back(i,j);
+ }
+ metrics.regionTopLevelOverlaps=activeRegionPairs.size();
+ metrics.regionPairsSkipped=possibleBlocks-activeRegionPairs.size();
+ // Only cached blocks in the active top-level frontier need to be retained.
+ // Evicting a disjoint block is safe: if envelopes overlap later, either a
+ // changed region triggers a rebuild or the absent block is rebuilt fresh.
+ // This bounds memory to currently relevant region interactions.
+ if(hierarchicalRegionSweep){
+  std::unordered_set<std::uint64_t> activeKeys;
+  activeKeys.reserve(activeRegionPairs.size()*2);
+  for(const auto [i,j]:activeRegionPairs)activeKeys.insert(pairKey(i,j));
+  for(auto it=cachedRegionPairs_.begin();it!=cachedRegionPairs_.end();){
+   if(!activeKeys.contains(it->first)){
+    it=cachedRegionPairs_.erase(it);
+    ++metrics.regionCacheEvictions;
+   }else ++it;
+  }
+ }
+ // The second tier produces primitive candidate IDs, and revalidates
+ // cached envelope pairs with CURRENT tight padded primitive AABBs.
+ for(const auto [i,j]:activeRegionPairs){
   auto& a=regions_[i];auto& b=regions_[j];
   const auto key=pairKey(i,j);
   auto it=cachedRegionPairs_.find(key);
@@ -303,6 +370,12 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
 std::vector<Primitive> MultiCloth::currentPrimitives() const {return makePrimitives();}
 void MultiCloth::setPolicy(Policy policy){policy_=policy;regional_.reset();global_.invalidate();}
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
+void MultiCloth::setHierarchicalRegions(bool enabled){
+ if(hierarchicalRegions_!=enabled){
+  hierarchicalRegions_=enabled;
+  regional_.reset();
+ }
+}
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();
@@ -474,7 +547,7 @@ void MultiCloth::step(){
   const auto queryStart=Clock::now();
   std::vector<Pair> pairs;
   if(policy_==Policy::RegionalCertified){
-   pairs=regional_.query(primitives,kMargin,adaptive_,metrics_);
+   pairs=regional_.query(primitives,kMargin,adaptive_,metrics_,hierarchicalRegions_);
   }else if(policy_==Policy::GlobalGuard){
    const auto& actual=global_.query(bounds,{kMargin,.045,live::UpdatePolicy::GuardedReuse},
                                      true,globalMetrics);
