@@ -68,5 +68,14 @@ int main(int argc,char** argv){
   std::cout<<"MAX abs "<<maxWorld<<" travel "<<maxTravel
            <<" frameDelta "<<maxDelta<<" structuralStretch "<<maxEdgeRatio
            <<" minZ "<<minHeight<<" interSheetCorrections "<<totalContacts<<"\n";
+  // The old implementation failed by two orders of magnitude at ~frame 220,
+  // despite passing candidate and solver-state equivalence tests.
+  // These intentionally conservative limits detect another catastrophic
+  // numerical blowup while allowing genuine draping and moving obstacles.
+  if(maxWorld>5.0||maxDelta>.8||maxEdgeRatio>2.6||minHeight<.039)
+   throw std::runtime_error("CLOTH UNSTABLE: runaway particle motion or structural strain");
+  if(totalContacts<100||maxTravel<1.0)
+   throw std::runtime_error("CLOTH INACTIVE: stable only because real contact or motion stopped");
+  std::cout<<"LONG_RUN_CLOTH_STABILITY_PASS\n";
  }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
