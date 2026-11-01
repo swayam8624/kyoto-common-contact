@@ -4,6 +4,7 @@
 // broad-phase benchmark. In particular, the synthetic multi-sheet geometry
 // contains no cloth-cloth contact response or physically simulated coupling.
 #include "ccp/live_cloth.hpp"
+#include "ccp/research_multicloth.hpp"
 #include <btBulletCollisionCommon.h>
 #include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
 #include <algorithm>
@@ -154,6 +155,26 @@ BoxList makeScene(const std::string& scene,int sample) {
         }
         return out;
     }
+    if(scene=="simulated_cloths3"){
+        // IMPORTANT: these are ACTUAL positions from a deforming, inter-sheet
+        // collision-responding C++ simulation, not synthetic sinusoidal AABBs.
+        // Every tested backend receives the identical immutable frame inputs.
+        static const std::vector<BoxList> recorded=[]{
+            std::vector<BoxList> snapshots;
+            ccp::research::MultiCloth world(3,2,ccp::research::Policy::RebuildSAP);
+            snapshots.reserve(kSamples);
+            for(int frame=0;frame<kSamples;++frame){
+                world.step();
+                const auto primitives=world.currentPrimitives();
+                BoxList boxes;boxes.reserve(primitives.size());
+                for(const auto& primitive:primitives)boxes.push_back(primitive.box);
+                snapshots.push_back(std::move(boxes));
+            }
+            return snapshots;
+        }();
+        if(sample<0||sample>=int(recorded.size()))throw std::runtime_error("invalid recorded frame");
+        return recorded[static_cast<std::size_t>(sample)];
+    }
     if(scene!="sheets2" && scene!="sheets3")
         throw std::runtime_error("unknown broad-phase benchmark scene "+scene);
     const int layers=scene=="sheets2"?2:3;
@@ -194,7 +215,7 @@ BoxList makeScene(const std::string& scene,int sample) {
     return out;
 }
 std::vector<std::string> cases() {
-    return {"sparse256","clustered512","dense256","sheets2","sheets3"};
+    return {"sparse256","clustered512","dense256","sheets2","sheets3","simulated_cloths3"};
 }
 double percentile(std::vector<double> values,double p) {
     std::sort(values.begin(),values.end());

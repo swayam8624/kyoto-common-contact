@@ -67,7 +67,7 @@ struct App {
  ccp::research::MultiCloth multi{3,2};
  bool multiMode=false,multiAudit=false;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
- int stage=1,evidenceScene=4;
+ int stage=1,evidenceScene=5;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
  V target{0,0,1.2};
  std::ofstream trace,events;
@@ -251,7 +251,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
  }
 if(key==GLFW_KEY_SPACE)a.paused=!a.paused;if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}if(key==GLFW_KEY_R){bool mode=a.sim.stats().sap,collide=a.sim.stats().collisions;auto request=a.sim.queryRequest();a.sim.reset();a.sim.setQueryRequest(request);a.sim.setBroadPhase(mode);a.sim.setCollisions(collide);a.cutaway=false;fitScene(a,w);}if(key==GLFW_KEY_F)fitScene(a,w);if(key==GLFW_KEY_B)a.sim.setBroadPhase(!a.sim.stats().sap);if(key==GLFW_KEY_C)a.sim.setCollisions(!a.sim.stats().collisions);if(key==GLFW_KEY_V)a.sim.setOracleEnabled(!a.sim.oracleEnabled());
 if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
-if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%5;a.inspectorScroll=0;}if(key==GLFW_KEY_Q){auto q=a.sim.queryRequest();q.updatePolicy=q.updatePolicy==ccp::live::UpdatePolicy::GuardedReuse?ccp::live::UpdatePolicy::RebuildEveryIteration:ccp::live::UpdatePolicy::GuardedReuse;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_M){auto q=a.sim.queryRequest();q.margin=q.margin<.03?.05:q.margin<.08?.10:.02;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_W)a.wire=!a.wire;if(key==GLFW_KEY_X)a.cutaway=!a.cutaway;if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;logEvent(a,"KEY "+std::to_string(key));}
+if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%6;a.inspectorScroll=0;}if(key==GLFW_KEY_Q){auto q=a.sim.queryRequest();q.updatePolicy=q.updatePolicy==ccp::live::UpdatePolicy::GuardedReuse?ccp::live::UpdatePolicy::RebuildEveryIteration:ccp::live::UpdatePolicy::GuardedReuse;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_M){auto q=a.sim.queryRequest();q.margin=q.margin<.03?.05:q.margin<.08?.10:.02;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_W)a.wire=!a.wire;if(key==GLFW_KEY_X)a.cutaway=!a.cutaway;if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;logEvent(a,"KEY "+std::to_string(key));}
 void mouse(GLFWwindow*w,int button,int action,int){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(button==GLFW_MOUSE_BUTTON_LEFT){a.drag=action==GLFW_PRESS;glfwGetCursorPos(w,&a.lastX,&a.lastY);}}
 void cursor(GLFWwindow*w,double x,double y){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(a.drag){a.yaw+=(x-a.lastX)*.006;a.pitch=std::clamp(a.pitch+(y-a.lastY)*.005,-.1,1.35);}a.lastX=x;a.lastY=y;}
 void scroll(GLFWwindow*w,double,double dy){
@@ -421,7 +421,7 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
   line("RUN scripts/prepare_meeting.sh",686);
  }
  heading("EXTERNAL 3D / BROAD PHASE ONLY",845);
- const std::array<std::string,5> cases={"sparse256","clustered512","dense256","sheets2","sheets3"};
+ const std::array<std::string,6> cases={"sparse256","clustered512","dense256","sheets2","sheets3","simulated_cloths3"};
  const auto selected=cases[std::clamp(a.evidenceScene,0,4)];
  line("SCENE: "+selected+"  /  H TO CHANGE",874,muted,1.22);
  line("ACTUAL BULLET DBVT / NOT A CLAIM OF BEST",897,purple,1.13);

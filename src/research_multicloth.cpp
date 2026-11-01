@@ -300,6 +300,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  }
  updateSpheres(0);
 }
+std::vector<Primitive> MultiCloth::currentPrimitives() const {return makePrimitives();}
 void MultiCloth::setPolicy(Policy policy){policy_=policy;regional_.reset();global_.invalidate();}
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}

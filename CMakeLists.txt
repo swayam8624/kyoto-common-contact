@@ -49,7 +49,7 @@ option(CCP_REQUIRE_BULLET "Fail configuration if the Bullet reference is unavail
 find_package(Bullet QUIET)
 if(Bullet_FOUND)
   add_executable(ccp_broadphase_leaderboard apps/broadphase_leaderboard.cpp)
-  target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ${BULLET_LIBRARIES})
+  target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ccp_multicloth ${BULLET_LIBRARIES})
   target_include_directories(ccp_broadphase_leaderboard PRIVATE ${BULLET_INCLUDE_DIRS})
   target_compile_options(ccp_broadphase_leaderboard PRIVATE -Wall -Wextra -Wpedantic)
   message(STATUS "External 3D broad-phase benchmark: Bullet DBVT enabled")

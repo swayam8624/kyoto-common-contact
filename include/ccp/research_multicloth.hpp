@@ -67,6 +67,9 @@ public:
   int sphereCount() const {return balls_;}
   int frame() const {return frame_;}
   Policy policy() const {return policy_;}
+  // Immutable broad-phase adapter for independent, equal-input published
+  // library benchmarks. It does NOT expose solver internal constraints.
+  std::vector<Primitive> currentPrimitives() const;
 private:
   struct Constraint {int a{},b{};double length{},compliance{},lambda{};};
   int sheets_{3},balls_{2},frame_{};
