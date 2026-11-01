@@ -65,7 +65,7 @@ struct MultiBenchRow {
 struct App {
  ccp::live::ClothSimulation sim;
  ccp::research::MultiCloth multi{3,2};
- bool multiMode=false,multiAudit=false;
+ bool multiMode=false,multiAudit=false,multiAdaptive=true;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
  int stage=1,evidenceScene=5;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
@@ -253,6 +253,10 @@ void key(GLFWwindow*w,int key,int,int action,int){
   } else if(key==GLFW_KEY_A){
    a.multiAudit=!a.multiAudit;a.multi.setAuditing(a.multiAudit);
    pushInspectorEvent(a,a.multiAudit?"EXHAUSTIVE COVERAGE AUDIT ON":"COVERAGE AUDIT OFF");
+  } else if(key==GLFW_KEY_Z){
+   a.multiAdaptive=!a.multiAdaptive;
+   a.multi.setAdaptive(a.multiAdaptive);
+   pushInspectorEvent(a,a.multiAdaptive?"ADAPTIVE REGION BUDGET":"FIXED REGION BUDGET");
   } else if(key==GLFW_KEY_W)a.wire=!a.wire;
   else if(key==GLFW_KEY_F)fitScene(a,w);
   else if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
@@ -311,10 +315,10 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("FRAME "+std::to_string(a.multi.frame())+" / "+
      std::to_string(a.multi.sheetCount())+" SHEETS",124,ink);
  line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount()),150);
- line("ACTIVE CONTACTS "+std::to_string(m.contacts),176,teal);
- line("INTERSHEET CONTACTS "+std::to_string(m.interSheetContacts),202,teal);
- line("QUERY PAIRS "+std::to_string(m.pairs)+" / PRECISE "+std::to_string(m.preciseTests),228);
- line("REGIONS DIRTY "+std::to_string(m.dirtyRegions),254);
+ line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
+ line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
+ line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
+ line("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),254,ink,1.20);
  line("PAIR BLOCK BUILDS "+std::to_string(m.regionalPairRebuilds),280);
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
@@ -587,12 +591,13 @@ int main(int argc,char**argv){try{
          " / MOVING BALLS "+std::to_string(a.multi.sphereCount()),blue,1.6);
    label("Q POLICY: "+policy,blue,1.5);
    label("L SHEETS / O BALLS / R RESET",blue,1.4);
+   label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
    label("FRAME "+std::to_string(a.multi.frame()));
    label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
-   label("INTERSHEET CONTACTS "+std::to_string(m.interSheetContacts),green,1.5);
-   label("SPHERE CONTACTS "+std::to_string(m.sphereContacts),green,1.5);
-   label("REGIONS REBUILT "+std::to_string(m.dirtyRegions),ink,1.45);
+   label("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),green,1.38);
+   label("SPHERE CORRECTIONS "+std::to_string(m.sphereContacts),green,1.42);
+   label("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),ink,1.26);
    label("PAIR BLOCKS REBUILT "+std::to_string(m.regionalPairRebuilds),ink,1.45);
    label("PAIR BLOCKS REUSED "+std::to_string(m.regionalPairReuses),ink,1.45);
    label("EXTRA GUARD PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.25);
