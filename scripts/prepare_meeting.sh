@@ -13,6 +13,9 @@ mkdir -p output/native
 python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
 python3 scripts/summarize_pipeline.py output/native/live_benchmark-postfix.csv output/native/cascade.svg
 python3 scripts/export_supporting_replays.py
+# The actual multi-cloth comparison rejects any changed physical trajectory.
+./build/ccp_multicloth_benchmark output/native/multicloth-real.csv 48
+python3 scripts/summarize_multicloth.py output/native/multicloth-real.csv output/native/multicloth-real.svg docs/MULTICLOTH_RESULTS.md
 ./build/ccp_broadphase_leaderboard output/native/broadphase-leaderboard.csv
 python3 scripts/summarize_leaderboard.py output/native/broadphase-leaderboard.csv output/native/broadphase-leaderboard.svg docs/BROADPHASE_RESULTS.md
 printf '\nMeeting verification completed; read docs/MEETING_RESULTS.md.\n'
