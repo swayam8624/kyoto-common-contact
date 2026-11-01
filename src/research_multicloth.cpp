@@ -632,6 +632,7 @@ void MultiCloth::step(){
  const auto start=Clock::now();
  ++frame_;
  metrics_={};const double time=frame_*kDt;
+ const auto frameStartPositions=positions_;
  updateSpheres(time);
  // Track only collision/floor projections. Geometric corrections should
  // remove penetration without becoming an unintended giant velocity.
@@ -789,6 +790,27 @@ void MultiCloth::step(){
  std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
  metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
                              metrics_.contactPairs.end());
+ // A solver can be exactly equivalent across broad phases while exploding.
+ // Measure its actual motion and grid edge strain each frame.
+ for(std::size_t i=0;i<positions_.size();++i){
+  const auto p=positions_[i];
+  if(!std::isfinite(p.x)||!std::isfinite(p.y)||!std::isfinite(p.z))
+   throw std::runtime_error("nonfinite cloth particle");
+  metrics_.maxFrameParticleTravel=std::max(metrics_.maxFrameParticleTravel,
+                              norm(sub(p,frameStartPositions[i])));
+  metrics_.maxWorldCoordinate=std::max(metrics_.maxWorldCoordinate,
+                             std::max({std::abs(p.x),std::abs(p.y),std::abs(p.z)}));
+ }
+ for(int sheet=0;sheet<sheets_;++sheet)for(int y=0;y<kSide;++y)for(int x=0;x<kSide;++x){
+  const std::size_t a=sheet*kSide*kSide+y*kSide+x;
+  for(const std::size_t b:{x+1<kSide?a+1:a,y+1<kSide?a+kSide:a}){
+   if(a==b)continue;
+   const double rest=norm(sub(initialPins_[a],initialPins_[b]));
+   if(rest>1e-12)
+    metrics_.maxStructuralEdgeStretch=std::max(metrics_.maxStructuralEdgeStretch,
+                         norm(sub(positions_[a],positions_[b]))/rest);
+  }
+ }
  metrics_.stepMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
 }
 } // namespace ccp::research
