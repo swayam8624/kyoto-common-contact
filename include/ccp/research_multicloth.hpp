@@ -109,6 +109,6 @@ private:
   Metrics metrics_;
   void updateSpheres(double t);
   std::vector<Primitive> makePrimitives() const;
-  void projectContacts(const std::vector<Pair>& pairs);
+  void projectContacts(const std::vector<Pair>& pairs,const std::vector<Bounds>& rawBounds);
 };
 } // namespace ccp::research
