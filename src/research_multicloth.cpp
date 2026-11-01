@@ -19,6 +19,15 @@ constexpr int kIterations=5;
 constexpr double kDt=1.0/90.0;
 constexpr double kThickness=0.062;
 constexpr double kMargin=0.075;
+// Stability contracts for the discrete XPBD-style test solver:
+// Contact projection is positional, not a perfectly elastic collision.
+// Limit its per-particle work in each iteration, and dissipate the associated
+// numerical velocity rather than reinjecting every correction next frame.
+constexpr double kWindAcceleration=1.6; // m/s^2, integrated using dt^2
+constexpr double kVelocityDamping=.982;
+constexpr double kMaxFreeVelocityStep=.060; // m per 1/90-second frame
+constexpr double kContactBudgetPerIteration=.030; // m, per dynamic vertex
+constexpr double kContactDisplacementDamping=.94; // 94% inelastic contact
 Vec3 add(Vec3 a,Vec3 b){return {a.x+b.x,a.y+b.y,a.z+b.z};}
 Vec3 sub(Vec3 a,Vec3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 Vec3 mul(Vec3 a,double x){return {a.x*x,a.y*x,a.z*x};}
@@ -349,7 +358,10 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  for(int layer=0;layer<sheets_;++layer){
   const int base=static_cast<int>(positions_.size());
   const double phi=layer*.13;
-  const double dz=2.05+.046*layer;
+  // At t=0, each separate sheet must have physical clearance. The old
+  // 0.046m layer separation was already SMALLER than kThickness=0.062m,
+  // triggering thousands of violent contact responses on frame one.
+  const double dz=2.05+.19*layer;
   for(int y=0;y<kSide;++y)
    for(int x=0;x<kSide;++x){
     const double u=(x-(kSide-1)*.5)*spacing;
@@ -480,7 +492,23 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
  }
  return out;
 }
-void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
+void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
+                                 const std::vector<Bounds>& rawBounds){
+ // Multiple triangle pairs share the SAME vertices. Without a per-vertex
+ // projection budget, dozens of valid local corrections can push a single
+ // particle several meters in ONE step, giving the next Verlet step huge
+ // artificial velocity. Bound the total motion PER solver iteration.
+ std::vector<double> correctionRemaining(positions_.size(),kContactBudgetPerIteration);
+ const auto limitedCorrection=[&](int id,Vec3 delta){
+  if(inverseMasses_[id]<=0)return false;
+  const double requested=norm(delta);
+  if(!std::isfinite(requested))throw std::runtime_error("nonfinite contact correction");
+  if(requested<=1e-14||correctionRemaining[id]<=0)return false;
+  const double actual=std::min(requested,correctionRemaining[id]);
+  positions_[id]=add(positions_[id],mul(delta,actual/requested));
+  correctionRemaining[id]-=actual;
+  return true;
+ };
  struct Weighted {std::array<int,3> ids{-1,-1,-1};std::array<double,3> w{};Vec3 p{};};
  const auto position=[&](const Weighted& x){Vec3 p{};for(int j=0;j<3;++j)
    if(x.ids[j]>=0)p=add(p,mul(positions_[x.ids[j]],x.w[j]));return p;};
@@ -493,13 +521,16 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
   }
   if(denom<=1e-16)return false;
   const Vec3 corr=mul(n,std::min(0.13,threshold-distance)/denom*.68);
+  bool moved=false;
   for(int j=0;j<3;++j){
-   if(a.ids[j]>=0)positions_[a.ids[j]]=add(positions_[a.ids[j]],
-      mul(corr,a.w[j]*inverseMasses_[a.ids[j]]));
-   if(b.ids[j]>=0)positions_[b.ids[j]]=sub(positions_[b.ids[j]],
-      mul(corr,b.w[j]*inverseMasses_[b.ids[j]]));
+   if(a.ids[j]>=0)
+    moved=limitedCorrection(a.ids[j],
+      mul(corr,a.w[j]*inverseMasses_[a.ids[j]]))||moved;
+   if(b.ids[j]>=0)
+    moved=limitedCorrection(b.ids[j],
+      mul(corr,-b.w[j]*inverseMasses_[b.ids[j]]))||moved;
   }
-  return true;
+  return moved;
  };
  const auto weightedTri=[&](int ti,std::array<double,3> w,Vec3 p){
   Weighted result;result.ids=triangles_[static_cast<std::size_t>(ti)];result.w=w;result.p=p;return result;
@@ -508,6 +539,20 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
   Weighted result;result.ids={id,-1,-1};result.w={1,0,0};result.p=positions_[id];return result;
  };
  for(const auto pair:pairs){
+  // The global guarded SAP explicitly emits a SUPSET of pairs from old
+  // fat AABBs. Such pairs must not inject actual contact impulses after
+  // separating! Revalidate against the CURRENT padded primitive boxes
+  // before any feature-level response. Keep this cost in narrowMs, not in
+  // the guarded broad-phase lookup metric.
+  if(policy_==Policy::GlobalGuard){
+   const auto& a=rawBounds.at(static_cast<std::size_t>(pair.a));
+   const auto& b=rawBounds.at(static_cast<std::size_t>(pair.b));
+   ++metrics_.broadAabbTests;
+   if(a.max.x+kMargin<b.min.x||b.max.x+kMargin<a.min.x||
+      a.max.y+kMargin<b.min.y||b.max.y+kMargin<a.min.y||
+      a.max.z+kMargin<b.min.z||b.max.z+kMargin<a.min.z)
+    continue;
+  }
   ++metrics_.preciseTests;
   int ia=pair.a,ib=pair.b;
   const int triangles=static_cast<int>(triangles_.size());
@@ -528,12 +573,16 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
     den+=mesh.w[j]*mesh.w[j]*inverseMasses_[mesh.ids[j]];
    if(d<ball.radius+kThickness&&den>1e-15){
     const auto correction=mul(n,std::min(0.15,ball.radius+kThickness-d)/den*.75);
-    for(int j=0;j<3;++j)positions_[mesh.ids[j]]=add(positions_[mesh.ids[j]],
-       mul(correction,mesh.w[j]*inverseMasses_[mesh.ids[j]]));
-    ++metrics_.contacts;++metrics_.sphereContacts;
-    if(policy_==Policy::OnlineContactAware)
-     ++metrics_.regionWork[triangleRegions_[ti]].contactCorrections;
-    metrics_.contactPairs.push_back(pair);
+    bool moved=false;
+    for(int j=0;j<3;++j)
+     moved=limitedCorrection(mesh.ids[j],
+       mul(correction,mesh.w[j]*inverseMasses_[mesh.ids[j]]))||moved;
+    if(moved){
+     ++metrics_.contacts;++metrics_.sphereContacts;
+     if(policy_==Policy::OnlineContactAware)
+      ++metrics_.regionWork[triangleRegions_[ti]].contactCorrections;
+     metrics_.contactPairs.push_back(pair);
+    }
    }
    continue;
   }
@@ -583,13 +632,27 @@ void MultiCloth::step(){
  const auto start=Clock::now();
  ++frame_;
  metrics_={};const double time=frame_*kDt;
+ const auto frameStartPositions=positions_;
  updateSpheres(time);
+ // Track only collision/floor projections. Geometric corrections should
+ // remove penetration without becoming an unintended giant velocity.
+ std::vector<Vec3> contactDisplacements(positions_.size(),Vec3{});
  for(std::size_t i=0;i<positions_.size();++i){
   if(pinned_[i])continue;
-  const Vec3 velocity=mul(sub(positions_[i],previous_[i]),.991);
+  Vec3 velocity=mul(sub(positions_[i],previous_[i]),kVelocityDamping);
+  const double speed=norm(velocity);
+  if(speed>kMaxFreeVelocityStep){
+   velocity=mul(velocity,kMaxFreeVelocityStep/speed);
+   ++metrics_.velocityClamps;
+  }
   const int sheet=int(i/(kSide*kSide));
-  const double wind=.0030*std::sin(2.8*time+sheet*.55+positions_[i].y*.9);
-  const Vec3 predicted=add(add(positions_[i],velocity),{wind,wind*.20,-9.81*kDt*kDt});
+  // The former 0.003m *position kick per frame* was equivalent to roughly
+  // 24m/s^2 lateral acceleration: >2x gravity, and badly destabilizing.
+  const double windAcceleration=kWindAcceleration*
+    std::sin(2.8*time+sheet*.55+positions_[i].y*.9);
+  const double wind=windAcceleration*kDt*kDt;
+  const Vec3 predicted=add(add(positions_[i],velocity),
+                           {wind,wind*.20,-9.81*kDt*kDt});
   previous_[i]=positions_[i];
   positions_[i]=predicted;
  }
@@ -601,9 +664,16 @@ void MultiCloth::step(){
   for(std::size_t i=0;i<pinned_.size();++i)if(pinned_[i]){
    const int layer=int(i/(kSide*kSide));
    const double phase=time*1.4+.7*layer;
+   const double initialPhase=.7*layer;
    const auto p=initialPins_[i];
-   positions_[i]={p.x+.22*std::sin(phase),p.y+.12*std::cos(phase*.75),
-                  p.z+.10*std::sin(phase*.8)};
+   // Subtract the t=0 oscillation offset. Previously sheet 2's corners
+   // teleported ~0.24m on the first solver step simply because each sheet
+   // had a different initial phase. Drive the anchors continuously instead.
+   positions_[i]={
+    p.x+.22*(std::sin(phase)-std::sin(initialPhase)),
+    p.y+.12*(std::cos(phase*.75)-std::cos(initialPhase*.75)),
+    p.z+.10*(std::sin(phase*.8)-std::sin(initialPhase*.8))
+   };
    previous_[i]=positions_[i];
   }
   constexpr double invDt2=1.0/(kDt*kDt);
@@ -620,7 +690,10 @@ void MultiCloth::step(){
    positions_[c.b]=sub(positions_[c.b],mul(corr,wb));
   }
   for(std::size_t i=0;i<positions_.size();++i)
-   if(inverseMasses_[i]>0&&positions_[i].z<.04)positions_[i].z=.04;
+   if(inverseMasses_[i]>0&&positions_[i].z<.04){
+    contactDisplacements[i].z+=.04-positions_[i].z;
+    positions_[i].z=.04;
+   }
   const auto primitives=makePrimitives();
   std::vector<Bounds> bounds;bounds.reserve(primitives.size());
   for(const auto& primitive:primitives)bounds.push_back(primitive.box);
@@ -670,11 +743,40 @@ void MultiCloth::step(){
    metrics_.oracleChecked=true;
   }
   const auto narrowStart=Clock::now();
-  projectContacts(pairs);
+  const auto beforeContact=positions_;
+  projectContacts(pairs,bounds);
+  for(std::size_t i=0;i<positions_.size();++i){
+   if(inverseMasses_[i]<=0)continue;
+   // Floor is a unilateral constraint: contact may have pushed the cloth
+   // downward after the pre-query floor projection.
+   if(positions_[i].z<.04)positions_[i].z=.04;
+   contactDisplacements[i]=add(contactDisplacements[i],
+                               sub(positions_[i],beforeContact[i]));
+  }
   metrics_.narrowMs+=std::chrono::duration<double,std::milli>(Clock::now()-narrowStart).count();
  }
+ // PBD collision projections remove penetration but should not create
+ // artificial high-frequency velocity. In Verlet coordinates, the velocity
+ // for the next frame is (current - previous); shift previous by most of
+ // the collision displacement to make collisions approximately inelastic.
+ // This is deliberately separate from the structural XPBD constraints.
+ for(std::size_t i=0;i<positions_.size();++i)
+  if(inverseMasses_[i]>0){
+   previous_[i]=add(previous_[i],
+                    mul(contactDisplacements[i],kContactDisplacementDamping));
+   const double speed=norm(sub(positions_[i],previous_[i]));
+   if(!std::isfinite(speed))throw std::runtime_error("nonfinite cloth velocity");
+   if(speed>kMaxFreeVelocityStep){
+    previous_[i]=sub(positions_[i],
+      mul(sub(positions_[i],previous_[i]),kMaxFreeVelocityStep/speed));
+    ++metrics_.velocityClamps;
+   }
+  }
  if(policy_==Policy::GlobalGuard){
-  metrics_.broadAabbTests=globalMetrics.pairTests;
+  // Preserve current-AABB revalidation work already counted in the
+  // downstream guarded candidate filter; do not overwrite it with the
+  // separate cached-SAP rebuild test count.
+  metrics_.broadAabbTests+=globalMetrics.pairTests;
   metrics_.lastEvent="GLOBAL_GUARD_REUSE";
  }
  if(policy_==Policy::RebuildSAP)metrics_.lastEvent="FULL_SAP_REBUILD";
@@ -702,6 +804,27 @@ void MultiCloth::step(){
  std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
  metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
                              metrics_.contactPairs.end());
+ // A solver can be exactly equivalent across broad phases while exploding.
+ // Measure its actual motion and grid edge strain each frame.
+ for(std::size_t i=0;i<positions_.size();++i){
+  const auto p=positions_[i];
+  if(!std::isfinite(p.x)||!std::isfinite(p.y)||!std::isfinite(p.z))
+   throw std::runtime_error("nonfinite cloth particle");
+  metrics_.maxFrameParticleTravel=std::max(metrics_.maxFrameParticleTravel,
+                              norm(sub(p,frameStartPositions[i])));
+  metrics_.maxWorldCoordinate=std::max(metrics_.maxWorldCoordinate,
+                             std::max({std::abs(p.x),std::abs(p.y),std::abs(p.z)}));
+ }
+ for(int sheet=0;sheet<sheets_;++sheet)for(int y=0;y<kSide;++y)for(int x=0;x<kSide;++x){
+  const std::size_t a=sheet*kSide*kSide+y*kSide+x;
+  for(const std::size_t b:{x+1<kSide?a+1:a,y+1<kSide?a+kSide:a}){
+   if(a==b)continue;
+   const double rest=norm(sub(initialPins_[a],initialPins_[b]));
+   if(rest>1e-12)
+    metrics_.maxStructuralEdgeStretch=std::max(metrics_.maxStructuralEdgeStretch,
+                         norm(sub(positions_[a],positions_[b]))/rest);
+  }
+ }
  metrics_.stepMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
 }
 } // namespace ccp::research

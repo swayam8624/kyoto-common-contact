@@ -257,6 +257,14 @@ void stepSimulation(App&a){
   a.multi.step();
   const auto& m=a.multi.metrics();
   if(m.oracleMisses)a.paused=true;
+  // Never let a numerical explosion continue invisibly in the viewer.
+  if(m.maxFrameParticleTravel>.8||m.maxStructuralEdgeStretch>2.6||
+     m.maxWorldCoordinate>5.0){
+   a.paused=true;
+   pushInspectorEvent(a,"PHYSICS STABILITY LIMIT: PAUSED");
+   pushInspectorEvent(a,"FRAME TRAVEL "+number(m.maxFrameParticleTravel,3)+
+     " EDGE STRETCH "+number(m.maxStructuralEdgeStretch,2));
+  }
   a.historyCandidates.push_back(double(m.pairs));
   a.historyInterContacts.push_back(double(m.interSheetContacts));
   a.historyBroadMs.push_back(m.broadMs);
@@ -436,6 +444,8 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
  line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
+ line("PHYSICAL STRAIN "+number(m.maxStructuralEdgeStretch,3)+
+      " FRAME DELTA "+number(m.maxFrameParticleTravel,3),366,teal,1.12);
  line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
       " / SKIPPED "+std::to_string(m.regionPairsSkipped),404,ink,1.18);
  line("ONLINE WORK "+number(m.onlineMeasuredWork,0)+
@@ -767,6 +777,8 @@ int main(int argc,char**argv){try{
    label("BROAD CPU "+number(m.broadMs)+" MS",muted,1.6);
    label("PRECISE CPU "+number(m.narrowMs)+" MS",muted,1.6);
    label("FULL STEP "+number(m.stepMs)+" MS",muted,1.65);
+   label("MAX EDGE STRETCH "+number(m.maxStructuralEdgeStretch,2)+"X",green,1.30);
+   label("FRAME PARTICLE TRAVEL "+number(m.maxFrameParticleTravel,3),green,1.23);
    label(m.oracleChecked?"A PAIR COVERAGE CHECKED":"A ORACLE UNCHECKED",m.oracleChecked?green:muted,1.4);
    label("RESEARCH DEMO / NO CCD",red,1.35);
    gap();

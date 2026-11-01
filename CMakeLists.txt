@@ -41,6 +41,8 @@ add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
 add_executable(ccp_online_trace apps/online_controller_trace.cpp)
 target_link_libraries(ccp_online_trace PRIVATE ccp_multicloth)
+add_executable(ccp_cloth_stability_probe apps/cloth_stability_probe.cpp)
+target_link_libraries(ccp_cloth_stability_probe PRIVATE ccp_multicloth)
 add_executable(ccp_patch_sweep apps/patch_granularity_benchmark.cpp)
 target_link_libraries(ccp_patch_sweep PRIVATE ccp_multicloth)
 

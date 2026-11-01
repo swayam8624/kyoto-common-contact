@@ -29,7 +29,9 @@ struct Metrics {
               regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
               onlineStrategySwitches{};
   double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
-         onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{};
+         onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{},
+         maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
+  std::size_t velocityClamps{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
   std::vector<Pair> candidatePairs,contactPairs;
@@ -105,6 +107,6 @@ private:
   Metrics metrics_;
   void updateSpheres(double t);
   std::vector<Primitive> makePrimitives() const;
-  void projectContacts(const std::vector<Pair>& pairs);
+  void projectContacts(const std::vector<Pair>& pairs,const std::vector<Bounds>& rawBounds);
 };
 } // namespace ccp::research
