@@ -29,6 +29,8 @@ struct Metrics {
               regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
               onlineStrategySwitches{};
   double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
+         maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
+  std::size_t velocityClamps{};
          onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{};
   bool oracleChecked{};
   std::string lastEvent{"UNQUERIED"};
