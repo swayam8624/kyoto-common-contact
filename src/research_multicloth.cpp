@@ -670,10 +670,20 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
       a.max.z+kMargin<b.min.z||b.max.z+kMargin<a.min.z)
     continue;
   }
-  ++metrics_.preciseTests;
-  int ia=pair.a,ib=pair.b;
+  const int ia=pair.a,ib=pair.b;
   const int triangles=static_cast<int>(triangles_.size());
   if(ia>=triangles&&ib>=triangles)continue;
+  const bool sameSheet=ia<triangles&&ib<triangles&&
+                       triangleSheets_[ia]==triangleSheets_[ib];
+  if(sameSheet){
+   if(!selfCollisions_||!nonlocalSelfPair(ia,ib)){
+    ++metrics_.selfTopologyFiltered;
+    continue;
+   }
+   ++metrics_.selfCandidatePairs;
+   ++metrics_.selfPreciseTests;
+  }
+  ++metrics_.preciseTests;
   if(ib>=triangles||ia>=triangles){
    const int ti=ia<triangles?ia:ib,si=(ia>=triangles?ia:ib)-triangles;
    if(si<0||si>=static_cast<int>(spheres_.size()))throw std::runtime_error("invalid sphere pair");
@@ -703,7 +713,6 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
    }
    continue;
   }
-  if(triangleSheets_[ia]==triangleSheets_[ib])continue;
   const auto ta=triangles_[ia],tb=triangles_[ib];
   // Choose the nearest primitive feature pair: six vertex-face and nine
   // edge-edge tests. This is an approximate *discrete* contact solver,
@@ -730,13 +739,63 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
    b.ids={va,vb,-1};b.w={1-pairS.t,pairS.t,0};b.p=pairS.b;
    consider(a,b);
   }
-  const double d=std::sqrt(best);
-  const Vec3 fallback=normalized(cross(sub(positions_[ta[1]],positions_[ta[0]]),
+  // For a nonlocal fold, an edge can PIERCE an interior triangle without
+  // leaving a vertex within contact thickness. Use current edge-face
+  // intersections to detect that discrete geometric self-intersection.
+  // This is an extra DISCRETE safeguard, not guaranteed temporal CCD.
+  bool piercing=false;
+  if(sameSheet){
+   const auto testPiercing=[&](const std::array<int,3>& edgeTri,int faceId,
+                               bool edgeIsA){
+    if(piercing)return;
+    const auto face=triangles_[static_cast<std::size_t>(faceId)];
+    for(int edge=0;edge<3&&!piercing;++edge){
+     const int v0=edgeTri[edge],v1=edgeTri[(edge+1)%3];
+     const auto hit=segmentFace(positions_[v0],positions_[v1],
+       positions_[face[0]],positions_[face[1]],positions_[face[2]]);
+     if(!hit)continue;
+     Weighted edgePoint;
+     edgePoint.ids={v0,v1,-1};
+     edgePoint.w={1.-hit->edgeParameter,hit->edgeParameter,0};
+     edgePoint.p=hit->p;
+     const Weighted facePoint=weightedTri(faceId,hit->bary,hit->p);
+     if(edgeIsA){bestA=edgePoint;bestB=facePoint;}
+     else{bestA=facePoint;bestB=edgePoint;}
+     piercing=true;
+    }
+   };
+   testPiercing(ta,ib,true);
+   testPiercing(tb,ia,false);
+   if(piercing)++metrics_.selfCrossings;
+  }
+  const double distance=piercing?0.:std::sqrt(best);
+  const Vec3 faceNormal=normalized(cross(sub(positions_[ta[1]],positions_[ta[0]]),
                                          sub(positions_[ta[2]],positions_[ta[0]])));
-  const Vec3 n=d>1e-9?mul(sub(bestA.p,bestB.p),1.0/d):
-    mul(fallback,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
-  if(respond(bestA,bestB,d,n,kThickness)){
-   ++metrics_.contacts;++metrics_.interSheetContacts;
+  Vec3 normal{};
+  if(!piercing&&distance>1e-9)
+   normal=mul(sub(bestA.p,bestB.p),1.0/distance);
+  else if(sameSheet){
+   // At geometric intersection, the two features coincide. Orient the
+   // separating normal using their PREVIOUS timestep separation when
+   // available; this avoids random front/back sign flips during folding.
+   const auto before=[&](const Weighted& w){
+    Vec3 value{};
+    for(int j=0;j<3;++j)if(w.ids[j]>=0)
+     value=add(value,mul(previous_[w.ids[j]],w.w[j]));
+    return value;
+   };
+   const Vec3 oldSide=sub(before(bestA),before(bestB));
+   normal=norm(oldSide)>1e-8?normalized(oldSide):faceNormal;
+   if(norm(oldSide)<=1e-8){
+    const Vec3 ca=mul(add(add(positions_[ta[0]],positions_[ta[1]]),positions_[ta[2]]),1./3);
+    const Vec3 cb=mul(add(add(positions_[tb[0]],positions_[tb[1]]),positions_[tb[2]]),1./3);
+    if(dot(normal,sub(ca,cb))<0)normal=mul(normal,-1);
+   }
+  }else normal=mul(faceNormal,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
+  if(respond(bestA,bestB,distance,normal,sameSheet?kSelfThickness:kThickness)){
+   ++metrics_.contacts;
+   if(sameSheet)++metrics_.selfContacts;
+   else ++metrics_.interSheetContacts;
    if(policy_==Policy::OnlineContactAware){
     ++metrics_.regionWork[triangleRegions_[ia]].contactCorrections;
     ++metrics_.regionWork[triangleRegions_[ib]].contactCorrections;
