@@ -340,13 +340,19 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
     pinned_.push_back(anchor?1:0);
     inverseMasses_.push_back(anchor?0.0:1.0);
    }
-  const int blocks=(kSide-1+2)/3;
+  const int blocks=(kSide-1)/patchCellSpan_;
   for(int y=0;y<kSide-1;++y)
    for(int x=0;x<kSide-1;++x){
     const int a=base+y*kSide+x,b=a+1,c=a+kSide,d=c+1;
     for(auto tri:{std::array<int,3>{a,b,d},std::array<int,3>{a,d,c}}){
      triangles_.push_back(tri);triangleSheets_.push_back(layer);
-     triangleRegions_.push_back(layer*100+(y/3)*blocks+x/3);
+     // Span three preserves the already-benchmarked reference region IDs.
+     // Other spans use a disjoint range, including span one (144 patches
+     // per sheet), avoiding collisions with the sphere region IDs.
+     const int region=patchCellSpan_==3
+       ? layer*100+(y/3)*4+x/3
+       : 1000+layer*400+(y/patchCellSpan_)*blocks+x/patchCellSpan_;
+     triangleRegions_.push_back(region);
     }
    }
   auto addConstraint=[&](int a,int b,double compliance){
@@ -376,6 +382,25 @@ void MultiCloth::setHierarchicalRegions(bool enabled){
   regional_.reset();
  }
 }
+void MultiCloth::setPatchCellSpan(int cells){
+ if(cells!=1&&cells!=2&&cells!=3&&cells!=4&&cells!=6&&cells!=12)
+  throw std::invalid_argument("patch span must be a divisor of 12: 1, 2, 3, 4, 6, 12");
+ if(cells==patchCellSpan_)return;
+ patchCellSpan_=cells;
+ const int blocks=(kSide-1)/cells;
+ for(std::size_t ti=0;ti<triangleRegions_.size();++ti){
+  const int sheet=triangleSheets_[ti];
+  const int cell=int((ti%std::size_t(2*(kSide-1)*(kSide-1)))/2);
+  const int y=cell/(kSide-1),x=cell%(kSide-1);
+  triangleRegions_[ti]=cells==3
+    ? sheet*100+(y/3)*4+x/3
+    : 1000+sheet*400+(y/cells)*blocks+x/cells;
+ }
+ // Topology grouping changed, so every previous block certificate and
+ // candidate list must be rejected before this new partition is queried.
+ regional_.reset();
+}
+
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();

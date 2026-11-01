@@ -61,6 +61,11 @@ public:
   void setPolicy(Policy policy);
   void setAdaptive(bool adaptive);
   void setHierarchicalRegions(bool enabled);
+  // Experimental *fixed* patch-granularity ablation, in mesh cell units.
+  // Repartitioning invalidates cached region pair blocks; physical
+  // triangle/particle identities and the caller-owned solver do not change.
+  void setPatchCellSpan(int cells);
+  int patchCellSpan() const {return patchCellSpan_;}
   void setAuditing(bool enable);
   bool hierarchicalRegions() const { return hierarchicalRegions_; }
   const std::vector<Vec3>& positions() const {return positions_;}
@@ -77,7 +82,7 @@ public:
   std::vector<Primitive> currentPrimitives() const;
 private:
   struct Constraint {int a{},b{};double length{},compliance{},lambda{};};
-  int sheets_{3},balls_{2},frame_{};
+  int sheets_{3},balls_{2},frame_{},patchCellSpan_{3};
   Policy policy_{Policy::RegionalCertified};
   bool adaptive_{true},auditing_{false},hierarchicalRegions_{false};
   std::vector<Vec3> positions_,previous_,initialPins_;
