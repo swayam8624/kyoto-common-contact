@@ -6,6 +6,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <sstream>
 #include <unordered_map>
@@ -18,6 +19,10 @@ constexpr int kSide=13;
 constexpr int kIterations=5;
 constexpr double kDt=1.0/90.0;
 constexpr double kThickness=0.062;
+// Self-contact uses the same conservative 0.075m AABB query margin. A
+// positive thickness and nonlocal topological exclusions are necessary
+// for folding cloth, but this is NOT continuous collision detection.
+constexpr double kSelfThickness=0.070;
 constexpr double kMargin=0.075;
 // Stability contracts for the discrete XPBD-style test solver:
 // Contact projection is positional, not a perfectly elastic collision.
@@ -123,6 +128,29 @@ SegPair closestSegments(Vec3 p1,Vec3 q1,Vec3 p2,Vec3 q2){
   }
  }
  return {add(p1,mul(d1,s)),add(p2,mul(d2,t)),s,t};
+}
+// Segment/triangle piercing can be missed by nearest-vertex-only tests:
+// the penetrating edge may already have crossed the face and its endpoints
+// can be farther than the cloth's contact thickness. This detects ACTUAL
+// current-segment crossings, not continuous time-of-impact.
+struct SegmentFaceHit {
+ Vec3 p{};
+ std::array<double,3> bary{};
+ double edgeParameter{};
+};
+std::optional<SegmentFaceHit> segmentFace(Vec3 p0,Vec3 p1,Vec3 a,Vec3 b,Vec3 c){
+ const Vec3 ab=sub(b,a),ac=sub(c,a),n=cross(ab,ac),direction=sub(p1,p0);
+ const double n2=len2(n),denom=dot(n,direction);
+ if(n2<1e-19||std::abs(denom)<1e-12)return std::nullopt;
+ const double t=dot(n,sub(a,p0))/denom;
+ if(t<0||t>1)return std::nullopt;
+ const Vec3 q=add(p0,mul(direction,t)),v=sub(q,a);
+ const double d00=dot(ab,ab),d01=dot(ab,ac),d11=dot(ac,ac);
+ const double d20=dot(v,ab),d21=dot(v,ac),den=d00*d11-d01*d01;
+ if(std::abs(den)<1e-20)return std::nullopt;
+ const double v1=(d11*d20-d01*d21)/den,v2=(d00*d21-d01*d20)/den;
+ if(v1<-.00001||v2<-.00001||v1+v2>1.00001)return std::nullopt;
+ return SegmentFaceHit{q,{1.-v1-v2,v1,v2},t};
 }
 }
 void RegionalCandidates::reset(){
@@ -353,6 +381,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  positions_.clear();previous_.clear();inverseMasses_.clear();
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
  pinned_.clear();initialPins_.clear();constraints_.clear();spheres_.clear();
+ grab_={};
  regional_.reset();global_.invalidate();metrics_={};
  const double spacing=2.2/(kSide-1);
  for(int layer=0;layer<sheets_;++layer){
@@ -463,6 +492,93 @@ void MultiCloth::assignOnlineRegionIds(){
  regional_.reset();
 }
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}
+void MultiCloth::setSelfCollisions(bool enabled){
+ if(selfCollisions_==enabled)return;
+ selfCollisions_=enabled;
+ regional_.reset();
+ global_.invalidate(); // eligibility masks now include/exclude same-sheet pairs
+}
+// Same-cloth triangles in the same cell or neighboring mesh cells share
+// an edge, vertex or structural one-ring neighborhood. Excluding them
+// prevents the cloth from repelling its own resting local mesh.
+bool MultiCloth::nonlocalSelfPair(int first,int second) const{
+ if(first==second||first<0||second<0 ||
+    first>=static_cast<int>(triangles_.size())||
+    second>=static_cast<int>(triangles_.size()))return false;
+ if(triangleSheets_[first]!=triangleSheets_[second])return false;
+ constexpr int cellsPerSheet=2*(kSide-1)*(kSide-1);
+ const int ca=(first%cellsPerSheet)/2,cb=(second%cellsPerSheet)/2;
+ const int ax=ca%(kSide-1),ay=ca/(kSide-1);
+ const int bx=cb%(kSide-1),by=cb/(kSide-1);
+ return std::abs(ax-bx)>1||std::abs(ay-by)>1;
+}
+bool MultiCloth::beginGrab(int ti,std::array<double,3> bary,Vec3 pickedPoint){
+ if(ti<0||ti>=static_cast<int>(triangles_.size()))return false;
+ for(double x:bary)if(!std::isfinite(x)||x<0||x>1)return false;
+ const double sum=bary[0]+bary[1]+bary[2];
+ if(std::abs(sum-1.)>1e-5)return false;
+ const auto tri=triangles_[static_cast<std::size_t>(ti)];
+ double weightedInverseMass=0;
+ for(int j=0;j<3;++j)
+  weightedInverseMass+=bary[j]*bary[j]*inverseMasses_[tri[j]];
+ if(weightedInverseMass<1e-10)return false;
+ if(!std::isfinite(pickedPoint.x)||!std::isfinite(pickedPoint.y)||
+    !std::isfinite(pickedPoint.z))return false;
+ grab_={true,ti,bary,pickedPoint,pickedPoint};
+ return true;
+}
+void MultiCloth::updateGrab(Vec3 target){
+ if(!grab_.active)return;
+ if(!std::isfinite(target.x)||!std::isfinite(target.y)||!std::isfinite(target.z))
+  throw std::invalid_argument("nonfinite cloth grab target");
+ // Keep mouse interaction within the demo's finite physical workspace.
+ grab_.target={std::clamp(target.x,-4.,4.),
+               std::clamp(target.y,-4.,4.),
+               std::clamp(target.z,.10,5.0)};
+}
+void MultiCloth::endGrab(){grab_.active=false;}
+Vec3 MultiCloth::grabPoint() const{
+ if(!grab_.active)return {};
+ const auto tri=triangles_.at(static_cast<std::size_t>(grab_.triangle));
+ Vec3 point{};
+ for(int j=0;j<3;++j)point=add(point,mul(positions_[tri[j]],grab_.bary[j]));
+ return point;
+}
+void MultiCloth::projectGrab(std::vector<Vec3>& nonphysical){
+ if(!grab_.active)return;
+ const auto tri=triangles_[static_cast<std::size_t>(grab_.triangle)];
+ const Vec3 delta=sub(grab_.filteredTarget,grabPoint());
+ const double length=norm(delta);
+ metrics_.grabError=length;
+ if(length<1e-8)return;
+ double inverse=0;
+ for(int j=0;j<3;++j)inverse+=
+   grab_.bary[j]*grab_.bary[j]*inverseMasses_[tri[j]];
+ if(inverse<1e-12)return;
+ // An XPBD-style, mass-weighted barycentric attachment. The held point
+ // follows smoothly instead of teleporting vertices and exciting extreme
+ // elastic energy. Contact projections may push it away to avoid overlap.
+ const Vec3 corr=mul(delta,std::min(.022/length,1.0)*.77/inverse);
+ for(int j=0;j<3;++j){
+  const int id=tri[j];
+  const Vec3 move=mul(corr,grab_.bary[j]*inverseMasses_[id]);
+  positions_[id]=add(positions_[id],move);
+  nonphysical[id]=add(nonphysical[id],move);
+ }
+ ++metrics_.grabCorrections;
+}
+void MultiCloth::displacePatchForTest(int sheet,int minX,int minY,int width,Vec3 delta){
+ if(sheet<0||sheet>=sheets_||minX<0||minY<0||width<1||
+    minX+width>kSide||minY+width>kSide)
+  throw std::invalid_argument("test patch out of cloth bounds");
+ for(int y=minY;y<minY+width;++y)for(int x=minX;x<minX+width;++x){
+  const int id=sheet*kSide*kSide+y*kSide+x;
+  if(pinned_[id])throw std::invalid_argument("cannot displace pinned cloth vertex");
+  positions_[id]=add(positions_[id],delta);
+  previous_[id]=add(previous_[id],delta);
+ }
+ regional_.reset();global_.invalidate();
+}
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();
  spheres_.push_back({{0.43*std::sin(.92*t),.15*std::cos(1.12*t),.97+.08*std::sin(.71*t)},.68});
@@ -481,7 +597,8 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
    hi={std::max(hi.x,p.x),std::max(hi.y,p.y),std::max(hi.z,p.z)};
   }
   const auto cat=std::uint32_t{1}<<triangleSheets_[i];
-  out.push_back({{int(i),lo,hi,cat,(clothMask^cat)|sphereCat,true},
+  out.push_back({{int(i),lo,hi,cat,
+                 (selfCollisions_?clothMask:(clothMask^cat))|sphereCat,true},
                  triangleRegions_[i],triangleSheets_[i]});
  }
  for(std::size_t i=0;i<spheres_.size();++i){
@@ -553,10 +670,20 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
       a.max.z+kMargin<b.min.z||b.max.z+kMargin<a.min.z)
     continue;
   }
-  ++metrics_.preciseTests;
-  int ia=pair.a,ib=pair.b;
+  const int ia=pair.a,ib=pair.b;
   const int triangles=static_cast<int>(triangles_.size());
   if(ia>=triangles&&ib>=triangles)continue;
+  const bool sameSheet=ia<triangles&&ib<triangles&&
+                       triangleSheets_[ia]==triangleSheets_[ib];
+  if(sameSheet){
+   if(!selfCollisions_||!nonlocalSelfPair(ia,ib)){
+    ++metrics_.selfTopologyFiltered;
+    continue;
+   }
+   ++metrics_.selfCandidatePairs;
+   ++metrics_.selfPreciseTests;
+  }
+  ++metrics_.preciseTests;
   if(ib>=triangles||ia>=triangles){
    const int ti=ia<triangles?ia:ib,si=(ia>=triangles?ia:ib)-triangles;
    if(si<0||si>=static_cast<int>(spheres_.size()))throw std::runtime_error("invalid sphere pair");
@@ -586,7 +713,6 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
    }
    continue;
   }
-  if(triangleSheets_[ia]==triangleSheets_[ib])continue;
   const auto ta=triangles_[ia],tb=triangles_[ib];
   // Choose the nearest primitive feature pair: six vertex-face and nine
   // edge-edge tests. This is an approximate *discrete* contact solver,
@@ -613,13 +739,63 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
    b.ids={va,vb,-1};b.w={1-pairS.t,pairS.t,0};b.p=pairS.b;
    consider(a,b);
   }
-  const double d=std::sqrt(best);
-  const Vec3 fallback=normalized(cross(sub(positions_[ta[1]],positions_[ta[0]]),
+  // For a nonlocal fold, an edge can PIERCE an interior triangle without
+  // leaving a vertex within contact thickness. Use current edge-face
+  // intersections to detect that discrete geometric self-intersection.
+  // This is an extra DISCRETE safeguard, not guaranteed temporal CCD.
+  bool piercing=false;
+  if(sameSheet){
+   const auto testPiercing=[&](const std::array<int,3>& edgeTri,int faceId,
+                               bool edgeIsA){
+    if(piercing)return;
+    const auto face=triangles_[static_cast<std::size_t>(faceId)];
+    for(int edge=0;edge<3&&!piercing;++edge){
+     const int v0=edgeTri[edge],v1=edgeTri[(edge+1)%3];
+     const auto hit=segmentFace(positions_[v0],positions_[v1],
+       positions_[face[0]],positions_[face[1]],positions_[face[2]]);
+     if(!hit)continue;
+     Weighted edgePoint;
+     edgePoint.ids={v0,v1,-1};
+     edgePoint.w={1.-hit->edgeParameter,hit->edgeParameter,0};
+     edgePoint.p=hit->p;
+     const Weighted facePoint=weightedTri(faceId,hit->bary,hit->p);
+     if(edgeIsA){bestA=edgePoint;bestB=facePoint;}
+     else{bestA=facePoint;bestB=edgePoint;}
+     piercing=true;
+    }
+   };
+   testPiercing(ta,ib,true);
+   testPiercing(tb,ia,false);
+   if(piercing)++metrics_.selfCrossings;
+  }
+  const double distance=piercing?0.:std::sqrt(best);
+  const Vec3 faceNormal=normalized(cross(sub(positions_[ta[1]],positions_[ta[0]]),
                                          sub(positions_[ta[2]],positions_[ta[0]])));
-  const Vec3 n=d>1e-9?mul(sub(bestA.p,bestB.p),1.0/d):
-    mul(fallback,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
-  if(respond(bestA,bestB,d,n,kThickness)){
-   ++metrics_.contacts;++metrics_.interSheetContacts;
+  Vec3 normal{};
+  if(!piercing&&distance>1e-9)
+   normal=mul(sub(bestA.p,bestB.p),1.0/distance);
+  else if(sameSheet){
+   // At geometric intersection, the two features coincide. Orient the
+   // separating normal using their PREVIOUS timestep separation when
+   // available; this avoids random front/back sign flips during folding.
+   const auto before=[&](const Weighted& w){
+    Vec3 value{};
+    for(int j=0;j<3;++j)if(w.ids[j]>=0)
+     value=add(value,mul(previous_[w.ids[j]],w.w[j]));
+    return value;
+   };
+   const Vec3 oldSide=sub(before(bestA),before(bestB));
+   normal=norm(oldSide)>1e-8?normalized(oldSide):faceNormal;
+   if(norm(oldSide)<=1e-8){
+    const Vec3 ca=mul(add(add(positions_[ta[0]],positions_[ta[1]]),positions_[ta[2]]),1./3);
+    const Vec3 cb=mul(add(add(positions_[tb[0]],positions_[tb[1]]),positions_[tb[2]]),1./3);
+    if(dot(normal,sub(ca,cb))<0)normal=mul(normal,-1);
+   }
+  }else normal=mul(faceNormal,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
+  if(respond(bestA,bestB,distance,normal,sameSheet?kSelfThickness:kThickness)){
+   ++metrics_.contacts;
+   if(sameSheet)++metrics_.selfContacts;
+   else ++metrics_.interSheetContacts;
    if(policy_==Policy::OnlineContactAware){
     ++metrics_.regionWork[triangleRegions_[ia]].contactCorrections;
     ++metrics_.regionWork[triangleRegions_[ib]].contactCorrections;
@@ -628,12 +804,38 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
   }
  }
 }
+std::size_t MultiCloth::runContactPassForTest(){
+ // This deliberately bypasses integration and structural projection to
+ // isolate the true geometry/feature-contact implementation in tests.
+ metrics_={};
+ const auto primitives=makePrimitives();
+ std::vector<Bounds> raw,padded;
+ raw.reserve(primitives.size());padded.reserve(primitives.size());
+ for(const auto& primitive:primitives){
+  raw.push_back(primitive.box);
+  padded.push_back(expand(primitive.box,kMargin*.5));
+ }
+ const auto pairs=live::candidates(padded,true);
+ metrics_.pairs=pairs.size();
+ metrics_.candidatePairs=pairs;
+ projectContacts(pairs,raw);
+ return metrics_.selfContacts;
+}
 void MultiCloth::step(){
  const auto start=Clock::now();
  ++frame_;
  metrics_={};const double time=frame_*kDt;
  const auto frameStartPositions=positions_;
  updateSpheres(time);
+ if(grab_.active){
+  // Smooth the TARGET at frame rate, regardless of how far or quickly a
+  // mouse event moves. The solver receives no discontinuous teleport.
+  const Vec3 toTarget=sub(grab_.target,grab_.filteredTarget);
+  const double distance=norm(toTarget);
+  const double travel=std::min(.055,distance);
+  if(distance>1e-12)
+   grab_.filteredTarget=add(grab_.filteredTarget,mul(toTarget,travel/distance));
+ }
  // Track only collision/floor projections. Geometric corrections should
  // remove penetration without becoming an unintended giant velocity.
  std::vector<Vec3> contactDisplacements(positions_.size(),Vec3{});
@@ -694,6 +896,10 @@ void MultiCloth::step(){
     contactDisplacements[i].z+=.04-positions_[i].z;
     positions_[i].z=.04;
    }
+  // The interactive grab is a mass-weighted barycentric positional
+  // constraint. It participates in the SAME five solver iterations,
+  // before collision queries so self-contact can resist a pulled fold.
+  projectGrab(contactDisplacements);
   const auto primitives=makePrimitives();
   std::vector<Bounds> bounds;bounds.reserve(primitives.size());
   for(const auto& primitive:primitives)bounds.push_back(primitive.box);
@@ -804,6 +1010,7 @@ void MultiCloth::step(){
  std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
  metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
                              metrics_.contactPairs.end());
+ if(grab_.active)metrics_.grabError=norm(sub(grab_.target,grabPoint()));
  // A solver can be exactly equivalent across broad phases while exploding.
  // Measure its actual motion and grid edge strain each frame.
  for(std::size_t i=0;i<positions_.size();++i){

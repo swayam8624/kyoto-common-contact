@@ -23,12 +23,13 @@ struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
 struct Metrics {
   std::size_t queryCount{}, pairs{}, preciseTests{}, contacts{}, interSheetContacts{},
-              sphereContacts{}, broadAabbTests{}, regionalPairRebuilds{},
+              sphereContacts{}, selfContacts{},selfCandidatePairs{}, selfPreciseTests{}, selfCrossings{},
+              selfTopologyFiltered{}, grabCorrections{}, broadAabbTests{}, regionalPairRebuilds{},
               regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{},
               regionTopLevelTests{}, regionTopLevelOverlaps{}, regionPairsSkipped{},
               regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
               onlineStrategySwitches{};
-  double broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
+  double grabError{}, broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
          onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{},
          maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
   std::size_t velocityClamps{};
@@ -76,6 +77,24 @@ public:
   bool onlineEnabled() const {return policy_==Policy::OnlineContactAware;}
   const OnlinePartitioner& onlineController() const {return online_;}
   void setAuditing(bool enable);
+  // Nonlocal cloth self-collision is ON by default. Immediate grid
+  // neighbors are excluded as structural constraints already connect them.
+  void setSelfCollisions(bool enabled);
+  bool selfCollisions() const {return selfCollisions_;}
+  // Mouse interaction: a barycentric, finite-mass surface attachment,
+  // not teleporting mesh vertices or modifying the broad-phase algorithm.
+  bool beginGrab(int triangle,std::array<double,3> barycentric,Vec3 pickedPoint);
+  void updateGrab(Vec3 target);
+  void endGrab();
+  bool grabbing() const {return grab_.active;}
+  Vec3 grabPoint() const;
+  Vec3 grabTarget() const {return grab_.target;}
+  // Deterministic self-contact fixture injection for regression tests only.
+  // For simulation experiments use beginGrab/updateGrab instead.
+  void displacePatchForTest(int sheet,int minX,int minY,int width,Vec3 delta);
+  // Test-only precise solver probe on current geometry, without advancing
+  // constraints or time. Used to verify a deliberately folded cloth patch.
+  std::size_t runContactPassForTest();
   bool hierarchicalRegions() const { return hierarchicalRegions_; }
   const std::vector<Vec3>& positions() const {return positions_;}
   const std::vector<std::array<int,3>>& triangles() const {return triangles_;}
@@ -93,13 +112,22 @@ private:
   struct Constraint {int a{},b{};double length{},compliance{},lambda{};};
   int sheets_{3},balls_{2},frame_{},patchCellSpan_{3};
   Policy policy_{Policy::RegionalCertified};
-  bool adaptive_{true},auditing_{false},hierarchicalRegions_{false};
+  bool adaptive_{true},auditing_{false},hierarchicalRegions_{false},selfCollisions_{true};
+  struct Grab {
+    bool active{false};
+    int triangle{-1};
+    std::array<double,3> bary{};
+    Vec3 target{},filteredTarget{};
+  } grab_;
   std::vector<Vec3> positions_,previous_,initialPins_;
   std::vector<double> inverseMasses_;
   std::vector<std::array<int,3>> triangles_;
   std::vector<int> triangleSheets_,triangleRegions_,pinned_;
   std::vector<Constraint> constraints_;
   std::vector<Sphere> spheres_;
+  std::size_t selfTopologyExclusions_{};
+  bool nonlocalSelfPair(int first,int second) const;
+  void projectGrab(std::vector<Vec3>& nonphysicalDisplacements);
   RegionalCandidates regional_;
   OnlinePartitioner online_;
   void assignOnlineRegionIds();

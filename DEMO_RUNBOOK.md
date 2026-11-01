@@ -49,3 +49,8 @@ log and continuous candidate/contact time-series, A for exhaustive broad-phase
 pair auditing, and 1/2/3/4 for stages. This is an actual simulated scene,
 not a prerecorded movie. The exact scope and limitations are in
 `docs/MULTICLOTH_CONTRACT.md`.
+
+
+## Interactive fabric manipulation and self folds
+
+Launch the corrected multi-cloth viewer with ./open_multicloth_demo.sh. Same-cloth collision is enabled. Click and hold the LEFT mouse button on the fabric and drag to move its actual picked surface point; release to let it settle. RIGHT mouse drag or SHIFT+LEFT drag rotates the camera; left-drag on the background also rotates. S toggles same-sheet contacts so you can compare with the previous intersecting state, G opens measured logs, and 4 highlights actual contact-response triangles. The cursor attachment is a smooth mass-weighted constraint, not instantaneous vertex teleportation. Inspect self-contact corrections and discrete geometric piercings in the native sidebar. This is not a guaranteed continuous collision detector; see docs/SELF_COLLISION_AND_DRAGGING.md.

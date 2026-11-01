@@ -8,6 +8,7 @@
 #endif
 #include "ccp/live_cloth.hpp"
 #include "ccp/research_multicloth.hpp"
+#include "ccp/cloth_interaction.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -72,6 +73,8 @@ struct App {
  ccp::research::MultiCloth multi{3,2};
  bool multiMode=false,multiAudit=false,multiAdaptive=true,multiHierarchy=true;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
+  bool clothMouseGrab=false;
+  V dragOrigin{},dragPlaneNormal{};
  int stage=1,evidenceScene=5;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
  V target{0,0,1.2};
@@ -289,6 +292,8 @@ void stepSimulation(App&a){
           a.multi.policy()==ccp::research::Policy::RegionalCertified?"REGIONAL":
           a.multi.policy()==ccp::research::Policy::GlobalGuard?"GLOBAL":"SAP")
        <<" PAIRS "<<m.pairs<<" CONTACTS "<<m.contacts
+       <<" SELF "<<m.selfContacts<<" PIERCINGS "<<m.selfCrossings
+       <<" GRAB "<<(a.multi.grabbing()?"ON":"OFF")
        <<" INTER "<<m.interSheetContacts<<" SPHERE "<<m.sphereContacts;
    pushInspectorEvent(a,line.str());
    std::ostringstream event;
@@ -326,6 +331,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  if(key==GLFW_KEY_ESCAPE){glfwSetWindowShouldClose(w,1);return;}
  if(key==GLFW_KEY_K){
+  a.multi.endGrab();a.clothMouseGrab=false;a.drag=false;
   a.multiMode=!a.multiMode;
   a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();
   a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
@@ -335,10 +341,18 @@ void key(GLFWwindow*w,int key,int,int action,int){
  }
  if(a.multiMode){
   if(key==GLFW_KEY_SPACE)a.paused=!a.paused;
+  else if(key==GLFW_KEY_S){
+   a.multi.setSelfCollisions(!a.multi.selfCollisions());
+   pushInspectorEvent(a,a.multi.selfCollisions()?
+     "SELF COLLISION ENABLED":"SELF COLLISION DISABLED");
+  }
   else if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}
-  else if(key==GLFW_KEY_R){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
-  else if(key==GLFW_KEY_L){a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
-  else if(key==GLFW_KEY_O){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_R){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_L){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_O){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
   else if(key==GLFW_KEY_Q){
    using P=ccp::research::Policy;
    a.multi.setPolicy(a.multi.policy()==P::RebuildSAP?P::GlobalGuard:
@@ -382,8 +396,67 @@ void key(GLFWwindow*w,int key,int,int action,int){
 if(key==GLFW_KEY_SPACE)a.paused=!a.paused;if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}if(key==GLFW_KEY_R){bool mode=a.sim.stats().sap,collide=a.sim.stats().collisions;auto request=a.sim.queryRequest();a.sim.reset();a.sim.setQueryRequest(request);a.sim.setBroadPhase(mode);a.sim.setCollisions(collide);a.cutaway=false;fitScene(a,w);}if(key==GLFW_KEY_F)fitScene(a,w);if(key==GLFW_KEY_B)a.sim.setBroadPhase(!a.sim.stats().sap);if(key==GLFW_KEY_C)a.sim.setCollisions(!a.sim.stats().collisions);if(key==GLFW_KEY_V)a.sim.setOracleEnabled(!a.sim.oracleEnabled());
 if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
 if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%6;a.inspectorScroll=0;}if(key==GLFW_KEY_Q){auto q=a.sim.queryRequest();q.updatePolicy=q.updatePolicy==ccp::live::UpdatePolicy::GuardedReuse?ccp::live::UpdatePolicy::RebuildEveryIteration:ccp::live::UpdatePolicy::GuardedReuse;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_M){auto q=a.sim.queryRequest();q.margin=q.margin<.03?.05:q.margin<.08?.10:.02;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_W)a.wire=!a.wire;if(key==GLFW_KEY_X)a.cutaway=!a.cutaway;if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;logEvent(a,"KEY "+std::to_string(key));}
-void mouse(GLFWwindow*w,int button,int action,int){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(button==GLFW_MOUSE_BUTTON_LEFT){a.drag=action==GLFW_PRESS;glfwGetCursorPos(w,&a.lastX,&a.lastY);}}
-void cursor(GLFWwindow*w,double x,double y){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(a.drag){a.yaw+=(x-a.lastX)*.006;a.pitch=std::clamp(a.pitch+(y-a.lastY)*.005,-.1,1.35);}a.lastX=x;a.lastY=y;}
+// Build a picking ray with the same view and .70-radian vertical FOV as
+// the OpenGL camera. GLFW cursor coordinates are WINDOW pixels, not retina
+// framebuffer pixels; ray aspect must therefore use glfwGetWindowSize().
+ccp::interaction::Ray rayForCursor(const App& a,GLFWwindow* w,double x,double y){
+ int width=0,height=0;glfwGetWindowSize(w,&width,&height);
+ const double viewport=std::max(1.0,width-350.0*height/920.0);
+ const V eye=add(a.target,{
+   a.distance*std::cos(a.pitch)*std::cos(a.yaw),
+   a.distance*std::cos(a.pitch)*std::sin(a.yaw),
+   a.distance*std::sin(a.pitch)});
+ return ccp::interaction::cameraRay(x,y,viewport,height,eye,a.target,.70);
+}
+void mouse(GLFWwindow*w,int button,int action,int mods){
+ auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
+ glfwGetCursorPos(w,&a.lastX,&a.lastY);
+ if(action==GLFW_RELEASE){
+  if(button==GLFW_MOUSE_BUTTON_LEFT){
+   a.drag=false;
+   if(a.clothMouseGrab){
+    a.multi.endGrab();a.clothMouseGrab=false;
+    pushInspectorEvent(a,"MOUSE RELEASED CLOTH");
+   }
+  }
+  if(button==GLFW_MOUSE_BUTTON_RIGHT)a.drag=false;
+  return;
+ }
+ if(action!=GLFW_PRESS)return;
+ if(button==GLFW_MOUSE_BUTTON_RIGHT){a.drag=true;return;}
+ if(button!=GLFW_MOUSE_BUTTON_LEFT)return;
+ int width=0,height=0;glfwGetWindowSize(w,&width,&height);
+ const double viewport=width-350.0*height/920.0;
+ if(a.lastX>=viewport)return; // do not pick through the right inspector
+ // Right-drag or Shift-left drag orbits the camera.
+ if(!a.multiMode||(mods&GLFW_MOD_SHIFT)){a.drag=true;return;}
+ const auto ray=rayForCursor(a,w,a.lastX,a.lastY);
+ const auto hit=ccp::interaction::pickTriangleRay(
+   ray,a.multi.positions(),a.multi.triangles());
+ if(hit&&a.multi.beginGrab(hit->triangle,hit->barycentric,hit->position)){
+  a.clothMouseGrab=true;
+  a.dragOrigin=hit->position;
+  a.dragPlaneNormal=norm(sub(a.target,ray.origin));
+  pushInspectorEvent(a,"MOUSE GRABBED SHEET "+
+    std::to_string(a.multi.triangleSheets()[hit->triangle]+1)+
+    " TRIANGLE "+std::to_string(hit->triangle));
+ }else a.drag=true; // empty background still rotates the camera
+}
+void cursor(GLFWwindow*w,double x,double y){
+ auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
+ if(a.clothMouseGrab){
+  // Drag in a camera-facing plane at the selected cloth depth. This
+  // allows lifting in 3D, not just sliding along the floor.
+  const auto ray=rayForCursor(a,w,x,y);
+  const auto target=ccp::interaction::intersectDragPlane(
+     ray,a.dragOrigin,a.dragPlaneNormal);
+  if(target)a.multi.updateGrab(*target);
+ }else if(a.drag){
+  a.yaw+=(x-a.lastX)*.006;
+  a.pitch=std::clamp(a.pitch+(y-a.lastY)*.005,-.1,1.35);
+ }
+ a.lastX=x;a.lastY=y;
+}
 void scroll(GLFWwindow*w,double,double dy){
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  int windowWidth=0,windowHeight=0;
@@ -434,8 +507,10 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
       (a.multi.onlineEnabled()?" / ONLINE PATCHES "+std::to_string(m.onlinePatches):
        " / FIXED PATCH "+std::to_string(a.multi.patchCellSpan())),150,ink,1.17);
  line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
- line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
- line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
+ line("INTERSHEET "+std::to_string(m.interSheetContacts)+
+      " / SELF "+std::to_string(m.selfContacts),202,teal);
+ line("PAIRS "+std::to_string(m.pairs)+
+      " / SELF PIERCINGS "+std::to_string(m.selfCrossings),228,ink,1.15);
  line("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),254,ink,1.20);
  line("LIVE SPLITS "+std::to_string(m.onlineSplits)+" MERGES "+
       std::to_string(m.onlineMerges)+" SWITCHES "+
@@ -443,7 +518,9 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("PAIR BLOCK BUILDS "+std::to_string(m.regionalPairRebuilds),280);
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
- line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
+ line("GRAB "+std::string(a.multi.grabbing()?"ACTIVE":"READY")+
+      " / ERROR "+number(m.grabError,3)+
+      " / GUARD "+number(m.meanRegionBudget,3),358,teal,1.12);
  line("PHYSICAL STRAIN "+number(m.maxStructuralEdgeStretch,3)+
       " FRAME DELTA "+number(m.maxFrameParticleTravel,3),366,teal,1.12);
  line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
@@ -709,6 +786,21 @@ int main(int argc,char**argv){try{
       color=sheetColors[std::clamp(sheet,0,2)];
     }
     if(a.stage==3)color=cand[i]?V{.88,.38,.055}:V{.33,.39,.43};if(a.stage==4)color=near[i]?V{.045,.51,.25}:V{.33,.39,.43};for(int id:t)vertex(solid,pos[id],normals[id],color);if(a.wire)for(int j=0;j<3;j++)segment(overlay,add(pos[t[j]],mul(normals[t[j]],.001)),add(pos[t[(j+1)%3]],mul(normals[t[(j+1)%3]],.001)),{.07,.13,.15});}
+  if(a.multiMode&&a.multi.grabbing()){
+   // Gold cross: mass-weighted picked surface point; cyan cross: cursor
+   // target. The segment shows attachment compliance and solver lag.
+   const V picked=a.multi.grabPoint(),goal=a.multi.grabTarget();
+   const V gold{.98,.72,.08},cyan{.05,.60,.93};
+   for(int axis=0;axis<3;++axis){
+    V o{};
+    if(axis==0)o.x=.075;
+    if(axis==1)o.y=.075;
+    if(axis==2)o.z=.075;
+    segment(overlay,sub(picked,o),add(picked,o),gold);
+    segment(overlay,sub(goal,mul(o,.55)),add(goal,mul(o,.55)),cyan);
+   }
+   segment(overlay,picked,goal,{.93,.81,.14});
+  }
   if(a.stage>=2){
    if(a.multiMode){
     if(a.stage==2){
@@ -754,10 +846,17 @@ int main(int argc,char**argv){try{
    label("Y: APPLY MEASURED CALIBRATION",blue,1.18);
    label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
          std::to_string(a.multi.patchCellSpan()),blue,1.22);
+   label(a.multi.selfCollisions()?
+         "S SELF COLLISION ON / TOGGLE":"S SELF COLLISION OFF / TOGGLE",green,1.28);
+   label("LEFT GRAB CLOTH / RIGHT ORBIT",blue,1.24);
+   label("SHIFT + LEFT ALSO ORBITS",muted,1.20);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
    label("FRAME "+std::to_string(a.multi.frame()));
    label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
    label("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),green,1.38);
+   label("SELF CORRECTIONS "+std::to_string(m.selfContacts)+
+         " / PIERCINGS "+std::to_string(m.selfCrossings),green,1.30);
+   if(a.multi.grabbing())label("GRAB ERROR "+number(m.grabError,3)+" M",blue,1.30);
    label("SPHERE CORRECTIONS "+std::to_string(m.sphereContacts),green,1.42);
    label("REGION INVALIDATIONS / STEP "+std::to_string(m.dirtyRegions),ink,1.26);
    label("PAIR BLOCKS REBUILT "+std::to_string(m.regionalPairRebuilds),ink,1.45);
@@ -793,7 +892,9 @@ int main(int argc,char**argv){try{
    label("K: OPEN DYNAMIC MULTICLOTH",blue,1.35);
   }
 
-  text(hud,a.cutaway?"VISUAL CUTAWAY / PHYSICS USES FULL MESH":"LIVE STATE / NO FILE PLAYBACK",26*scale,height-27*scale,1.6*scale,ink);M ui=ortho(0,width,height,0,-1,1);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);uploadDraw(vao,buffer,hud,GL_TRIANGLES);
+  text(hud,a.multiMode?"LEFT GRAB CLOTH | RIGHT / SHIFT-LEFT ORBIT | S SELF COLLISION":
+    (a.cutaway?"VISUAL CUTAWAY / PHYSICS USES FULL MESH":"LIVE STATE / NO FILE PLAYBACK"),
+    26*scale,height-27*scale,1.30*scale,ink);M ui=ortho(0,width,height,0,-1,1);glUseProgram(lines);glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);uploadDraw(vao,buffer,hud,GL_TRIANGLES);
   glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glUseProgram(fontProgram);glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,fontTexture);glUniform1i(glGetUniformLocation(fontProgram,"atlas"),0);uploadDraw(vao,buffer,glyphVertices,GL_TRIANGLES);glDisable(GL_BLEND);
   if(a.evidenceMode)
    drawEvidencePane(a,viewport,panel,scale,width,height,vao,buffer,lines,fontProgram,fontTexture,ui);
