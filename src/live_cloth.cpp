@@ -220,6 +220,7 @@ void ClothSimulation::reset() {
     positions_.clear(); previousPositions_.clear(); triangles_.clear(); constraints_.clear();
     stats_={};
     stats_.sap=sap; stats_.collisions=collisions;
+    stats_.oracleEnabled=oracleEnabled_;
     stats_.guardedReuse=queryRequest_.updatePolicy==UpdatePolicy::GuardedReuse;
     broadPhase_.invalidate();
     positions_.reserve(kSide*kSide);
@@ -266,7 +267,14 @@ void ClothSimulation::step() {
     double narrowTotal=0.0;
     QueryMetrics queryMetrics;
     stats_.guardedReuse=queryRequest_.updatePolicy==UpdatePolicy::GuardedReuse;
+    stats_.oracleEnabled=oracleEnabled_;
+    stats_.oracleChecked=false;
     stats_.oracleMisses=0;
+    stats_.oracleMs=0.0;
+    stats_.diagnosticMs=0.0;
+    stats_.preciseTests=0;
+    stats_.oracleTests=0;
+    stats_.diagnosticTests=0;
     stats_.candidateTriangles.clear(); stats_.contactTriangles.clear();
     for(int iteration=0;iteration<kSolverIterations;++iteration) {
         const auto solverStart=Clock::now();
@@ -286,21 +294,42 @@ void ClothSimulation::step() {
             const auto current=queryBoundsFor(positions_,triangles_,sphere,radius);
             const auto& pairs=broadPhase_.query(current,queryRequest_,stats_.sap,queryMetrics);
             const auto narrowStart=Clock::now();
-            std::vector<bool> sphereCandidates(triangles_.size(),false);
+            const double oracleBefore=stats_.oracleMs;
+            // Actual production path: precise checks ONLY for broad-phase
+            // candidates. Sort IDs so a conservative cached superset cannot
+            // perturb sequential constraint application order.
+            std::vector<int> sphereCandidates;
+            sphereCandidates.reserve(pairs.size());
             for(const auto pair:pairs) {
-                if(pair.a==static_cast<int>(triangles_.size())) sphereCandidates[static_cast<std::size_t>(pair.b)]=true;
-                else if(pair.b==static_cast<int>(triangles_.size())) sphereCandidates[static_cast<std::size_t>(pair.a)]=true;
+                if(pair.a==static_cast<int>(triangles_.size())) sphereCandidates.push_back(pair.b);
+                else if(pair.b==static_cast<int>(triangles_.size())) sphereCandidates.push_back(pair.a);
             }
+            std::sort(sphereCandidates.begin(),sphereCandidates.end());
+            sphereCandidates.erase(std::unique(sphereCandidates.begin(),sphereCandidates.end()),sphereCandidates.end());
             std::vector<int> activeContacts;
-            // Snapshot the active set before response so supersets cannot alter sequential solver order.
-            for(std::size_t ti=0;ti<triangles_.size();++ti) {
-                const auto tri=triangles_[ti];
+            activeContacts.reserve(sphereCandidates.size());
+            for(const int ti:sphereCandidates) {
+                const auto tri=triangles_[static_cast<std::size_t>(ti)];
                 const double d=length(sub(closestPoint(sphere,positions_[tri[0]],positions_[tri[1]],positions_[tri[2]]),sphere));
-                if(d<=radius+queryRequest_.margin && !sphereCandidates[ti]) ++stats_.oracleMisses;
-                if(d<radius+kThickness) activeContacts.push_back(static_cast<int>(ti));
+                ++stats_.preciseTests;
+                if(d<radius+kThickness) activeContacts.push_back(ti);
+            }
+            // The exhaustive oracle is *not* used to drive response. It runs
+            // independently for correctness evidence and has its own clock.
+            if(oracleEnabled_) {
+                const auto oracleStart=Clock::now();
+                stats_.oracleChecked=true;
+                for(std::size_t ti=0;ti<triangles_.size();++ti) {
+                    const auto tri=triangles_[ti];
+                    const double d=length(sub(closestPoint(sphere,positions_[tri[0]],positions_[tri[1]],positions_[tri[2]]),sphere));
+                    ++stats_.oracleTests;
+                    if(d<=radius+queryRequest_.margin &&
+                       !std::binary_search(sphereCandidates.begin(),sphereCandidates.end(),static_cast<int>(ti)))
+                        ++stats_.oracleMisses;
+                }
+                stats_.oracleMs+=std::chrono::duration<double,std::milli>(Clock::now()-oracleStart).count();
             }
             for(const int ti:activeContacts) {
-                if(!sphereCandidates[static_cast<std::size_t>(ti)]) continue;
                 const auto tri=triangles_[static_cast<std::size_t>(ti)];
                 const Vec3 q=closestPoint(sphere,positions_[tri[0]],positions_[tri[1]],positions_[tri[2]]);
                 const Vec3 delta=sub(q,sphere); const double distance=length(delta);
@@ -313,7 +342,8 @@ void ClothSimulation::step() {
                     positions_[tri[k]]=add(positions_[tri[k]],mul(n,penetration*bary[k]/denom));
                 stats_.contactTriangles.push_back(ti);
             }
-            narrowTotal+=std::chrono::duration<double,std::milli>(Clock::now()-narrowStart).count();
+            const double elapsedNarrow=std::chrono::duration<double,std::milli>(Clock::now()-narrowStart).count();
+            narrowTotal+=std::max(0.0,elapsedNarrow-(stats_.oracleMs-oracleBefore));
         }
         stats_.solverMs+=std::chrono::duration<double,std::milli>(Clock::now()-solverStart).count();
     }
@@ -339,24 +369,33 @@ void ClothSimulation::step() {
         const int ti=pair.a==static_cast<int>(triangles_.size())?pair.b:pair.a;
         stats_.candidateTriangles.push_back(ti);
     }
+    // Global final-frame scan is for scientific visualization and min-gap
+    // statistics, not for production collision response. Always count its cost.
+    const auto diagnosticStart=Clock::now();
     for(std::size_t ti=0;ti<triangles_.size();++ti) {
         const auto tri=triangles_[ti];
         const double d=length(sub(closestPoint(sphere,positions_[tri[0]],positions_[tri[1]],positions_[tri[2]]),sphere));
+        ++stats_.diagnosticTests;
         const double gap=d-radius;
         stats_.minGap=std::min(stats_.minGap,gap);
         if(d<=radius+queryRequest_.margin) {
             ++stats_.proximityCount; stats_.contactTriangles.push_back(static_cast<int>(ti));
-            if(!std::binary_search(stats_.candidateTriangles.begin(),stats_.candidateTriangles.end(),static_cast<int>(ti)))
+            if(oracleEnabled_ &&
+               !std::binary_search(stats_.candidateTriangles.begin(),stats_.candidateTriangles.end(),static_cast<int>(ti)))
                 ++stats_.oracleMisses;
         }
     }
+    stats_.diagnosticMs=std::chrono::duration<double,std::milli>(Clock::now()-diagnosticStart).count();
     stats_.candidateCount=stats_.candidateTriangles.size();
     double maxStrain=0.0;
     for(const auto& c:constraints_) if(c.rest>1e-12)
         maxStrain=std::max(maxStrain,std::abs(length(sub(positions_[c.a],positions_[c.b]))/c.rest-1.0));
     stats_.maxStrain=maxStrain;
-    stats_.solverMs=std::chrono::duration<double,std::milli>(Clock::now()-frameStart).count()-queryMetrics.broadMs-narrowTotal;
     stats_.stepMs=std::chrono::duration<double,std::milli>(Clock::now()-frameStart).count();
+    // Residual includes XPBD solver, integration, bound construction, and
+    // bookkeeping; it must not be mislabeled as pure solver microtiming.
+    stats_.solverMs=std::max(0.0,stats_.stepMs-queryMetrics.broadMs-narrowTotal
+                                       -stats_.oracleMs-stats_.diagnosticMs);
 }
 
 void ClothSimulation::setBroadPhase(bool sap) {
@@ -364,6 +403,11 @@ void ClothSimulation::setBroadPhase(bool sap) {
     stats_.sap=sap;
 }
 void ClothSimulation::setCollisions(bool enabled) { stats_.collisions=enabled; }
+void ClothSimulation::setOracleEnabled(bool enabled) {
+    oracleEnabled_=enabled;
+    stats_.oracleEnabled=enabled;
+}
+bool ClothSimulation::oracleEnabled() const { return oracleEnabled_; }
 void ClothSimulation::setQueryRequest(QueryRequest request) {
     if(!std::isfinite(request.margin) || request.margin<kThickness)
         throw std::invalid_argument("query margin must be finite and at least the response thickness");
