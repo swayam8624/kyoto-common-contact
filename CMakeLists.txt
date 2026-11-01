@@ -32,6 +32,12 @@ if(APPLE)
 endif()
 add_executable(ccp_live_benchmark apps/live_benchmark.cpp)
 target_link_libraries(ccp_live_benchmark PRIVATE ccp_live)
+# Coupled, continually driven multi-cloth experimental broad-phase research.
+add_library(ccp_multicloth src/research_multicloth.cpp)
+target_link_libraries(ccp_multicloth PUBLIC ccp_live)
+target_include_directories(ccp_multicloth PUBLIC include)
+target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+
 
 # Independent, published-family 3D baseline: actual Bullet DBVT library.
 # Without Bullet, the project still builds its own core and tests, but does
@@ -58,6 +64,9 @@ target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(ccp_multicloth_tests tests/research_multicloth_tests.cpp)
+  target_link_libraries(ccp_multicloth_tests PRIVATE ccp_multicloth)
+  add_test(NAME moving_multicloth_regional_coverage COMMAND ccp_multicloth_tests)
   if(TARGET ccp_broadphase_leaderboard)
     add_test(NAME published_3d_broadphase_coverage
       COMMAND ccp_broadphase_leaderboard --self-test)
