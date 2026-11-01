@@ -23,7 +23,7 @@ struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
 struct Metrics {
   std::size_t queryCount{}, pairs{}, preciseTests{}, contacts{}, interSheetContacts{},
-              sphereContacts{}, selfContacts{},selfCandidatePairs{}, selfPreciseTests{},
+              sphereContacts{}, selfContacts{},selfCandidatePairs{}, selfPreciseTests{}, selfCrossings{},
               selfTopologyFiltered{}, grabCorrections{}, broadAabbTests{}, regionalPairRebuilds{},
               regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{},
               regionTopLevelTests{}, regionTopLevelOverlaps{}, regionPairsSkipped{},
