@@ -804,6 +804,23 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
   }
  }
 }
+std::size_t MultiCloth::runContactPassForTest(){
+ // This deliberately bypasses integration and structural projection to
+ // isolate the true geometry/feature-contact implementation in tests.
+ metrics_={};
+ const auto primitives=makePrimitives();
+ std::vector<Bounds> raw,padded;
+ raw.reserve(primitives.size());padded.reserve(primitives.size());
+ for(const auto& primitive:primitives){
+  raw.push_back(primitive.box);
+  padded.push_back(expand(primitive.box,kMargin*.5));
+ }
+ const auto pairs=live::candidates(padded,true);
+ metrics_.pairs=pairs.size();
+ metrics_.candidatePairs=pairs;
+ projectContacts(pairs,raw);
+ return metrics_.selfContacts;
+}
 void MultiCloth::step(){
  const auto start=Clock::now();
  ++frame_;
