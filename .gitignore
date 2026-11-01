@@ -17,3 +17,7 @@ output/native/benchmark-postfix*
 output/research3d/video_frames/
 *.blend1
 output/native/supporting-offline-replay.html
+output/native/broadphase-leaderboard.csv
+output/native/broadphase-leaderboard.svg
+docs/BROADPHASE_RESULTS.md
+output/native/cascade.svg

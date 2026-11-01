@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Configure C++23 core
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      - name: Install upstream Bullet 3D broad phase
+        run: sudo apt-get update -qq && sudo apt-get install -y libbullet-dev
+      - name: Configure C++23 core and published Bullet baseline
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON -DCCP_REQUIRE_BULLET=ON
       - name: Build
         run: cmake --build build --parallel 2
       - name: Unit and contract tests
@@ -21,7 +23,10 @@ jobs:
           mkdir -p output/native
           ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv
           python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
+          python3 scripts/summarize_pipeline.py output/native/live_benchmark-postfix.csv output/native/cascade.svg
           python3 scripts/export_supporting_replays.py
+          ./build/ccp_broadphase_leaderboard output/native/broadphase-leaderboard.csv
+          python3 scripts/summarize_leaderboard.py output/native/broadphase-leaderboard.csv output/native/broadphase-leaderboard.svg docs/BROADPHASE_RESULTS.md
       - name: Publish benchmark artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -30,15 +35,21 @@ jobs:
           path: |
             output/native/live_benchmark-postfix.csv
             output/native/benchmark-postfix.svg
+            output/native/cascade.svg
             output/native/supporting-offline-replay.html
+            output/native/broadphase-leaderboard.csv
+            output/native/broadphase-leaderboard.svg
+            docs/BROADPHASE_RESULTS.md
             docs/MEETING_RESULTS.md
 
   macos-native:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Install GLFW
-        run: brew list glfw >/dev/null 2>&1 || brew install glfw
+      - name: Install GLFW and upstream Bullet
+        run: |
+          brew list glfw >/dev/null 2>&1 || brew install glfw
+          brew list bullet >/dev/null 2>&1 || brew install bullet
       - name: Configure native C++23 viewer and core
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
       - name: Build native bundle and tests

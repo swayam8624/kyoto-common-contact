@@ -183,13 +183,31 @@ const std::vector<Pair>& BroadPhaseService::query(const std::vector<Bounds>& raw
     for(const auto& raw:rawGeometryBounds) current.push_back(expanded(raw,request.margin*0.5));
     validateBounds(current);
 
-    bool canReuse=cacheValid_ && request.updatePolicy==UpdatePolicy::GuardedReuse &&
-                  sameRequest(cachedRequest_,request) && cachedSAP_==useSAP &&
-                  envelopes_.size()==current.size();
-    if(canReuse) for(std::size_t i=0;i<current.size();++i)
-        if(!containsBounds(envelopes_[i],current[i])) { canReuse=false; break; }
+    // A cache *decision* is scientific evidence: a rebuild due to an
+    // escaping triangle has a different meaning than explicit policy
+    // changes, topology changes, or a first-time empty cache.
+    bool canReuse=true;
+    if(request.updatePolicy!=UpdatePolicy::GuardedReuse) {
+        canReuse=false; metrics.lastDecision="POLICY_REBUILD";
+    } else if(!cacheValid_) {
+        canReuse=false; metrics.lastDecision="CACHE_EMPTY";
+    } else if(!sameRequest(cachedRequest_,request)) {
+        canReuse=false; metrics.lastDecision="REQUEST_CHANGED";
+    } else if(cachedSAP_!=useSAP) {
+        canReuse=false; metrics.lastDecision="BACKEND_CHANGED";
+    } else if(envelopes_.size()!=current.size()) {
+        canReuse=false; metrics.lastDecision="PRIMITIVE_COUNT_CHANGED";
+    }
+    if(canReuse) for(std::size_t i=0;i<current.size();++i) {
+        if(!containsBounds(envelopes_[i],current[i])) {
+            canReuse=false;
+            metrics.lastDecision="ENVELOPE_ESCAPE_OR_METADATA_CHANGE";
+            break;
+        }
+    }
     if(canReuse) {
         ++metrics.reuses;
+        metrics.lastDecision="CERTIFIED_REUSE";
         metrics.broadMs+=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
         return pairs_;
     }
@@ -362,6 +380,7 @@ void ClothSimulation::step() {
     stats_.queryBounds=broadPhase_.envelopes();
     stats_.queryBuilds=queryMetrics.builds; stats_.queryReuses=queryMetrics.reuses;
     stats_.pairTests=queryMetrics.pairTests; stats_.broadMs=queryMetrics.broadMs;
+    stats_.cacheDecision=queryMetrics.lastDecision;
     stats_.candidateTriangles.clear(); stats_.contactTriangles.clear();
     stats_.minGap=std::numeric_limits<double>::infinity(); stats_.proximityCount=0;
     for(const auto pair:finalPairs) {

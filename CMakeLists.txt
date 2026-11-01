@@ -33,6 +33,23 @@ endif()
 add_executable(ccp_live_benchmark apps/live_benchmark.cpp)
 target_link_libraries(ccp_live_benchmark PRIVATE ccp_live)
 
+# Independent, published-family 3D baseline: actual Bullet DBVT library.
+# Without Bullet, the project still builds its own core and tests, but does
+# NOT claim to have compared against a published external implementation.
+option(CCP_REQUIRE_BULLET "Fail configuration if the Bullet reference is unavailable" OFF)
+find_package(Bullet QUIET)
+if(Bullet_FOUND)
+  add_executable(ccp_broadphase_leaderboard apps/broadphase_leaderboard.cpp)
+  target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ${BULLET_LIBRARIES})
+  target_include_directories(ccp_broadphase_leaderboard PRIVATE ${BULLET_INCLUDE_DIRS})
+  target_compile_options(ccp_broadphase_leaderboard PRIVATE -Wall -Wextra -Wpedantic)
+  message(STATUS "External 3D broad-phase benchmark: Bullet DBVT enabled")
+elseif(CCP_REQUIRE_BULLET)
+  message(FATAL_ERROR "Bullet 3D reference requested but not installed; install libbullet-dev or brew install bullet")
+else()
+  message(STATUS "External 3D broad-phase benchmark unavailable: install Bullet to enable it")
+endif()
+
 add_executable(common_bounds_demo apps/common_bounds_demo.cpp)
 target_compile_options(common_bounds_demo PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -41,6 +58,10 @@ target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
+  if(TARGET ccp_broadphase_leaderboard)
+    add_test(NAME published_3d_broadphase_coverage
+      COMMAND ccp_broadphase_leaderboard --self-test)
+  endif()
   add_executable(ccp_live_tests tests/live_cloth_tests.cpp)
   target_link_libraries(ccp_live_tests PRIVATE ccp_live)
   add_test(NAME live_cloth_contracts COMMAND ccp_live_tests)
