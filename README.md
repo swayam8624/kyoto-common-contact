@@ -33,6 +33,15 @@ ctest --test-dir build --output-on-failure
 
 The native target requires the installed GLFW development library and macOS OpenGL/CoreText frameworks. It was compiled and exercised on Apple M2 Pro / OpenGL 4.1 Metal. The launcher configures/builds only if the executable is absent; rerun the build command after editing source.
 
+**November 2 repair-branch note:** The saved baseline under `output/native/benchmark-summary.txt`
+was measured with an *exhaustive precise-distance scan in every solver iteration*.
+It is historical and must not be passed off as a result from the candidate-only
+production narrow phase. On the repair branch run `./scripts/prepare_meeting.sh`
+to rebuild, test, perform independently oracle-checked preflight, time the
+production path without the exhaustive oracle, and create a fresh SVG and
+Markdown report. The per-frame global **visualization** scan still runs and is
+timed separately. See `docs/MEETING_READINESS.md` for the presenter workflow.
+
 The recorded local benchmark uses five paired trials of 300 steps, excluding the first 30 steps per trial from timing summaries. Both variants use the same solver, SAP backend, geometry, timestep (1/120 s), margin (0.05), and displacement budget (0.04). Mean / maximum CPU step time was **2.351 / 4.184 ms** for rebuilding and **0.999 / 2.951 ms** for guarded reuse. All compared particle positions matched exactly in this run and the exhaustive required-pair oracle reported zero omissions. Timing includes the diagnostic oracle and excludes rendering; this is one synthetic fixture, not a general performance claim. Raw measurements and settings are in `output/native/live_benchmark.csv` and `benchmark-summary.txt`.
 
 This is a small XPBD-style cloth/contact implementation, not an integration with the official IPC, OGC, PBD or CCFR implementations. It does not provide swept continuous collision detection or self collision, and does not establish their collision-free guarantees. The next research step is one real method adapter, validated against that method's original candidate pipeline.

@@ -54,6 +54,18 @@ int main() {
     const auto islands=sim.snapshot();
     require(islands.bodies.size()==10,"island scene population");
     require(islands.islands.front()!=islands.islands.back(),"separated contact groups have distinct islands");
+    // Island colors must reflect real contacts between previously separate
+    // moving groups, not merely a preassigned static object category.
+    bool observedMerge=false;
+    for(int frame=0;frame<100;++frame) {
+        sim.step();
+        const auto state=sim.snapshot();
+        // Any confirmed inter-group contact joins two graph components.
+        for(const auto& contact:state.contacts)
+            if((contact.a<6 && contact.b>=6)||(contact.b<6 && contact.a>=6))
+                observedMerge=true;
+    }
+    require(observedMerge,"moving island groups form a verified cross-group contact");
     require(ccp::toJson(islands).find("\"candidatePairs\"")!=std::string::npos,"snapshot JSON contains candidates");
 
     ccp::Simulation discrete;

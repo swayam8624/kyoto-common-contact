@@ -22,7 +22,14 @@ The budget controls how much geometric motion the existing certificate may toler
 
 `ClothSimulation::step()` integrates the current particle state, runs eight XPBD distance-constraint iterations, and invokes the shared service for the resulting current geometry each iteration. Candidate triangle IDs drive exact sphere–triangle closest-point checks. The active precise set is collected before sequential collision projection, so changing the number of extra candidates does not reorder response. A final query supplies diagnostics and render classifications. The renderer consumes the same `positions()` array in the same executable; it has no mesh-file or animation playback path.
 
-An exhaustive sphere–triangle proximity oracle checks coverage at each queried iteration and in final diagnostics. An omission pauses the interactive simulation. Disabling collision response is an explicit separate control; broad phase itself does not create contact forces. Cached candidates may include extra triangles compared with a freshly built current-bound query; the precise stage rejects them.
+The normal contact path now performs precise checks **only on sorted candidate triangles**.
+An independent exhaustive sphere–triangle oracle, enabled by default for
+validation, checks required-pair coverage without driving response. It is
+timed separately and can be disabled for performance measurements. The
+benchmark performs a full oracle-checked preflight first. The final global
+geometry diagnostic scan remains enabled and separately timed to support
+scene-wide minimum gap and visualization. An unchecked frame must never be
+reported as a proven zero-omission frame. An omission pauses the interactive simulation. Disabling collision response is an explicit separate control; broad phase itself does not create contact forces. Cached candidates may include extra triangles compared with a freshly built current-bound query; the precise stage rejects them.
 
 ## Verification and evidence
 

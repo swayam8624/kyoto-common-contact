@@ -56,7 +56,11 @@ private:
 struct Stats {
     std::size_t frame{}, candidateCount{}, proximityCount{}, oracleMisses{}, pairTests{}, iterations{};
     std::size_t queryBuilds{}, queryReuses{};
-    double broadMs{}, narrowMs{}, solverMs{}, stepMs{}, minGap{}, maxStrain{};
+    // CPU times are partitioned: broad, candidate-only narrow, optional
+    // exhaustive oracle, final display diagnostics, and remaining integration.
+    double broadMs{}, narrowMs{}, oracleMs{}, diagnosticMs{}, solverMs{}, stepMs{}, minGap{}, maxStrain{};
+    std::size_t preciseTests{}, oracleTests{}, diagnosticTests{};
+    bool oracleChecked{}, oracleEnabled{true};
     bool sap{true}, collisions{true}, guardedReuse{true};
     std::vector<Bounds> queryBounds;
     std::vector<int> candidateTriangles, contactTriangles;
@@ -69,6 +73,10 @@ public:
     void step();
     void setBroadPhase(bool sap);
     void setCollisions(bool enabled);
+    // Oracle is independent of production narrow phase: on for verification,
+    // off for unbiased timing. No check means no claim of zero misses.
+    void setOracleEnabled(bool enabled);
+    [[nodiscard]] bool oracleEnabled() const;
     void setQueryRequest(QueryRequest request);
     [[nodiscard]] QueryRequest queryRequest() const;
     [[nodiscard]] const std::vector<Vec3>& positions() const;
@@ -83,6 +91,7 @@ private:
     std::vector<Constraint> constraints_;
     Stats stats_;
     QueryRequest queryRequest_;
+    bool oracleEnabled_{true};
     BroadPhaseService broadPhase_;
 };
 
