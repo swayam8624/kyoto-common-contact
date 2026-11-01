@@ -1,0 +1,32 @@
+name: Native core regression (headless)
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - fix/kyoto-meeting-validated-demo
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure C++23 core
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Unit and contract tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Candidate-driven paired benchmark
+        run: |
+          mkdir -p output/native
+          ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv
+          python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
+      - name: Publish benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccp-ubuntu-core-verification
+          path: |
+            output/native/live_benchmark-postfix.csv
+            output/native/benchmark-postfix.svg
+            docs/MEETING_RESULTS.md

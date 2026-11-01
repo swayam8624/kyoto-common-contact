@@ -1,2 +1,18 @@
 /build/
 /.presentation-build/
+# Historical tracked evidence is intentionally preserved. These rules prevent
+# *new* local dependencies, caches and raw framebuffer captures being added.
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+**/*.dylib
+**/*.so
+**/.DS_Store
+.presentation-rebuild/pydeps/
+output/native/*.ppm
+output/native/*_trace.csv
+output/native/native_trace.csv
+output/native/live_benchmark-postfix.csv
+output/native/benchmark-postfix*
+output/research3d/video_frames/
+*.blend1
