@@ -65,6 +65,9 @@ target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(ccp_multicloth_tests tests/research_multicloth_tests.cpp)
+  target_link_libraries(ccp_multicloth_tests PRIVATE ccp_multicloth)
+  add_test(NAME moving_multicloth_regional_coverage COMMAND ccp_multicloth_tests)
   if(TARGET ccp_broadphase_leaderboard)
     add_test(NAME published_3d_broadphase_coverage
       COMMAND ccp_broadphase_leaderboard --self-test)
