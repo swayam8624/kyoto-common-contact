@@ -37,6 +37,9 @@ add_library(ccp_multicloth src/research_multicloth.cpp)
 target_link_libraries(ccp_multicloth PUBLIC ccp_live)
 target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
+target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
+
 
 
 # Independent, published-family 3D baseline: actual Bullet DBVT library.
