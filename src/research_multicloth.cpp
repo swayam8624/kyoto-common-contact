@@ -641,8 +641,10 @@ void MultiCloth::step(){
   if(pinned_[i])continue;
   Vec3 velocity=mul(sub(positions_[i],previous_[i]),kVelocityDamping);
   const double speed=norm(velocity);
-  if(speed>kMaxFreeVelocityStep)
+  if(speed>kMaxFreeVelocityStep){
    velocity=mul(velocity,kMaxFreeVelocityStep/speed);
+   ++metrics_.velocityClamps;
+  }
   const int sheet=int(i/(kSide*kSide));
   // The former 0.003m *position kick per frame* was equivalent to roughly
   // 24m/s^2 lateral acceleration: >2x gravity, and badly destabilizing.
@@ -757,9 +759,11 @@ void MultiCloth::step(){
                     mul(contactDisplacements[i],kContactDisplacementDamping));
    const double speed=norm(sub(positions_[i],previous_[i]));
    if(!std::isfinite(speed))throw std::runtime_error("nonfinite cloth velocity");
-   if(speed>kMaxFreeVelocityStep)
+   if(speed>kMaxFreeVelocityStep){
     previous_[i]=sub(positions_[i],
       mul(sub(positions_[i],previous_[i]),kMaxFreeVelocityStep/speed));
+    ++metrics_.velocityClamps;
+   }
   }
  if(policy_==Policy::GlobalGuard){
   metrics_.broadAabbTests=globalMetrics.pairTests;
