@@ -177,6 +177,31 @@ void loadEvidence(App& a) {
  }
  pushInspectorEvent(a,"EVIDENCE: LOCAL CSV "+std::string(a.broadphaseResults.empty()?"MISSING":"LOADED"));
 }
+// Configure a STATIC candidate policy using calibration-only measurements.
+// Evaluation frames never enter the policy selection; no online learning
+// or prior-art novelty is claimed.
+void applyCalibratedPatch(App& a){
+ const PatchBenchRow* selected=nullptr;
+ for(const auto& row:a.patchResults){
+  if(row.phase!="calibration"||row.frontier=="sap_rebuild")continue;
+  if(!selected||row.meanStepMs<selected->meanStepMs)selected=&row;
+ }
+ if(!selected){
+  pushInspectorEvent(a,"CALIBRATION MISSING: RUN prepare_meeting.sh");
+  return;
+ }
+ a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
+ a.multi.setAdaptive(false);
+ a.multiAdaptive=false;
+ a.multiHierarchy=selected->frontier=="two_tier";
+ a.multi.setHierarchicalRegions(a.multiHierarchy);
+ a.multi.setPatchCellSpan(selected->span);
+ a.historyCandidates.clear();
+ a.historyInterContacts.clear();
+ a.historyBroadMs.clear();
+ pushInspectorEvent(a,"CALIBRATION APPLIED: PATCH "+
+    std::to_string(selected->span)+" "+selected->frontier);
+}
 void fitScene(App&a,GLFWwindow*w){
  const auto& points=a.multiMode?a.multi.positions():a.sim.positions();
  V lo=points.front(),hi=lo;
@@ -286,6 +311,9 @@ void key(GLFWwindow*w,int key,int,int action,int){
    a.multiHierarchy=!a.multiHierarchy;
    a.multi.setHierarchicalRegions(a.multiHierarchy);
    pushInspectorEvent(a,a.multiHierarchy?"TWO-TIER REGION FRONTIER":"ALL-REGION-PAIRS ABLATION");
+  } else if(key==GLFW_KEY_Y){
+   loadEvidence(a);
+   applyCalibratedPatch(a);
   } else if(key==GLFW_KEY_P){
    const std::array<int,6> spans={1,2,3,4,6,12};
    const auto it=std::find(spans.begin(),spans.end(),a.multi.patchCellSpan());
@@ -658,6 +686,7 @@ int main(int argc,char**argv){try{
    label("L SHEETS / O BALLS / R RESET",blue,1.4);
    label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
    label(a.multiHierarchy?"J: TWO-TIER REGION SWEEP":"J: FLAT REGION-PAIR ABLATION",blue,1.22);
+   label("Y: APPLY MEASURED CALIBRATION",blue,1.18);
    label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
          std::to_string(a.multi.patchCellSpan()),blue,1.22);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);

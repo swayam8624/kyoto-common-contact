@@ -77,3 +77,5 @@ Use `./open_multicloth_demo.sh` for a continuously excited, physically interacti
 The new optional two-tier region sweep is enabled in the native research viewer by J. It prunes region-envelope pairs before consulting local candidate caches, while preserving a flat-pair ablation. The P key cycles mesh patch sizes (1, 2, 3, 4, 6, 12 cells). Repartitioning invalidates regional caches but never changes the physical solver.
 
 Run the normal meeting-preparation script to generate patch-sweep.csv, patch-sweep.svg, and PATCH_CALIBRATION.md. The 12-way sweep chooses a region size using one earlier time window and evaluates it on a later window. It is an offline ablation, not an online trained algorithm or claimed publication novelty.
+
+Press Y in the native multi-cloth demo to apply the policy selected from your local earlier calibration frames in patch-sweep.csv. This configures the *actual running region candidate system* without changing the solver. It is offline profile-guided static configuration, NOT an online adaptive partitioner. The timed profile excludes the optional exhaustive oracle after preflight but checks physical positions against SAP on every frame.

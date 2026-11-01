@@ -70,6 +70,7 @@ int main(int argc,char** argv){
   std::vector<std::vector<Vec3>> reference;
   Stats sapCalibration,sapEvaluation;
   for(int frame=0;frame<frames;++frame){
+   if(frame==warmup)sap.setAuditing(false); // exclude brute-force oracle from timing
    sap.step();
    reference.push_back(sap.positions());
    if(frame>=warmup)(frame<split?sapCalibration:sapEvaluation).add(sap.metrics(),0);
@@ -87,6 +88,7 @@ int main(int argc,char** argv){
     physics.setPatchCellSpan(span);
     Stats calibration,evaluation;
     for(int frame=0;frame<frames;++frame){
+     if(frame==warmup)physics.setAuditing(false);
      physics.step();
      const double error=maxError(reference[frame],physics.positions());
      if(error>=1e-8)throw std::runtime_error(
