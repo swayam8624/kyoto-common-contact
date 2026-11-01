@@ -75,3 +75,20 @@ makes the exhaustive oracle independent and explicitly toggleable, adds
 precise/oracle/display diagnostic costs and counters, and runs an oracle-checked
 preflight outside timed benchmark runs. These statements still require a passing
 fresh build and test log before being presented as verified.
+
+## Dynamic contact-island scene (rigid-sphere supporting demo)
+
+The legacy browser scene now begins with two spatially separated moving
+sphere groups whose paths intersect in the same Z plane. It forms actual
+cross-group narrow-phase contacts rather than permanently separated static
+clusters. The graph is reconstructed from verified contacts each frame, and
+colors update from connected components. To demonstrate:
+
+```sh
+./scripts/launch_meeting.sh islands
+```
+
+Select **02 · Contact islands**. Observe the two groups approaching,
+pause around their interaction, then turn contact/island overlays on/off.
+This graph is for independent rigid spheres with an impulse solver, *not*
+the internal constraint graph of the cloth/XPBD experiment.

@@ -27,3 +27,12 @@ demonstrates contact islands and swept sphere TOI. It is a **separate** solver
 and not part of the native cloth/OGC experiment. Do not conflate them.
 
 Leave collision response ON, cutaway OFF, and margin 0.05. Press R to prepare the next demonstration.
+
+## Island supporting-demo instructions
+
+Use `./scripts/launch_meeting.sh islands` to open the older browser viewer.
+Select scene **02 · Contact islands**, reset, start and pause as the moving
+groups approach. Candidate lines represent broad-phase possibilities;
+confirmed-contact links contribute to the island graph. Distinct group
+colors can merge at actual cross-group contact. This is a **separate C++
+rigid-sphere impulse solver**, not a hidden island implementation of XPBD cloth.

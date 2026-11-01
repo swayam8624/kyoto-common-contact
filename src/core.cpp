@@ -137,8 +137,14 @@ void Simulation::reset(const std::string& scene) {
                  {1,{0.72,0.0,0.0},{-1.25,0.0,0.0},0.18,1.0},
                  {2,{0.0,0.65,0.0},{0.0,0.0,0.0},0.16,1.0}};
     } else if(scene=="islands") {
-        for(int i=0;i<6;++i) bodies_.push_back({i,{-0.78+0.23*i,0.28,0.0},{0.0,0.0,0.0},0.13,1.0});
-        for(int i=0;i<4;++i) bodies_.push_back({6+i,{0.18+0.23*i,-0.45,0.32},{0.0,0.0,0.0},0.13,1.0});
+        // Two initially separate chains approach each other, then interact.
+        // Both groups occupy the same Z plane; a previous 0.32 Z offset
+        // exceeded the combined sphere radii and prevented any cross-group
+        // contacts, making the "merge" demonstration visually misleading.
+        for(int i=0;i<6;++i)
+            bodies_.push_back({i,{-0.78+0.23*i,0.28,0.0},{0.0,-0.85,0.0},0.13,1.0});
+        for(int i=0;i<4;++i)
+            bodies_.push_back({6+i,{0.18+0.23*i,-0.45,0.0},{0.0,0.85,0.0},0.13,1.0});
     } else if(scene=="dense") {
         int id=0;
         for(int y=0;y<5;++y) for(int x=0;x<9;++x)
