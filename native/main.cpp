@@ -60,7 +60,7 @@ struct EvidenceBar { std::string scene,algorithm; double meanMs{},extraCandidate
 struct PatchBenchRow {
  int span{};
  std::string frontier,phase;
- double meanStepMs{};
+ double meanStepMs{},maxPositionError{};
 };
 struct MultiBenchRow {
  int sheets{};
@@ -108,7 +108,10 @@ void loadEvidence(App& a) {
     PatchBenchRow row;
     row.span=std::stoi(cells[0]);row.frontier=cells[1];
     row.phase=cells[2];row.meanStepMs=std::stod(cells[4]);
-    if(std::isfinite(row.meanStepMs))a.patchResults.push_back(row);
+    row.maxPositionError=std::stod(cells[12]);
+    if(std::isfinite(row.meanStepMs)&&row.meanStepMs>=0 &&
+       std::isfinite(row.maxPositionError)&&row.maxPositionError>=0 &&
+       row.maxPositionError<1e-8)a.patchResults.push_back(row);
    } catch(const std::exception&) {}
   }
  }
@@ -181,26 +184,48 @@ void loadEvidence(App& a) {
 // Evaluation frames never enter the policy selection; no online learning
 // or prior-art novelty is claimed.
 void applyCalibratedPatch(App& a){
- const PatchBenchRow* selected=nullptr;
- for(const auto& row:a.patchResults){
-  if(row.phase!="calibration"||row.frontier=="sap_rebuild")continue;
-  if(!selected||row.meanStepMs<selected->meanStepMs)selected=&row;
+ // Require the entire 12-variant, two-phase matrix plus SAP, all with
+ // validated paired positions. Partial/stale benchmark output is rejected.
+ constexpr std::array<int,6> spans{1,2,3,4,6,12};
+ const auto count=[&](int span,const std::string& mode,const std::string& phase){
+  return std::count_if(a.patchResults.begin(),a.patchResults.end(),
+   [&](const PatchBenchRow& r){
+    return r.span==span && r.frontier==mode && r.phase==phase;
+   });
+ };
+ bool valid=a.patchResults.size()==26;
+ for(const auto& phase:{"calibration","evaluation"}){
+  if(count(0,"sap_rebuild",phase)!=1)valid=false;
+  for(const int span:spans)
+   for(const auto& mode:{"all_region_pairs","two_tier"})
+    if(count(span,mode,phase)!=1)valid=false;
  }
- if(!selected){
-  pushInspectorEvent(a,"CALIBRATION MISSING: RUN prepare_meeting.sh");
+ if(!valid){
+  pushInspectorEvent(a,"INCOMPLETE CALIBRATION: RUN prepare_meeting.sh");
   return;
  }
- a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
- a.multi.setAdaptive(false);
- a.multiAdaptive=false;
- a.multiHierarchy=selected->frontier=="two_tier";
- a.multi.setHierarchicalRegions(a.multiHierarchy);
- a.multi.setPatchCellSpan(selected->span);
+ const PatchBenchRow* selected=nullptr;
+ for(const auto& row:a.patchResults){
+  if(row.phase!="calibration")continue;
+  if(!selected || row.meanStepMs<selected->meanStepMs)selected=&row;
+ }
+ if(!selected)return;
+ if(selected->frontier=="sap_rebuild"){
+  a.multi.setPolicy(ccp::research::Policy::RebuildSAP);
+  pushInspectorEvent(a,"CALIBRATION CHOSE SAP FALLBACK");
+ }else{
+  a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
+  a.multi.setAdaptive(false);
+  a.multiAdaptive=false;
+  a.multiHierarchy=selected->frontier=="two_tier";
+  a.multi.setHierarchicalRegions(a.multiHierarchy);
+  a.multi.setPatchCellSpan(selected->span);
+  pushInspectorEvent(a,"CALIBRATION APPLIED PATCH "+
+     std::to_string(selected->span)+" "+selected->frontier);
+ }
  a.historyCandidates.clear();
  a.historyInterContacts.clear();
  a.historyBroadMs.clear();
- pushInspectorEvent(a,"CALIBRATION APPLIED: PATCH "+
-    std::to_string(selected->span)+" "+selected->frontier);
 }
 void fitScene(App&a,GLFWwindow*w){
  const auto& points=a.multiMode?a.multi.positions():a.sim.positions();
@@ -426,7 +451,7 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  if(!a.patchResults.empty()){
   auto winner=a.patchResults.end();
   for(auto it=a.patchResults.begin();it!=a.patchResults.end();++it)
-   if(it->phase=="calibration" && it->frontier!="sap_rebuild" &&
+   if(it->phase=="calibration" &&
       (winner==a.patchResults.end() || it->meanStepMs<winner->meanStepMs))
     winner=it;
   if(winner!=a.patchResults.end()){

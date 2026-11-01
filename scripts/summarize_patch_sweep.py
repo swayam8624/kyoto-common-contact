@@ -43,7 +43,10 @@ for row in rows:
 if set(data)!=expected:
     raise SystemExit(f"incomplete patch-size experiment {expected-set(data)}")
 
-selected=min(variants,key=lambda item:float(data[(*item,"calibration")]["meanStepMs"]))
+# Include the reference SAP as a fallback: profiling must never be forced
+# to choose an expensive regional configuration in a sparse workload.
+choices=variants+[(0,"sap_rebuild")]
+selected=min(choices,key=lambda item:float(data[(*item,"calibration")]["meanStepMs"]))
 winner=float(data[(*selected,"evaluation")]["meanStepMs"])
 sap=float(data[0,"sap_rebuild","evaluation"]["meanStepMs"])
 control=float(data[3,"all_region_pairs","evaluation"]["meanStepMs"])
@@ -69,7 +72,7 @@ for i,(span,frontier) in enumerate(order):
 svg.extend([
 f'<text x="30" y="711" fill="#193146" font-family="Arial,sans-serif" font-size="17">SAP evaluation reference: {sap:.4f} ms / step</text>',
 f'<text x="30" y="740" fill="#193146" font-family="Arial,sans-serif" font-size="17">Calibration-selected: {escape(selected[1])}, span {selected[0]} · evaluation {winner:.4f} ms ({improvement:+.1f}% relative to SAP)</text>',
-'<text x="30" y="786" fill="#53677b" font-family="Arial,sans-serif" font-size="13">A single timing run is noisy. Calibrating on one trajectory is not independent-scene generalization.</text>',
+'<text x="30" y="786" fill="#53677b" font-family="Arial,sans-serif" font-size="13">SAP is an eligible fallback. A single timing run is noisy; this does not establish independent-scene generalization.</text>',
 '<text x="30" y="813" fill="#53677b" font-family="Arial,sans-serif" font-size="13">No online region splitter/merger or publication-level novelty is claimed.</text>',
 '</svg>'])
 chart.parent.mkdir(parents=True,exist_ok=True)
@@ -94,7 +97,7 @@ lines += [
 "",
 "## Training-time choice and untouched later-frame result",
 "",
-f"Calibration chose **{selected[1]}**, patch span **{selected[0]}** cells.",
+f"Calibration chose **{selected[1]}**" + (f", patch span **{selected[0]}** cells." if selected[1]!="sap_rebuild" else " as the lower-cost fallback."),
 f"Later-frame evaluation: **{winner:.4f} ms**, SAP **{sap:.4f} ms**, original flat span-three **{control:.4f} ms**.",
 f"Evaluation step-time reduction relative to SAP: **{improvement:+.2f}%** (negative = slower).",
 "",
