@@ -6,6 +6,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <sstream>
 #include <unordered_map>
@@ -18,6 +19,10 @@ constexpr int kSide=13;
 constexpr int kIterations=5;
 constexpr double kDt=1.0/90.0;
 constexpr double kThickness=0.062;
+// Self-contact uses the same conservative 0.075m AABB query margin. A
+// positive thickness and nonlocal topological exclusions are necessary
+// for folding cloth, but this is NOT continuous collision detection.
+constexpr double kSelfThickness=0.070;
 constexpr double kMargin=0.075;
 // Stability contracts for the discrete XPBD-style test solver:
 // Contact projection is positional, not a perfectly elastic collision.
@@ -123,6 +128,29 @@ SegPair closestSegments(Vec3 p1,Vec3 q1,Vec3 p2,Vec3 q2){
   }
  }
  return {add(p1,mul(d1,s)),add(p2,mul(d2,t)),s,t};
+}
+// Segment/triangle piercing can be missed by nearest-vertex-only tests:
+// the penetrating edge may already have crossed the face and its endpoints
+// can be farther than the cloth's contact thickness. This detects ACTUAL
+// current-segment crossings, not continuous time-of-impact.
+struct SegmentFaceHit {
+ Vec3 p{};
+ std::array<double,3> bary{};
+ double edgeParameter{};
+};
+std::optional<SegmentFaceHit> segmentFace(Vec3 p0,Vec3 p1,Vec3 a,Vec3 b,Vec3 c){
+ const Vec3 ab=sub(b,a),ac=sub(c,a),n=cross(ab,ac),direction=sub(p1,p0);
+ const double n2=len2(n),denom=dot(n,direction);
+ if(n2<1e-19||std::abs(denom)<1e-12)return std::nullopt;
+ const double t=dot(n,sub(a,p0))/denom;
+ if(t<0||t>1)return std::nullopt;
+ const Vec3 q=add(p0,mul(direction,t)),v=sub(q,a);
+ const double d00=dot(ab,ab),d01=dot(ab,ac),d11=dot(ac,ac);
+ const double d20=dot(v,ab),d21=dot(v,ac),den=d00*d11-d01*d01;
+ if(std::abs(den)<1e-20)return std::nullopt;
+ const double v1=(d11*d20-d01*d21)/den,v2=(d00*d21-d01*d20)/den;
+ if(v1<-.00001||v2<-.00001||v1+v2>1.00001)return std::nullopt;
+ return SegmentFaceHit{q,{1.-v1-v2,v1,v2},t};
 }
 }
 void RegionalCandidates::reset(){
@@ -353,6 +381,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  positions_.clear();previous_.clear();inverseMasses_.clear();
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
  pinned_.clear();initialPins_.clear();constraints_.clear();spheres_.clear();
+ grab_={};
  regional_.reset();global_.invalidate();metrics_={};
  const double spacing=2.2/(kSide-1);
  for(int layer=0;layer<sheets_;++layer){
@@ -463,6 +492,93 @@ void MultiCloth::assignOnlineRegionIds(){
  regional_.reset();
 }
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}
+void MultiCloth::setSelfCollisions(bool enabled){
+ if(selfCollisions_==enabled)return;
+ selfCollisions_=enabled;
+ regional_.reset();
+ global_.invalidate(); // eligibility masks now include/exclude same-sheet pairs
+}
+// Same-cloth triangles in the same cell or neighboring mesh cells share
+// an edge, vertex or structural one-ring neighborhood. Excluding them
+// prevents the cloth from repelling its own resting local mesh.
+bool MultiCloth::nonlocalSelfPair(int first,int second) const{
+ if(first==second||first<0||second<0 ||
+    first>=static_cast<int>(triangles_.size())||
+    second>=static_cast<int>(triangles_.size()))return false;
+ if(triangleSheets_[first]!=triangleSheets_[second])return false;
+ constexpr int cellsPerSheet=2*(kSide-1)*(kSide-1);
+ const int ca=(first%cellsPerSheet)/2,cb=(second%cellsPerSheet)/2;
+ const int ax=ca%(kSide-1),ay=ca/(kSide-1);
+ const int bx=cb%(kSide-1),by=cb/(kSide-1);
+ return std::abs(ax-bx)>1||std::abs(ay-by)>1;
+}
+bool MultiCloth::beginGrab(int ti,std::array<double,3> bary,Vec3 pickedPoint){
+ if(ti<0||ti>=static_cast<int>(triangles_.size()))return false;
+ for(double x:bary)if(!std::isfinite(x)||x<0||x>1)return false;
+ const double sum=bary[0]+bary[1]+bary[2];
+ if(std::abs(sum-1.)>1e-5)return false;
+ const auto tri=triangles_[static_cast<std::size_t>(ti)];
+ double weightedInverseMass=0;
+ for(int j=0;j<3;++j)
+  weightedInverseMass+=bary[j]*bary[j]*inverseMasses_[tri[j]];
+ if(weightedInverseMass<1e-10)return false;
+ if(!std::isfinite(pickedPoint.x)||!std::isfinite(pickedPoint.y)||
+    !std::isfinite(pickedPoint.z))return false;
+ grab_={true,ti,bary,pickedPoint,pickedPoint};
+ return true;
+}
+void MultiCloth::updateGrab(Vec3 target){
+ if(!grab_.active)return;
+ if(!std::isfinite(target.x)||!std::isfinite(target.y)||!std::isfinite(target.z))
+  throw std::invalid_argument("nonfinite cloth grab target");
+ // Keep mouse interaction within the demo's finite physical workspace.
+ grab_.target={std::clamp(target.x,-4.,4.),
+               std::clamp(target.y,-4.,4.),
+               std::clamp(target.z,.10,5.0)};
+}
+void MultiCloth::endGrab(){grab_.active=false;}
+Vec3 MultiCloth::grabPoint() const{
+ if(!grab_.active)return {};
+ const auto tri=triangles_.at(static_cast<std::size_t>(grab_.triangle));
+ Vec3 point{};
+ for(int j=0;j<3;++j)point=add(point,mul(positions_[tri[j]],grab_.bary[j]));
+ return point;
+}
+void MultiCloth::projectGrab(std::vector<Vec3>& nonphysical){
+ if(!grab_.active)return;
+ const auto tri=triangles_[static_cast<std::size_t>(grab_.triangle)];
+ const Vec3 delta=sub(grab_.filteredTarget,grabPoint());
+ const double length=norm(delta);
+ metrics_.grabError=length;
+ if(length<1e-8)return;
+ double inverse=0;
+ for(int j=0;j<3;++j)inverse+=
+   grab_.bary[j]*grab_.bary[j]*inverseMasses_[tri[j]];
+ if(inverse<1e-12)return;
+ // An XPBD-style, mass-weighted barycentric attachment. The held point
+ // follows smoothly instead of teleporting vertices and exciting extreme
+ // elastic energy. Contact projections may push it away to avoid overlap.
+ const Vec3 corr=mul(delta,std::min(.022/length,1.0)*.77/inverse);
+ for(int j=0;j<3;++j){
+  const int id=tri[j];
+  const Vec3 move=mul(corr,grab_.bary[j]*inverseMasses_[id]);
+  positions_[id]=add(positions_[id],move);
+  nonphysical[id]=add(nonphysical[id],move);
+ }
+ ++metrics_.grabCorrections;
+}
+void MultiCloth::displacePatchForTest(int sheet,int minX,int minY,int width,Vec3 delta){
+ if(sheet<0||sheet>=sheets_||minX<0||minY<0||width<1||
+    minX+width>kSide||minY+width>kSide)
+  throw std::invalid_argument("test patch out of cloth bounds");
+ for(int y=minY;y<minY+width;++y)for(int x=minX;x<minX+width;++x){
+  const int id=sheet*kSide*kSide+y*kSide+x;
+  if(pinned_[id])throw std::invalid_argument("cannot displace pinned cloth vertex");
+  positions_[id]=add(positions_[id],delta);
+  previous_[id]=add(previous_[id],delta);
+ }
+ regional_.reset();global_.invalidate();
+}
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();
  spheres_.push_back({{0.43*std::sin(.92*t),.15*std::cos(1.12*t),.97+.08*std::sin(.71*t)},.68});
@@ -481,7 +597,8 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
    hi={std::max(hi.x,p.x),std::max(hi.y,p.y),std::max(hi.z,p.z)};
   }
   const auto cat=std::uint32_t{1}<<triangleSheets_[i];
-  out.push_back({{int(i),lo,hi,cat,(clothMask^cat)|sphereCat,true},
+  out.push_back({{int(i),lo,hi,cat,
+                 (selfCollisions_?clothMask:(clothMask^cat))|sphereCat,true},
                  triangleRegions_[i],triangleSheets_[i]});
  }
  for(std::size_t i=0;i<spheres_.size();++i){
