@@ -100,3 +100,24 @@ Do not claim the native 3D demo renders the synthetic multi-sheet benchmark geom
 ## Real moving three-cloth demonstration
 
 Run ./open_multicloth_demo.sh. Keys: L cycles sheet count 1/2/3, O cycles moving sphere count 1/2, Q cycles SAP rebuild/global guarded/regional-certified, A turns exhaustive pair audit on/off, G opens scrollable live event and time-series panel, 1-4 select geometry/guard regions/candidates/actual contact corrections. Insert the newly generated multicloth-real.svg and broadphase-leaderboard.svg charts. The external 3D comparison now includes simulated_cloths3 real physical AABB snapshots. Do not claim the adaptive method is historically novel; assess it using the paired measured cost and zero-miss contract.
+
+
+## Additional research slides: November 1 hierarchical / granularity ablations
+
+### Slide F — Why global guarded SAP fails as cloth interaction becomes dense
+
+Use the measured 1/2/3-cloth full-physics graph from output/native/multicloth-real.svg. Show the complete CPU timestep alongside broad-phase time and candidate count, explicitly noting that a fast broad-phase cache can be worse overall when conservative extra candidates induce expensive inter-sheet precise contact checks. The physically interacting multi-cloth solver is a custom discrete XPBD-style test fixture, not IPC/OGC/CCFR.
+
+### Slide G — Two-level certified candidate frontier (experimental)
+
+Top-level: sweep sorted UNION AABBs of stable mesh patches, omitting disjoint patch pairs. Second level: certify each patch's per-primitive envelope; rebuild only pair-cache blocks incident to invalidated patches; then check stored primitive candidates against current tight padded AABBs. Show the conditional proof: if each current padded primitive AABB is inside its stored envelope, then every current required overlap pair must be in the envelope candidate set. A disjoint union-envelope pair cannot contain any current required overlap. The design is related to existing region broad phases, not an established novel invention.
+
+### Slide H — Why we measured patch size instead of inventing an optimal number
+
+Use the measured output/native/patch-sweep.svg chart. Its 12 experiments use 1, 2, 3, 4, 6 and 12 cloth cells per region, with flat and hierarchical patch-frontier modes. Select one policy using earlier calibration frames ONLY; report its performance on later evaluation frames, including SAP as a fallback. Explain that a fine 1x1 partition can be very expensive despite pruning thousands of disjoint patch pairs. Highlight both positive and negative cases.
+
+### Slide I — Novelty decision gate
+
+**Implemented:** verified partial region invalidation, hierarchical envelope-pair culling, tight candidate revalidation, variable topology-aligned region granularity, static profile-based configuration, actual inter-sheet dynamics, independent Bullet/DPVT comparisons, per-frame physical state agreement with SAP. **Not implemented:** online optimum-granularity learning, full continuous collision detection for cloth, self-contact, first-party IPC/OGC/CCFR adapters, GPU LBVH and PhysX ABP/PABP comparisons. Do not label mere regional spatial subdivision, hierarchy, guards, or patch profiling a new published broad-phase algorithm. Research novelty requires related-work differentiation and a convincing advantage across independent scenes and hardware.
+
+In the native viewer: launch open_multicloth_demo.sh, press J to compare all-pairs versus two-level region frontiers, P to change patch size, Y to apply the complete locally measured calibration matrix (or SAP fallback), and G to scroll to the six-way physics-step comparison and live patch-pair counts.
