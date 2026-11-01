@@ -93,3 +93,10 @@ A reproducible online-versus-SAP coupled simulation trace runs as part of `scrip
 The original live three-cloth test fixture suffered a reproduced numerical explosion after extended playback. Run `./scripts/prepare_meeting.sh` and then `./open_multicloth_demo.sh` on the updated branch to use the corrected physically integrated wind, initially separated sheets, bounded per-vertex contact projection, damped collision impulses, and corrected floor response. The meeting script now performs a **480-frame stability regression** and fails on runaway world positions, impossible structural stretching, floor penetration, or frozen/no-contact cloth. The native HUD shows physical frame travel and mesh-edge strain and pauses on instability.
 
 **Do not reuse prior performance figures from the unstable workload.** The fixed physics scenario changes its trajectories, contact counts, and candidate distributions. Full details, before/after measurements, and limitations: [Cloth stability regression](docs/CLOTH_STABILITY_FIX.md).
+
+
+## Cloth self-contact and mouse interaction (current)
+
+The three-cloth native physics fixture now resolves **nonlocal triangle contacts within the same cloth sheet**, not just interactions between different sheets and moving spheres. It excludes nearby triangles sharing the same structural mesh neighborhood, evaluates vertex-face/edge-edge proximity and discrete edge-piercing, and applies bounded, symmetric positional response. Press **S** to toggle self-contact (enabled by default) for an immediate comparison; the cache resets on any collision mask change.
+
+In the native demo, **left-click a visible cloth triangle and drag** to pull it through a barycentric mouse attachment. **Right-drag** or **Shift+left-drag** orbits the camera; clicking empty background also orbits. The picked point and target are drawn in gold/cyan and physics continues during drag. For design, tests and numerical limitations, see [self-collision and mouse dragging](docs/SELF_COLLISION_AND_DRAGGING.md). These are discrete contact tests, **not CCD or an intersection-free proof**. Re-run the benchmark script because self-contact changes the workload.
