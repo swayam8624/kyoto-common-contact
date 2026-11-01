@@ -1,0 +1,11 @@
+{"kind":"deck","id":"pr/9xn3ok","name":"Deck"}
+{"kind":"layout","id":"ly/j250vepc","editable":false,"name":"Master","type":"master"}
+{"kind":"layout","id":"ly/8bulgvap","editable":false,"name":"Title Slide","type":"title","placeholders":[{"name":"title","type":"title"},{"name":"subtitle","type":"subtitle"}]}
+{"kind":"layout","id":"ly/k7y587m1","editable":false,"name":"Section Header","type":"sectionHeader","placeholders":[{"name":"title","type":"title"}]}
+{"kind":"layout","id":"ly/z2ps7udc","editable":false,"name":"Title and Body","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/9gbyp4ny","editable":false,"name":"Title and Two Column","type":"twoColTx","placeholders":[{"name":"title","type":"title"},{"name":"Left column","type":"body"},{"name":"Right column","type":"body"}]}
+{"kind":"layout","id":"ly/v2d8v29g","editable":false,"name":"Title and One Column","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/p0vi9cz2","editable":false,"name":"Blank","type":"blank"}
+{"kind":"slide","id":"sl/ydmfcl","slideIndex":0,"layout":{"id":"ly/p0vi9cz2","name":"Blank"},"title":"One common broad-phase contract","textShapes":1,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"textbox","id":"sh/d832p4f6","slideIndex":0,"position":{"left":60,"top":60,"width":1100,"height":150},"text":"One common broad-phase contract","geometry":"rect","style":{"fontSize":44,"typeface":"Aptos","color":"#17202A","alignment":"left"}}
+{"kind":"notes","id":"nt/ydmfcl","slideIndex":0,"text":""}

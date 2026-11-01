@@ -1,0 +1,16 @@
+{
+  "source": "Blender cloth physics",
+  "frames": 90,
+  "fps": 30,
+  "vertices": 1225,
+  "triangles": 2312,
+  "sphere": [
+    0,
+    0,
+    0.9,
+    0.8
+  ],
+  "margin": 0.05,
+  "cache": "native shape key replay of evaluated cloth positions",
+  "solverAdapter": "not integrated; C++ queries evaluated mesh snapshots"
+}

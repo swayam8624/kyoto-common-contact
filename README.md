@@ -1,13 +1,40 @@
-# Common broad-phase research demo in 3D
+# Common broad-phase research prototype
 
-Launch the native, offline demo with `./open_3d_demo.sh`. It opens the self-contained Blender scene using a clean startup configuration. No localhost server is needed.
+Run `./open_3d_demo.sh` to open the native GLFW/OpenGL application. The C++ cloth solver, shared candidate service, exact sphere–triangle narrow phase, collision response, and renderer execute in the same process. The application does not load recorded simulation meshes or use a web server.
 
-Use the View Layer selector to switch among **01 Physics replay**, **02 Candidates · frame 60**, and **03 Proximity · frame 60**. Space plays the recorded physics; mouse navigation rotates the 3D scene. The two analysis stages are static snapshots of the same simulated frame.
+The research question is whether one bounds-and-request interface can reduce collision candidate work while preserving the caller's precise contact requirements. The implemented experiment compares rebuilding on every solver iteration with guarded reuse of a candidate list. The service checks an enclosure certificate before every reuse; changes in geometry, request, filtering metadata or backend trigger a rebuild when necessary.
 
-The video `output/research3d/Common_Broad_Phase_3D.mp4` is a portable playback of the actual recorded cloth simulation. The native `.blend` remains fully three dimensional.
+The default camera includes the whole initial cloth and obstacle. The optional visual cutaway is off. Press **F** to frame the current scene and **R** to restart the fall. See [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) for the short presentation walkthrough.
 
-Blender computes cloth physics; the C++23 common-bound query processes exported, evaluated triangle geometry. The render highlights C++ candidate and precise-proximity classifications. The cutaway is a visualization only; queries use the full mesh. This does not yet replace the internal collision system of Blender, IPC, OGC or XPBD.
+| Key | Action |
+| --- | --- |
+| Space / N | Run or pause / advance one physics step |
+| Q | Rebuild every iteration / guarded candidate reuse |
+| M | Query margin: 0.02, 0.05, 0.10 |
+| B | Sweep and prune / exhaustive AABB reference |
+| 1–4 | Geometry / certified bounds / candidates / precise proximity |
+| F / R | Frame the whole current scene / reset simulation and camera |
+| C | Enable or disable collision response (sphere and floor) |
+| X / W | Optional visual cutaway / triangle wire overlay |
+| Drag / scroll | Orbit / zoom |
+| Escape | Exit |
 
-See `output/research3d/README.md` for regeneration, provenance and verification.
+The common interface is `BroadPhaseService` in `include/ccp/live_cloth.hpp`. It accepts only geometric bounds, stable IDs, eligibility metadata and a query request. It has no cloth or solver dependency. The cloth adapter requests current-iteration queries, then uses returned IDs to select exact contact checks and response. Detailed semantics and correctness conditions are in [native/RESEARCH_CONTRACT.md](native/RESEARCH_CONTRACT.md).
 
-The earlier point-triangle HTML illustration is retained in the output directory as a historical diagnostic.
+Build and verify on this machine:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/ccp_live_benchmark output/native/live_benchmark.csv
+./open_3d_demo.sh
+```
+
+The native target requires the installed GLFW development library and macOS OpenGL/CoreText frameworks. It was compiled and exercised on Apple M2 Pro / OpenGL 4.1 Metal. The launcher configures/builds only if the executable is absent; rerun the build command after editing source.
+
+The recorded local benchmark uses five paired trials of 300 steps, excluding the first 30 steps per trial from timing summaries. Both variants use the same solver, SAP backend, geometry, timestep (1/120 s), margin (0.05), and displacement budget (0.04). Mean / maximum CPU step time was **2.351 / 4.184 ms** for rebuilding and **0.999 / 2.951 ms** for guarded reuse. All compared particle positions matched exactly in this run and the exhaustive required-pair oracle reported zero omissions. Timing includes the diagnostic oracle and excludes rendering; this is one synthetic fixture, not a general performance claim. Raw measurements and settings are in `output/native/live_benchmark.csv` and `benchmark-summary.txt`.
+
+This is a small XPBD-style cloth/contact implementation, not an integration with the official IPC, OGC, PBD or CCFR implementations. It does not provide swept continuous collision detection or self collision, and does not establish their collision-free guarantees. The next research step is one real method adapter, validated against that method's original candidate pipeline.
+
+Earlier Blender and HTML experiments remain under `output/research3d` and `output/` for provenance. They are historical artifacts; this launch path uses the live C++ application.

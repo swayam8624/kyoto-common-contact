@@ -1,0 +1,4 @@
+record,id,x,y,z,vx,vy,vz,radius,island,contact_a,contact_b,toi_s
+body,0,-0.556667,0,0,-110,0,0,0.18,0,,,
+body,1,0.556667,0,0,110,0,0,0.18,0,,,
+contact,,,,,,,,,,0,1,0.004909

@@ -1,0 +1,26 @@
+00:02.036  blend            | Read blend: "/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/research3d/Common_Broad_Phase_3D.blend"
+/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/.render3d/render.py:8: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  m=bpy.data.materials.new(name);m.diffuse_color=(*col,1);m.use_nodes=True;n=m.node_tree.nodes.get('Principled BSDF');n.inputs['Base Color'].default_value=(*col,1);n.inputs['Roughness'].default_value=rough;n.inputs['Metallic'].default_value=metal;return m
+00:26.373  render           | Saved: '/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/research3d/geometry.png'
+INFO: Ucupaint 2.4.9 is registered!
+Batch Import Images to Brushes addon registered successfully
+Extra Pies: Register built-in pies for use with non-standard Keymap.
+Reloading external rigs...
+Reloading external metarigs...
+Sculptools: GPU shaders unavailable (background mode?): GPU functions for drawing requires the gpu module to be initialized. See gpu.init.
+INFO: Ucupaint update routine is done in 0.17 ms!
+INFO: Ucupaint update routine is done in 0.24 ms!
+RENDERED geometry
+00:49.975  render           | Saved: '/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/research3d/candidates.png'
+RENDERED candidates
+01:14.929  render           | Saved: '/Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/research3d/proximity.png'
+RENDERED proximity
+Info: Saved as "Common_Broad_Phase_3D.blend"
+RENDER_COMPLETE
+01:14.958  blend            | Writing user preferences: "/Users/swayamsingal/Library/Application Support/Blender/5.2/config/userpref.blend" 
+INFO: Ucupaint 2.4.9 is unregistered!
+Batch Import Images to Brushes addon unregistered successfully
+Info: Preferences saved
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

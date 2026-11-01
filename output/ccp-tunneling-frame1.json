@@ -1,0 +1,136 @@
+{
+  "format": "CCP frame capture",
+  "version": 1,
+  "capturedAt": "2026-11-01T13:22:07.353Z",
+  "snapshot": {
+    "protocol": 1,
+    "scene": "tunneling",
+    "broadPhase": "sweep",
+    "queryMode": "swept",
+    "frame": 1,
+    "potentialPairs": 1,
+    "candidates": 1,
+    "broadMs": 0.000292,
+    "narrowMs": 0.000457,
+    "bodies": [
+      {
+        "id": 0,
+        "p": [
+          -0.556667,
+          0,
+          0
+        ],
+        "v": [
+          -110,
+          0,
+          0
+        ],
+        "r": 0.18,
+        "island": 0
+      },
+      {
+        "id": 1,
+        "p": [
+          0.556667,
+          0,
+          0
+        ],
+        "v": [
+          110,
+          0,
+          0
+        ],
+        "r": 0.18,
+        "island": 0
+      }
+    ],
+    "candidatePairs": [
+      [
+        0,
+        1
+      ]
+    ],
+    "contacts": [
+      {
+        "a": 0,
+        "b": 1,
+        "n": [
+          1,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "distance": 0.36,
+        "penetration": 0,
+        "toi": 0.004909
+      }
+    ],
+    "motionPaths": [
+      [
+        [
+          -0.72,
+          0,
+          0
+        ],
+        [
+          -0.18,
+          0,
+          0
+        ],
+        [
+          -0.556667,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0.72,
+          0,
+          0
+        ],
+        [
+          0.18,
+          0,
+          0
+        ],
+        [
+          0.556667,
+          0,
+          0
+        ]
+      ]
+    ],
+    "freeFlightPositions": [
+      [
+        0.196667,
+        0,
+        0
+      ],
+      [
+        -0.196667,
+        0,
+        0
+      ]
+    ]
+  },
+  "replay": {
+    "version": 1,
+    "startedAt": "test",
+    "initial": {
+      "scene": "tunneling",
+      "broadPhase": "sweep",
+      "queryMode": "swept"
+    },
+    "actions": [
+      {
+        "command": "step",
+        "count": 1
+      }
+    ]
+  }
+}

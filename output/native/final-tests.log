@@ -1,0 +1,13 @@
+Test project /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/build
+    Start 1: live_cloth_contracts
+1/4 Test #1: live_cloth_contracts .............   Passed    1.86 sec
+    Start 2: ccp_core_contracts
+2/4 Test #2: ccp_core_contracts ...............   Passed    0.01 sec
+    Start 3: common_bounds_contract
+3/4 Test #3: common_bounds_contract ...........   Passed    0.01 sec
+    Start 4: mesh_bounds_query_contract
+4/4 Test #4: mesh_bounds_query_contract .......   Passed    0.00 sec
+
+100% tests passed out of 4
+
+Total Test time (real) =   1.88 sec

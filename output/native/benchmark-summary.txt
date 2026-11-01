@@ -1,0 +1,4 @@
+Measured paired CPU cloth diagnostics; first 30 frames per trial were advanced but excluded from timing summaries and CSV.
+baseline_rebuild meanStepMs=2.35117 maxStepMs=4.18375 p95StepMs=2.72708 generatorCalls=12150 reuses=0
+guarded_reuse meanStepMs=0.999491 maxStepMs=2.9505 p95StepMs=1.19762 generatorCalls=600 reuses=11550
+maxPositionError=0 measuredFramesPerPolicy=1350

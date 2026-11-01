@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08121d"><title>Common Contact Pipeline · Research Demo</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="mark">CC</div><div><strong>Common Contact Pipeline</strong><small>INSPECTABLE RESEARCH DEMO</small></div></div>
+    <div class="topmeta"><span class="live-dot"></span><span>LIVE CORE</span><i></i><span id="frame-label">FRAME 0000</span><i></i><span>PROTOTYPE · SPHERE RIGID BODY</span></div>
+    <button class="icon-button" id="help" title="About this demo">?</button>
+  </header>
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="section-label">EXPERIMENT</div>
+      <label class="field-label" for="scene">Scene</label>
+      <select id="scene"><option value="elastic">01 · Elastic collision</option><option value="islands">02 · Contact islands</option><option value="dense">03 · Dense broad phase</option><option value="tunneling">04 · Tunneling check</option></select>
+      <div class="section-label spaced">BROAD PHASE</div>
+      <div class="segmented"><button data-mode="brute">Brute force</button><button class="selected" data-mode="sweep">Sweep &amp; prune</button></div>
+      <div class="section-label spaced">QUERY MODE</div>
+      <div class="segmented"><button class="selected" data-query="discrete">Discrete</button><button data-query="swept">Swept / TOI</button></div>
+      <div class="section-label spaced">INSPECTION</div>
+      <label class="toggle"><input type="checkbox" id="show-candidates" checked><span class="switch"></span><span>Candidate pairs <small>conservative AABB overlap</small></span></label>
+      <label class="toggle"><input type="checkbox" id="show-contacts" checked><span class="switch"></span><span>Verified contacts <small>sphere distance predicate</small></span></label>
+      <label class="toggle"><input type="checkbox" id="show-islands" checked><span class="switch"></span><span>Contact islands <small>components from contacts</small></span></label>
+      <div class="section-label spaced">CAPTURE</div>
+      <div class="capture-controls"><button id="record" class="capture-primary">● Start capture</button><button id="replay" disabled>Replay</button><button id="load-replay">Load replay</button><button id="export-json">JSON</button><button id="export-csv">CSV</button><input id="replay-file" type="file" accept="application/json,.json" hidden></div>
+      <div id="capture-status" class="capture-status">Frame export · replay session</div>
+      <div class="sidebar-note"><span class="note-mark">i</span><p>Candidate pairs are possible interactions. Only narrow-phase contacts connect bodies into islands.</p></div>
+      <div class="sidebar-foot">DEMO SCOPE <b>Rigid spheres · 3D state</b><span>Solver behavior is demonstration-specific.</span></div>
+    </aside>
+    <section class="workspace">
+      <div class="canvas-head"><div><div class="eyebrow">SIMULATION VIEW</div><h1 id="scene-title">Elastic sphere collision</h1></div><div class="view-badges"><span id="query-badge" class="query-badge">DISCRETE QUERY</span><div class="view-badge"><span class="pulse"></span> LIVE SIMULATION</div></div></div>
+      <div class="stage"><canvas id="world"></canvas><div class="axis"><span>X</span><span>Y</span><span>Z</span></div><div class="legend"><span><i class="dot candidate"></i>Candidate</span><span><i class="dot contact"></i>Verified contact / TOI</span><span><i class="dot island"></i>Island color</span></div><div class="stage-caption"><span id="query-caption">DISCRETE ENDPOINTS</span> <b>·</b> FIXED STEP 1/120 s</div></div>
+      <div class="controls"><div class="transport"><button id="reset" class="control-button" title="Reset">↺</button><button id="play" class="play-button" title="Pause">Ⅱ</button><button id="step" class="control-button" title="Step one frame">→|</button><span class="divider"></span><span id="run-status">RUNNING</span></div><div class="timeline"><div class="track"><div id="progress"></div></div><span id="timeline-frame">0</span></div><div class="speed">1×</div></div>
+      <div class="pipeline"><div class="pipeline-head"><span>FRAME PIPELINE</span><span>AUTHORITATIVE STATE FROM C++</span></div><div class="stages"><div class="stage-card active"><b>A</b><span>Motion</span><small>positions · velocities</small></div><div class="stage-arrow">›</div><div class="stage-card active"><b>B</b><span>Broad phase</span><small id="broad-stage">sweep &amp; prune</small></div><div class="stage-arrow">›</div><div class="stage-card active"><b>C</b><span>Narrow phase</span><small id="narrow-stage">sphere–sphere</small></div><div class="stage-arrow">›</div><div class="stage-card active"><b>D</b><span>Islands</span><small>contact components</small></div><div class="stage-arrow">›</div><div class="stage-card active"><b>E</b><span>Response</span><small>elastic impulse</small></div><div class="stage-arrow">›</div><div class="stage-card active"><b>F</b><span>Update</span><small>state + telemetry</small></div></div></div>
+    </section>
+    <aside class="inspector">
+      <div class="inspector-title"><div><div class="eyebrow">FRAME INSPECTOR</div><h2>Diagnostics</h2></div><span class="ok-pill">DETERMINISTIC</span></div>
+      <div class="metric-grid"><div class="metric"><span>OBJECTS</span><strong id="m-objects">—</strong><small>dynamic spheres</small></div><div class="metric"><span>CONTACTS</span><strong id="m-contacts">—</strong><small>earliest TOI <b id="m-toi">—</b></small></div><div class="metric"><span>CANDIDATES</span><strong id="m-candidates">—</strong><small>of <b id="m-potential">—</b> possible pairs</small></div><div class="metric"><span>ISLANDS</span><strong id="m-islands">—</strong><small>contact graph components</small></div></div>
+      <div class="chart-card"><div class="card-title">PIPELINE TIMING <span>ms / frame</span></div><div class="timing-row"><span>Broad phase</span><div class="bar"><i id="broad-bar"></i></div><b id="broad-time">0.000</b></div><div class="timing-row"><span>Narrow + response + graph</span><div class="bar teal"><i id="narrow-bar"></i></div><b id="narrow-time">0.000</b></div><small class="timing-foot">Microtiming is scene- and machine-dependent.</small></div>
+      <div class="card-title pair-heading">PAIR LEDGER <span id="pair-count">0 entries</span></div><div class="pair-list" id="pairs"></div>
+      <div class="caveat"><b id="caveat-title">Interpretation boundary</b><p id="caveat-copy">This prototype compares two conservative candidate generators for spheres. It does not implement or validate IPC, OGC, PBD/XPBD, or CCFR.</p></div>
+    </aside>
+  </main>
+  <dialog id="about"><button class="close" id="close-help">×</button><h2>About the prototype</h2><p>The C++ core owns the simulation state and computes candidate pairs, sphere contacts, elastic response, and contact islands. The swept mode uses conservative linear swept AABBs and analytic sphere-sphere time of impact for this demo geometry.</p><p>Broad-phase timings are measured locally and should be treated as diagnostics, not benchmark claims. Swept bounds here cover linear sphere translation; mesh rotation/deformation and external-method integration are not implemented.</p></dialog>
+  <script type="module" src="/viewer.js"></script>
+</body></html>

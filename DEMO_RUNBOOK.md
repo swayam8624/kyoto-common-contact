@@ -1,0 +1,15 @@
+# Three-minute native research walkthrough
+
+Launch `./open_3d_demo.sh`. Keep the default full cloth view; **X cutaway must read OFF**. Press Space to pause, then R to reset. The entire initial sheet must be visible above the sphere. F reframes the current geometry if the camera has been moved.
+
+1. Press 1, then Space. Explain the falling cloth and fixed obstacle. These positions are integrated by the C++ solver in the running application, rather than read from an animation file. Pause while the cloth is draping and press F.
+2. Press 2. Explain one format: stable primitive ID, geometric min/max bounds, category/mask and movable flag. The request supplies the proximity margin and update policy. The displayed certified bounds enclose the currently padded geometry; the view caps triangle-box overlays at 40 for readability, while all primitives remain in the query.
+3. Press 3, then 4. Amber triangles are retained candidates; green triangles pass the precise sphere–triangle distance test. Extra broad-phase candidates are expected. Candidate and proximity views show the complete cloth unless X is explicitly enabled.
+4. Press Q until the panel reads REBUILD EVERY ITERATION, then N. Observe the build counter for that physics step. Press Q to GUARDED ENVELOPE REUSE and N again. The service keeps actual candidate pairs while every padded bound stays inside its certified envelope. It rebuilds on an escaped envelope or incompatible request. This is the before/after mechanism; switching policies does not intentionally change contact physics.
+5. Press M, then N. The changed proximity request invalidates the cache. Point out the new margin and the build/reuse counters. B can switch to the exhaustive AABB reference; leave SAP selected for the main demo.
+6. Show `output/native/benchmark.png`: five paired trials, identical inputs and settings, mean / p95 / maximum CPU step time. State that all particle positions matched and no required pairs were omitted in this fixture. Timing includes oracle diagnostics and excludes rendering. This is a local prototype measurement, not a cross-solver benchmark.
+7. End with the proposed first real adapter: retain an existing method's narrow phase, solver, tolerances and motion requirements; replace candidate generation alone and compare coverage, outcomes, stage cost and total runtime.
+
+The app writes per-step state and measurements to `ccp-native-lab/native_trace.csv` within the system temporary directory and input events to `native_events.log` alongside it. The app prints the exact runtime folder on startup; `--trace PATH` chooses an explicit trace destination. A measured frame has both a position checksum and oracle count. These logs make live controls inspectable; the stronger paired benchmark compares all particle coordinates, not just checksums.
+
+Leave collision response ON, cutaway OFF, and margin 0.05. Press R to prepare the next demonstration.

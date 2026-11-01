@@ -1,0 +1,3 @@
+NATIVE_GPU Apple M2 Pro OPENGL 4.1 Metal - 91.7
+LIVE CAPTURE_STATE frame=120 broad=SAP response=1 guarded=0 margin=0.05 candidates=855 minGap=0.0199978 stateHash=708.37821800662
+GPU_FRAMEBUFFER_CAPTURE /Users/swayamsingal/Desktop/Programming/kyoto-common-contact/output/native/native-baseline.ppm

@@ -1,0 +1,15 @@
+{
+  "maxVertexErrorByFrame": {
+    "1": 0.0,
+    "20": 5.960646373703944e-08,
+    "35": 1.3328003749250113e-07,
+    "60": 1.1920928955078125e-07,
+    "90": 1.2013700229374393e-07
+  },
+  "viewLayers": [
+    "01 Physics replay",
+    "02 Candidates \u00b7 frame 60",
+    "03 Proximity \u00b7 frame 60"
+  ],
+  "passed": true
+}
