@@ -8,6 +8,7 @@
 #endif
 #include "ccp/live_cloth.hpp"
 #include "ccp/research_multicloth.hpp"
+#include "ccp/cloth_interaction.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -72,6 +73,8 @@ struct App {
  ccp::research::MultiCloth multi{3,2};
  bool multiMode=false,multiAudit=false,multiAdaptive=true,multiHierarchy=true;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
+  bool clothMouseGrab=false;
+  V dragOrigin{},dragPlaneNormal{};
  int stage=1,evidenceScene=5;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
  V target{0,0,1.2};
@@ -326,6 +329,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  if(key==GLFW_KEY_ESCAPE){glfwSetWindowShouldClose(w,1);return;}
  if(key==GLFW_KEY_K){
+  a.multi.endGrab();a.clothMouseGrab=false;a.drag=false;
   a.multiMode=!a.multiMode;
   a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();
   a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
@@ -335,10 +339,18 @@ void key(GLFWwindow*w,int key,int,int action,int){
  }
  if(a.multiMode){
   if(key==GLFW_KEY_SPACE)a.paused=!a.paused;
+  else if(key==GLFW_KEY_S){
+   a.multi.setSelfCollisions(!a.multi.selfCollisions());
+   pushInspectorEvent(a,a.multi.selfCollisions()?
+     "SELF COLLISION ENABLED":"SELF COLLISION DISABLED");
+  }
   else if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}
-  else if(key==GLFW_KEY_R){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
-  else if(key==GLFW_KEY_L){a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
-  else if(key==GLFW_KEY_O){a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_R){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_L){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount()%3+1,a.multi.sphereCount());a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
+  else if(key==GLFW_KEY_O){a.clothMouseGrab=false;a.drag=false;
+    a.multi.reset(a.multi.sheetCount(),a.multi.sphereCount()==1?2:1);a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();fitScene(a,w);}
   else if(key==GLFW_KEY_Q){
    using P=ccp::research::Policy;
    a.multi.setPolicy(a.multi.policy()==P::RebuildSAP?P::GlobalGuard:
@@ -382,8 +394,67 @@ void key(GLFWwindow*w,int key,int,int action,int){
 if(key==GLFW_KEY_SPACE)a.paused=!a.paused;if(key==GLFW_KEY_N){a.paused=true;stepSimulation(a);}if(key==GLFW_KEY_R){bool mode=a.sim.stats().sap,collide=a.sim.stats().collisions;auto request=a.sim.queryRequest();a.sim.reset();a.sim.setQueryRequest(request);a.sim.setBroadPhase(mode);a.sim.setCollisions(collide);a.cutaway=false;fitScene(a,w);}if(key==GLFW_KEY_F)fitScene(a,w);if(key==GLFW_KEY_B)a.sim.setBroadPhase(!a.sim.stats().sap);if(key==GLFW_KEY_C)a.sim.setCollisions(!a.sim.stats().collisions);if(key==GLFW_KEY_V)a.sim.setOracleEnabled(!a.sim.oracleEnabled());
 if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
 if(key==GLFW_KEY_H){a.evidenceScene=(a.evidenceScene+1)%6;a.inspectorScroll=0;}if(key==GLFW_KEY_Q){auto q=a.sim.queryRequest();q.updatePolicy=q.updatePolicy==ccp::live::UpdatePolicy::GuardedReuse?ccp::live::UpdatePolicy::RebuildEveryIteration:ccp::live::UpdatePolicy::GuardedReuse;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_M){auto q=a.sim.queryRequest();q.margin=q.margin<.03?.05:q.margin<.08?.10:.02;a.sim.setQueryRequest(q);}if(key==GLFW_KEY_W)a.wire=!a.wire;if(key==GLFW_KEY_X)a.cutaway=!a.cutaway;if(key>=GLFW_KEY_1&&key<=GLFW_KEY_4)a.stage=key-GLFW_KEY_0;logEvent(a,"KEY "+std::to_string(key));}
-void mouse(GLFWwindow*w,int button,int action,int){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(button==GLFW_MOUSE_BUTTON_LEFT){a.drag=action==GLFW_PRESS;glfwGetCursorPos(w,&a.lastX,&a.lastY);}}
-void cursor(GLFWwindow*w,double x,double y){auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));if(a.drag){a.yaw+=(x-a.lastX)*.006;a.pitch=std::clamp(a.pitch+(y-a.lastY)*.005,-.1,1.35);}a.lastX=x;a.lastY=y;}
+// Build a picking ray with the same view and .70-radian vertical FOV as
+// the OpenGL camera. GLFW cursor coordinates are WINDOW pixels, not retina
+// framebuffer pixels; ray aspect must therefore use glfwGetWindowSize().
+ccp::interaction::Ray rayForCursor(const App& a,GLFWwindow* w,double x,double y){
+ int width=0,height=0;glfwGetWindowSize(w,&width,&height);
+ const double viewport=std::max(1.0,width-350.0*height/920.0);
+ const V eye=add(a.target,{
+   a.distance*std::cos(a.pitch)*std::cos(a.yaw),
+   a.distance*std::cos(a.pitch)*std::sin(a.yaw),
+   a.distance*std::sin(a.pitch)});
+ return ccp::interaction::cameraRay(x,y,viewport,height,eye,a.target,.70);
+}
+void mouse(GLFWwindow*w,int button,int action,int mods){
+ auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
+ glfwGetCursorPos(w,&a.lastX,&a.lastY);
+ if(action==GLFW_RELEASE){
+  if(button==GLFW_MOUSE_BUTTON_LEFT){
+   a.drag=false;
+   if(a.clothMouseGrab){
+    a.multi.endGrab();a.clothMouseGrab=false;
+    pushInspectorEvent(a,"MOUSE RELEASED CLOTH");
+   }
+  }
+  if(button==GLFW_MOUSE_BUTTON_RIGHT)a.drag=false;
+  return;
+ }
+ if(action!=GLFW_PRESS)return;
+ if(button==GLFW_MOUSE_BUTTON_RIGHT){a.drag=true;return;}
+ if(button!=GLFW_MOUSE_BUTTON_LEFT)return;
+ int width=0,height=0;glfwGetWindowSize(w,&width,&height);
+ const double viewport=width-350.0*height/920.0;
+ if(a.lastX>=viewport)return; // do not pick through the right inspector
+ // Right-drag or Shift-left drag orbits the camera.
+ if(!a.multiMode||(mods&GLFW_MOD_SHIFT)){a.drag=true;return;}
+ const auto ray=rayForCursor(a,w,a.lastX,a.lastY);
+ const auto hit=ccp::interaction::pickTriangleRay(
+   ray,a.multi.positions(),a.multi.triangles());
+ if(hit&&a.multi.beginGrab(hit->triangle,hit->barycentric,hit->position)){
+  a.clothMouseGrab=true;
+  a.dragOrigin=hit->position;
+  a.dragPlaneNormal=norm(sub(a.target,ray.origin));
+  pushInspectorEvent(a,"MOUSE GRABBED SHEET "+
+    std::to_string(a.multi.triangleSheets()[hit->triangle]+1)+
+    " TRIANGLE "+std::to_string(hit->triangle));
+ }else a.drag=true; // empty background still rotates the camera
+}
+void cursor(GLFWwindow*w,double x,double y){
+ auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
+ if(a.clothMouseGrab){
+  // Drag in a camera-facing plane at the selected cloth depth. This
+  // allows lifting in 3D, not just sliding along the floor.
+  const auto ray=rayForCursor(a,w,x,y);
+  const auto target=ccp::interaction::intersectDragPlane(
+     ray,a.dragOrigin,a.dragPlaneNormal);
+  if(target)a.multi.updateGrab(*target);
+ }else if(a.drag){
+  a.yaw+=(x-a.lastX)*.006;
+  a.pitch=std::clamp(a.pitch+(y-a.lastY)*.005,-.1,1.35);
+ }
+ a.lastX=x;a.lastY=y;
+}
 void scroll(GLFWwindow*w,double,double dy){
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  int windowWidth=0,windowHeight=0;
