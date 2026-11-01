@@ -124,7 +124,7 @@ private:
   std::vector<Sphere> spheres_;
   std::size_t selfTopologyExclusions_{};
   bool nonlocalSelfPair(int first,int second) const;
-  void projectGrab();
+  void projectGrab(std::vector<Vec3>& nonphysicalDisplacements);
   RegionalCandidates regional_;
   OnlinePartitioner online_;
   void assignOnlineRegionIds();
