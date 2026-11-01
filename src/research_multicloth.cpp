@@ -664,9 +664,16 @@ void MultiCloth::step(){
   for(std::size_t i=0;i<pinned_.size();++i)if(pinned_[i]){
    const int layer=int(i/(kSide*kSide));
    const double phase=time*1.4+.7*layer;
+   const double initialPhase=.7*layer;
    const auto p=initialPins_[i];
-   positions_[i]={p.x+.22*std::sin(phase),p.y+.12*std::cos(phase*.75),
-                  p.z+.10*std::sin(phase*.8)};
+   // Subtract the t=0 oscillation offset. Previously sheet 2's corners
+   // teleported ~0.24m on the first solver step simply because each sheet
+   // had a different initial phase. Drive the anchors continuously instead.
+   positions_[i]={
+    p.x+.22*(std::sin(phase)-std::sin(initialPhase)),
+    p.y+.12*(std::cos(phase*.75)-std::cos(initialPhase*.75)),
+    p.z+.10*(std::sin(phase*.8)-std::sin(initialPhase*.8))
+   };
    previous_[i]=positions_[i];
   }
   constexpr double invDt2=1.0/(kDt*kDt);
