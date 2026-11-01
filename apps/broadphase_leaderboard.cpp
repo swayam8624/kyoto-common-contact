@@ -38,7 +38,7 @@ struct Result {
     std::string scene, algorithm;
     int primitives{}, samples{};
     double meanMs{}, medianMs{}, p95Ms{}, avgCandidates{}, avgExtras{};
-    std::size_t totalBuilds{}, totalReuses{}, totalMisses{};
+    std::size_t totalBuilds{}, totalReuses{}, totalUpdates{}, totalMisses{};
 };
 
 bool overlap(const Bounds& a,const Bounds& b) {
@@ -62,51 +62,74 @@ BoxList pad(const BoxList& raw) {
 
 // The same exact 3D AABB primitive bounds and eligibility filter are passed
 // to all algorithms. Bullet is never replaced with an imitation BVH.
+// Genuine upstream Bullet DBVT. A persistent Bullet instance is an important
+// stronger baseline: it can update/refit its tree when geometry changes rather
+// than reconstructing everything on every solver iteration.
+class BulletTree {
+    btDefaultCollisionConfiguration config_;
+    btCollisionDispatcher dispatcher_{&config_};
+    btDbvtBroadphase broadphase_;
+    BoxList stored_;
+    std::vector<btBroadphaseProxy*> proxies_;
+public:
+    BulletTree()=default;
+    BulletTree(const BulletTree&)=delete;
+    BulletTree& operator=(const BulletTree&)=delete;
+    ~BulletTree() {
+        for(auto* proxy:proxies_) broadphase_.destroyProxy(proxy,&dispatcher_);
+    }
+    Pairs update(const BoxList& alreadyPadded) {
+        if(proxies_.empty()) {
+            stored_=alreadyPadded; // Stable storage addresses for Bullet client objects.
+            proxies_.reserve(stored_.size());
+            for(auto& b:stored_) {
+                auto* proxy=broadphase_.createProxy(
+                    btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
+                    btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
+                    BOX_SHAPE_PROXYTYPE,static_cast<void*>(&b),1,1,&dispatcher_);
+                if(!proxy) throw std::runtime_error("Bullet failed to create DBVT proxy");
+                proxies_.push_back(proxy);
+            }
+        } else {
+            if(alreadyPadded.size()!=stored_.size())
+                throw std::runtime_error("dynamic Bullet fixture changed primitive count");
+            for(std::size_t i=0;i<stored_.size();++i) {
+                if(stored_[i].id!=alreadyPadded[i].id)
+                    throw std::runtime_error("dynamic Bullet fixture changed primitive identity");
+                // Update existing Bullet proxies (no fresh DBVT construction).
+                stored_[i]=alreadyPadded[i];
+                const auto& b=stored_[i];
+                broadphase_.setAabbForceUpdate(
+                    proxies_[i],
+                    btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
+                    btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
+                    &dispatcher_);
+            }
+        }
+        broadphase_.calculateOverlappingPairs(&dispatcher_);
+        const auto& overlapping=broadphase_.getOverlappingPairCache()->getOverlappingPairArray();
+        Pairs result;
+        result.reserve(static_cast<std::size_t>(overlapping.size()));
+        for(int i=0;i<overlapping.size();++i) {
+            const auto* a=overlapping[i].m_pProxy0;
+            const auto* b=overlapping[i].m_pProxy1;
+            if(!a||!b||!a->m_clientObject||!b->m_clientObject)
+                throw std::runtime_error("Bullet returned invalid dynamic pair");
+            const auto& pa=*static_cast<const Bounds*>(a->m_clientObject);
+            const auto& pb=*static_cast<const Bounds*>(b->m_clientObject);
+            if(!eligible(pa,pb)) continue;
+            result.push_back({std::min(pa.id,pb.id),std::max(pa.id,pb.id)});
+        }
+        std::sort(result.begin(),result.end());
+        result.erase(std::unique(result.begin(),result.end()),result.end());
+        return result;
+    }
+};
+// A separate fresh Bullet DBVT baseline measures reconstruction each query.
+// It is NOT conflated with persistent updating or our guarded pair-list reuse.
 Pairs bulletPairs(const BoxList& alreadyPadded) {
-    btDefaultCollisionConfiguration config;
-    btCollisionDispatcher dispatcher(&config);
-    btDbvtBroadphase broadphase;
-    // Bullet's internal dynamic-tree implementation may use padded "fat"
-    // leaves. We preserve any conservative extra pairs in its output.
-    // Stable pointers directly to immutable input bounds: O(1) metadata
-    // recovery per pair. A linear ID lookup here would unfairly add O(N)
-    // per returned pair to Bullet's measured time in dense scenes.
-    std::vector<btBroadphaseProxy*> proxies;
-    proxies.reserve(alreadyPadded.size());
-    for(std::size_t i=0;i<alreadyPadded.size();++i) {
-        const auto& b=alreadyPadded[i];
-        auto* proxy=broadphase.createProxy(
-            btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
-            btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
-            BOX_SHAPE_PROXYTYPE,
-            const_cast<Bounds*>(&alreadyPadded[i]),
-            1,1,&dispatcher);
-        if(!proxy) throw std::runtime_error("Bullet broadphase could not create proxy");
-        proxies.push_back(proxy);
-    }
-    broadphase.calculateOverlappingPairs(&dispatcher);
-    const auto& bullet=broadphase.getOverlappingPairCache()->getOverlappingPairArray();
-    Pairs result;
-    result.reserve(static_cast<std::size_t>(bullet.size()));
-    for(int i=0;i<bullet.size();++i) {
-        const auto* p=bullet[i].m_pProxy0;
-        const auto* q=bullet[i].m_pProxy1;
-        if(!p||!q||!p->m_clientObject||!q->m_clientObject)
-            throw std::runtime_error("Bullet returned an invalid collision pair");
-        const auto& ba=*static_cast<const Bounds*>(p->m_clientObject);
-        const auto& bb=*static_cast<const Bounds*>(q->m_clientObject);
-        if(!eligible(ba,bb)) continue;
-        const int a=ba.id;
-        const int b=bb.id;
-        // We deliberately keep Bullet's conservative possible overlaps, even
-        // if its internal fat-tree pair cache is broader than the exact AABB
-        // reference; this is what the next method-specific stage receives.
-        result.push_back({std::min(a,b),std::max(a,b)});
-    }
-    std::sort(result.begin(),result.end());
-    result.erase(std::unique(result.begin(),result.end()),result.end());
-    for(auto* proxy:proxies) broadphase.destroyProxy(proxy,&dispatcher);
-    return result;
+    BulletTree transient;
+    return transient.update(alreadyPadded);
 }
 
 // Synthetic but deterministic 3D spatial distributions. No claims of
@@ -183,12 +206,14 @@ std::string backendName(int kind) {
         case 1: return "sweep_prune";
         case 2: return "bullet_dbvt";
         case 3: return "guarded_sap";
+        case 4: return "bullet_dbvt_dynamic";
         default: throw std::runtime_error("unknown algorithm");
     }
 }
 Result measure(const std::string& scene,int kind,const std::vector<BoxList>& samples,
                const std::vector<Pairs>& oracle) {
     ccp::live::BroadPhaseService cached;
+    BulletTree dynamicBullet;
     std::vector<double> elapsed;
     double totalCandidates=0,totalExtras=0;
     std::size_t builds=0,reuses=0;
@@ -199,6 +224,7 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
         Pairs pairs;
         if(kind==0 || kind==1) pairs=ccp::live::candidates(pad(bounds),kind==1);
         if(kind==2) pairs=bulletPairs(pad(bounds));
+        if(kind==4) pairs=dynamicBullet.update(pad(bounds));
         if(kind==3) pairs=cached.query(bounds,
                 {kMargin,kBudget,ccp::live::UpdatePolicy::GuardedReuse},true,metrics);
         const double milliseconds=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
@@ -211,7 +237,7 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
         elapsed.push_back(milliseconds);
         totalCandidates+=double(pairs.size());
         totalExtras+=double(extra);
-        builds+=(kind==3?metrics.builds:1);
+        builds+=(kind==3?metrics.builds:(kind==4?(i==0?1:0):1));
         reuses+=metrics.reuses;
     }
     const auto size=samples.size();
@@ -219,7 +245,7 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
         std::accumulate(elapsed.begin(),elapsed.end(),0.0)/double(size),
         percentile(elapsed,0.5),percentile(elapsed,0.95),
         totalCandidates/double(size),totalExtras/double(size),
-        builds,reuses,0};
+        builds,reuses,kind==4?size-1:0,0};
 }
 void selfTest() {
     const BoxList raw={
@@ -231,7 +257,10 @@ void selfTest() {
     const auto oracle=ccp::live::candidates(boxes,false);
     const auto sap=ccp::live::candidates(boxes,true);
     const auto bullet=bulletPairs(boxes);
-    if(oracle!=sap || !std::includes(bullet.begin(),bullet.end(),oracle.begin(),oracle.end()))
+    BulletTree dynamic;
+    const auto bulletDynamic=dynamic.update(boxes);
+    if(oracle!=sap || !std::includes(bullet.begin(),bullet.end(),oracle.begin(),oracle.end()) ||
+       !std::includes(bulletDynamic.begin(),bulletDynamic.end(),oracle.begin(),oracle.end()))
         throw std::runtime_error("basic Bullet/SAP/exhaustive inclusion failure");
     for(const auto& scene:cases()) {
         for(int i=0;i<3;++i) {
@@ -244,7 +273,7 @@ void selfTest() {
                 throw std::runtime_error("Bullet DBVT correctness error: "+scene);
         }
     }
-    std::cout<<"Bullet dynamic BVH / SAP / exhaustive: conservative pair coverage verified\n";
+    std::cout<<"Upstream Bullet DBVT (rebuild and persistent), SAP and exhaustive conservative coverage verified\n";
 }
 }
 int main(int argc,char** argv) {
@@ -260,7 +289,7 @@ int main(int argc,char** argv) {
         std::ofstream csv(file);
         if(!csv) throw std::runtime_error("cannot create leaderboard CSV");
         csv<<"scene,algorithm,primitives,samples,meanMs,medianMs,p95Ms,"
-              "meanCandidates,meanExtraCandidates,builds,reuses,misses\n";
+              "meanCandidates,meanExtraCandidates,builds,reuses,misses,updates\n";
         csv<<std::fixed<<std::setprecision(9);
         for(const auto& scene:cases()) {
             // Every algorithm receives identical geometric input states.
@@ -275,17 +304,18 @@ int main(int argc,char** argv) {
                 oracle.push_back(ccp::live::candidates(pad(raw),false));
                 samples.push_back(std::move(raw));
             }
-            for(int algorithm=0;algorithm<4;++algorithm) {
+            for(int algorithm=0;algorithm<5;++algorithm) {
                 const auto r=measure(scene,algorithm,samples,oracle);
                 csv<<r.scene<<','<<r.algorithm<<','<<r.primitives<<','<<r.samples<<','
                    <<r.meanMs<<','<<r.medianMs<<','<<r.p95Ms<<','
                    <<r.avgCandidates<<','<<r.avgExtras<<','
-                   <<r.totalBuilds<<','<<r.totalReuses<<','<<r.totalMisses<<'\n';
+                   <<r.totalBuilds<<','<<r.totalReuses<<','<<r.totalMisses<<','
+                   <<r.totalUpdates<<'\n';
                 std::cout<<r.scene<<" / "<<r.algorithm<<" meanMs="<<r.meanMs
                          <<" avgPairs="<<r.avgCandidates
                          <<" extra="<<r.avgExtras
                          <<" builds="<<r.totalBuilds
-                         <<" reuses="<<r.totalReuses<<'\n';
+                         <<" reuses="<<r.totalReuses<<" refitUpdates="<<r.totalUpdates<<'\n';
             }
         }
         csv.flush();
