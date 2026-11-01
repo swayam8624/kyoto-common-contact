@@ -25,7 +25,8 @@ def capture(scene: str, query: str, steps: int) -> list[dict]:
         nonlocal serial
         serial += 1
         assert proc.stdin and proc.stdout
-        proc.stdin.write(json.dumps({"id":serial, **kwargs}) + "\n")
+        # The legacy C++ command reader currently recognizes compact JSON tokens.
+        proc.stdin.write(json.dumps({"id":serial, **kwargs}, separators=(",", ":")) + "\n")
         proc.stdin.flush()
         line = proc.stdout.readline()
         if not line:
