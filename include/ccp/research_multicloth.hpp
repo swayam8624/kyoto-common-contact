@@ -92,6 +92,9 @@ public:
   // Deterministic self-contact fixture injection for regression tests only.
   // For simulation experiments use beginGrab/updateGrab instead.
   void displacePatchForTest(int sheet,int minX,int minY,int width,Vec3 delta);
+  // Test-only precise solver probe on current geometry, without advancing
+  // constraints or time. Used to verify a deliberately folded cloth patch.
+  std::size_t runContactPassForTest();
   bool hierarchicalRegions() const { return hierarchicalRegions_; }
   const std::vector<Vec3>& positions() const {return positions_;}
   const std::vector<std::array<int,3>>& triangles() const {return triangles_;}
