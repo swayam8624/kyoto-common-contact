@@ -773,7 +773,10 @@ void MultiCloth::step(){
    }
   }
  if(policy_==Policy::GlobalGuard){
-  metrics_.broadAabbTests=globalMetrics.pairTests;
+  // Preserve current-AABB revalidation work already counted in the
+  // downstream guarded candidate filter; do not overwrite it with the
+  // separate cached-SAP rebuild test count.
+  metrics_.broadAabbTests+=globalMetrics.pairTests;
   metrics_.lastEvent="GLOBAL_GUARD_REUSE";
  }
  if(policy_==Policy::RebuildSAP)metrics_.lastEvent="FULL_SAP_REBUILD";
