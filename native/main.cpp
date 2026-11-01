@@ -57,6 +57,11 @@ void segment(std::vector<Vertex>&v,V a,V b,V color){vertex(v,a,{0,0,1},color);ve
 void box(std::vector<Vertex>&v,V lo,V hi,V color){std::array<V,8>p;for(int i=0;i<8;i++)p[i]={i&1?hi.x:lo.x,i&2?hi.y:lo.y,i&4?hi.z:lo.z};for(int i=0;i<8;i++)for(int k=0;k<3;k++)if(!(i&(1<<k)))segment(v,p[i],p[i|(1<<k)],color);}
 void sphere(std::vector<Vertex>&v,V center,double radius){const int rings=24,slices=40;auto p=[&](int j,int i){double th=M_PI*j/rings,ph=2*M_PI*i/slices;return V{std::sin(th)*std::cos(ph),std::sin(th)*std::sin(ph),std::cos(th)};};for(int j=0;j<rings;j++)for(int i=0;i<slices;i++){V a=p(j,i),b=p(j+1,i),c=p(j+1,i+1),d=p(j,i+1);for(V n:{a,b,c,a,c,d})vertex(v,add(center,mul(n,radius)),n,{.16,.21,.26});}}
 struct EvidenceBar { std::string scene,algorithm; double meanMs{},extraCandidates{}; };
+struct PatchBenchRow {
+ int span{};
+ std::string frontier,phase;
+ double meanStepMs{};
+};
 struct MultiBenchRow {
  int sheets{};
  std::string policy;
@@ -74,6 +79,7 @@ struct App {
  std::vector<std::string> recentEvents;
  std::vector<EvidenceBar> broadphaseResults;
  std::vector<MultiBenchRow> multiResults;
+ std::vector<PatchBenchRow> patchResults;
  std::vector<double> historyCandidates,historyInterContacts,historyBroadMs;
  double rebuildMean=std::numeric_limits<double>::quiet_NaN();
  double guardedMean=std::numeric_limits<double>::quiet_NaN();
@@ -90,6 +96,22 @@ void loadEvidence(App& a) {
  const std::filesystem::path base(CCP_OUTPUT_DIR);
  a.broadphaseResults.clear();
  a.multiResults.clear();
+ a.patchResults.clear();
+ {
+  std::ifstream input(base/"patch-sweep.csv");
+  std::string line;std::getline(input,line);
+  while(std::getline(input,line)){
+   std::stringstream stream(line);std::string cell;std::vector<std::string> cells;
+   while(std::getline(stream,cell,','))cells.push_back(cell);
+   if(cells.size()<13)continue;
+   try {
+    PatchBenchRow row;
+    row.span=std::stoi(cells[0]);row.frontier=cells[1];
+    row.phase=cells[2];row.meanStepMs=std::stod(cells[4]);
+    if(std::isfinite(row.meanStepMs))a.patchResults.push_back(row);
+   } catch(const std::exception&) {}
+  }
+ }
  {
   std::ifstream input(base/"multicloth-real.csv");
   std::string line;std::getline(input,line);
@@ -264,6 +286,12 @@ void key(GLFWwindow*w,int key,int,int action,int){
    a.multiHierarchy=!a.multiHierarchy;
    a.multi.setHierarchicalRegions(a.multiHierarchy);
    pushInspectorEvent(a,a.multiHierarchy?"TWO-TIER REGION FRONTIER":"ALL-REGION-PAIRS ABLATION");
+  } else if(key==GLFW_KEY_P){
+   const std::array<int,6> spans={1,2,3,4,6,12};
+   const auto it=std::find(spans.begin(),spans.end(),a.multi.patchCellSpan());
+   const std::size_t next=(std::size_t(it-spans.begin())+1)%spans.size();
+   a.multi.setPatchCellSpan(spans[next]);
+   pushInspectorEvent(a,"MESH PATCH SPAN "+std::to_string(spans[next]));
   } else if(key==GLFW_KEY_W)a.wire=!a.wire;
   else if(key==GLFW_KEY_F)fitScene(a,w);
   else if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
@@ -321,7 +349,8 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  heading("LIVE DYNAMIC PHYSICS / NOT REPLAY",94);
  line("FRAME "+std::to_string(a.multi.frame())+" / "+
      std::to_string(a.multi.sheetCount())+" SHEETS",124,ink);
- line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount()),150);
+ line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount())+
+      " / PATCH "+std::to_string(a.multi.patchCellSpan()),150);
  line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
  line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
  line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
@@ -363,6 +392,26 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  }else{
   line("NO VERIFIED LOCAL MULTICLOTH CSV",869,red,1.22);
   line("RUN scripts/prepare_meeting.sh",896);
+ }
+ // This is an OFFLINE chosen static region size: calibration is earlier
+ // physics frames; evaluation consists of later frames. No online learning.
+ if(!a.patchResults.empty()){
+  auto winner=a.patchResults.end();
+  for(auto it=a.patchResults.begin();it!=a.patchResults.end();++it)
+   if(it->phase=="calibration" && it->frontier!="sap_rebuild" &&
+      (winner==a.patchResults.end() || it->meanStepMs<winner->meanStepMs))
+    winner=it;
+  if(winner!=a.patchResults.end()){
+   line("PATCH PROFILE (EARLY TRAIN)",1300,blue,1.34);
+   line("CHOSEN "+winner->frontier+" "+std::to_string(winner->span),1322,ink,1.13);
+   const auto evaluated=std::find_if(a.patchResults.begin(),a.patchResults.end(),
+     [&](const PatchBenchRow& e){
+      return e.phase=="evaluation" && e.span==winner->span &&
+             e.frontier==winner->frontier;
+     });
+   if(evaluated!=a.patchResults.end())
+    line("LATER EVAL STEP "+number(evaluated->meanStepMs,3)+" MS",1346,teal,1.25);
+  }
  }
  heading("PROPOSED ALGORITHM / AUDITABLE",1387);
  line("1  PARTITION STABLE MESH PATCHES",1417,ink,1.22);
@@ -609,6 +658,8 @@ int main(int argc,char**argv){try{
    label("L SHEETS / O BALLS / R RESET",blue,1.4);
    label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
    label(a.multiHierarchy?"J: TWO-TIER REGION SWEEP":"J: FLAT REGION-PAIR ABLATION",blue,1.22);
+   label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
+         std::to_string(a.multi.patchCellSpan()),blue,1.22);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
    label("FRAME "+std::to_string(a.multi.frame()));
    label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
