@@ -23,7 +23,7 @@ int main(int argc,char** argv){
   MultiCloth sim(3,2,Policy::OnlineContactAware);
   std::vector<ccp::research::Vec3> initial=sim.positions(),last=initial;
   double maxWorld=0,maxTravel=0,maxDelta=0,maxEdgeRatio=0,minHeight=1e9;
-  std::size_t totalContacts=0;
+  std::size_t totalContacts=0,totalVelocityClamps=0;
   std::cout<<std::fixed<<std::setprecision(5);
   for(int step=1;step<=frames;++step){
    sim.step();
@@ -60,6 +60,7 @@ int main(int argc,char** argv){
    maxEdgeRatio=std::max(maxEdgeRatio,ratio);
    minHeight=std::min(minHeight,minZ);
    totalContacts+=sim.metrics().interSheetContacts;
+   totalVelocityClamps+=sim.metrics().velocityClamps;
    if(step==1||step%20==0||step==frames)
     std::cout<<"FRAME "<<step<<" abs "<<world<<" travel "<<travel
              <<" delta "<<delta<<" stretch "<<ratio<<" minZ "<<minZ
@@ -69,7 +70,8 @@ int main(int argc,char** argv){
   }
   std::cout<<"MAX abs "<<maxWorld<<" travel "<<maxTravel
            <<" frameDelta "<<maxDelta<<" structuralStretch "<<maxEdgeRatio
-           <<" minZ "<<minHeight<<" interSheetCorrections "<<totalContacts<<"\n";
+           <<" minZ "<<minHeight<<" interSheetCorrections "<<totalContacts
+           <<" velocityClamps "<<totalVelocityClamps<<"\n";
   // The old implementation failed by two orders of magnitude at ~frame 220,
   // despite passing candidate and solver-state equivalence tests.
   // These intentionally conservative limits detect another catastrophic
