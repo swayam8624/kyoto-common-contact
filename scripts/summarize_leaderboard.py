@@ -21,7 +21,7 @@ expected={"scene","algorithm","primitives","samples","meanMs","medianMs",
 if not rows or not expected.issubset(rows[0]):
     raise SystemExit("Missing or incompatible genuine Bullet broad-phase CSV")
 cases=["sparse256","clustered512","dense256","sheets2","sheets3","simulated_cloths3"]
-algos=["exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap"]
+algos=["exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap","region_fixed","region_adaptive"]
 by_key={}
 for row in rows:
     key=(row["scene"],row["algorithm"])
@@ -39,16 +39,16 @@ def num(v,d=4):return f"{float(v):.{d}f}"
 def label(s):return s.replace("_"," ").title().replace("Dbvt","DBVT").replace("Sap","SAP")
 # One result chart showing all algorithms, separately per scene. No fake
 # comparison against GPU LBVH or Box2D's 2D dynamic tree.
-W,H=1200,915
+W,H=1200,1380
 palette={"exhaustive_aabb":"#b88b50","sweep_prune":"#4a82bb",
-         "bullet_dbvt":"#9c79c6","bullet_dbvt_dynamic":"#497fba","guarded_sap":"#238a80"}
+         "bullet_dbvt":"#9c79c6","bullet_dbvt_dynamic":"#497fba","guarded_sap":"#238a80","region_fixed":"#b06d98","region_adaptive":"#246b62"}
 svg=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
-'<rect width="1200" height="915" fill="#f9fbfd"/>',
+'<rect width="1200" height="1380" fill="#f9fbfd"/>',
 '<text x="42" y="48" font-family="Arial,sans-serif" fill="#16283c" font-size="28" font-weight="bold">3D Broad-Phase: Identical Bounds, Independent Baselines</text>',
 '<text x="42" y="76" font-family="Arial,sans-serif" fill="#536475" font-size="16">Actual Bullet DBVT (upstream library) · Exhaustive AABB · SAP · Guarded SAP</text>',
 '<text x="42" y="100" font-family="Arial,sans-serif" fill="#536475" font-size="13">Mean CPU full-query time in ms (lower is better); results are for this machine and synthetic workloads</text>']
 for si,scene in enumerate(cases):
-    y=145+si*125
+    y=145+si*196
     svg.append(f'<text x="42" y="{y}" fill="#16283c" font-family="Arial,sans-serif" font-size="17" font-weight="bold">{escape(label(scene))}</text>')
     mx=max(float(by_key[scene,a]["meanMs"]) for a in algos)
     mx=max(mx,1e-10)
@@ -66,7 +66,7 @@ for si,scene in enumerate(cases):
         svg.append(f'<rect x="260" y="{yy-13}" width="{width:.2f}" height="16" rx="3" fill="{palette[a]}"/>')
         svg.append(f'<text x="42" y="{yy}" font-family="Arial,sans-serif" font-size="12" fill="#3b4b5f">{escape(label(a))}</text>')
         svg.append(f'<text x="910" y="{yy}" font-family="Arial,sans-serif" font-size="13" fill="#16283c">{val:.5f} ms</text>')
-svg.append('<text x="42" y="899" font-family="Arial,sans-serif" font-size="13" fill="#536475">Guarded reuse may emit conservative extra pairs. This chart measures broad phase only; NO simulated cloth-cloth response.</text>')
+svg.append('<text x="42" y="1359" font-family="Arial,sans-serif" font-size="13" fill="#536475">Guarded reuse may emit conservative extra pairs. This chart measures broad phase only; NO simulated cloth-cloth response.</text>')
 svg.append('</svg>')
 svg_file.write_text("\n".join(svg),encoding="utf-8")
 lines=["# Verified 3D broad-phase comparison","",
