@@ -21,7 +21,7 @@ expected={"scene","algorithm","primitives","samples","meanMs","medianMs",
 if not rows or not expected.issubset(rows[0]):
     raise SystemExit("Missing or incompatible genuine Bullet broad-phase CSV")
 cases=["sparse256","clustered512","dense256","sheets2","sheets3"]
-algos=["exhaustive_aabb","sweep_prune","bullet_dbvt","guarded_sap"]
+algos=["exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap"]
 by_key={}
 for row in rows:
     key=(row["scene"],row["algorithm"])
@@ -41,7 +41,7 @@ def label(s):return s.replace("_"," ").title().replace("Dbvt","DBVT").replace("S
 # comparison against GPU LBVH or Box2D's 2D dynamic tree.
 W,H=1200,780
 palette={"exhaustive_aabb":"#b88b50","sweep_prune":"#4a82bb",
-         "bullet_dbvt":"#9c79c6","guarded_sap":"#238a80"}
+         "bullet_dbvt":"#9c79c6","bullet_dbvt_dynamic":"#497fba","guarded_sap":"#238a80"}
 svg=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
 '<rect width="1200" height="780" fill="#f9fbfd"/>',
 '<text x="42" y="48" font-family="Arial,sans-serif" fill="#16283c" font-size="28" font-weight="bold">3D Broad-Phase: Identical Bounds, Independent Baselines</text>',
@@ -78,17 +78,18 @@ lines=["# Verified 3D broad-phase comparison","",
        "Generated scene sheets are moving geometric AABB fixtures—not physically simulated coupled cloth.",
        "Each algorithm includes its own construction and candidate-list materialization in the measured duration.",
        "Oracle generation and correctness checking occur outside the timed window.","",
-       "| Scenario | Primitives | Method | Mean broad (ms) | p95 (ms) | Mean candidates | Mean extra candidates | Builds | Reuses | Misses |",
-       "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|"]
+       "| Scenario | Primitives | Method | Mean broad (ms) | p95 (ms) | Mean candidates | Mean extra candidates | Builds | Cache reuses | Bullet updates | Misses |",
+       "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
 for scenario in cases:
     for algorithm in algos:
         r=by_key[scenario,algorithm]
-        lines.append(f'| {scenario} | {r["primitives"]} | {algorithm} | {num(r["meanMs"],6)} | {num(r["p95Ms"],6)} | {num(r["meanCandidates"],1)} | {num(r["meanExtraCandidates"],1)} | {r["builds"]} | {r["reuses"]} | {r["misses"]} |')
+        lines.append(f'| {scenario} | {r["primitives"]} | {algorithm} | {num(r["meanMs"],6)} | {num(r["p95Ms"],6)} | {num(r["meanCandidates"],1)} | {num(r["meanExtraCandidates"],1)} | {r["builds"]} | {r["reuses"]} | {r["updates"]} | {r["misses"]} |')
 lines.extend(["",
 "## Interpreting the results",
 "",
 "The independent benchmark tests **spatial candidate discovery**, not contact impulses, precise triangle geometry, CCD or solver convergence.",
 "The guarded policy's candidate count can be larger than freshly regenerated pairs. Whether its saved builds improve end-to-end contact time depends on the *extra precise tests* a caller must run.",
+"To avoid a weakened external baseline, we compare both **freshly reconstructed** Bullet DBVT and **one persistent Bullet DBVT updated on every geometry change**. Those are different computational regimes; persistent Bullet reuses its spatial tree but does not reuse a frozen pair list.",
 "Those extra tests have NOT been modeled as invented time savings. The existing live cloth benchmark separately measures real candidate-only precise work, whole-step time, and validation.",
 "",
 "## Literature and implementation",

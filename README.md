@@ -59,3 +59,9 @@ This is *not* a universal best-algorithm leaderboard; CPU rebuild and temporal
 reuse costs are compared with full candidate-set correctness checks. The
 synthetic two/three-cloth bounds workloads include geometric inter-sheet
 potential pairs but no real cloth self-collision solver or physical coupling.
+
+The published-library comparison includes a stronger **persistent Bullet
+DBVT update** row, alongside fresh Bullet rebuild. Importantly, the
+temporal Bullet strategy updates its spatial tree, whereas guarded SAP
+reuses a certified pair *superset*. Compare returned pair counts and
+downstream precise work, not query time alone.

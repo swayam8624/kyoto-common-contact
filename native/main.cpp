@@ -228,8 +228,8 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
  const auto selected=cases[std::clamp(a.evidenceScene,0,4)];
  line("SCENE: "+selected+"  /  H TO CHANGE",874,muted,1.22);
  line("ACTUAL BULLET DBVT / NOT A CLAIM OF BEST",897,purple,1.13);
- const std::array<std::string,4> methods={"exhaustive_aabb","sweep_prune","bullet_dbvt","guarded_sap"};
- const std::array<V,4> colors={amber,blue,purple,teal};
+ const std::array<std::string,5> methods={"exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap"};
+ const std::array<V,5> colors={amber,blue,purple,{.24,.44,.68},teal};
  double maxMs=0;
  for(const auto& row:a.broadphaseResults)
   if(row.scene==selected)maxMs=std::max(maxMs,row.meanMs);
@@ -240,26 +240,26 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
    if(it!=a.broadphaseResults.end())
     bar(methods[i],it->meanMs,maxMs,935+float(i)*61,colors[i]);
   }
-  line("GUARDED MAY EMIT EXTRA PRECISE PAIRS",1200,muted,1.11);
+  line("GUARDED MAY EMIT EXTRA PRECISE PAIRS",1227,muted,1.11);
  } else {
   line("NO PUBLISHED BASELINE CSV",947,amber);
   line("INSTALL BULLET; RUN MEETING PREP",974);
  }
- heading("DOWNSTREAM / REAL MEASURED CASCADE",1263);
+ heading("DOWNSTREAM / REAL MEASURED CASCADE",1290);
  if(std::isfinite(a.rebuildMean)&&std::isfinite(a.guardedMean)) {
-  line("MEAN REBUILD / GUARDED",1290,blue,1.18);
-  line("BROAD  "+number(a.rebuildBroad,3)+" / "+number(a.guardedBroad,3)+" MS",1315,ink,1.22);
-  line("PRECISE "+number(a.rebuildNarrow,3)+" / "+number(a.guardedNarrow,3)+" MS",1340,ink,1.22);
-  line("TESTS "+number(a.rebuildPrecise,0)+" / "+number(a.guardedPrecise,0),1365,ink,1.22);
-  line("STEP  "+number(a.rebuildMean,3)+" / "+number(a.guardedMean,3)+" MS",1390,ink,1.22);
+  line("MEAN REBUILD / GUARDED",1317,blue,1.18);
+  line("BROAD  "+number(a.rebuildBroad,3)+" / "+number(a.guardedBroad,3)+" MS",1342,ink,1.22);
+  line("PRECISE "+number(a.rebuildNarrow,3)+" / "+number(a.guardedNarrow,3)+" MS",1367,ink,1.22);
+  line("TESTS "+number(a.rebuildPrecise,0)+" / "+number(a.guardedPrecise,0),1392,ink,1.22);
+  line("STEP  "+number(a.rebuildMean,3)+" / "+number(a.guardedMean,3)+" MS",1417,ink,1.22);
  }
- line("EXTRA CACHED PAIRS MAY INCREASE",1420,muted,1.13);
- line("PRECISE TESTS. NOT FREE SPEEDUP.",1442,muted,1.12);
- heading("NOVELTY / RESEARCH BOUNDARY",1490);
- line("NOT NOVEL: SAP, BVH, FAT AABBS",1520,muted,1.18);
- line("HYPOTHESIS: METHOD-AWARE CERTIFIED",1544,teal,1.18);
- line("REUSE ACROSS DISTINCT CONTACT MODELS",1566,teal,1.16);
- line("NOT YET VERIFIED ACROSS IPC/OGC",1589,amber,1.15);
+ line("EXTRA CACHED PAIRS MAY INCREASE",1447,muted,1.13);
+ line("PRECISE TESTS. NOT FREE SPEEDUP.",1469,muted,1.12);
+ heading("NOVELTY / RESEARCH BOUNDARY",1517);
+ line("NOT NOVEL: SAP, BVH, FAT AABBS",1547,muted,1.18);
+ line("HYPOTHESIS: METHOD-AWARE CERTIFIED",1571,teal,1.18);
+ line("REUSE ACROSS DISTINCT CONTACT MODELS",1593,teal,1.16);
+ line("NOT YET VERIFIED ACROSS IPC/OGC",1616,amber,1.15);
  // Clip ALL evidence drawing and text to the real right-side inspector.
  glEnable(GL_SCISSOR_TEST);
  glScissor((int)viewport,0,(int)panel,height);

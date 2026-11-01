@@ -120,3 +120,15 @@ calls. No hypothetical downstream savings are counted as observed.
 The external Bullet DBVT/Guarded/SAP leaderboard is a **broad-phase-only**
 benchmark with no narrow phase or solver. Do not compare its isolated
 milliseconds to full physics step times as if they were the same quantity.
+
+## Meaningful published baseline
+
+The revised five-way comparison includes both **fresh rebuild** and
+**persistent dynamic-update** modes for the actual 3D Bullet
+`btDbvtBroadphase`. Persistent Bullet reuses/updates a *tree* rather
+than simply returning a frozen cached candidate list. This is a more
+credible temporal competitor than repeatedly constructing a new Bullet
+tree. All three search engines and both temporal update strategies
+must conservatively include every exhaustive AABB-overlap pair.
+Do not call this the best published algorithm; published GPU LBVH,
+other BVHs, hardware and workload regimes are not evaluated.
