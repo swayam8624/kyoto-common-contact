@@ -270,6 +270,41 @@ int main(){
    (void)onlineMerges;(void)onlineModeSwitches;
   }
 
+  // A cached *superset* must not alter the physical solver. Previously,
+  // an extra fat-AABB candidate could enter an approximate contact
+  // projection and the new per-vertex cap made SAP/global trajectories
+  // diverge. Exact-current-AABB rejection before feature response fixes it.
+  {
+   MultiCloth reference(3,2,Policy::RebuildSAP);
+   MultiCloth guarded(3,2,Policy::GlobalGuard);
+   MultiCloth online(3,2,Policy::OnlineContactAware);
+   reference.setAuditing(true);
+   guarded.setAuditing(true);
+   online.setAuditing(true);
+   std::size_t actualContactSteps=0;
+   for(int frame=0;frame<145;++frame){
+    reference.step();guarded.step();online.step();
+    for(const auto* candidate:{&reference,&guarded,&online}){
+     const auto& m=candidate->metrics();
+     require(m.maxWorldCoordinate<5.0,
+             "unstable world coordinates in broad-phase policy");
+     require(m.maxStructuralEdgeStretch<2.6,
+             "grid structural stretch exceeded cloth safety envelope");
+     require(m.maxFrameParticleTravel<.8,
+             "unphysical single-frame particle motion");
+     require(m.queryCount==5,"solver iteration/query count changed");
+     for(std::size_t i=0;i<reference.positions().size();++i){
+      const auto a=reference.positions()[i],b=candidate->positions()[i];
+      const double dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;
+      if(std::sqrt(dx*dx+dy*dy+dz*dz)>1e-8)
+       throw std::runtime_error("cached superset or online policy changed physics");
+     }
+    }
+    if(reference.metrics().interSheetContacts)++actualContactSteps;
+   }
+   require(actualContactSteps>50,"multi-cloth interaction disappeared after stabilization");
+  }
+
   std::cout<<"Region certification, local invalidation, moving 1/2/3 cloths, "
               "real inter-sheet contacts, and paired SAP state equivalence PASS\n";
  }catch(const std::exception& e){
