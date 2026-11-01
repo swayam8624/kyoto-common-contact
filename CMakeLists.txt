@@ -39,6 +39,8 @@ target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
+add_executable(ccp_patch_sweep apps/patch_granularity_benchmark.cpp)
+target_link_libraries(ccp_patch_sweep PRIVATE ccp_multicloth)
 
 
 

@@ -70,3 +70,10 @@ downstream precise work, not query time alone.
 ## Live multi-cloth research experiment (new)
 
 Use `./open_multicloth_demo.sh` for a continuously excited, physically interacting **three-cloth + two-moving-sphere** research scene. It compares full SAP, the older global guard, and a new experimental locally certified region-pair method that revalidates cached candidates against current tight AABBs. Press K for the original one-cloth demonstration; L changes the cloth count; O changes spheres; Q changes the policy; G shows the live diagnostic/time-series panel. Benchmarks and candid novelty limits are in `docs/MULTICLOTH_CONTRACT.md` and generated `docs/MULTICLOTH_RESULTS.md`.
+
+
+### Hierarchical region and patch-size experiments
+
+The new optional two-tier region sweep is enabled in the native research viewer by J. It prunes region-envelope pairs before consulting local candidate caches, while preserving a flat-pair ablation. The P key cycles mesh patch sizes (1, 2, 3, 4, 6, 12 cells). Repartitioning invalidates regional caches but never changes the physical solver.
+
+Run the normal meeting-preparation script to generate patch-sweep.csv, patch-sweep.svg, and PATCH_CALIBRATION.md. The 12-way sweep chooses a region size using one earlier time window and evaluates it on a later window. It is an offline ablation, not an online trained algorithm or claimed publication novelty.
