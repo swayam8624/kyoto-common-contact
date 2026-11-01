@@ -810,6 +810,15 @@ void MultiCloth::step(){
  metrics_={};const double time=frame_*kDt;
  const auto frameStartPositions=positions_;
  updateSpheres(time);
+ if(grab_.active){
+  // Smooth the TARGET at frame rate, regardless of how far or quickly a
+  // mouse event moves. The solver receives no discontinuous teleport.
+  const Vec3 toTarget=sub(grab_.target,grab_.filteredTarget);
+  const double distance=norm(toTarget);
+  const double travel=std::min(.055,distance);
+  if(distance>1e-12)
+   grab_.filteredTarget=add(grab_.filteredTarget,mul(toTarget,travel/distance));
+ }
  // Track only collision/floor projections. Geometric corrections should
  // remove penetration without becoming an unintended giant velocity.
  std::vector<Vec3> contactDisplacements(positions_.size(),Vec3{});
@@ -870,6 +879,10 @@ void MultiCloth::step(){
     contactDisplacements[i].z+=.04-positions_[i].z;
     positions_[i].z=.04;
    }
+  // The interactive grab is a mass-weighted barycentric positional
+  // constraint. It participates in the SAME five solver iterations,
+  // before collision queries so self-contact can resist a pulled fold.
+  projectGrab(contactDisplacements);
   const auto primitives=makePrimitives();
   std::vector<Bounds> bounds;bounds.reserve(primitives.size());
   for(const auto& primitive:primitives)bounds.push_back(primitive.box);
@@ -980,6 +993,7 @@ void MultiCloth::step(){
  std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
  metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
                              metrics_.contactPairs.end());
+ if(grab_.active)metrics_.grabError=norm(sub(grab_.target,grabPoint()));
  // A solver can be exactly equivalent across broad phases while exploding.
  // Measure its actual motion and grid edge strain each frame.
  for(std::size_t i=0;i<positions_.size();++i){
