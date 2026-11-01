@@ -155,6 +155,34 @@ int main(){
    }
   }
   require(skippedInPhysics>0,"hierarchical frontier never excluded region pairs");
+  // Varying patch granularity is a pure broad-phase experiment. Even
+  // changing it mid-simulation must preserve the physical trajectory.
+  MultiCloth patchReference(3,2,Policy::RebuildSAP);
+  MultiCloth patchCandidate(3,2,Policy::RegionalCertified);
+  patchReference.setAuditing(true);
+  patchCandidate.setAuditing(true);
+  patchCandidate.setHierarchicalRegions(true);
+  const std::array<int,6> spans{1,2,3,4,6,12};
+  for(int frame=0;frame<36;++frame){
+   // Explicitly trigger cache invalidation on each partition change.
+   if(frame%6==0)patchCandidate.setPatchCellSpan(spans[frame/6]);
+   patchReference.step();
+   patchCandidate.step();
+   require(patchCandidate.patchCellSpan()==spans[frame/6],
+           "new patch span not applied");
+   const auto& a=patchReference.positions();
+   const auto& b=patchCandidate.positions();
+   for(std::size_t i=0;i<a.size();++i){
+    const double dx=a[i].x-b[i].x,dy=a[i].y-b[i].y,dz=a[i].z-b[i].z;
+    if(std::sqrt(dx*dx+dy*dy+dz*dz)>1e-8)
+     throw std::runtime_error("patch-cell repartition changed physical trajectory");
+   }
+  }
+  bool invalidSpanRejected=false;
+  try{patchCandidate.setPatchCellSpan(5);}
+  catch(const std::invalid_argument&){invalidSpanRejected=true;}
+  require(invalidSpanRejected,"invalid patch cell span accepted");
+
   std::cout<<"Region certification, local invalidation, moving 1/2/3 cloths, "
               "real inter-sheet contacts, and paired SAP state equivalence PASS\n";
  }catch(const std::exception& e){
