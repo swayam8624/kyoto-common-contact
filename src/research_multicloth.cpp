@@ -121,7 +121,8 @@ void RegionalCandidates::reset(){
  knownIds_.clear();knownRegions_.clear();previousMargin_=-1;
 }
 const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>& items,
- double margin,bool adaptive,Metrics& metrics,bool hierarchicalRegionSweep){
+ double margin,bool adaptive,Metrics& metrics,bool hierarchicalRegionSweep,
+ bool collectFeedback){
  const auto start=Clock::now();
  if(!std::isfinite(margin)||margin<0)throw std::invalid_argument("invalid region query margin");
  // Caller supplies unique stable primitive IDs. A topology change invalidates
@@ -164,6 +165,10 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
    for(std::size_t j=0;j<region.itemIndices.size();++j)
     motion=std::max(motion,maxChange(current[region.itemIndices[j]],region.previous[j]));
   region.motionEwma=region.motionEwma*.65+motion*.35;
+  if(collectFeedback){
+   auto& feedback=metrics.regionWork[region.id];
+   feedback.maxBoundMotion=std::max(feedback.maxBoundMotion,motion);
+  }
   region.dirty=region.envelopes.size()!=region.itemIndices.size();
   if(!region.dirty){
    for(std::size_t j=0;j<region.itemIndices.size();++j)
@@ -184,6 +189,7 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
     region.envelopes.push_back(expand(raw,items[static_cast<std::size_t>(idx)].box.movable?region.budget:0.0));
    }
    ++metrics.dirtyRegions;
+   if(collectFeedback)++metrics.regionWork[region.id].invalidations;
   } else {
    region.previous.clear();
    for(int idx:region.itemIndices)region.previous.push_back(current[static_cast<std::size_t>(idx)]);
@@ -268,6 +274,7 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   const auto key=pairKey(i,j);
   auto it=cachedRegionPairs_.find(key);
   const bool rebuild=a.dirty||b.dirty||it==cachedRegionPairs_.end();
+  const auto checksBefore=metrics.broadAabbTests;
   if(rebuild){
    std::vector<Pair> list;
    if(overlap(a.unionEnvelope,b.unionEnvelope)) {
@@ -288,15 +295,16 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
    it=cachedRegionPairs_.insert_or_assign(key,std::move(list)).first;
    ++metrics.regionalPairRebuilds;
   } else ++metrics.regionalPairReuses;
-  std::size_t rejected=0;
+  std::size_t rejected=0,kept=0;
   for(const Pair p:it->second){
    const auto ia=byId.find(p.a),ib=byId.find(p.b);
    if(ia==byId.end()||ib==byId.end())throw std::runtime_error("stale region pair ID");
    const auto& ca=current[static_cast<std::size_t>(ia->second)];
    const auto& cb=current[static_cast<std::size_t>(ib->second)];
    ++metrics.broadAabbTests;
-   if(overlap(ca,cb)&&eligible(ca,cb))output_.push_back(p);
-   else ++rejected;
+   if(overlap(ca,cb)&&eligible(ca,cb)){
+    output_.push_back(p);++kept;
+   } else ++rejected;
   }
   // Observed inflation enters the *next* budget decision. We use an EWMA
   // so one transient collision burst cannot permanently collapse the guard.
@@ -305,6 +313,18 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   a.previousInflation=a.previousInflation*.94+ratio*.06;
   b.previousInflation=b.previousInflation*.94+ratio*.06;
   metrics.cachedPairsRejected+=rejected;
+  if(collectFeedback){
+   const auto built=metrics.broadAabbTests-checksBefore-it->second.size();
+   const auto credit=[&](int id){
+    auto& v=metrics.regionWork[id];
+    v.aabbChecks+=built;
+    v.cachedChecks+=it->second.size();
+    v.candidateTouches+=kept;
+    v.rejectedCandidates+=rejected;
+   };
+   credit(a.id);
+   if(a.id!=b.id)credit(b.id);
+  }
  }
  std::sort(output_.begin(),output_.end());
  output_.erase(std::unique(output_.begin(),output_.end()),output_.end());
@@ -372,9 +392,25 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
    }
  }
  updateSpheres(0);
+ if(policy_==Policy::OnlineContactAware){
+  online_.reset(sheets_);
+  assignOnlineRegionIds();
+ }
 }
 std::vector<Primitive> MultiCloth::currentPrimitives() const {return makePrimitives();}
-void MultiCloth::setPolicy(Policy policy){policy_=policy;regional_.reset();global_.invalidate();}
+void MultiCloth::setPolicy(Policy policy){
+ if(policy_==policy)return;
+ policy_=policy;
+ if(policy_==Policy::OnlineContactAware){
+  online_.reset(sheets_);
+  assignOnlineRegionIds();
+ }else{
+  const int span=patchCellSpan_;
+  patchCellSpan_=0;
+  setPatchCellSpan(span);
+ }
+ regional_.reset();global_.invalidate();
+}
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
 void MultiCloth::setHierarchicalRegions(bool enabled){
  if(hierarchicalRegions_!=enabled){
@@ -383,6 +419,8 @@ void MultiCloth::setHierarchicalRegions(bool enabled){
  }
 }
 void MultiCloth::setPatchCellSpan(int cells){
+ if(policy_==Policy::OnlineContactAware)
+  throw std::invalid_argument("manual patch span not available in online policy");
  if(cells!=1&&cells!=2&&cells!=3&&cells!=4&&cells!=6&&cells!=12)
   throw std::invalid_argument("patch span must be a divisor of 12: 1, 2, 3, 4, 6, 12");
  if(cells==patchCellSpan_)return;
@@ -401,6 +439,15 @@ void MultiCloth::setPatchCellSpan(int cells){
  regional_.reset();
 }
 
+void MultiCloth::assignOnlineRegionIds(){
+ for(std::size_t ti=0;ti<triangleRegions_.size();++ti){
+  const int sheet=triangleSheets_[ti];
+  const int cell=int((ti%std::size_t(2*(kSide-1)*(kSide-1)))/2);
+  const int y=cell/(kSide-1),x=cell%(kSide-1);
+  triangleRegions_[ti]=online_.regionForCell(sheet,x,y);
+ }
+ regional_.reset();
+}
 void MultiCloth::setAuditing(bool enable){auditing_=enable;}
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();
@@ -482,6 +529,8 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
     for(int j=0;j<3;++j)positions_[mesh.ids[j]]=add(positions_[mesh.ids[j]],
        mul(correction,mesh.w[j]*inverseMasses_[mesh.ids[j]]));
     ++metrics_.contacts;++metrics_.sphereContacts;
+    if(policy_==Policy::OnlineContactAware)
+     ++metrics_.regionWork[triangleRegions_[ti]].contactCorrections;
     metrics_.contactPairs.push_back(pair);
    }
    continue;
@@ -520,6 +569,10 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
     mul(fallback,triangleSheets_[ia]<triangleSheets_[ib]?1:-1);
   if(respond(bestA,bestB,d,n,kThickness)){
    ++metrics_.contacts;++metrics_.interSheetContacts;
+   if(policy_==Policy::OnlineContactAware){
+    ++metrics_.regionWork[triangleRegions_[ia]].contactCorrections;
+    ++metrics_.regionWork[triangleRegions_[ib]].contactCorrections;
+   }
    metrics_.contactPairs.push_back(pair);
   }
  }
@@ -571,8 +624,9 @@ void MultiCloth::step(){
   for(const auto& primitive:primitives)bounds.push_back(primitive.box);
   const auto queryStart=Clock::now();
   std::vector<Pair> pairs;
-  if(policy_==Policy::RegionalCertified){
-   pairs=regional_.query(primitives,kMargin,adaptive_,metrics_,hierarchicalRegions_);
+  if(policy_==Policy::RegionalCertified||policy_==Policy::OnlineContactAware){
+   pairs=regional_.query(primitives,kMargin,adaptive_,metrics_,hierarchicalRegions_,
+     policy_==Policy::OnlineContactAware);
   }else if(policy_==Policy::GlobalGuard){
    const auto& actual=global_.query(bounds,{kMargin,.045,live::UpdatePolicy::GuardedReuse},
                                      true,globalMetrics);
@@ -587,7 +641,7 @@ void MultiCloth::step(){
    }
    pairs=live::candidates(paddedBounds,true,&metrics_.broadAabbTests);
   }
-  if(policy_!=Policy::RegionalCertified){
+  if(policy_!=Policy::RegionalCertified&&policy_!=Policy::OnlineContactAware){
    metrics_.broadMs+=std::chrono::duration<double,std::milli>(Clock::now()-queryStart).count();
    ++metrics_.queryCount;metrics_.pairs=pairs.size();
   }
@@ -622,6 +676,27 @@ void MultiCloth::step(){
   metrics_.lastEvent="GLOBAL_GUARD_REUSE";
  }
  if(policy_==Policy::RebuildSAP)metrics_.lastEvent="FULL_SAP_REBUILD";
+ if(policy_==Policy::OnlineContactAware){
+  const auto update=online_.observe(frame_,metrics_.regionWork,metrics_.regionGuards,
+                                    metrics_.broadMs,metrics_.queryCount);
+  metrics_.onlinePatches=update.patches;
+  metrics_.onlineSplits=update.splits;
+  metrics_.onlineMerges=update.merges;
+  metrics_.onlineStrategySwitches=update.strategySwitches;
+  metrics_.onlineDecisionMs=update.decisionMs;
+  metrics_.onlineMeasuredWork=update.observedWork;
+  metrics_.onlineContactHeat=update.observedContacts;
+  metrics_.onlineCoarsePairFraction=update.coarsePairFraction;
+  const bool hierarchyChanged=hierarchicalRegions_!=update.hierarchy;
+  hierarchicalRegions_=update.hierarchy;
+  if(update.splits||update.merges){
+   assignOnlineRegionIds();
+   metrics_.lastEvent=update.splits?"ONLINE_PATCH_SPLIT":"ONLINE_PATCH_MERGE";
+  }else if(hierarchyChanged){
+   regional_.reset();
+   metrics_.lastEvent="ONLINE_FRONTIER_CHANGE";
+  }else metrics_.lastEvent="ONLINE_OBSERVING";
+ }
  std::sort(metrics_.contactPairs.begin(),metrics_.contactPairs.end());
  metrics_.contactPairs.erase(std::unique(metrics_.contactPairs.begin(),metrics_.contactPairs.end()),
                              metrics_.contactPairs.end());

@@ -33,7 +33,7 @@ endif()
 add_executable(ccp_live_benchmark apps/live_benchmark.cpp)
 target_link_libraries(ccp_live_benchmark PRIVATE ccp_live)
 # Coupled, continually driven multi-cloth experimental broad-phase research.
-add_library(ccp_multicloth src/research_multicloth.cpp)
+add_library(ccp_multicloth src/research_multicloth.cpp src/online_partitioner.cpp)
 target_link_libraries(ccp_multicloth PUBLIC ccp_live)
 target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
