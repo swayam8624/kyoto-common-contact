@@ -16,3 +16,4 @@ output/native/live_benchmark-postfix.csv
 output/native/benchmark-postfix*
 output/research3d/video_frames/
 *.blend1
+output/native/supporting-offline-replay.html

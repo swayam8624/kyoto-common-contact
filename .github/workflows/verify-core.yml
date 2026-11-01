@@ -21,6 +21,7 @@ jobs:
           mkdir -p output/native
           ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv
           python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
+          python3 scripts/export_supporting_replays.py
       - name: Publish benchmark artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -29,6 +30,7 @@ jobs:
           path: |
             output/native/live_benchmark-postfix.csv
             output/native/benchmark-postfix.svg
+            output/native/supporting-offline-replay.html
             docs/MEETING_RESULTS.md
 
   macos-native:

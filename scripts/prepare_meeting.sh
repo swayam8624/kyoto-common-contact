@@ -9,6 +9,7 @@ ctest --test-dir build --output-on-failure
 mkdir -p output/native
 ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv | tee output/native/benchmark-postfix-summary.txt
 python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
+python3 scripts/export_supporting_replays.py
 printf '\nMeeting verification completed; read docs/MEETING_RESULTS.md.\n'
 if [ -x build/ccp_native.app/Contents/MacOS/ccp_native ]; then
   printf 'Native viewer: ./open_3d_demo.sh\n'

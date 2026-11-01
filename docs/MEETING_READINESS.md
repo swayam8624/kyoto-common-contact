@@ -92,3 +92,17 @@ Select **02 · Contact islands**. Observe the two groups approaching,
 pause around their interaction, then turn contact/island overlays on/off.
 This graph is for independent rigid spheres with an impulse solver, *not*
 the internal constraint graph of the cloth/XPBD experiment.
+
+## Portable offline fallback (new, generated from real C++ frames)
+
+The verification script exports
+`output/native/supporting-offline-replay.html`, a **fully self-contained**
+browser playback with no server, external libraries, or internet requirement.
+Its JSON frames are recorded directly from `build/ccp_service`, including
+candidate pairs, confirmed contacts, island memberships, trajectories, and
+analytic TOI when available. The generator rejects an island scene that never
+forms cross-group contacts or a failed swept tunneling test.
+
+It is a separate rigid-sphere demo. It does not simulate cloth, OGC, IPC,
+CCFR or XPBD. On macOS use `open output/native/supporting-offline-replay.html`.
+This is the safest islands/tunneling screen-share fallback.
