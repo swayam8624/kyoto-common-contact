@@ -518,9 +518,9 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("PAIR BLOCK BUILDS "+std::to_string(m.regionalPairRebuilds),280);
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
- line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
- line("MOUSE GRAB "+std::string(a.multi.grabbing()?"ACTIVE":"READY")+
-      " / ERROR "+number(m.grabError,3),345,teal,1.15);
+ line("GRAB "+std::string(a.multi.grabbing()?"ACTIVE":"READY")+
+      " / ERROR "+number(m.grabError,3)+
+      " / GUARD "+number(m.meanRegionBudget,3),358,teal,1.12);
  line("PHYSICAL STRAIN "+number(m.maxStructuralEdgeStretch,3)+
       " FRAME DELTA "+number(m.maxFrameParticleTravel,3),366,teal,1.12);
  line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
