@@ -1,4 +1,5 @@
 #include "ccp/research_multicloth.hpp"
+#include "ccp/cloth_interaction.hpp"
 #include <cmath>
 #include <algorithm>
 #include <map>
@@ -303,6 +304,106 @@ int main(){
     if(reference.metrics().interSheetContacts)++actualContactSteps;
    }
    require(actualContactSteps>50,"multi-cloth interaction disappeared after stabilization");
+  }
+
+  // Picking math is independent from OpenGL, so retina-style window
+  // coordinates, triangle barycentrics and depth-aware drag planes can be
+  // checked in the ordinary Linux/macOS headless test executable.
+  {
+   namespace pick=ccp::interaction;
+   const std::vector<Vec3> vertices={{-1,0,1},{1,0,1},{0,0,3}};
+   const std::vector<std::array<int,3>> faces={{0,1,2}};
+   const auto center=pick::cameraRay(400,300,800,600,{0,-5,2},{0,0,2});
+   const auto hit=pick::pickTriangleRay(center,vertices,faces);
+   require(hit.has_value(),"camera center ray failed to pick cloth triangle");
+   require(hit->triangle==0&&std::abs(hit->position.y)<1e-8,
+           "ray-triangle picked wrong position");
+   require(std::abs(hit->barycentric[0]+hit->barycentric[1]+
+                    hit->barycentric[2]-1.)<1e-10,
+           "picked barycentric coordinates not normalized");
+   const auto offset=pick::cameraRay(500,300,800,600,{0,-5,2},{0,0,2});
+   const auto translated=pick::intersectDragPlane(offset,hit->position,{0,1,0});
+   require(translated.has_value()&&translated->x>hit->position.x+.2,
+           "mouse drag did not translate point in camera plane");
+   const auto miss=pick::cameraRay(0,0,800,600,{0,-5,2},{0,0,2});
+   require(!pick::pickTriangleRay(miss,vertices,faces),
+           "ray missed background but still selected cloth");
+  }
+
+  // Construct an actual same-sheet nonlocal fold. With self-collision
+  // enabled, broad phase must emit distant-triangle pairs and the precise
+  // pass must move both interacting features. Disabling same-sheet masks
+  // must remove these responses, without suppressing inter-sheet contacts.
+  {
+   MultiCloth folded(1,1,Policy::RegionalCertified);
+   folded.displacePatchForTest(0,2,2,3,{.915,0,.016});
+   const auto before=folded.positions();
+   const std::size_t self=folded.runContactPassForTest();
+   require(self>0,"folded same-sheet geometry produced no self-contact");
+   require(folded.metrics().selfCandidatePairs>=self,
+           "self-contact count exceeds eligible nonlocal AABB candidates");
+   require(folded.metrics().selfTopologyFiltered>0,
+           "shared-neighbor triangles were not excluded from self solver");
+   double maxMovement=0;
+   for(std::size_t i=0;i<before.size();++i){
+    const auto a=before[i],b=folded.positions()[i];
+    const double dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;
+    maxMovement=std::max(maxMovement,std::sqrt(dx*dx+dy*dy+dz*dz));
+   }
+   require(maxMovement>1e-6&&maxMovement<.05,
+           "same-sheet collision did not produce bounded physical correction");
+   MultiCloth off(1,1,Policy::RegionalCertified);
+   off.setSelfCollisions(false);
+   off.displacePatchForTest(0,2,2,3,{.915,0,.016});
+   require(off.runContactPassForTest()==0,
+           "disabled self collision still changed same-sheet geometry");
+  }
+
+  // A mouse-style barycentric attachment must drag the cloth without
+  // teleporting its vertices, and both the full SAP and online partition
+  // broad-phase policies must produce the SAME physical trajectory.
+  {
+   MultiCloth sap(2,2,Policy::RebuildSAP);
+   MultiCloth online(2,2,Policy::OnlineContactAware);
+   const int selected=((6*12+6)*2); // sheet zero, central movable triangle
+   const std::array<double,3> bary{.2,.5,.3};
+   const auto tri=sap.triangles().at(selected);
+   Vec3 hit{};
+   for(int j=0;j<3;++j){
+    const auto p=sap.positions().at(tri[j]);
+    hit.x+=p.x*bary[j];hit.y+=p.y*bary[j];hit.z+=p.z*bary[j];
+   }
+   require(sap.beginGrab(selected,bary,hit)&&
+           online.beginGrab(selected,bary,hit),"cannot grab movable cloth");
+   const double firstX=sap.grabPoint().x;
+   double greatestShift=0;
+   for(int frame=0;frame<78;++frame){
+    const double t=frame/77.;
+    const Vec3 target={hit.x+.75*t,hit.y+.14*std::sin(t*3.1),
+                       hit.z-.33*t};
+    sap.updateGrab(target);online.updateGrab(target);
+    sap.step();online.step();
+    greatestShift=std::max(greatestShift,std::abs(sap.grabPoint().x-firstX));
+    require(sap.metrics().grabCorrections>0,
+            "mouse target was never projected into cloth constraints");
+    require(sap.metrics().maxFrameParticleTravel<.8&&
+            sap.metrics().maxStructuralEdgeStretch<2.6,
+            "mouse dragging destabilized the cloth solver");
+    for(std::size_t i=0;i<sap.positions().size();++i){
+     const auto a=sap.positions()[i],b=online.positions()[i];
+     const double dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;
+     if(std::sqrt(dx*dx+dy*dy+dz*dz)>1e-8)
+      throw std::runtime_error("mouse drag changed state between broad-phase policies");
+    }
+   }
+   require(greatestShift>.15,"mouse grab did not move cloth visibly");
+   sap.endGrab();online.endGrab();
+   require(!sap.grabbing()&&!online.grabbing(),"mouse release did not clear attachment");
+   for(int frame=0;frame<18;++frame){
+    sap.step();online.step();
+    require(sap.metrics().maxStructuralEdgeStretch<2.6,
+            "releasing grabbed cloth destabilized its springs");
+   }
   }
 
   std::cout<<"Region certification, local invalidation, moving 1/2/3 cloths, "
