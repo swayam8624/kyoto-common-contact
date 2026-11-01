@@ -9,6 +9,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 mkdir -p output/native
+./build/ccp_cloth_stability_probe 480 | tee output/native/cloth-stability.txt
 ./build/ccp_live_benchmark output/native/live_benchmark-postfix.csv | tee output/native/benchmark-postfix-summary.txt
 python3 scripts/summarize_benchmark.py output/native/live_benchmark-postfix.csv output/native/benchmark-postfix.svg docs/MEETING_RESULTS.md
 python3 scripts/summarize_pipeline.py output/native/live_benchmark-postfix.csv output/native/cascade.svg
