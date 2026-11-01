@@ -230,6 +230,8 @@ std::string backendName(int kind) {
         case 4: return "bullet_dbvt_dynamic";
         case 5: return "region_fixed";
         case 6: return "region_adaptive";
+        case 7: return "region_sweep_fixed";
+        case 8: return "region_sweep_adaptive";
         default: throw std::runtime_error("unknown algorithm");
     }
 }
@@ -258,6 +260,7 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
                const std::vector<Pairs>& oracle) {
     ccp::live::BroadPhaseService cached;
     ccp::research::RegionalCandidates fixedRegions,adaptiveRegions;
+    ccp::research::RegionalCandidates sweptFixedRegions,sweptAdaptiveRegions;
     BulletTree dynamicBullet;
     std::vector<double> elapsed;
     double totalCandidates=0,totalExtras=0;
@@ -276,6 +279,8 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
                 {kMargin,kBudget,ccp::live::UpdatePolicy::GuardedReuse},true,metrics);
         if(kind==5) pairs=fixedRegions.query(regionalInput,kMargin,false,regionMetrics);
         if(kind==6) pairs=adaptiveRegions.query(regionalInput,kMargin,true,regionMetrics);
+        if(kind==7) pairs=sweptFixedRegions.query(regionalInput,kMargin,false,regionMetrics,true);
+        if(kind==8) pairs=sweptAdaptiveRegions.query(regionalInput,kMargin,true,regionMetrics,true);
         const double milliseconds=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
         if(!std::includes(pairs.begin(),pairs.end(),oracle[i].begin(),oracle[i].end()))
             throw std::runtime_error("REQUIRED PAIR OMITTED by "+backendName(kind)+" on "+scene+
@@ -354,7 +359,7 @@ int main(int argc,char** argv) {
                 oracle.push_back(ccp::live::candidates(pad(raw),false));
                 samples.push_back(std::move(raw));
             }
-            for(int algorithm=0;algorithm<7;++algorithm) {
+            for(int algorithm=0;algorithm<9;++algorithm) {
                 const auto r=measure(scene,algorithm,samples,oracle);
                 csv<<r.scene<<','<<r.algorithm<<','<<r.primitives<<','<<r.samples<<','
                    <<r.meanMs<<','<<r.medianMs<<','<<r.p95Ms<<','
