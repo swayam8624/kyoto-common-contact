@@ -32,6 +32,13 @@ if(APPLE)
 endif()
 add_executable(ccp_live_benchmark apps/live_benchmark.cpp)
 target_link_libraries(ccp_live_benchmark PRIVATE ccp_live)
+# Continuously driven 1-3 cloth sheets + moving obstacles. Actual inter-sheet
+# discrete contact response; broad-phase algorithm stays separate.
+add_library(ccp_multicloth src/research_multicloth.cpp)
+target_link_libraries(ccp_multicloth PUBLIC ccp_live)
+target_include_directories(ccp_multicloth PUBLIC include)
+target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+
 
 # Independent, published-family 3D baseline: actual Bullet DBVT library.
 # Without Bullet, the project still builds its own core and tests, but does

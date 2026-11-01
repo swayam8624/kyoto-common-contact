@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <compare>
 #include <cstdint>
-#include <string>
 #include <vector>
 
 namespace ccp::live {
@@ -27,9 +26,6 @@ struct QueryRequest {
 struct QueryMetrics {
     std::size_t builds{}, reuses{}, pairTests{};
     double broadMs{};
-    // Last cache action across the current broad-phase query group.
-    // Exposes WHY we rebuilt, not merely how often.
-    std::string lastDecision{"UNQUERIED"};
 };
 
 // Returns canonical, sorted unique ID pairs with inclusive AABB overlap.
@@ -60,7 +56,6 @@ private:
 struct Stats {
     std::size_t frame{}, candidateCount{}, proximityCount{}, oracleMisses{}, pairTests{}, iterations{};
     std::size_t queryBuilds{}, queryReuses{};
-    std::string cacheDecision{"UNQUERIED"};
     // CPU times are partitioned: broad, candidate-only narrow, optional
     // exhaustive oracle, final display diagnostics, and remaining integration.
     double broadMs{}, narrowMs{}, oracleMs{}, diagnosticMs{}, solverMs{}, stepMs{}, minGap{}, maxStrain{};

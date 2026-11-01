@@ -65,7 +65,6 @@ int main() {
         require(serviceMetrics.pairTests==testsBeforeReuse,"reuse performs no new AABB pair predicates");
         (void)service.query(serviceBounds,{0.2,0.4,UpdatePolicy::GuardedReuse},true,serviceMetrics);
         require(serviceMetrics.builds==2,"margin change forces a service rebuild");
-        require(serviceMetrics.lastDecision=="REQUEST_CHANGED","margin change reports an explicit cache invalidation reason");
         (void)service.query(serviceBounds,{0.2,0.5,UpdatePolicy::GuardedReuse},true,serviceMetrics);
         require(serviceMetrics.builds==3,"displacement-budget change forces a service rebuild");
         const auto beforeCategoryChange=serviceMetrics.builds;

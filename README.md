@@ -47,21 +47,3 @@ The recorded local benchmark uses five paired trials of 300 steps, excluding the
 This is a small XPBD-style cloth/contact implementation, not an integration with the official IPC, OGC, PBD or CCFR implementations. It does not provide swept continuous collision detection or self collision, and does not establish their collision-free guarantees. The next research step is one real method adapter, validated against that method's original candidate pipeline.
 
 Earlier Blender and HTML experiments remain under `output/research3d` and `output/` for provenance. They are historical artifacts; this launch path uses the live C++ application.
-
-## Published-family broad-phase baseline (real Bullet DBVT)
-
-Run `brew install bullet` on macOS or install `libbullet-dev` on Linux,
-then run `./scripts/prepare_meeting.sh`. The benchmark builds and exercises
-the actual Bullet Physics `btDbvtBroadphase`, exhaustive AABB, local
-sweep-and-prune, and guarded SAP. It produces
-`output/native/broadphase-leaderboard.svg` and `docs/BROADPHASE_RESULTS.md`.
-This is *not* a universal best-algorithm leaderboard; CPU rebuild and temporal
-reuse costs are compared with full candidate-set correctness checks. The
-synthetic two/three-cloth bounds workloads include geometric inter-sheet
-potential pairs but no real cloth self-collision solver or physical coupling.
-
-The published-library comparison includes a stronger **persistent Bullet
-DBVT update** row, alongside fresh Bullet rebuild. Importantly, the
-temporal Bullet strategy updates its spatial tree, whereas guarded SAP
-reuses a certified pair *superset*. Compare returned pair counts and
-downstream precise work, not query time alone.
