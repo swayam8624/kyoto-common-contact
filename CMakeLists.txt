@@ -24,7 +24,7 @@ target_include_directories(ccp_live PUBLIC include)
 target_compile_options(ccp_live PRIVATE -Wall -Wextra -Wpedantic)
 if(APPLE)
   add_executable(ccp_native MACOSX_BUNDLE native/main.cpp native/font_atlas.cpp)
-  target_link_libraries(ccp_native PRIVATE ccp_live glfw OpenGL::GL
+  target_link_libraries(ccp_native PRIVATE ccp_live ccp_multicloth glfw OpenGL::GL
     "-framework CoreText" "-framework CoreGraphics" "-framework CoreFoundation")
   target_compile_definitions(ccp_native PRIVATE CCP_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/output/native")
   set_target_properties(ccp_native PROPERTIES MACOSX_BUNDLE_INFO_PLIST
