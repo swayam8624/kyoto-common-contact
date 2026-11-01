@@ -68,9 +68,9 @@ Pairs bulletPairs(const BoxList& alreadyPadded) {
     btDbvtBroadphase broadphase;
     // Bullet's internal dynamic-tree implementation may use padded "fat"
     // leaves. We preserve any conservative extra pairs in its output.
-    std::vector<int> ids;
-    ids.reserve(alreadyPadded.size());
-    for(const auto& b:alreadyPadded) ids.push_back(b.id);
+    // Stable pointers directly to immutable input bounds: O(1) metadata
+    // recovery per pair. A linear ID lookup here would unfairly add O(N)
+    // per returned pair to Bullet's measured time in dense scenes.
     std::vector<btBroadphaseProxy*> proxies;
     proxies.reserve(alreadyPadded.size());
     for(std::size_t i=0;i<alreadyPadded.size();++i) {
@@ -79,7 +79,7 @@ Pairs bulletPairs(const BoxList& alreadyPadded) {
             btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
             btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
             BOX_SHAPE_PROXYTYPE,
-            static_cast<void*>(&ids[i]),
+            const_cast<Bounds*>(&alreadyPadded[i]),
             1,1,&dispatcher);
         if(!proxy) throw std::runtime_error("Bullet broadphase could not create proxy");
         proxies.push_back(proxy);
@@ -93,14 +93,11 @@ Pairs bulletPairs(const BoxList& alreadyPadded) {
         const auto* q=bullet[i].m_pProxy1;
         if(!p||!q||!p->m_clientObject||!q->m_clientObject)
             throw std::runtime_error("Bullet returned an invalid collision pair");
-        const int a=*static_cast<int*>(p->m_clientObject);
-        const int b=*static_cast<int*>(q->m_clientObject);
-        const auto ia=std::find(ids.begin(),ids.end(),a);
-        const auto ib=std::find(ids.begin(),ids.end(),b);
-        if(ia==ids.end()||ib==ids.end()) throw std::runtime_error("Bullet pair unknown primitive");
-        const auto& ba=alreadyPadded[static_cast<std::size_t>(ia-ids.begin())];
-        const auto& bb=alreadyPadded[static_cast<std::size_t>(ib-ids.begin())];
+        const auto& ba=*static_cast<const Bounds*>(p->m_clientObject);
+        const auto& bb=*static_cast<const Bounds*>(q->m_clientObject);
         if(!eligible(ba,bb)) continue;
+        const int a=ba.id;
+        const int b=bb.id;
         // We deliberately keep Bullet's conservative possible overlaps, even
         // if its internal fat-tree pair cache is broader than the exact AABB
         // reference; this is what the next method-specific stage receives.
