@@ -52,6 +52,8 @@ int main(int argc,char** argv){
      ratio=std::max(ratio,dist(points[id],points[id+side])/rest);
     }
    }
+   if(step==1&&delta>.08)
+    throw std::runtime_error("UNSTABLE FIRST FRAME: cloth anchors teleported at startup");
    maxWorld=std::max(maxWorld,world);
    maxTravel=std::max(maxTravel,travel);
    maxDelta=std::max(maxDelta,delta);
