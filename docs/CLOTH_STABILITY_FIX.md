@@ -14,6 +14,7 @@ The old global guarded cache also passed conservative extra candidate pairs stra
 
 - Wind is now a physically integrated acceleration: 1.6 m/s^2 peak times dt squared, not a constant position kick.
 - Initial cloth-layer spacing is 0.19 meters, clear of initial contact thickness.
+- Cloth anchor drives subtract their time-zero phase offsets, eliminating a large first-frame sheet-specific corner teleport.
 - The total contact projection per dynamic particle is capped at 0.030 meters PER constraint iteration, including all primitive pairs sharing that vertex.
 - 94% of collision and floor projection displacement is removed from next-frame Verlet velocity (approximately inelastic positional response), while genuine gravity, external animation and structural motion remain.
 - Free velocity is damped by 0.982 per frame with a 0.060-meter-per-frame emergency cap.
