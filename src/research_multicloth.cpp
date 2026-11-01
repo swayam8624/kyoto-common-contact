@@ -479,7 +479,7 @@ void MultiCloth::step(){
                                      true,globalMetrics);
    pairs=actual;
   }else{
-   for(auto b:bounds){b.min=sub(b.min,{kMargin*.5,kMargin*.5,kMargin*.5});
+   for(auto& b:bounds){b.min=sub(b.min,{kMargin*.5,kMargin*.5,kMargin*.5});
                       b.max=add(b.max,{kMargin*.5,kMargin*.5,kMargin*.5});}
    pairs=live::candidates(bounds,true,&metrics_.broadAabbTests);
   }
