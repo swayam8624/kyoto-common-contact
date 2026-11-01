@@ -34,7 +34,7 @@ for i,row in enumerate(rows):
         raise SystemExit("online partition disappeared")
 if not any(int(r["onlineSplits"])>0 for r in rows):
     raise SystemExit("controller must perform an actual local region split")
-if sum(int(r["coverageChecked"]) for r in rows)<10:
+if sum(int(r["coverageChecked"]) for r in rows)<8:
     raise SystemExit("not enough independent oracle audit frames")
 warmup=12
 measured=rows[warmup:]

@@ -394,6 +394,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  updateSpheres(0);
  if(policy_==Policy::OnlineContactAware){
   online_.reset(sheets_);
+  hierarchicalRegions_=online_.hierarchical();
   assignOnlineRegionIds();
  }
 }
@@ -403,6 +404,7 @@ void MultiCloth::setPolicy(Policy policy){
  policy_=policy;
  if(policy_==Policy::OnlineContactAware){
   online_.reset(sheets_);
+  hierarchicalRegions_=online_.hierarchical();
   assignOnlineRegionIds();
  }else{
   const int span=patchCellSpan_;

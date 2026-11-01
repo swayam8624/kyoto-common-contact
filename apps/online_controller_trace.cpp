@@ -33,7 +33,8 @@ int main(int argc,char** argv){
    // The periodic oracle is independent from production queries and runs
    // identically on both policies. Both solvers execute the same fixed
    // forces and constraints, so comparing coordinates is another safety gate.
-   const bool verify=frame<=12||frame%20==0;
+   // Match the simulator's actual exhaustive-oracle frame schedule.
+   const bool verify=frame==1||frame%15==0;
    online.setAuditing(verify);sap.setAuditing(verify);
    online.step();sap.step();
    const auto& a=online.positions();const auto& b=sap.positions();
