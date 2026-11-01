@@ -95,3 +95,8 @@ Also report real **precise test counts** for baseline versus guarded policy. No 
 5:00–6:00: Scroll to measured downstream cascade and novelty boundary; ask which IPC/OGC/CCFR adapter to implement next.
 
 Do not claim the native 3D demo renders the synthetic multi-sheet benchmark geometry or physically simulates interacting sheets: those benchmark fixtures are geometric inputs evaluated separately by the C++ algorithms. The main native 3D scene remains the actual single-cloth XPBD-style testbed.
+
+
+## Real moving three-cloth demonstration
+
+Run ./open_multicloth_demo.sh. Keys: L cycles sheet count 1/2/3, O cycles moving sphere count 1/2, Q cycles SAP rebuild/global guarded/regional-certified, A turns exhaustive pair audit on/off, G opens scrollable live event and time-series panel, 1-4 select geometry/guard regions/candidates/actual contact corrections. Insert the newly generated multicloth-real.svg and broadphase-leaderboard.svg charts. The external 3D comparison now includes simulated_cloths3 real physical AABB snapshots. Do not claim the adaptive method is historically novel; assess it using the paired measured cost and zero-miss contract.

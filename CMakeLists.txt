@@ -24,7 +24,7 @@ target_include_directories(ccp_live PUBLIC include)
 target_compile_options(ccp_live PRIVATE -Wall -Wextra -Wpedantic)
 if(APPLE)
   add_executable(ccp_native MACOSX_BUNDLE native/main.cpp native/font_atlas.cpp)
-  target_link_libraries(ccp_native PRIVATE ccp_live glfw OpenGL::GL
+  target_link_libraries(ccp_native PRIVATE ccp_live ccp_multicloth glfw OpenGL::GL
     "-framework CoreText" "-framework CoreGraphics" "-framework CoreFoundation")
   target_compile_definitions(ccp_native PRIVATE CCP_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/output/native")
   set_target_properties(ccp_native PROPERTIES MACOSX_BUNDLE_INFO_PLIST
@@ -32,6 +32,15 @@ if(APPLE)
 endif()
 add_executable(ccp_live_benchmark apps/live_benchmark.cpp)
 target_link_libraries(ccp_live_benchmark PRIVATE ccp_live)
+# Coupled, continually driven multi-cloth experimental broad-phase research.
+add_library(ccp_multicloth src/research_multicloth.cpp)
+target_link_libraries(ccp_multicloth PUBLIC ccp_live)
+target_include_directories(ccp_multicloth PUBLIC include)
+target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
+target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
+
+
 
 # Independent, published-family 3D baseline: actual Bullet DBVT library.
 # Without Bullet, the project still builds its own core and tests, but does
@@ -40,7 +49,7 @@ option(CCP_REQUIRE_BULLET "Fail configuration if the Bullet reference is unavail
 find_package(Bullet QUIET)
 if(Bullet_FOUND)
   add_executable(ccp_broadphase_leaderboard apps/broadphase_leaderboard.cpp)
-  target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ${BULLET_LIBRARIES})
+  target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ccp_multicloth ${BULLET_LIBRARIES})
   target_include_directories(ccp_broadphase_leaderboard PRIVATE ${BULLET_INCLUDE_DIRS})
   target_compile_options(ccp_broadphase_leaderboard PRIVATE -Wall -Wextra -Wpedantic)
   message(STATUS "External 3D broad-phase benchmark: Bullet DBVT enabled")
@@ -58,6 +67,9 @@ target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(ccp_multicloth_tests tests/research_multicloth_tests.cpp)
+  target_link_libraries(ccp_multicloth_tests PRIVATE ccp_multicloth)
+  add_test(NAME moving_multicloth_regional_coverage COMMAND ccp_multicloth_tests)
   if(TARGET ccp_broadphase_leaderboard)
     add_test(NAME published_3d_broadphase_coverage
       COMMAND ccp_broadphase_leaderboard --self-test)

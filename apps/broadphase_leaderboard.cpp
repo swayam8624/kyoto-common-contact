@@ -4,6 +4,7 @@
 // broad-phase benchmark. In particular, the synthetic multi-sheet geometry
 // contains no cloth-cloth contact response or physically simulated coupling.
 #include "ccp/live_cloth.hpp"
+#include "ccp/research_multicloth.hpp"
 #include <btBulletCollisionCommon.h>
 #include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
 #include <algorithm>
@@ -154,6 +155,26 @@ BoxList makeScene(const std::string& scene,int sample) {
         }
         return out;
     }
+    if(scene=="simulated_cloths3"){
+        // IMPORTANT: these are ACTUAL positions from a deforming, inter-sheet
+        // collision-responding C++ simulation, not synthetic sinusoidal AABBs.
+        // Every tested backend receives the identical immutable frame inputs.
+        static const std::vector<BoxList> recorded=[]{
+            std::vector<BoxList> snapshots;
+            ccp::research::MultiCloth world(3,2,ccp::research::Policy::RebuildSAP);
+            snapshots.reserve(kSamples);
+            for(int frame=0;frame<kSamples;++frame){
+                world.step();
+                const auto primitives=world.currentPrimitives();
+                BoxList boxes;boxes.reserve(primitives.size());
+                for(const auto& primitive:primitives)boxes.push_back(primitive.box);
+                snapshots.push_back(std::move(boxes));
+            }
+            return snapshots;
+        }();
+        if(sample<0||sample>=int(recorded.size()))throw std::runtime_error("invalid recorded frame");
+        return recorded[static_cast<std::size_t>(sample)];
+    }
     if(scene!="sheets2" && scene!="sheets3")
         throw std::runtime_error("unknown broad-phase benchmark scene "+scene);
     const int layers=scene=="sheets2"?2:3;
@@ -194,7 +215,7 @@ BoxList makeScene(const std::string& scene,int sample) {
     return out;
 }
 std::vector<std::string> cases() {
-    return {"sparse256","clustered512","dense256","sheets2","sheets3"};
+    return {"sparse256","clustered512","dense256","sheets2","sheets3","simulated_cloths3"};
 }
 double percentile(std::vector<double> values,double p) {
     std::sort(values.begin(),values.end());
@@ -207,19 +228,45 @@ std::string backendName(int kind) {
         case 2: return "bullet_dbvt";
         case 3: return "guarded_sap";
         case 4: return "bullet_dbvt_dynamic";
+        case 5: return "region_fixed";
+        case 6: return "region_adaptive";
         default: throw std::runtime_error("unknown algorithm");
     }
+}
+// Preserve the stable mesh-patch identity of each triangle across deformations.
+// All search methods consume identical current raw bounds, masks, and IDs.
+std::vector<ccp::research::Primitive> regionAdapter(const std::string& scene,
+                                                     const BoxList& boxes){
+ std::vector<ccp::research::Primitive> out;out.reserve(boxes.size());
+ const bool sheets=scene=="simulated_cloths3"||scene=="sheets2"||scene=="sheets3";
+ for(const auto& b:boxes){
+  int region=b.id/16,sheet=-1;
+  if(sheets){
+   const int layers=scene=="sheets2"?2:3;
+   const int trianglesPerSheet=288;
+   if(b.id<layers*trianglesPerSheet) {
+    sheet=b.id/trianglesPerSheet;
+    const int cell=(b.id%trianglesPerSheet)/2;
+    region=sheet*100+(cell/12/3)*4+(cell%12)/3;
+   }else region=layers*100+(b.id-layers*trianglesPerSheet);
+  }
+  out.push_back({b,region,sheet});
+ }
+ return out;
 }
 Result measure(const std::string& scene,int kind,const std::vector<BoxList>& samples,
                const std::vector<Pairs>& oracle) {
     ccp::live::BroadPhaseService cached;
+    ccp::research::RegionalCandidates fixedRegions,adaptiveRegions;
     BulletTree dynamicBullet;
     std::vector<double> elapsed;
     double totalCandidates=0,totalExtras=0;
     std::size_t builds=0,reuses=0;
     for(std::size_t i=0;i<samples.size();++i) {
         const auto& bounds=samples[i];
+        const auto regionalInput=regionAdapter(scene,bounds);
         ccp::live::QueryMetrics metrics;
+        ccp::research::Metrics regionMetrics;
         const auto begin=Clock::now();
         Pairs pairs;
         if(kind==0 || kind==1) pairs=ccp::live::candidates(pad(bounds),kind==1);
@@ -227,6 +274,8 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
         if(kind==4) pairs=dynamicBullet.update(pad(bounds));
         if(kind==3) pairs=cached.query(bounds,
                 {kMargin,kBudget,ccp::live::UpdatePolicy::GuardedReuse},true,metrics);
+        if(kind==5) pairs=fixedRegions.query(regionalInput,kMargin,false,regionMetrics);
+        if(kind==6) pairs=adaptiveRegions.query(regionalInput,kMargin,true,regionMetrics);
         const double milliseconds=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
         if(!std::includes(pairs.begin(),pairs.end(),oracle[i].begin(),oracle[i].end()))
             throw std::runtime_error("REQUIRED PAIR OMITTED by "+backendName(kind)+" on "+scene+
@@ -237,8 +286,9 @@ Result measure(const std::string& scene,int kind,const std::vector<BoxList>& sam
         elapsed.push_back(milliseconds);
         totalCandidates+=double(pairs.size());
         totalExtras+=double(extra);
-        builds+=(kind==3?metrics.builds:(kind==4?(i==0?1:0):1));
-        reuses+=metrics.reuses;
+        builds+=(kind>=5?regionMetrics.regionalPairRebuilds:
+                 kind==3?metrics.builds:(kind==4?(i==0?1:0):1));
+        reuses+=kind>=5?regionMetrics.regionalPairReuses:metrics.reuses;
     }
     const auto size=samples.size();
     return {scene,backendName(kind),int(samples[0].size()),int(size),
@@ -304,7 +354,7 @@ int main(int argc,char** argv) {
                 oracle.push_back(ccp::live::candidates(pad(raw),false));
                 samples.push_back(std::move(raw));
             }
-            for(int algorithm=0;algorithm<5;++algorithm) {
+            for(int algorithm=0;algorithm<7;++algorithm) {
                 const auto r=measure(scene,algorithm,samples,oracle);
                 csv<<r.scene<<','<<r.algorithm<<','<<r.primitives<<','<<r.samples<<','
                    <<r.meanMs<<','<<r.medianMs<<','<<r.p95Ms<<','

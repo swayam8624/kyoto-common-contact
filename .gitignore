@@ -21,3 +21,6 @@ output/native/broadphase-leaderboard.csv
 output/native/broadphase-leaderboard.svg
 docs/BROADPHASE_RESULTS.md
 output/native/cascade.svg
+output/native/multicloth-real.csv
+output/native/multicloth-real.svg
+docs/MULTICLOTH_RESULTS.md

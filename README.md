@@ -65,3 +65,8 @@ DBVT update** row, alongside fresh Bullet rebuild. Importantly, the
 temporal Bullet strategy updates its spatial tree, whereas guarded SAP
 reuses a certified pair *superset*. Compare returned pair counts and
 downstream precise work, not query time alone.
+
+
+## Live multi-cloth research experiment (new)
+
+Use `./open_multicloth_demo.sh` for a continuously excited, physically interacting **three-cloth + two-moving-sphere** research scene. It compares full SAP, the older global guard, and a new experimental locally certified region-pair method that revalidates cached candidates against current tight AABBs. Press K for the original one-cloth demonstration; L changes the cloth count; O changes spheres; Q changes the policy; G shows the live diagnostic/time-series panel. Benchmarks and candid novelty limits are in `docs/MULTICLOTH_CONTRACT.md` and generated `docs/MULTICLOTH_RESULTS.md`.

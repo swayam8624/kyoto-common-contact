@@ -360,3 +360,10 @@ numbers. Look under \`output/native/\` for SVG figures and raw CSVs.
 - OGC: https://ankachan.github.io/Projects/OGC/
 - PBD source: https://github.com/InteractiveComputerGraphics/PositionBasedDynamics
 - CCFR: https://arxiv.org/abs/2607.26901
+
+
+## Moving multi-cloth research experiment
+
+A live native C++ simulator now drives one, two or three deformable cloth sheets with two moving spheres and discrete inter-sheet contact corrections. The regional-certified candidate service caches pair blocks for stable mesh patches, selectively invalidates blocks touching escaped regions, and rechecks every cached candidate against current tight padded AABBs. Its adaptive budget uses measured motion and rejected-pair ratio. This is an experimental combination, NOT established novel prior art: PhysX has region broad phases and 2026 research already covers selective deforming BVH updates.
+
+The new simulated_cloths3 external benchmark records real physics-generated geometry and compares upstream Bullet DBVT rebuild and persistent update, SAP, global guard, and regional fixed/adaptive strategies with the same AABB masks and positions. Read raw candidate counts and full solver comparisons before drawing conclusions.
