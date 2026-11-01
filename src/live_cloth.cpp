@@ -406,6 +406,9 @@ void ClothSimulation::setCollisions(bool enabled) { stats_.collisions=enabled; }
 void ClothSimulation::setOracleEnabled(bool enabled) {
     oracleEnabled_=enabled;
     stats_.oracleEnabled=enabled;
+    // The previous frame's coverage result cannot validate a new mode.
+    stats_.oracleChecked=false;
+    stats_.oracleMisses=0;
 }
 bool ClothSimulation::oracleEnabled() const { return oracleEnabled_; }
 void ClothSimulation::setQueryRequest(QueryRequest request) {

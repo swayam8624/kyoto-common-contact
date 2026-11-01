@@ -75,7 +75,7 @@ svg_path.write_text("\n".join(parts),encoding="utf-8")
 md_path.parent.mkdir(parents=True,exist_ok=True)
 md=f"""# Kyoto meeting: post-fix benchmark results
 
-**Generated from real CSV:** \`{src}\`
+**Generated from real CSV:** `{src}`
 
 The independent all-triangle correctness oracle ran in a separate, untimed
 preflight. The timed simulations use **candidate-driven narrow phase**, with
@@ -103,7 +103,7 @@ numbers a fully optimized production pipeline. A disabled oracle does not mean
 zero unchecked misses; the dedicated oracle preflight and automated tests
 provide the tested fixture's correctness evidence.
 
-Generated figure: \`{svg_path}\`
+Generated figure: `{svg_path}`
 """
 md_path.write_text(md,encoding="utf-8")
 print(f"Calculated {b['n']} and {g['n']} measured frames. Mean ratio {ratio:.3f}x")
