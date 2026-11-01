@@ -17,7 +17,8 @@ using ccp::research::MultiCloth;
 using ccp::research::Policy;
 using ccp::research::Vec3;
 struct Aggregate {
- double broad{},precise{},step{},pairs{},inter{},sphere{},builds{},reuses{},rejected{},tests{};
+ double broad{},precise{},step{},pairs{},inter{},sphere{},builds{},reuses{},rejected{},tests{},
+        topLevelTests{},activeBlocks{},skippedBlocks{},cacheEvictions{};
  double maxError{};
  std::size_t frames{};
  void add(const ccp::research::Metrics& m,double error){
@@ -28,6 +29,10 @@ struct Aggregate {
   reuses+=double(m.regionalPairReuses);
   rejected+=double(m.cachedPairsRejected);
   tests+=double(m.preciseTests);
+  topLevelTests+=double(m.regionTopLevelTests);
+  activeBlocks+=double(m.regionTopLevelOverlaps);
+  skippedBlocks+=double(m.regionPairsSkipped);
+  cacheEvictions+=double(m.regionCacheEvictions);
   maxError=std::max(maxError,error);
   ++frames;
  }
@@ -47,6 +52,8 @@ const char* name(int method){
   case 1:return "global_guarded";
   case 2:return "region_fixed";
   case 3:return "region_adaptive";
+  case 4:return "region_sweep_fixed";
+  case 5:return "region_sweep_adaptive";
   default:return "invalid";
  }
 }
@@ -63,7 +70,8 @@ int main(int argc,char** argv){
   csv<<std::fixed<<std::setprecision(9);
   csv<<"sheets,balls,policy,frames,meanBroadMs,meanNarrowMs,meanStepMs,"
         "meanCandidates,meanInterContacts,meanSphereContacts,meanRegionBuilds,"
-        "meanRegionReuses,meanRejected,meanPreciseTests,maxPositionError\n";
+        "meanRegionReuses,meanRejected,meanPreciseTests,maxPositionError,"
+        "meanTopLevelTests,meanActiveRegionPairs,meanSkippedRegionPairs,meanCacheEvictions\n";
   constexpr int warmup=8;
   for(int sheets=1;sheets<=3;++sheets){
    MultiCloth reference(sheets,2,Policy::RebuildSAP);
@@ -76,11 +84,12 @@ int main(int argc,char** argv){
     states.push_back(reference.positions());
     baselineStats.push_back(reference.metrics());
    }
-   for(int method=0;method<4;++method){
+   for(int method=0;method<6;++method){
     Aggregate result;
     MultiCloth sim(sheets,2,method==0?Policy::RebuildSAP:
                    method==1?Policy::GlobalGuard:Policy::RegionalCertified);
-    sim.setAdaptive(method==3);
+    sim.setAdaptive(method==3||method==5);
+    sim.setHierarchicalRegions(method>=4);
     sim.setAuditing(true);
     for(int frame=0;frame<frames;++frame){
      if(method>0)sim.step();
@@ -100,11 +109,14 @@ int main(int argc,char** argv){
        <<result.broad/n<<','<<result.precise/n<<','<<result.step/n<<','
        <<result.pairs/n<<','<<result.inter/n<<','<<result.sphere/n<<','
        <<result.builds/n<<','<<result.reuses/n<<','<<result.rejected/n<<','
-       <<result.tests/n<<','<<result.maxError<<'\n';
+       <<result.tests/n<<','<<result.maxError<<','
+       <<result.topLevelTests/n<<','<<result.activeBlocks/n<<','
+       <<result.skippedBlocks/n<<','<<result.cacheEvictions/n<<'\n';
     std::cout<<"SHEETS "<<sheets<<" METHOD "<<name(method)
              <<" STEP_MS "<<result.step/n<<" BROAD_MS "<<result.broad/n
              <<" EXACT_PAIR_CANDIDATES "<<result.pairs/n
              <<" CROSS_SHEET_RESPONSES "<<result.inter/n
+             <<" SKIPPED_PATCH_PAIRS "<<result.skippedBlocks/n
              <<" MAX_SOLVER_ERROR "<<result.maxError<<'\n';
    }
   }
