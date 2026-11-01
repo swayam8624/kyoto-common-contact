@@ -7,6 +7,7 @@
 #include <map>
 #include <numeric>
 #include <stdexcept>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 namespace ccp::research {
@@ -492,8 +493,18 @@ void MultiCloth::step(){
    exact.reserve(bounds.size());
    for(auto b:bounds)exact.push_back(expand(b,kMargin*.5));
    const auto oracle=live::candidates(exact,false);
-   if(!std::includes(pairs.begin(),pairs.end(),oracle.begin(),oracle.end()))
-    throw std::runtime_error("MULTICLOTH BROAD PHASE MISSED REQUIRED PAIR");
+   if(!std::includes(pairs.begin(),pairs.end(),oracle.begin(),oracle.end())) {
+    std::ostringstream error;error<<"MISS frame="<<frame_<<" iter="<<iter
+      <<" policy="<<int(policy_)<<" oracle="<<oracle.size()
+      <<" actual="<<pairs.size();
+    for(const auto pair:oracle) {
+     if(!std::binary_search(pairs.begin(),pairs.end(),pair)) {
+      error<<" missing=("<<pair.a<<","<<pair.b<<")";
+      break;
+     }
+    }
+    throw std::runtime_error(error.str());
+   }
    if(policy_==Policy::RegionalCertified&&pairs!=oracle)
     throw std::runtime_error("REGIONAL EXACT-CURRENT AABB REVALIDATION DISAGREES");
    metrics_.oracleChecked=true;
