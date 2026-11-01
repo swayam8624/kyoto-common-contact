@@ -13,7 +13,7 @@ jobs:
       - name: Install upstream Bullet 3D broad phase
         run: sudo apt-get update -qq && sudo apt-get install -y libbullet-dev
       - name: Configure C++23 core and published Bullet baseline
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON -DCCP_REQUIRE_BULLET=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON
       - name: Build
         run: cmake --build build --parallel 2
       - name: Unit and contract tests
@@ -27,6 +27,8 @@ jobs:
           python3 scripts/export_supporting_replays.py
           ./build/ccp_multicloth_benchmark output/native/multicloth-real.csv 36
           python3 scripts/summarize_multicloth.py output/native/multicloth-real.csv output/native/multicloth-real.svg docs/MULTICLOTH_RESULTS.md
+          ./build/ccp_patch_sweep output/native/patch-sweep.csv 40
+          python3 scripts/summarize_patch_sweep.py output/native/patch-sweep.csv output/native/patch-sweep.svg docs/PATCH_CALIBRATION.md
           ./build/ccp_broadphase_leaderboard output/native/broadphase-leaderboard.csv
           python3 scripts/summarize_leaderboard.py output/native/broadphase-leaderboard.csv output/native/broadphase-leaderboard.svg docs/BROADPHASE_RESULTS.md
       - name: Publish benchmark artifacts
@@ -42,6 +44,9 @@ jobs:
             output/native/multicloth-real.csv
             output/native/multicloth-real.svg
             docs/MULTICLOTH_RESULTS.md
+            output/native/patch-sweep.csv
+            output/native/patch-sweep.svg
+            docs/PATCH_CALIBRATION.md
             output/native/broadphase-leaderboard.csv
             output/native/broadphase-leaderboard.svg
             docs/BROADPHASE_RESULTS.md

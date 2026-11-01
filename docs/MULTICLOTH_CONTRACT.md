@@ -130,3 +130,19 @@ Prior literature worth evaluating:
 The next research task should involve a real solver's recorded geometries
 or source-level adapter, multi-scale region optimization, and comparisons
 with a stronger published dynamic broad-phase implementation.
+
+
+## Additional hierarchical and granularity experiments
+
+A two-level alternative performs sweep-and-prune on conservative UNION envelopes of stable mesh patches. Every patch-pair not overlapping at this coarse level is omitted from cached primitive-pair traversal; this is safe because current padded primitive bounds remain inside their enclosing patch envelopes. Newly overlapping or invalidated patches rebuild the necessary cache blocks. The original O(R squared) region-pair enumeration remains an explicit ablation. Reject duplicate primitive IDs, invalid AABBs, and non-finite coordinates.
+
+Six fixed region sizes (1/2/3/4/6/12 cells) can be chosen without changing the solver. The patch profiler measures both all-region-pair and two-tier modes, independently verifies the same three-cloth physics as SAP, chooses using early calibration frames, and reports later-frame evaluation. No online adaptive partitioning is claimed. The regional size selection is research scaffolding to evaluate whether a more principled contact-work-aware policy is justified.
+
+PhysX's automatic and parallel box pruning are existing multi-region alternatives, and our sweep is not claimed to be a replacement or original hierarchy design. See https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/include/PxBroadPhase.h .
+
+
+### Use the measured calibration in the live experiment
+
+Press Y after running prepare_meeting.sh. The app selects a patch size and two-tier/flat frontier using only the early calibration rows in patch-sweep.csv, and configures the active broad-phase service; later evaluation rows are never used for selection. The solver and particle coordinates are unchanged. Press P to override size, J to change frontier. This is static profile-guided setup, not a proven online adaptive method.
+
+The profiling app disables the expensive optional brute-force oracle in timed windows after warm-up and checks paired particle-state equivalence on every measured frame. Independent tests still audit the exact AABB candidate set.

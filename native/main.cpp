@@ -57,6 +57,11 @@ void segment(std::vector<Vertex>&v,V a,V b,V color){vertex(v,a,{0,0,1},color);ve
 void box(std::vector<Vertex>&v,V lo,V hi,V color){std::array<V,8>p;for(int i=0;i<8;i++)p[i]={i&1?hi.x:lo.x,i&2?hi.y:lo.y,i&4?hi.z:lo.z};for(int i=0;i<8;i++)for(int k=0;k<3;k++)if(!(i&(1<<k)))segment(v,p[i],p[i|(1<<k)],color);}
 void sphere(std::vector<Vertex>&v,V center,double radius){const int rings=24,slices=40;auto p=[&](int j,int i){double th=M_PI*j/rings,ph=2*M_PI*i/slices;return V{std::sin(th)*std::cos(ph),std::sin(th)*std::sin(ph),std::cos(th)};};for(int j=0;j<rings;j++)for(int i=0;i<slices;i++){V a=p(j,i),b=p(j+1,i),c=p(j+1,i+1),d=p(j,i+1);for(V n:{a,b,c,a,c,d})vertex(v,add(center,mul(n,radius)),n,{.16,.21,.26});}}
 struct EvidenceBar { std::string scene,algorithm; double meanMs{},extraCandidates{}; };
+struct PatchBenchRow {
+ int span{};
+ std::string frontier,phase;
+ double meanStepMs{},maxPositionError{};
+};
 struct MultiBenchRow {
  int sheets{};
  std::string policy;
@@ -65,7 +70,7 @@ struct MultiBenchRow {
 struct App {
  ccp::live::ClothSimulation sim;
  ccp::research::MultiCloth multi{3,2};
- bool multiMode=false,multiAudit=false,multiAdaptive=true;
+ bool multiMode=false,multiAudit=false,multiAdaptive=true,multiHierarchy=true;
  bool paused=false,wire=true,cutaway=false,drag=false,evidenceMode=false;
  int stage=1,evidenceScene=5;
  double yaw=-.93,pitch=.53,distance=8,lastX{},lastY{},inspectorScroll=0;
@@ -74,6 +79,7 @@ struct App {
  std::vector<std::string> recentEvents;
  std::vector<EvidenceBar> broadphaseResults;
  std::vector<MultiBenchRow> multiResults;
+ std::vector<PatchBenchRow> patchResults;
  std::vector<double> historyCandidates,historyInterContacts,historyBroadMs;
  double rebuildMean=std::numeric_limits<double>::quiet_NaN();
  double guardedMean=std::numeric_limits<double>::quiet_NaN();
@@ -90,6 +96,25 @@ void loadEvidence(App& a) {
  const std::filesystem::path base(CCP_OUTPUT_DIR);
  a.broadphaseResults.clear();
  a.multiResults.clear();
+ a.patchResults.clear();
+ {
+  std::ifstream input(base/"patch-sweep.csv");
+  std::string line;std::getline(input,line);
+  while(std::getline(input,line)){
+   std::stringstream stream(line);std::string cell;std::vector<std::string> cells;
+   while(std::getline(stream,cell,','))cells.push_back(cell);
+   if(cells.size()<13)continue;
+   try {
+    PatchBenchRow row;
+    row.span=std::stoi(cells[0]);row.frontier=cells[1];
+    row.phase=cells[2];row.meanStepMs=std::stod(cells[4]);
+    row.maxPositionError=std::stod(cells[12]);
+    if(std::isfinite(row.meanStepMs)&&row.meanStepMs>=0 &&
+       std::isfinite(row.maxPositionError)&&row.maxPositionError>=0 &&
+       row.maxPositionError<1e-8)a.patchResults.push_back(row);
+   } catch(const std::exception&) {}
+  }
+ }
  {
   std::ifstream input(base/"multicloth-real.csv");
   std::string line;std::getline(input,line);
@@ -155,6 +180,53 @@ void loadEvidence(App& a) {
  }
  pushInspectorEvent(a,"EVIDENCE: LOCAL CSV "+std::string(a.broadphaseResults.empty()?"MISSING":"LOADED"));
 }
+// Configure a STATIC candidate policy using calibration-only measurements.
+// Evaluation frames never enter the policy selection; no online learning
+// or prior-art novelty is claimed.
+void applyCalibratedPatch(App& a){
+ // Require the entire 12-variant, two-phase matrix plus SAP, all with
+ // validated paired positions. Partial/stale benchmark output is rejected.
+ constexpr std::array<int,6> spans{1,2,3,4,6,12};
+ const auto count=[&](int span,const std::string& mode,const std::string& phase){
+  return std::count_if(a.patchResults.begin(),a.patchResults.end(),
+   [&](const PatchBenchRow& r){
+    return r.span==span && r.frontier==mode && r.phase==phase;
+   });
+ };
+ bool valid=a.patchResults.size()==26;
+ for(const auto& phase:{"calibration","evaluation"}){
+  if(count(0,"sap_rebuild",phase)!=1)valid=false;
+  for(const int span:spans)
+   for(const auto& mode:{"all_region_pairs","two_tier"})
+    if(count(span,mode,phase)!=1)valid=false;
+ }
+ if(!valid){
+  pushInspectorEvent(a,"INCOMPLETE CALIBRATION: RUN prepare_meeting.sh");
+  return;
+ }
+ const PatchBenchRow* selected=nullptr;
+ for(const auto& row:a.patchResults){
+  if(row.phase!="calibration")continue;
+  if(!selected || row.meanStepMs<selected->meanStepMs)selected=&row;
+ }
+ if(!selected)return;
+ if(selected->frontier=="sap_rebuild"){
+  a.multi.setPolicy(ccp::research::Policy::RebuildSAP);
+  pushInspectorEvent(a,"CALIBRATION CHOSE SAP FALLBACK");
+ }else{
+  a.multi.setPolicy(ccp::research::Policy::RegionalCertified);
+  a.multi.setAdaptive(false);
+  a.multiAdaptive=false;
+  a.multiHierarchy=selected->frontier=="two_tier";
+  a.multi.setHierarchicalRegions(a.multiHierarchy);
+  a.multi.setPatchCellSpan(selected->span);
+  pushInspectorEvent(a,"CALIBRATION APPLIED PATCH "+
+     std::to_string(selected->span)+" "+selected->frontier);
+ }
+ a.historyCandidates.clear();
+ a.historyInterContacts.clear();
+ a.historyBroadMs.clear();
+}
 void fitScene(App&a,GLFWwindow*w){
  const auto& points=a.multiMode?a.multi.positions():a.sim.positions();
  V lo=points.front(),hi=lo;
@@ -204,6 +276,8 @@ void stepSimulation(App&a){
    std::ostringstream event;
    event<<"REGION DIRTY "<<m.dirtyRegions<<" BLOCKS "<<m.regionalPairRebuilds
         <<"/"<<m.regionalPairReuses<<" REJECTED "<<m.cachedPairsRejected;
+   event<<" FRONTIER "<<m.regionTopLevelOverlaps
+        <<" SKIPPED "<<m.regionPairsSkipped;
    pushInspectorEvent(a,event.str());
    std::ostringstream cost;
    cost<<"BROAD "<<number(m.broadMs,3)<<"ms PRECISE "
@@ -237,6 +311,7 @@ void key(GLFWwindow*w,int key,int,int action,int){
   a.historyCandidates.clear();a.historyInterContacts.clear();a.historyBroadMs.clear();
   a.paused=false;a.evidenceMode=false;a.inspectorScroll=0;
   pushInspectorEvent(a,a.multiMode?"DYNAMIC 3-SHEET SCENE":"SINGLE CLOTH BASELINE");
+  if(a.multiMode)a.multi.setHierarchicalRegions(a.multiHierarchy);
   fitScene(a,w);return;
  }
  if(a.multiMode){
@@ -257,6 +332,19 @@ void key(GLFWwindow*w,int key,int,int action,int){
    a.multiAdaptive=!a.multiAdaptive;
    a.multi.setAdaptive(a.multiAdaptive);
    pushInspectorEvent(a,a.multiAdaptive?"ADAPTIVE REGION BUDGET":"FIXED REGION BUDGET");
+  } else if(key==GLFW_KEY_J){
+   a.multiHierarchy=!a.multiHierarchy;
+   a.multi.setHierarchicalRegions(a.multiHierarchy);
+   pushInspectorEvent(a,a.multiHierarchy?"TWO-TIER REGION FRONTIER":"ALL-REGION-PAIRS ABLATION");
+  } else if(key==GLFW_KEY_Y){
+   loadEvidence(a);
+   applyCalibratedPatch(a);
+  } else if(key==GLFW_KEY_P){
+   const std::array<int,6> spans={1,2,3,4,6,12};
+   const auto it=std::find(spans.begin(),spans.end(),a.multi.patchCellSpan());
+   const std::size_t next=(std::size_t(it-spans.begin())+1)%spans.size();
+   a.multi.setPatchCellSpan(spans[next]);
+   pushInspectorEvent(a,"MESH PATCH SPAN "+std::to_string(spans[next]));
   } else if(key==GLFW_KEY_W)a.wire=!a.wire;
   else if(key==GLFW_KEY_F)fitScene(a,w);
   else if(key==GLFW_KEY_G){a.evidenceMode=!a.evidenceMode;a.inspectorScroll=0;loadEvidence(a);}
@@ -276,7 +364,7 @@ void scroll(GLFWwindow*w,double,double dy){
  // Mouse wheel over right inspector scrolls benchmark evidence; over the
  // 3D viewport it still zooms the camera.
  if(a.evidenceMode&&a.lastX>windowWidth-panelWidth) {
-  a.inspectorScroll=std::clamp(a.inspectorScroll-dy*65.0,0.0,950.0);
+  a.inspectorScroll=std::clamp(a.inspectorScroll-dy*65.0,0.0,1230.0);
  } else a.distance=std::clamp(a.distance-dy*.3,2.2,12.);
 }
 extern "C" unsigned char* ccpFontAtlas(int*,int*,float*);
@@ -314,7 +402,8 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  heading("LIVE DYNAMIC PHYSICS / NOT REPLAY",94);
  line("FRAME "+std::to_string(a.multi.frame())+" / "+
      std::to_string(a.multi.sheetCount())+" SHEETS",124,ink);
- line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount()),150);
+ line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount())+
+      " / PATCH "+std::to_string(a.multi.patchCellSpan()),150);
  line("CONTACT CORRECTIONS / 5 ITER "+std::to_string(m.contacts),176,teal,1.15);
  line("INTERSHEET CORRECTIONS "+std::to_string(m.interSheetContacts),202,teal);
  line("LAST-QUERY PAIRS "+std::to_string(m.pairs)+" / TESTS "+std::to_string(m.preciseTests),228,ink,1.15);
@@ -323,6 +412,8 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
  line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
  line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
+ line("PATCH FRONTIER "+std::to_string(m.regionTopLevelOverlaps)+
+      " / SKIPPED "+std::to_string(m.regionPairsSkipped),404,ink,1.18);
  line(m.oracleChecked?"EXHAUSTIVE AABB COVERAGE VERIFIED":"ORACLE NOT CHECKED",385,
       m.oracleChecked?teal:amber,1.26);
  heading("SCROLLABLE LIVE EVENT TRACE",427);
@@ -332,9 +423,11 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
  heading("MEASURED 1/2/3 CLOTH COMPARISON",774);
  line("SAME FORCES + PRECISE SOLVER",799,muted,1.18);
  line("BENCHMARKED ON THIS MACHINE",821,muted,1.20);
- const std::array<std::string,4> policies={
-  "sap_rebuild","global_guarded","region_fixed","region_adaptive"};
- const std::array<V,4> colors={amber,blue,{.53,.36,.69},teal};
+ const std::array<std::string,6> policies={
+  "sap_rebuild","global_guarded","region_fixed","region_adaptive",
+  "region_sweep_fixed","region_sweep_adaptive"};
+ const std::array<V,6> colors={
+  amber,blue,{.53,.36,.69},teal,{.17,.47,.69},{.14,.42,.34}};
  double maximum=0;
  for(const auto& row:a.multiResults)
   if(row.sheets==a.multi.sheetCount())maximum=std::max(maximum,row.stepMs);
@@ -353,27 +446,47 @@ void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,
   line("NO VERIFIED LOCAL MULTICLOTH CSV",869,red,1.22);
   line("RUN scripts/prepare_meeting.sh",896);
  }
- heading("PROPOSED ALGORITHM / AUDITABLE",1209);
- line("1  PARTITION STABLE MESH PATCHES",1239,ink,1.22);
- line("2  CERTIFY EACH REGION ENVELOPE",1264,ink,1.22);
- line("3  RECOMPUTE ONLY INCIDENT PAIRS",1289,ink,1.22);
- line("4  RECHECK CACHED PAIRS WITH",1314,ink,1.22);
- line("   CURRENT TIGHT AABBS",1336,ink,1.22);
- line("5  ADAPT LOCAL GUARD BY MOTION",1361,ink,1.22);
- line("   AND REJECTED-PAIR OVERHEAD",1384,ink,1.22);
- heading("RESEARCH NOVELTY IS UNPROVEN",1431);
- line("PRIOR BVH REGION AND TEMPORAL",1461,amber,1.18);
- line("UPDATE METHODS ALREADY EXIST",1484,amber,1.18);
- line("NEW TESTABLE CLAIM: BETTER",1514,teal,1.17);
- line("TOTAL CONTACT WORK + NO MISSES",1537,teal,1.17);
- line("NOT CCD / NOT IPC OR OGC",1568,red,1.18);
- heading("CONTACT DENSITY / TIME SERIES",1603);
- line("TEAL: INTER-SHEET / BLUE: CANDIDATES",1626,muted,1.08);
+ // This is an OFFLINE chosen static region size: calibration is earlier
+ // physics frames; evaluation consists of later frames. No online learning.
+ if(!a.patchResults.empty()){
+  auto winner=a.patchResults.end();
+  for(auto it=a.patchResults.begin();it!=a.patchResults.end();++it)
+   if(it->phase=="calibration" &&
+      (winner==a.patchResults.end() || it->meanStepMs<winner->meanStepMs))
+    winner=it;
+  if(winner!=a.patchResults.end()){
+   line("PATCH PROFILE (EARLY TRAIN)",1300,blue,1.34);
+   line("CHOSEN "+winner->frontier+" "+std::to_string(winner->span),1322,ink,1.13);
+   const auto evaluated=std::find_if(a.patchResults.begin(),a.patchResults.end(),
+     [&](const PatchBenchRow& e){
+      return e.phase=="evaluation" && e.span==winner->span &&
+             e.frontier==winner->frontier;
+     });
+   if(evaluated!=a.patchResults.end())
+    line("LATER EVAL STEP "+number(evaluated->meanStepMs,3)+" MS",1346,teal,1.25);
+  }
+ }
+ heading("PROPOSED ALGORITHM / AUDITABLE",1387);
+ line("1  PARTITION STABLE MESH PATCHES",1417,ink,1.22);
+ line("2  CERTIFY PATCH ENVELOPE",1442,ink,1.22);
+ line("3  SWEEP REGIONAL ENVELOPE PAIRS",1467,ink,1.22);
+ line("4  SELECTIVELY REBUILD BLOCKS",1492,ink,1.22);
+ line("5  REVALIDATE CURRENT TIGHT AABBS",1692,ink,1.22);
+ line("6  OPTIONAL LOCAL GUARD FEEDBACK",1539,ink,1.22);
+ line("   MOTION / CANDIDATE OVERHEAD",1562,ink,1.22);
+ heading("RESEARCH NOVELTY IS UNPROVEN",1609);
+ line("PRIOR BVH REGION AND TEMPORAL",1639,amber,1.18);
+ line("UPDATE METHODS ALREADY EXIST",1662,amber,1.18);
+ line("NEW TESTABLE CLAIM: BETTER",1692,teal,1.17);
+ line("TOTAL CONTACT WORK + NO MISSES",1715,teal,1.17);
+ line("NOT CCD / NOT IPC OR OGC",1746,red,1.18);
+ heading("CONTACT DENSITY / TIME SERIES",1781);
+ line("TEAL: INTER-SHEET / BLUE: CANDIDATES",1804,muted,1.08);
  if(a.historyCandidates.size()>1){
   const auto maxC=*std::max_element(a.historyCandidates.begin(),a.historyCandidates.end());
   const auto maxI=*std::max_element(a.historyInterContacts.begin(),a.historyInterContacts.end());
   const double width=std::max(10.0f,maxBar-4*scale);
-  const double base=1714.0*scale-scroll;
+  const double base=1892.0*scale-scroll;
   const double heightRange=68.0*scale;
   for(std::size_t i=1;i<a.historyCandidates.size();++i){
    const double ax=x+width*double(i-1)/double(a.historyCandidates.size()-1);
@@ -460,8 +573,13 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
  const auto selected=cases[std::clamp(a.evidenceScene,0,4)];
  line("SCENE: "+selected+"  /  H TO CHANGE",874,muted,1.22);
  line("ACTUAL BULLET DBVT / NOT A CLAIM OF BEST",897,purple,1.13);
- const std::array<std::string,7> methods={"exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic","guarded_sap","region_fixed","region_adaptive"};
- const std::array<V,7> colors={amber,blue,purple,{.24,.44,.68},teal,{.58,.31,.54},{.15,.42,.36}};
+ const std::array<std::string,9> methods={
+  "exhaustive_aabb","sweep_prune","bullet_dbvt","bullet_dbvt_dynamic",
+  "guarded_sap","region_fixed","region_adaptive",
+  "region_sweep_fixed","region_sweep_adaptive"};
+ const std::array<V,9> colors={
+  amber,blue,purple,{.24,.44,.68},teal,{.58,.31,.54},{.15,.42,.36},
+  {.14,.51,.72},{.12,.38,.30}};
  double maxMs=0;
  for(const auto& row:a.broadphaseResults)
   if(row.scene==selected)maxMs=std::max(maxMs,row.meanMs);
@@ -470,7 +588,7 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
    auto it=std::find_if(a.broadphaseResults.begin(),a.broadphaseResults.end(),
        [&](const EvidenceBar& row){return row.scene==selected&&row.algorithm==methods[i];});
    if(it!=a.broadphaseResults.end())
-    bar(methods[i],it->meanMs,maxMs,935+float(i)*45,colors[i]);
+    bar(methods[i],it->meanMs,maxMs,935+float(i)*38,colors[i]);
   }
   line("GUARD MAY EMIT EXTRA PRECISE PAIRS",1280,muted,1.11);
  } else {
@@ -510,7 +628,7 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
 int main(int argc,char**argv){try{
  const auto runtimeDir=std::filesystem::temp_directory_path()/"ccp-native-lab";std::filesystem::create_directories(runtimeDir);
  int captureSteps=-1;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string();bool closeCapture=false;App a;
- for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth")a.multiMode=true;else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
+ for(int i=1;i<argc;i++){std::string arg=argv[i];if(arg=="--multicloth"){a.multiMode=true;a.multi.setHierarchicalRegions(true);}else if(arg=="--paused")a.paused=true;else if(arg=="--baseline"){auto q=a.sim.queryRequest();q.updatePolicy=ccp::live::UpdatePolicy::RebuildEveryIteration;a.sim.setQueryRequest(q);}else if(arg=="--reference")a.sim.setBroadPhase(false);else if(arg=="--trace"&&i+1<argc)tracePath=argv[++i];else if(arg=="--capture-after"&&i+1<argc)captureSteps=std::stoi(argv[++i]);else if(arg=="--capture"&&i+1<argc)capturePath=argv[++i];else if(arg=="--exit-after-capture")closeCapture=true;else if(arg=="--stage"&&i+1<argc)a.stage=std::stoi(argv[++i]);else if(arg=="--cutaway")a.cutaway=true;}
  glfwSetErrorCallback([](int,const char*e){std::cerr<<"GLFW "<<e<<'\n';});if(!glfwInit())throw std::runtime_error("glfwInit failed");glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
 #ifdef __APPLE__
  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GL_TRUE);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
@@ -592,6 +710,10 @@ int main(int argc,char**argv){try{
    label("Q POLICY: "+policy,blue,1.5);
    label("L SHEETS / O BALLS / R RESET",blue,1.4);
    label(a.multiAdaptive?"Z: ADAPTIVE REGION BUDGET":"Z: FIXED REGION BUDGET",blue,1.28);
+   label(a.multiHierarchy?"J: TWO-TIER REGION SWEEP":"J: FLAT REGION-PAIR ABLATION",blue,1.22);
+   label("Y: APPLY MEASURED CALIBRATION",blue,1.18);
+   label("P: PATCH CELLS "+std::to_string(a.multi.patchCellSpan())+" x "+
+         std::to_string(a.multi.patchCellSpan()),blue,1.22);
    label("K SINGLE CLOTH / A PAIR AUDIT",blue,1.35);
    label("FRAME "+std::to_string(a.multi.frame()));
    label("CANDIDATES "+std::to_string(m.pairs),ink,1.6);
@@ -602,6 +724,7 @@ int main(int argc,char**argv){try{
    label("PAIR BLOCKS REUSED "+std::to_string(m.regionalPairReuses),ink,1.45);
    label("EXTRA GUARD PAIRS REJECTED "+std::to_string(m.cachedPairsRejected),ink,1.25);
    label("REGION BUDGET "+number(m.meanRegionBudget,4),muted,1.5);
+   label("PATCH PAIRS SKIPPED "+std::to_string(m.regionPairsSkipped),muted,1.35);
    label("PRECISE TESTS "+std::to_string(m.preciseTests),muted,1.5);
    gap();
    label("BROAD CPU "+number(m.broadMs)+" MS",muted,1.6);

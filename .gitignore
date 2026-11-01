@@ -24,3 +24,7 @@ output/native/cascade.svg
 output/native/multicloth-real.csv
 output/native/multicloth-real.svg
 docs/MULTICLOTH_RESULTS.md
+
+output/native/patch-sweep.csv
+output/native/patch-sweep.svg
+docs/PATCH_CALIBRATION.md
