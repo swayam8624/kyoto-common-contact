@@ -492,7 +492,8 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
  }
  return out;
 }
-void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
+void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
+                                 const std::vector<Bounds>& rawBounds){
  // Multiple triangle pairs share the SAME vertices. Without a per-vertex
  // projection budget, dozens of valid local corrections can push a single
  // particle several meters in ONE step, giving the next Verlet step huge
@@ -538,6 +539,20 @@ void MultiCloth::projectContacts(const std::vector<Pair>& pairs){
   Weighted result;result.ids={id,-1,-1};result.w={1,0,0};result.p=positions_[id];return result;
  };
  for(const auto pair:pairs){
+  // The global guarded SAP explicitly emits a SUPSET of pairs from old
+  // fat AABBs. Such pairs must not inject actual contact impulses after
+  // separating! Revalidate against the CURRENT padded primitive boxes
+  // before any feature-level response. Keep this cost in narrowMs, not in
+  // the guarded broad-phase lookup metric.
+  if(policy_==Policy::GlobalGuard){
+   const auto& a=rawBounds.at(static_cast<std::size_t>(pair.a));
+   const auto& b=rawBounds.at(static_cast<std::size_t>(pair.b));
+   ++metrics_.broadAabbTests;
+   if(a.max.x+kMargin<b.min.x||b.max.x+kMargin<a.min.x||
+      a.max.y+kMargin<b.min.y||b.max.y+kMargin<a.min.y||
+      a.max.z+kMargin<b.min.z||b.max.z+kMargin<a.min.z)
+    continue;
+  }
   ++metrics_.preciseTests;
   int ia=pair.a,ib=pair.b;
   const int triangles=static_cast<int>(triangles_.size());
@@ -719,7 +734,7 @@ void MultiCloth::step(){
   }
   const auto narrowStart=Clock::now();
   const auto beforeContact=positions_;
-  projectContacts(pairs);
+  projectContacts(pairs,bounds);
   for(std::size_t i=0;i<positions_.size();++i){
    if(inverseMasses_[i]<=0)continue;
    // Floor is a unilateral constraint: contact may have pushed the cloth
