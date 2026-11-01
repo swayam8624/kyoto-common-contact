@@ -57,6 +57,11 @@ void segment(std::vector<Vertex>&v,V a,V b,V color){vertex(v,a,{0,0,1},color);ve
 void box(std::vector<Vertex>&v,V lo,V hi,V color){std::array<V,8>p;for(int i=0;i<8;i++)p[i]={i&1?hi.x:lo.x,i&2?hi.y:lo.y,i&4?hi.z:lo.z};for(int i=0;i<8;i++)for(int k=0;k<3;k++)if(!(i&(1<<k)))segment(v,p[i],p[i|(1<<k)],color);}
 void sphere(std::vector<Vertex>&v,V center,double radius){const int rings=24,slices=40;auto p=[&](int j,int i){double th=M_PI*j/rings,ph=2*M_PI*i/slices;return V{std::sin(th)*std::cos(ph),std::sin(th)*std::sin(ph),std::cos(th)};};for(int j=0;j<rings;j++)for(int i=0;i<slices;i++){V a=p(j,i),b=p(j+1,i),c=p(j+1,i+1),d=p(j,i+1);for(V n:{a,b,c,a,c,d})vertex(v,add(center,mul(n,radius)),n,{.16,.21,.26});}}
 struct EvidenceBar { std::string scene,algorithm; double meanMs{},extraCandidates{}; };
+struct MultiBenchRow {
+ int sheets{};
+ std::string policy;
+ double broadMs{},preciseMs{},stepMs{},candidates{},interContacts{},rejected{},positionError{};
+};
 struct App {
  ccp::live::ClothSimulation sim;
  ccp::research::MultiCloth multi{3,2};
@@ -68,6 +73,7 @@ struct App {
  std::ofstream trace,events;
  std::vector<std::string> recentEvents;
  std::vector<EvidenceBar> broadphaseResults;
+ std::vector<MultiBenchRow> multiResults;
  double rebuildMean=std::numeric_limits<double>::quiet_NaN();
  double guardedMean=std::numeric_limits<double>::quiet_NaN();
  double rebuildBroad{},guardedBroad{},rebuildNarrow{},guardedNarrow{};
@@ -82,6 +88,25 @@ void pushInspectorEvent(App& a,const std::string& event) {
 void loadEvidence(App& a) {
  const std::filesystem::path base(CCP_OUTPUT_DIR);
  a.broadphaseResults.clear();
+ a.multiResults.clear();
+ {
+  std::ifstream input(base/"multicloth-real.csv");
+  std::string line;std::getline(input,line);
+  while(std::getline(input,line)){
+   std::stringstream ss(line);std::string field;std::vector<std::string> cells;
+   while(std::getline(ss,field,','))cells.push_back(field);
+   if(cells.size()<15)continue;
+   try{
+    MultiBenchRow m;
+    m.sheets=std::stoi(cells[0]);m.policy=cells[2];
+    m.broadMs=std::stod(cells[4]);m.preciseMs=std::stod(cells[5]);
+    m.stepMs=std::stod(cells[6]);m.candidates=std::stod(cells[7]);
+    m.interContacts=std::stod(cells[8]);m.rejected=std::stod(cells[12]);
+    m.positionError=std::stod(cells[14]);
+    if(m.positionError<1e-7)a.multiResults.push_back(m);
+   }catch(const std::exception&){}
+  }
+ }
  a.rebuildMean=a.guardedMean=std::numeric_limits<double>::quiet_NaN();
  {
   std::ifstream input(base/"broadphase-leaderboard.csv");
@@ -253,10 +278,103 @@ std::string number(double d,int precision=3){std::ostringstream s;s<<std::fixed<
 void uploadDraw(GLuint vao,GLuint buffer,const std::vector<Vertex>&v,GLenum type){glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,buffer);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(Vertex),v.data(),GL_DYNAMIC_DRAW);glDrawArrays(type,0,(GLsizei)v.size());}
 void capture(int w,int h,const std::string&path){std::vector<unsigned char> pixels(w*h*3);glPixelStorei(GL_PACK_ALIGNMENT,1);glReadBuffer(GL_BACK);glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());std::ofstream out(path,std::ios::binary);out<<"P6\n"<<w<<' '<<h<<"\n255\n";for(int y=h-1;y>=0;y--)out.write(reinterpret_cast<char*>(pixels.data()+y*w*3),w*3);std::cout<<"GPU_FRAMEBUFFER_CAPTURE "<<path<<'\n';}
 
+
+// All charts are generated exclusively from measured C++ CSVs. No fabricated
+// "research speedups" or animations are displayed in this evidence inspector.
+void drawMulticlothInspector(const App&a,float viewport,float panel,float scale,int width,int height,
+ GLuint vao,GLuint buffer,GLuint lines,GLuint fontProgram,GLuint fontTexture,const M& ui){
+ std::vector<Vertex> mesh;glyphVertices.clear();
+ const float x=viewport+14*scale,scroll=float(a.inspectorScroll*scale),maxBar=panel-28*scale;
+ const V ink{.12,.17,.23},muted{.37,.44,.52},blue{.13,.37,.68},teal{.05,.50,.41},amber{.72,.42,.13},red{.75,.22,.19};
+ rect(mesh,viewport,0,panel,height,{.969,.976,.987});
+ auto line=[&](std::string content,float y,V c=V{.3,.38,.47},float size=1.4){
+  if(content.size()>48)content.resize(48);
+  text(mesh,content,x,y*scale-scroll,size*scale,c);
+ };
+ auto heading=[&](std::string content,float y){
+  line(content,y,blue,1.75);
+ };
+ const auto& m=a.multi.metrics();
+ heading("EXPERIMENTAL REGIONAL BROAD PHASE",26);
+ line("K SINGLE CLOTH / L SHEETS / O BALLS",54,muted,1.20);
+ heading("LIVE DYNAMIC PHYSICS / NOT REPLAY",94);
+ line("FRAME "+std::to_string(a.multi.frame())+" / "+
+     std::to_string(a.multi.sheetCount())+" SHEETS",124,ink);
+ line("MOVING OBSTACLES "+std::to_string(a.multi.sphereCount()),150);
+ line("ACTIVE CONTACTS "+std::to_string(m.contacts),176,teal);
+ line("INTERSHEET CONTACTS "+std::to_string(m.interSheetContacts),202,teal);
+ line("QUERY PAIRS "+std::to_string(m.pairs)+" / PRECISE "+std::to_string(m.preciseTests),228);
+ line("REGIONS DIRTY "+std::to_string(m.dirtyRegions),254);
+ line("PAIR BLOCK BUILDS "+std::to_string(m.regionalPairRebuilds),280);
+ line("PAIR BLOCK REUSES "+std::to_string(m.regionalPairReuses),306);
+ line("GUARD EXTRAS REJECTED "+std::to_string(m.cachedPairsRejected),332);
+ line("MEAN GUARD BUDGET "+number(m.meanRegionBudget,4),358);
+ line(m.oracleChecked?"EXHAUSTIVE AABB COVERAGE VERIFIED":"ORACLE NOT CHECKED",385,
+      m.oracleChecked?teal:amber,1.26);
+ heading("SCROLLABLE LIVE EVENT TRACE",427);
+ const std::size_t count=std::min<std::size_t>(a.recentEvents.size(),12);
+ for(std::size_t j=0;j<count;++j)
+  line(a.recentEvents[a.recentEvents.size()-count+j],455+23*float(j),muted,1.18);
+ heading("MEASURED 1/2/3 CLOTH COMPARISON",774);
+ line("SAME FORCES + PRECISE SOLVER",799,muted,1.18);
+ line("BENCHMARKED ON THIS MACHINE",821,muted,1.20);
+ const std::array<std::string,4> policies={
+  "sap_rebuild","global_guarded","region_fixed","region_adaptive"};
+ const std::array<V,4> colors={amber,blue,{.53,.36,.69},teal};
+ double maximum=0;
+ for(const auto& row:a.multiResults)
+  if(row.sheets==a.multi.sheetCount())maximum=std::max(maximum,row.stepMs);
+ if(maximum>0){
+  for(std::size_t i=0;i<policies.size();++i){
+   auto it=std::find_if(a.multiResults.begin(),a.multiResults.end(),
+      [&](const MultiBenchRow& row){return row.sheets==a.multi.sheetCount()&&row.policy==policies[i];});
+   if(it==a.multiResults.end())continue;
+   const float y=861+float(i)*72;
+   line(it->policy+" "+number(it->stepMs,3)+"MS",y,ink,1.24);
+   const float bw=float(std::clamp(it->stepMs/maximum,0.0,1.0))*std::max(12.0f,maxBar);
+   rect(mesh,x,(y+19)*scale-scroll,bw,12*scale,colors[i]);
+   line("BROAD "+number(it->broadMs,3)+" PRECISE "+number(it->preciseMs,3),y+47,muted,1.12);
+  }
+ }else{
+  line("NO VERIFIED LOCAL MULTICLOTH CSV",869,red,1.22);
+  line("RUN scripts/prepare_meeting.sh",896);
+ }
+ heading("PROPOSED ALGORITHM / AUDITABLE",1209);
+ line("1  PARTITION STABLE MESH PATCHES",1239,ink,1.22);
+ line("2  CERTIFY EACH REGION ENVELOPE",1264,ink,1.22);
+ line("3  RECOMPUTE ONLY INCIDENT PAIRS",1289,ink,1.22);
+ line("4  RECHECK CACHED PAIRS WITH",1314,ink,1.22);
+ line("   CURRENT TIGHT AABBS",1336,ink,1.22);
+ line("5  ADAPT LOCAL GUARD BY MOTION",1361,ink,1.22);
+ line("   AND REJECTED-PAIR OVERHEAD",1384,ink,1.22);
+ heading("RESEARCH NOVELTY IS UNPROVEN",1431);
+ line("PRIOR BVH REGION AND TEMPORAL",1461,amber,1.18);
+ line("UPDATE METHODS ALREADY EXIST",1484,amber,1.18);
+ line("NEW TESTABLE CLAIM: BETTER",1514,teal,1.17);
+ line("TOTAL CONTACT WORK + NO MISSES",1537,teal,1.17);
+ line("NOT CCD / NOT IPC OR OGC",1568,red,1.18);
+ glEnable(GL_SCISSOR_TEST);glScissor((int)viewport,0,(int)panel,height);
+ glUseProgram(lines);
+ glUniformMatrix4fv(glGetUniformLocation(lines,"vp"),1,GL_FALSE,ui.a);
+ uploadDraw(vao,buffer,mesh,GL_TRIANGLES);
+ glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+ glUseProgram(fontProgram);
+ glUniformMatrix4fv(glGetUniformLocation(fontProgram,"vp"),1,GL_FALSE,ui.a);
+ glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,fontTexture);
+ glUniform1i(glGetUniformLocation(fontProgram,"atlas"),0);
+ uploadDraw(vao,buffer,glyphVertices,GL_TRIANGLES);
+ glDisable(GL_BLEND);glDisable(GL_SCISSOR_TEST);
+}
+
 // Evidence mode uses the same GPU framebuffer and glyph atlas as the native
 // viewer. It is a scrollable scientific pane, NOT a separate webpage.
 void drawEvidencePane(const App& a,float viewport,float panel,float scale,int width,int height,
                       GLuint vao,GLuint buffer,GLuint lines,GLuint fontProgram,GLuint fontTexture,const M& ui) {
+ if(a.multiMode){
+  drawMulticlothInspector(a,viewport,panel,scale,width,height,
+                          vao,buffer,lines,fontProgram,fontTexture,ui);
+  return;
+ }
  std::vector<Vertex> shapes;
  glyphVertices.clear();
  const float x=viewport+13*scale;
