@@ -126,7 +126,7 @@ echo "[KYOTO] comparing exact current-AABB pairs for six deformable material fam
 for n in "${SIZES[@]}"; do
   outfile="$RUN/csv/materials-n${n}.csv"
   echo "[KYOTO] material CPU comparison, target elements=$n, frames=$FRAMES"
-  "$BUILD/ccp_material_benchmark "$outfile" all "$n" "$FRAMES" 1234 "$AUDIT" "$VERBOSE" \
+  "$BUILD/ccp_material_benchmark" "$outfile" all "$n" "$FRAMES" 1234 "$AUDIT" "$VERBOSE" \
     2>&1 | tee "$RUN/logs/materials-n${n}.log"
 done
 CSVFILES=()
@@ -137,19 +137,19 @@ for regime in "${REGIMES[@]}"; do
     standard) extraN=1024; extraFrames=96;; stress) extraN=2048; extraFrames=180;; esac
   outfile="$RUN/csv/materials-${regime}-n${extraN}.csv"
   echo "[KYOTO] deformation stress regime=$regime n=$extraN"
-  "$BUILD/ccp_material_benchmark "$outfile" all "$extraN" "$extraFrames" 1234 "$AUDIT" "$VERBOSE" "$regime" \
+  "$BUILD/ccp_material_benchmark" "$outfile" all "$extraN" "$extraFrames" 1234 "$AUDIT" "$VERBOSE" "$regime" \
     2>&1 | tee "$RUN/logs/materials-${regime}.log"
   CSVFILES+=("$outfile")
 done
 python3 scripts/summarize_material_suite.py "${CSVFILES[@]}" \
   --output "$RUN/MATERIAL_RESULTS.md" > "$RUN/logs/material-summary.log"
 echo "[KYOTO] coupled cloth - original Online controller vs Global Guard / SAP"
-"$BUILD/ccp_multicloth_benchmark "$RUN/csv/coupled-2-obstacles.csv" "$CLOTH_FRAMES" 2 \
+"$BUILD/ccp_multicloth_benchmark" "$RUN/csv/coupled-2-obstacles.csv" "$CLOTH_FRAMES" 2 \
   2>&1 | tee "$RUN/logs/coupled-2-obstacles.log"
-"$BUILD/ccp_multicloth_benchmark "$RUN/csv/coupled-5-obstacles.csv" "$CLOTH_FRAMES" 5 \
+"$BUILD/ccp_multicloth_benchmark" "$RUN/csv/coupled-5-obstacles.csv" "$CLOTH_FRAMES" 5 \
   2>&1 | tee "$RUN/logs/coupled-5-obstacles.log"
 TRACE_FRAMES=$(( CLOTH_FRAMES < 60 ? 60 : CLOTH_FRAMES ))
-"$BUILD/ccp_online_trace "$RUN/csv/online-original-trace.csv" "$TRACE_FRAMES" \
+"$BUILD/ccp_online_trace" "$RUN/csv/online-original-trace.csv" "$TRACE_FRAMES" \
   2>&1 | tee "$RUN/logs/online-trace.log"
 echo "[KYOTO] exact material snapshots shared between CPU and Metal"
 case "$MODE" in
@@ -164,14 +164,14 @@ for mat in cloth sponge cushion soft_ball spring mixed; do
   snapshot="$RUN/snapshots/${mat}-${regime}.kmcb"
   cpu="$RUN/csv/actual-${mat}-${regime}-cpu.csv"
   echo "[KYOTO] serializing $mat Float32 AABB trajectories"
-  "$BUILD/ccp_material_export "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 "$regime" \
+  "$BUILD/ccp_material_export" "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 "$regime" \
     2>&1 | tee "$RUN/logs/export-${mat}-${regime}.log"
-  "$BUILD/ccp_material_replay "$snapshot" "$cpu" "$VERBOSE" \
+  "$BUILD/ccp_material_replay" "$snapshot" "$cpu" "$VERBOSE" \
     2>&1 | tee "$RUN/logs/replay-${mat}-${regime}-cpu.log"
-  if [ -x "$BUILD/ccp_scaling_metal ]; then
+  if [ -x "$BUILD/ccp_scaling_metal" ]; then
     for backend in sap region online; do
       gpu="$RUN/csv/actual-${mat}-${regime}-metal-${backend}.csv"
-      "$BUILD/ccp_scaling_metal --replay "$snapshot" "$gpu" "$backend" \
+      "$BUILD/ccp_scaling_metal" --replay "$snapshot" "$gpu" "$backend" \
         2>&1 | tee "$RUN/logs/replay-${mat}-${regime}-gpu-${backend}.log"
       python3 scripts/verify_material_cpu_gpu.py "$cpu" "$gpu" \
         --output "$RUN/verification/${mat}-${regime}-cpu-metal-${backend}.md" \
@@ -183,10 +183,10 @@ for mat in cloth sponge cushion soft_ball spring mixed; do
 done
 done
 echo "[KYOTO] cross-backend reference tests (synthetic GPU SAP/complete oracle controls)"
-if [ -x "$BUILD/ccp_scaling_metal ]; then
-  "$BUILD/ccp_scaling_metal "$RUN/csv/gpu-sap-hotspot.csv" 512 32 hotspot 1234 sap \
+if [ -x "$BUILD/ccp_scaling_metal" ]; then
+  "$BUILD/ccp_scaling_metal" "$RUN/csv/gpu-sap-hotspot.csv" 512 32 hotspot 1234 sap \
     2>&1 | tee "$RUN/logs/gpu-sap.log"
-  "$BUILD/ccp_scaling_metal "$RUN/csv/gpu-exhaustive-hotspot.csv" 512 32 hotspot 1234 exhaustive \
+  "$BUILD/ccp_scaling_metal" "$RUN/csv/gpu-exhaustive-hotspot.csv" 512 32 hotspot 1234 exhaustive \
     2>&1 | tee "$RUN/logs/gpu-exhaustive.log"
 else
   echo "Metal target unavailable. No GPU timing claim." | tee "$RUN/logs/gpu-unavailable.log"
