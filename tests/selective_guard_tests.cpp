@@ -53,6 +53,30 @@ int main(){
   insist(full>0,"no full rebuild path tested");
   insist(repair>0,"no localized guard repair path tested");
   insist(reuse>0,"no certified pair-cache reuse path tested");
+  // Force and verify the multithreaded local-repair path on a larger
+  // region family. Both serial and eight-worker output must equal SAP's
+  // exact current pair set on EVERY tested frame.
+  {
+   ccp::research::SelectiveGuard sequential(.025,.045,1);
+   ccp::research::SelectiveGuard parallel(.025,.045,8);
+   std::size_t parallelFrames=0;
+   for(int frame=0;frame<16;++frame){
+    std::vector<Bounds> scene;scene.reserve(2048);
+    for(int id=0;id<2048;++id){
+     const double x=(id%64)*.075+((id%37==0)?(frame%2?.18:-.18):0.);
+     const double y=(id/64)*.075;
+     scene.push_back({id,{x,y,0},{x+.082,y+.082,.08},1u,1u,true});
+    }
+    ccp::research::SelectiveGuard::Metrics a,b;
+    const auto serialResult=sequential.query(scene,a);
+    const auto threadedResult=parallel.query(scene,b);
+    const auto expected=truth(scene);
+    insist(serialResult==expected&&threadedResult==expected,
+           "multithreaded selective guard lost exact collision candidates");
+    if(b.parallelWorkers>1)++parallelFrames;
+   }
+   insist(parallelFrames>0,"parallel selective guard never used >1 CPU worker");
+  }
   // Inputs with invalid coordinates must be rejected prior to publishing a
   // cache certificate. Reusing the cache afterwards must remain safe.
   std::vector<Bounds> invalid={
