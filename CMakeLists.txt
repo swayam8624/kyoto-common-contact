@@ -37,6 +37,10 @@ add_library(ccp_multicloth src/research_multicloth.cpp src/online_partitioner.cp
 target_link_libraries(ccp_multicloth PUBLIC ccp_live)
 target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+# Heterogeneous, deformable mass-spring broad-phase research fixtures.
+add_executable(ccp_material_benchmark apps/material_suite_benchmark.cpp)
+target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
+target_compile_options(ccp_material_benchmark PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
 add_executable(ccp_online_trace apps/online_controller_trace.cpp)
@@ -94,6 +98,8 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME deformable_material_suite_oracle
+    COMMAND ccp_material_benchmark ${'${CMAKE_CURRENT_BINARY_DIR}'}/material-ci-smoke.csv all 48 4 1234 1 0)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
