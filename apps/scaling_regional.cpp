@@ -25,8 +25,8 @@ size_t positive(const char* raw,size_t max){
  return size_t(value);
 }
 // Stable object identities and coherent motion are critical to measuring
-// certificate reuse. Region assignment is recomputed from current geometry,
-// so no object silently retains an invalid spatial membership after motion.
+// certificate reuse. Two experiments are supported: stable cloth-like topology
+// and spatial reassignment, which must invalidate the affected certificates.
 std::vector<Primitive> scene(size_t n,unsigned seed,int frame,
                              const std::string& kind,float cellWidth){
  std::mt19937 rng(seed);std::uniform_real_distribution<float> random(-1.f,1.f);
@@ -76,8 +76,8 @@ std::vector<Pair> oracle(const std::vector<Primitive>& items,double margin){
 }
 int main(int argc,char** argv){
  try{
-  if(argc!=8)throw std::runtime_error(
-   "usage: ccp_scaling_regional OUTPUT.csv N FRAMES SCENE SEED CELL_WIDTH MODE[fixed|adaptive|hierarchical]");
+  if(argc!=8&&argc!=9)throw std::runtime_error(
+   "usage: ccp_scaling_regional OUTPUT.csv N FRAMES SCENE SEED CELL_WIDTH MODE[fixed|adaptive|hierarchical] [stable|spatial]");
   const size_t n=positive(argv[2],50000),frames=positive(argv[3],10000);
   const std::string kind=argv[4];
   const unsigned seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
@@ -86,15 +86,25 @@ int main(int argc,char** argv){
    throw std::runtime_error("invalid cell width");
   const std::string mode=argv[7];
   if(mode!="fixed"&&mode!="adaptive"&&mode!="hierarchical")throw std::runtime_error("invalid mode");
+  const std::string membership=argc==9?argv[8]:"stable";
+  if(membership!="stable"&&membership!="spatial")throw std::runtime_error("invalid membership policy");
+  const auto original=scene(n,seed,0,kind,cellWidth);
+  std::vector<int> stableRegions;stableRegions.reserve(n);
+  for(const auto& primitive:original)stableRegions.push_back(primitive.region);
   if(kind=="all_overlap"&&n>2048)throw std::runtime_error("all_overlap safety limit N=2048");
   std::filesystem::path file(argv[1]);
   if(!file.parent_path().empty())std::filesystem::create_directories(file.parent_path());
   std::ofstream csv(file);if(!csv)throw std::runtime_error("cannot write CSV");
-  csv<<"backend,scene,n,frame,seed,cell_width,ms,candidates,oracle_checked,misses,builds,reuses,top_level_tests,skipped_blocks\n";
+  csv<<"backend,scene,n,frame,seed,cell_width,membership,migrations,ms,candidates,oracle_checked,misses,builds,reuses,top_level_tests,skipped_blocks\n";
   csv<<std::fixed<<std::setprecision(8);
   RegionalCandidates service;constexpr double margin=.05;
   for(size_t frame=0;frame<frames;++frame){
    auto items=scene(n,seed,int(frame),kind,cellWidth);
+   size_t migrations=0;
+   for(size_t i=0;i<items.size();++i){
+    if(items[i].region!=stableRegions[i])++migrations;
+    if(membership=="stable")items[i].region=stableRegions[i];
+   }
    Metrics m;
    const auto start=Clock::now();
    const auto& pairs=service.query(items,margin,mode!="fixed",m,mode=="hierarchical");
@@ -106,7 +116,7 @@ int main(int argc,char** argv){
      throw std::runtime_error("certified region query omitted required AABB pair");
    }
    csv<<"cpu_region_"<<mode<<','<<kind<<','<<n<<','<<frame<<','<<seed<<','
-      <<cellWidth<<','<<elapsed<<','<<pairs.size()<<','<<(checked?1:0)
+      <<cellWidth<<','<<membership<<','<<migrations<<','<<elapsed<<','<<pairs.size()<<','<<(checked?1:0)
       <<",0,"<<m.regionalPairRebuilds<<','<<m.regionalPairReuses<<','
       <<m.regionTopLevelTests<<','<<m.regionPairsSkipped<<'\n';
   }
