@@ -71,8 +71,27 @@ target_compile_options(common_bounds_demo PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(mesh_bounds_query apps/mesh_bounds_query.cpp)
 target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
+
+# Standalone deterministic CPU scaling reference. This is intentionally
+# distinct from the coupled deformable simulation and the adaptive controller.
+find_package(Threads REQUIRED)
+add_executable(ccp_scaling_cpu apps/scaling_cpu.cpp)
+target_link_libraries(ccp_scaling_cpu PRIVATE Threads::Threads)
+target_compile_options(ccp_scaling_cpu PRIVATE -Wall -Wextra -Wpedantic)
+
+# Native Apple GPU reference uses actual Metal compute, not simulated GPU data.
+# Its exhaustive kernel is a correctness/performance control, not an optimized
+# counterpart to the adaptive CPU approach.
+if(APPLE)
+  enable_language(OBJCXX)
+  add_executable(ccp_scaling_metal apps/scaling_metal.mm)
+  target_link_libraries(ccp_scaling_metal PRIVATE "-framework Foundation" "-framework Metal")
+  target_compile_options(ccp_scaling_metal PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
     add_test(NAME evidence_csv_contracts
