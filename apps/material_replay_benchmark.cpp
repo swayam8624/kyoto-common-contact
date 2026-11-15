@@ -4,6 +4,7 @@
 // All methods materialize full current sorted pair sets; every frame is
 // compared against independently executed SAP and sampled brute-force oracle.
 #include "ccp/generic_online.hpp"
+#include "ccp/learned_online.hpp"
 #include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <array>
@@ -15,6 +16,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -150,7 +152,7 @@ public:
  }
 };
 #endif
-enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online
+enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -164,6 +166,7 @@ const char* name(Kind kind){
  case Kind::Adaptive:return "region_adaptive";
  case Kind::Hierarchy:return "region_hierarchical";
  case Kind::Online:return "online_cost_aware";
+ case Kind::Learned:return "ml_cost_aware";
 #ifdef CCP_HAVE_BULLET
  case Kind::Bullet:return "bullet_dbvt_persistent";
 #endif
@@ -175,6 +178,9 @@ struct Observation {
  double ms{};
  size_t builds{},reuses{},repairs{},aabbTests{},workers{1};
  int span{64};bool usedGlobal{};
+ ccp::learned::Features features{};
+ std::string selected{"none"};
+ bool switched{};
 };
 class Method {
  Kind kind_;
@@ -182,15 +188,34 @@ class Method {
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
  ccp::bench::GenericOnline online_{0};
+ std::unique_ptr<ccp::bench::LearnedOnline> learned_;
+ ccp::learned::Extractor features_;
 #ifdef CCP_HAVE_BULLET
  PersistentBullet bullet_;
 #endif
 public:
- explicit Method(Kind kind):kind_(kind){}
+ explicit Method(Kind kind,const std::string& model=""):kind_(kind){
+  if(kind==Kind::Learned){
+   if(model.empty())throw std::invalid_argument("ML model required for learned method");
+   learned_=std::make_unique<ccp::bench::LearnedOnline>(model,0.);
+  }
+ }
  Observation run(const std::vector<Bounds>& boxes){
   Observation r;
+  const auto fullStart=Clock::now();
+  r.features=features_.describe(boxes);
+  // Existing teacher timings EXCLUDE feature collection. Only learned
+  // selector wall time INCLUDES it and network inference.
   const auto start=Clock::now();
-  if(kind_==Kind::Sap)
+  if(kind_==Kind::Learned){
+   const auto result=learned_->query(primitives(boxes));
+   r.pairs=result.pairs;r.span=result.span;r.usedGlobal=result.usedGlobal;
+   r.builds=result.builds+result.guardBuilds;
+   r.reuses=result.reuses+result.guardReuses;
+   r.repairs=result.selectiveRepairs;r.aabbTests=result.aabbTests;
+   r.workers=result.workers;r.selected=result.learnedAction;
+   r.switched=result.switched;
+  }else if(kind_==Kind::Sap)
    r.pairs=ccp::live::candidates(boxes,true);
 #ifdef CCP_HAVE_BULLET
   else if(kind_==Kind::Bullet)r.pairs=bullet_.query(boxes);
@@ -224,11 +249,16 @@ public:
     r.aabbTests=m.broadAabbTests;
    }
   }
-  r.ms=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
+  const auto backendEnd=Clock::now();
+  features_.observe(boxes,r.pairs.size());
+  r.ms=std::chrono::duration<double,std::milli>(
+   (kind_==Kind::Learned?Clock::now():backendEnd)-
+   (kind_==Kind::Learned?fullStart:start)).count();
   return r;
  }
 };
-void run(const std::string& filename,const std::string& output,int verbose){
+void run(const std::string& filename,const std::string& output,int verbose,
+         const std::string& model){
  MaterialReplay header(filename);
  if(std::filesystem::exists(output))throw std::runtime_error("refusing to overwrite CPU replay results");
  std::filesystem::path file(output);
@@ -236,7 +266,9 @@ void run(const std::string& filename,const std::string& output,int verbose){
  std::ofstream csv(output);
  if(!csv)throw std::runtime_error("cannot create replay CSV");
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
-       "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path\n";
+       "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,chosen_backend,ml_switched";
+ for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
+ csv<<'\n';
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
@@ -245,9 +277,10 @@ void run(const std::string& filename,const std::string& output,int verbose){
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
 #endif
+ if(!model.empty())methods.push_back(Kind::Learned);
  for(Kind method:methods){
   MaterialReplay stream(filename);
-  Method algorithm(method);
+  Method algorithm(method,model);
   double sum=0;
   for(uint32_t frame=0;frame<header.frames;++frame){
    const auto boxes=stream.next();
@@ -271,7 +304,10 @@ void run(const std::string& filename,const std::string& output,int verbose){
       <<observed.ms<<','<<observed.pairs.size()<<','<<hash<<','<<(audited?1:0)
       <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
       <<observed.aabbTests<<','<<observed.workers<<','<<observed.span<<','
-      <<(observed.usedGlobal?"localguard":"region")<<'\n';
+      <<(observed.usedGlobal?"localguard":"region")<<','
+      <<observed.selected<<','<<(observed.switched?1:0);
+   for(double f:observed.features)csv<<','<<f;
+   csv<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
     std::cerr<<"[REPLAY] method="<<name(method)<<" frame="<<frame+1<<'/'
       <<header.frames<<" ms="<<observed.ms<<" pairs="<<observed.pairs.size()
@@ -288,11 +324,11 @@ void run(const std::string& filename,const std::string& output,int verbose){
 }
 int main(int argc,char** argv){
  try{
-  if(argc<3||argc>4)
-   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1]");
+  if(argc<3||argc>5)
+   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt]");
   int verbose=argc==4?std::stoi(argv[3]):1;
   if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
-  run(argv[1],argv[2],verbose);
+  run(argv[1],argv[2],verbose,argc==5?argv[4]:"");
  }catch(const std::exception& e){
   std::cerr<<"MATERIAL CPU REPLAY FAILED: "<<e.what()<<'\n';return 1;
  }
