@@ -59,3 +59,12 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 **Next experimental decision:** add an event-triggered/low-cost bypass for scenes where neural inference cannot plausibly amortize; independently measure model overhead; expand training to materially larger and more diverse deformation regimes; use **new untouched test seeds** for all changes motivated by seed 101 results. Compare on actual complete `MultiCloth` physical trajectories before integrating learned selection as a default research policy. A losing model must remain preserved, not silently replaced.
 
+
+## 2026-11-16 — Strict second holdout regression exposed malformed telemetry CSV
+
+**CI failure:** [Kyoto scaling workflow 43753335669](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43753335669) passed native compilation but the learned C++ regression failed with Python `KeyError: 'ml_bypassed'`. Cause: while adding five ML telemetry columns to each CSV row, the header was not updated to include the matching columns. This was a schema error, not a geometry/collision failure.
+
+**Repair:** Explicitly align the header with `ml_bypassed,ml_feature_ms,ml_inference_ms,ml_decision_ms,ml_backend_ms`, and strengthen the C++ regression and PyTorch loader to reject extra/unnamed CSV cells rather than training on shifted feature indices. The failed branch revision and workflow are retained for audit. **No second-run performance values** are reported from this failed revision.
+
+**Holdout integrity:** After inspecting the initial seed-101 loss, a model-bypass path for small primitive counts was introduced. Any apparent performance improvement on seed 101 is therefore **test-contaminated** and may not count as validation. The new workflow intentionally uses independent seeds 607–1301 and tests both 128 and 512 requested elements; the ML engine must execute above the 384-AABB bypass cutoff. The bypass action is explicitly counted, not misreported as neural inference.
+
