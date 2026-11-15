@@ -18,6 +18,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef CCP_HAVE_BULLET
+#include <btBulletCollisionCommon.h>
+#include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
+#endif
 namespace {
 using namespace ccp::research;
 using Clock=std::chrono::steady_clock;
@@ -88,7 +92,69 @@ void requireSortedUnique(const Pairs& pairs,size_t count){
   if(i && !(pairs[i-1]<p))throw std::runtime_error("non-unique or unsorted replay pairs");
  }
 }
-enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online};
+#ifdef CCP_HAVE_BULLET
+// External published-family baseline: upstream Bullet persistent DBVT.
+// Update the same proxies each frame, never rebuild the tree from scratch.
+class PersistentBullet {
+ btDefaultCollisionConfiguration config_;
+ btCollisionDispatcher dispatcher_{&config_};
+ btDbvtBroadphase broadphase_;
+ std::vector<Bounds> stored_;
+ std::vector<btBroadphaseProxy*> proxies_;
+public:
+ ~PersistentBullet(){
+  for(auto* p:proxies_)broadphase_.destroyProxy(p,&dispatcher_);
+ }
+ Pairs query(const std::vector<Bounds>& boxes){
+  if(proxies_.empty()){
+   stored_=boxes;
+   proxies_.reserve(stored_.size());
+   for(auto& b:stored_){
+    auto* proxy=broadphase_.createProxy(
+     btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
+     btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
+     BOX_SHAPE_PROXYTYPE,static_cast<void*>(&b),1,1,&dispatcher_);
+    if(!proxy)throw std::runtime_error("Bullet failed to construct DBVT proxy");
+    proxies_.push_back(proxy);
+   }
+  }else{
+   if(boxes.size()!=stored_.size())
+    throw std::runtime_error("Bullet material topology changed");
+   for(size_t i=0;i<boxes.size();++i){
+    if(boxes[i].id!=stored_[i].id)
+     throw std::runtime_error("Bullet material stable-ID mismatch");
+    stored_[i]=boxes[i];
+    const auto& b=stored_[i];
+    broadphase_.setAabbForceUpdate(
+     proxies_[i],btVector3(btScalar(b.min.x),btScalar(b.min.y),btScalar(b.min.z)),
+     btVector3(btScalar(b.max.x),btScalar(b.max.y),btScalar(b.max.z)),
+     &dispatcher_);
+   }
+  }
+  broadphase_.calculateOverlappingPairs(&dispatcher_);
+  Pairs result;
+  const auto& cached=broadphase_.getOverlappingPairCache()->getOverlappingPairArray();
+  result.reserve(size_t(cached.size()));
+  for(int i=0;i<cached.size();++i){
+   const auto* pa=cached[i].m_pProxy0,*pb=cached[i].m_pProxy1;
+   if(!pa||!pb||!pa->m_clientObject||!pb->m_clientObject)
+    throw std::runtime_error("invalid Bullet pair");
+   const auto& a=*static_cast<const Bounds*>(pa->m_clientObject);
+   const auto& b=*static_cast<const Bounds*>(pb->m_clientObject);
+   if(!overlap(a,b))continue;
+   result.push_back({std::min(a.id,b.id),std::max(a.id,b.id)});
+  }
+  std::sort(result.begin(),result.end());
+  result.erase(std::unique(result.begin(),result.end()),result.end());
+  return result;
+ }
+};
+#endif
+enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online
+#ifdef CCP_HAVE_BULLET
+,Bullet
+#endif
+};
 const char* name(Kind kind){
  switch(kind){
  case Kind::Sap:return "sap_rebuild";
@@ -98,6 +164,9 @@ const char* name(Kind kind){
  case Kind::Adaptive:return "region_adaptive";
  case Kind::Hierarchy:return "region_hierarchical";
  case Kind::Online:return "online_cost_aware";
+#ifdef CCP_HAVE_BULLET
+ case Kind::Bullet:return "bullet_dbvt_persistent";
+#endif
  }
  return "invalid";
 }
@@ -113,6 +182,9 @@ class Method {
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
  ccp::bench::GenericOnline online_{0};
+#ifdef CCP_HAVE_BULLET
+ PersistentBullet bullet_;
+#endif
 public:
  explicit Method(Kind kind):kind_(kind){}
  Observation run(const std::vector<Bounds>& boxes){
@@ -120,6 +192,9 @@ public:
   const auto start=Clock::now();
   if(kind_==Kind::Sap)
    r.pairs=ccp::live::candidates(boxes,true);
+#ifdef CCP_HAVE_BULLET
+  else if(kind_==Kind::Bullet)r.pairs=bullet_.query(boxes);
+#endif
   else if(kind_==Kind::Global){
    ccp::live::QueryMetrics m;
    const auto& cached=global_.query(boxes,{0,.045,ccp::live::UpdatePolicy::GuardedReuse},true,m);
@@ -163,8 +238,12 @@ void run(const std::string& filename,const std::string& output,int verbose){
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
- for(Kind method:{Kind::Sap,Kind::Global,Kind::Selective,Kind::Fixed,Kind::Adaptive,
-                  Kind::Hierarchy,Kind::Online}){
+ std::vector<Kind> methods={Kind::Sap,Kind::Global,Kind::Selective,
+  Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online};
+#ifdef CCP_HAVE_BULLET
+ methods.push_back(Kind::Bullet);
+#endif
+ for(Kind method:methods){
   MaterialReplay stream(filename);
   Method algorithm(method);
   double sum=0;
@@ -201,7 +280,7 @@ void run(const std::string& filename,const std::string& output,int verbose){
    <<" frames="<<header.frames<<" n="<<header.n<<"\n";
  }
  if(!csv)throw std::runtime_error("failed to write replay CSV");
- std::cout<<"[PASS] exact pair hashes matched across all seven CPU policies for "
+ std::cout<<"[PASS] exact pair hashes matched across "<<methods.size()<<" CPU policies for "
    <<header.frames<<" frames: "<<output<<"\n";
 }
 }
