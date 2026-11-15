@@ -23,7 +23,7 @@ inline std::vector<Bounds> rawBounds(const std::vector<Primitive>& items){
 struct Result {
  double queryMs{};
  std::vector<Pair> pairs;
- std::size_t builds{},reuses{},dirty{},guardBuilds{},guardReuses{},selectiveRepairs{},aabbTests{};
+ std::size_t builds{},reuses{},dirty{},guardBuilds{},guardReuses{},selectiveRepairs{},aabbTests{},workers{1};
  int span{64};
  bool usedGlobal{};
  bool changedSpan{};
@@ -77,6 +77,7 @@ public:
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
    r.guardBuilds=m.fullBuilds;r.guardReuses=m.cacheReuses;
    r.selectiveRepairs=m.partialRepairs;r.aabbTests=m.pairChecks;
+   r.workers=m.parallelWorkers;
 
   }else{
    std::vector<Primitive> reindexed=input;
