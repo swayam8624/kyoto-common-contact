@@ -180,7 +180,7 @@ struct Observation {
  int span{64};bool usedGlobal{};
  ccp::learned::Features features{};
  std::string selected{"none"};
- bool switched{};
+ bool switched{},bypassed{};
 };
 class Method {
  Kind kind_;
@@ -214,7 +214,7 @@ public:
    r.reuses=result.reuses+result.guardReuses;
    r.repairs=result.selectiveRepairs;r.aabbTests=result.aabbTests;
    r.workers=result.workers;r.selected=result.learnedAction;
-   r.switched=result.switched;
+   r.switched=result.switched;r.bypassed=result.learnedBypassed;
    r.mlFeatureMs=result.mlFeatureMs;r.mlInferenceMs=result.mlInferenceMs;
    r.mlDecisionMs=result.mlDecisionMs;r.mlBackendMs=result.mlBackendMs;
   }else if(kind_==Kind::Sap)
@@ -305,7 +305,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
       <<observed.aabbTests<<','<<observed.workers<<','<<observed.span<<','
       <<(observed.usedGlobal?"localguard":"region")<<','
-      <<observed.selected<<','<<(observed.switched?1:0)<<','
+      <<observed.selected<<','<<(observed.switched?1:0)<<','<<(observed.bypassed?1:0)<<','
       <<observed.mlFeatureMs<<','<<observed.mlInferenceMs<<','
       <<observed.mlDecisionMs<<','<<observed.mlBackendMs;
    for(double f:observed.features)csv<<','<<f;
