@@ -51,7 +51,8 @@ for n in "${SIZES[@]}"; do
   ./build/ccp_material_benchmark "$outfile" all "$n" "$FRAMES" 1234 "$AUDIT" 1 \
     2>&1 | tee "$RUN/logs/materials-n${n}.log"
 done
-mapfile -t CSVFILES < <(find "$RUN/csv" -maxdepth 1 -name 'materials-n*.csv' | sort)
+CSVFILES=()
+for n in "${SIZES[@]}"; do CSVFILES+=("$RUN/csv/materials-n${n}.csv"); done
 python3 scripts/summarize_material_suite.py "${CSVFILES[@]}" \
   --output "$RUN/MATERIAL_RESULTS.md" > "$RUN/logs/material-summary.log"
 echo "[KYOTO] coupled cloth - original Online controller vs Global Guard / SAP"
