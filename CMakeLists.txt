@@ -124,6 +124,11 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME learned_cpp_model_and_exact_pair_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_learned_cxx.py
+        $<TARGET_FILE:ccp_material_export>
+        $<TARGET_FILE:ccp_material_replay>)
     add_test(NAME evidence_csv_contracts
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_evidence_summarizers.py)
   endif()
