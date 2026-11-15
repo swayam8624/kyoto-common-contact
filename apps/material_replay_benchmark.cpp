@@ -175,7 +175,7 @@ const char* name(Kind kind){
 }
 struct Observation {
  Pairs pairs;
- double ms{};
+ double ms{},mlFeatureMs{},mlInferenceMs{},mlDecisionMs{},mlBackendMs{};
  size_t builds{},reuses{},repairs{},aabbTests{},workers{1};
  int span{64};bool usedGlobal{};
  ccp::learned::Features features{};
@@ -215,6 +215,8 @@ public:
    r.repairs=result.selectiveRepairs;r.aabbTests=result.aabbTests;
    r.workers=result.workers;r.selected=result.learnedAction;
    r.switched=result.switched;
+   r.mlFeatureMs=result.mlFeatureMs;r.mlInferenceMs=result.mlInferenceMs;
+   r.mlDecisionMs=result.mlDecisionMs;r.mlBackendMs=result.mlBackendMs;
   }else if(kind_==Kind::Sap)
    r.pairs=ccp::live::candidates(boxes,true);
 #ifdef CCP_HAVE_BULLET
@@ -303,7 +305,9 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
       <<observed.aabbTests<<','<<observed.workers<<','<<observed.span<<','
       <<(observed.usedGlobal?"localguard":"region")<<','
-      <<observed.selected<<','<<(observed.switched?1:0);
+      <<observed.selected<<','<<(observed.switched?1:0)<<','
+      <<observed.mlFeatureMs<<','<<observed.mlInferenceMs<<','
+      <<observed.mlDecisionMs<<','<<observed.mlBackendMs;
    for(double f:observed.features)csv<<','<<f;
    csv<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
