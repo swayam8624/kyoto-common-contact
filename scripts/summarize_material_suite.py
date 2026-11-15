@@ -27,7 +27,7 @@ def report(csvfile):
         policy = r["policy"]
         if policy not in POLICIES:
             raise RuntimeError(f"Unexpected method: {policy}")
-        key = (material, int(r["requested_elements"]), int(r["seed"]))
+        key = (material, r.get("regime","baseline"), int(r["requested_elements"]), int(r["seed"]))
         by_group[key,policy].append(r)
         all_frames[key].add(int(r["frame"]))
         if int(r["oracle_checked"]) and (int(r["misses"]) or int(r["extras"])):
@@ -44,12 +44,12 @@ def report(csvfile):
         "First four frames excluded from timing summary where possible. "
         "Values are descriptive, not confidence intervals.",
         "",
-        "| Material | Budget | Actual AABBs | Policy | Median ms | P95 ms | "
+        "| Material | Regime | Budget | Actual AABBs | Policy | Median ms | P95 ms | "
         "Speedup vs Global Guard | Audits | Builds | Local repairs |",
-        "|---|---:|---:|---|---:|---:|---:|---:|---:|---:|",
+        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|",
     ]
     for key in sorted(all_frames):
-        material,budget,seed = key
+        material,regime,budget,seed = key
         expected = all_frames[key]
         observed = {p for k,p in by_group if k==key}
         if observed != POLICIES:
@@ -73,7 +73,7 @@ def report(csvfile):
             repairs = sum(int(r["selective_repairs"]) for r in records)
             speedup = baseline/median(durations) if median(durations)>0 else float("inf")
             output.append(
-                f"| {material} | {budget} | {actual} | {policy} | "
+                f"| {material} | {regime} | {budget} | {actual} | {policy} | "
                 f"{median(durations):.5f} | {percentile(durations,.95):.5f} | "
                 f"{speedup:.2f}x | {audits}/{len(records)} | {builds} | {repairs} |"
             )
