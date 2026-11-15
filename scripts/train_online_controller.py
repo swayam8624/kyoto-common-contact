@@ -84,6 +84,8 @@ def load(paths):
             rows=list(reader)
         by_frame={}
         for row in rows:
+            if None in row or any(v is None for v in row.values()):
+                raise ValueError(f"Malformed teacher CSV header/field count: {path}")
             name=row["backend"]
             if name not in POLICIES:continue
             frame=int(row["frame"])
