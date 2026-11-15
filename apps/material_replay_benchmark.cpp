@@ -266,7 +266,9 @@ void run(const std::string& filename,const std::string& output,int verbose,
  std::ofstream csv(output);
  if(!csv)throw std::runtime_error("cannot create replay CSV");
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
-       "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,chosen_backend,ml_switched";
+       "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,"
+       "chosen_backend,ml_switched,ml_bypassed,ml_feature_ms,ml_inference_ms,"
+       "ml_decision_ms,ml_backend_ms";
  for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
  csv<<'\n';
  csv<<std::fixed<<std::setprecision(9);
