@@ -5,6 +5,7 @@
 // Distinct physical parameters are exploratory mass-spring fixtures, not FEM.
 // No GPU timing claims are made by this executable.
 #include "ccp/material_scenes.hpp"
+#include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -56,11 +57,12 @@ void validatePairVector(const std::vector<Pair>& pairs,size_t n){
   if(i>0&&!(pairs[i-1]<p))throw std::runtime_error("unsorted or duplicate candidate pair");
  }
 }
-enum class Policy {SAP,Guard,RegionFixed,RegionAdaptive,RegionHierarchy,Online};
+enum class Policy {SAP,Guard,SelectiveGuard,RegionFixed,RegionAdaptive,RegionHierarchy,Online};
 const char* name(Policy p){
  switch(p){
  case Policy::SAP:return "sap_rebuild";
  case Policy::Guard:return "global_guarded_exact";
+ case Policy::SelectiveGuard:return "selective_guard_exact";
  case Policy::RegionFixed:return "region_fixed";
  case Policy::RegionAdaptive:return "region_adaptive";
  case Policy::RegionHierarchy:return "region_hierarchical";
@@ -71,7 +73,7 @@ const char* name(Policy p){
 struct Result {
  double queryMs{};
  std::vector<Pair> pairs;
- std::size_t builds{},reuses{},dirty{},guardBuilds{},guardReuses{},aabbTests{};
+ std::size_t builds{},reuses{},dirty{},guardBuilds{},guardReuses{},selectiveRepairs{},aabbTests{};
  int span{64};
  bool usedGlobal{};
  bool changedSpan{};
@@ -85,7 +87,7 @@ struct Result {
 // the original MultiCloth::OnlineContactAware physical solver controller.
 class GenericOnline {
  RegionalCandidates regions_;
- ccp::live::BroadPhaseService guard_;
+ ccp::research::SelectiveGuard guard_;
  int span_{64},frame_{},lastEdit_{-1000},lastModeSwitch_{-1000};
  bool global_{false};
  double regionEwma_{0},globalEwma_{0};
@@ -114,12 +116,13 @@ public:
   r.usedGlobal=global_;r.span=span_;
   if(global_){
    const auto raw=rawBounds(input);
-   ccp::live::QueryMetrics m;
+   ccp::research::SelectiveGuard::Metrics m;
    const auto start=Clock::now();
-   const auto& list=guard_.query(raw,{margin,.045,ccp::live::UpdatePolicy::GuardedReuse},true,m);
-   r.pairs=exactGuard(list,padded(raw,margin));
+   const auto& list=guard_.query(raw,m);
+   r.pairs.assign(list.begin(),list.end());
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
-   r.guardBuilds=m.builds;r.guardReuses=m.reuses;
+   r.guardBuilds=m.fullBuilds;r.guardReuses=m.cacheReuses;
+   r.selectiveRepairs=m.partialRepairs;r.aabbTests=m.pairChecks;
    globalEwma_=globalObservations_?globalEwma_*.85+r.queryMs*.15:r.queryMs;
    ++globalObservations_;
   }else{
@@ -159,6 +162,7 @@ class BenchmarkPolicy {
  Policy policy_;
  RegionalCandidates regions_;
  ccp::live::BroadPhaseService guard_;
+ ccp::research::SelectiveGuard selective_;
  GenericOnline online_;
  static constexpr double margin=.025;
 public:
@@ -171,6 +175,16 @@ public:
    const auto begin=Clock::now();
    r.pairs=ccp::live::candidates(bounds,true);
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
+  }else if(policy_==Policy::SelectiveGuard){
+   auto bounds=rawBounds(input);
+   ccp::research::SelectiveGuard::Metrics m;
+   const auto begin=Clock::now();
+   const auto& pairs=selective_.query(bounds,m);
+   r.pairs.assign(pairs.begin(),pairs.end());
+   r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
+   r.guardBuilds=m.fullBuilds;r.guardReuses=m.cacheReuses;
+   r.selectiveRepairs=m.partialRepairs;r.dirty=m.dirtyObjects;
+   r.aabbTests=m.pairChecks;
   }else if(policy_==Policy::Guard){
    auto bounds=rawBounds(input);
    ccp::live::QueryMetrics m;
@@ -204,7 +218,7 @@ void run(const std::string& material,int requested,int frames,unsigned seed,
          int auditEvery,int verbose,std::ofstream& csv){
  // All competing policies restart from identical deterministic initial states
  // with the same random seed and evolve independent, equal-time trajectories.
- for(Policy policy:{Policy::SAP,Policy::Guard,Policy::RegionFixed,
+ for(Policy policy:{Policy::SAP,Policy::Guard,Policy::SelectiveGuard,Policy::RegionFixed,
                     Policy::RegionAdaptive,Policy::RegionHierarchy,Policy::Online}){
   World world(material,requested,seed);
   BenchmarkPolicy method(policy);
@@ -242,7 +256,7 @@ void run(const std::string& material,int requested,int frames,unsigned seed,
       <<output.pairs.size()<<','<<(audit?1:0)<<','<<reference<<','
       <<misses<<','<<extras<<','<<output.builds<<','<<output.reuses<<','
       <<output.dirty<<','<<output.guardBuilds<<','<<output.guardReuses<<','
-      <<output.aabbTests<<','<<output.span<<','<<(output.usedGlobal?"global":"regional")
+      <<output.aabbTests<<','<<output.selectiveRepairs<<','<<output.span<<','<<(output.usedGlobal?"global":"regional")
       <<','<<(output.changedSpan?1:0)<<','<<(output.switched?1:0)<<'\n';
    if(!csv)throw std::runtime_error("CSV output error");
    sum+=output.queryMs;maxPairs=std::max(maxPairs,output.pairs.size());
@@ -253,6 +267,7 @@ void run(const std::string& material,int requested,int frames,unsigned seed,
      <<" "<<frame+1<<"/"<<frames<<" query_ms="<<output.queryMs
      <<" candidates="<<output.pairs.size()<<" audit="<<(audit?"PASS":"skip")
      <<" region_span="<<output.span<<" path="<<(output.usedGlobal?"guard":"region")
+     <<" repairs="<<output.selectiveRepairs
      <<" builds="<<output.builds+output.guardBuilds
      <<" reuses="<<output.reuses+output.guardReuses<<"\n";
   }
@@ -279,7 +294,7 @@ int main(int argc,char** argv){
   std::ofstream csv(path);if(!csv)throw std::runtime_error("could not open evidence CSV");
   csv<<"material,requested_elements,primitives,nodes,bonds,seed,frame,policy,query_ms,"
         "pairs,oracle_checked,oracle_pairs,misses,extras,region_builds,region_reuses,"
-        "dirty_regions,guard_builds,guard_reuses,aabb_tests,online_span,online_path,"
+        "dirty_regions,guard_builds,guard_reuses,aabb_tests,selective_repairs,online_span,online_path,"
         "online_span_changed,online_strategy_switch\n";
   const auto kinds=std::array<std::string,6>{"cloth","sponge","cushion","soft_ball","spring","mixed"};
   if(kind=="all"){
