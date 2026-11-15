@@ -6,6 +6,8 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <algorithm>
+#include <array>
+#include <memory>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -22,6 +24,42 @@ namespace {
 struct alignas(16) GPUBox {float lo[4],hi[4];};
 struct GPUPair {uint32_t a,b; bool operator<(const GPUPair& q)const{return a<q.a||(a==q.a&&b<q.b);} bool operator==(const GPUPair& q)const{return a==q.a&&b==q.b;}};
 using Clock=std::chrono::steady_clock;
+class MaterialReplay {
+ std::ifstream stream_;
+public:
+ uint32_t count{},frames{},seed{},material{};
+ explicit MaterialReplay(const std::string& path):stream_(path,std::ios::binary){
+  if(!stream_)throw std::runtime_error("cannot open material snapshot file");
+  char magic[8]={};
+  stream_.read(magic,8);
+  if(std::string(magic,8)!="KYOTOM01")
+   throw std::runtime_error("invalid material snapshot header; expected KYOTOM01");
+  for(auto* value:{&count,&frames,&seed,&material})
+   stream_.read(reinterpret_cast<char*>(value),sizeof(uint32_t));
+  if(!stream_||!count||count>16384||!frames||frames>10000||material>5)
+   throw std::runtime_error("unsupported material replay header dimensions");
+  const auto start=stream_.tellg();
+  stream_.seekg(0,std::ios::end);
+  const auto bytes=stream_.tellg()-start;
+  const auto expected=std::streamoff(count)*std::streamoff(frames)*std::streamoff(6*sizeof(float));
+  if(bytes!=expected)throw std::runtime_error("material replay size mismatch");
+  stream_.seekg(start);
+ }
+ std::vector<GPUBox> read(){
+  std::vector<GPUBox> result;result.reserve(count);
+  for(uint32_t i=0;i<count;++i){
+   std::array<float,6> v{};
+   stream_.read(reinterpret_cast<char*>(v.data()),sizeof(v));
+   if(!stream_)throw std::runtime_error("incomplete material snapshot frame");
+   for(auto x:v)if(!std::isfinite(x))throw std::runtime_error("non-finite replay material AABB");
+   if(v[0]>v[3]||v[1]>v[4]||v[2]>v[5])
+    throw std::runtime_error("inverted material replay box");
+   result.push_back({{v[0],v[1],v[2],0},{v[3],v[4],v[5],0}});
+  }
+  return result;
+ }
+};
+
 size_t positive(const char* raw,size_t maximum){
  const std::string s(raw);size_t consumed=0;unsigned long long v=0;
  try{v=std::stoull(s,&consumed);}catch(...){throw std::runtime_error("invalid integer argument");}
@@ -138,10 +176,16 @@ kernel void exhaustive_pairs(
 int main(int argc,char** argv){
  @autoreleasepool {
  try{
-  if(argc!=7)throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive]");
-  const size_t n=positive(argv[2],16384),frames=positive(argv[3],10000);
-  const auto kind=std::string(argv[4]);const auto seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
-  const std::string mode=argv[6];
+  const bool replay=argc==5&&std::string(argv[1])=="--replay";
+  if(!replay&&argc!=7)
+   throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive] OR --replay MATERIAL.kmcb OUTPUT.csv MODE[sap|exhaustive]");
+  std::unique_ptr<MaterialReplay> material;
+  if(replay)material=std::make_unique<MaterialReplay>(argv[2]);
+  const size_t n=replay?material->count:positive(argv[2],16384);
+  const size_t frames=replay?material->frames:positive(argv[3],10000);
+  const auto kind=replay?std::string("material_replay_")+std::to_string(material->material):std::string(argv[4]);
+  const unsigned seed=replay?material->seed:unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
+  const std::string mode=replay?argv[4]:argv[6];
   if(mode!="sap"&&mode!="exhaustive")throw std::runtime_error("invalid Metal mode");
   id<MTLDevice> device=MTLCreateSystemDefaultDevice();
   if(!device)throw std::runtime_error("no Metal GPU found");
@@ -159,13 +203,14 @@ int main(int argc,char** argv){
   id<MTLBuffer> counts=[device newBufferWithLength:n*sizeof(uint32_t) options:MTLResourceStorageModeShared];
   id<MTLBuffer> offsets=[device newBufferWithLength:n*sizeof(uint32_t) options:MTLResourceStorageModeShared];
   if(!queue||!input||!counts||!offsets)throw std::runtime_error("Metal resource allocation failed");
-  std::filesystem::path path(argv[1]);
+  std::filesystem::path path(replay?argv[3]:argv[1]);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
+  if(std::filesystem::exists(path))throw std::runtime_error("refusing to overwrite GPU evidence CSV");
   std::ofstream out(path);if(!out)throw std::runtime_error("cannot open output CSV");
   out<<"backend,scene,n,frame,seed,device,host_ms,gpu_ms,overlaps,oracle_checked,misses,pair_bytes\n";
   out<<std::fixed<<std::setprecision(8);
   for(size_t frame=0;frame<frames;++frame){
-   auto boxes=scene(n,seed,int(frame),kind);
+   auto boxes=replay?material->read():scene(n,seed,int(frame),kind);
    const auto begin=Clock::now();
    if(mode=="sap")std::sort(boxes.begin(),boxes.end(),[](const GPUBox& a,const GPUBox& b){return a.lo[0]<b.lo[0];});
    std::copy(boxes.begin(),boxes.end(),static_cast<GPUBox*>([input contents]));
