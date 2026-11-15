@@ -30,6 +30,7 @@ struct Result {
  bool usedGlobal{};
  bool changedSpan{};
  bool switched{};
+ bool learnedBypassed{};
  std::string learnedAction{};
 };
 // Generic scalable online extension: unlike the old 12x12 cloth controller,
