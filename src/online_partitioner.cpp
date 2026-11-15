@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 namespace ccp::research {
@@ -106,13 +107,27 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
  }
  // Topology-independent diagnostic: compare current conservative patch
  // union boxes, not stale narrow-phase contacts.
- std::size_t possible=0,near=0;
- for(std::size_t i=0;i<guards.size();++i)
-  for(std::size_t j=i+1;j<guards.size();++j){
-   ++possible;
-   if(overlaps(guards[i],guards[j]))++near;
+ // Sweep sorted coarse envelopes: sparse workloads avoid the former
+ // quadratic all-guards scan. Dense worst cases still have quadratic true
+ // overlaps (an unavoidable output-size lower bound for pair enumeration).
+ std::vector<std::size_t> sorted(guards.size());
+ std::iota(sorted.begin(),sorted.end(),std::size_t{0});
+ std::sort(sorted.begin(),sorted.end(),[&](std::size_t a,std::size_t b){
+  return guards[a].min.x<guards[b].min.x||
+    (guards[a].min.x==guards[b].min.x&&a<b);
+ });
+ std::size_t near=0;
+ for(std::size_t p=0;p<sorted.size();++p){
+  const auto& a=guards[sorted[p]];
+  for(std::size_t q=p+1;q<sorted.size();++q){
+   const auto& b=guards[sorted[q]];
+   if(b.min.x>a.max.x)break;
+   if(overlaps(a,b))++near;
   }
- result.coarsePairFraction=possible?double(near)/double(possible):1.0;
+ }
+ const double count=double(guards.size());
+ const double possible=count*(count-1.)*.5;
+ result.coarsePairFraction=possible>0.?double(near)/possible:1.0;
  // Both update strategies are measured per broad-phase query while active.
  const double sample=broadMilliseconds/double(queryCount);
  double& ewma=hierarchical_?hierTimeEwma_:flatTimeEwma_;
