@@ -59,20 +59,31 @@ public:
   ++frame_;
   const auto raw=rawBounds(input);
   const auto tight=padded(raw,margin_);
-  const auto features=features_.describe(tight);
+  // At tiny N the measured decision overhead can dominate the entire
+  // guarded query. Deterministically use the safe guarded method rather
+  // than paying for neural inference. This gate was developed AFTER
+  // examining the first negative seed-101 test; all gains MUST be checked
+  // on previously unseen seeds, never retroactively on that test set.
+  constexpr size_t kSmallSceneCutoff=384;
+  const bool bypass=tight.size()<kSmallSceneCutoff;
+  const auto features=bypass?learned::Features{}:features_.describe(tight);
   const auto featureEnd=Clock::now();
-  const auto predicted=model_.predict(features);
+  const auto predicted=bypass?std::array<double,learned::kActions>{}:
+                               model_.predict(features);
   const auto inferenceEnd=Clock::now();
-  int selected=active_;
-  if(selected<0){
-   selected=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
-  }else if(frame_-lastSwitch_>=cooldown_){
-   const int fastest=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
-   if(fastest!=active_ && predicted[size_t(fastest)]+penaltyMs_<
-       predicted[size_t(active_)]*(1.-hysteresis_))
-    selected=fastest;
+  int selected=bypass?1:active_;
+  if(!bypass){
+   if(selected<0){
+    selected=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
+   }else if(frame_-lastSwitch_>=cooldown_){
+    const int fastest=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
+    if(fastest!=active_ && predicted[size_t(fastest)]+penaltyMs_<
+        predicted[size_t(active_)]*(1.-hysteresis_))
+     selected=fastest;
+   }
   }
   Result result;result.span=64;result.usedGlobal=selected==1||selected==2;
+  result.learnedBypassed=bypass;
   if(selected!=active_){
    // Any method resumed after a gap MUST reject stale cached certificates.
    // This reset is included in end-to-end online controller timing.
@@ -112,7 +123,8 @@ public:
    result.dirty=m.dirtyRegions;result.aabbTests=m.broadAabbTests;
   }else throw std::logic_error("ML selector returned unsupported action");
   const auto backendEnd=Clock::now();
-  features_.observe(tight,result.pairs.size());
+  if(bypass)features_.reset();
+  else features_.observe(tight,result.pairs.size());
   result.learnedAction=learned::kActionNames[size_t(selected)];
   const auto finished=Clock::now();
   result.mlFeatureMs=std::chrono::duration<double,std::milli>(featureEnd-begin).count();
