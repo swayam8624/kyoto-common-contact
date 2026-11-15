@@ -62,6 +62,33 @@ echo "[KYOTO] coupled cloth - original Online controller vs Global Guard / SAP"
   2>&1 | tee "$RUN/logs/coupled-5-obstacles.log"
 ./build/ccp_online_trace "$RUN/csv/online-original-trace.csv" "$CLOTH_FRAMES" \
   2>&1 | tee "$RUN/logs/online-trace.log"
+echo "[KYOTO] exact material snapshots shared between CPU and Metal"
+case "$MODE" in
+ smoke) REPLAY_BUDGET=64 ; REPLAY_FRAMES=8 ;;
+ quick) REPLAY_BUDGET=256 ; REPLAY_FRAMES=30 ;;
+ standard) REPLAY_BUDGET=1024 ; REPLAY_FRAMES=64 ;;
+ stress) REPLAY_BUDGET=4096 ; REPLAY_FRAMES=120 ;;
+esac
+mkdir -p "$RUN/snapshots" "$RUN/verification"
+for mat in cloth sponge cushion soft_ball spring mixed; do
+  snapshot="$RUN/snapshots/${mat}.kmcb"
+  cpu="$RUN/csv/actual-${mat}-cpu.csv"
+  echo "[KYOTO] serializing $mat Float32 AABB trajectories"
+  ./build/ccp_material_export "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 \
+    2>&1 | tee "$RUN/logs/export-${mat}.log"
+  ./build/ccp_material_replay "$snapshot" "$cpu" 1 \
+    2>&1 | tee "$RUN/logs/replay-${mat}-cpu.log"
+  if [ -x ./build/ccp_scaling_metal ]; then
+    gpu="$RUN/csv/actual-${mat}-metal-sap.csv"
+    ./build/ccp_scaling_metal --replay "$snapshot" "$gpu" sap \
+      2>&1 | tee "$RUN/logs/replay-${mat}-gpu.log"
+    python3 scripts/verify_material_cpu_gpu.py "$cpu" "$gpu" \
+      --output "$RUN/verification/${mat}-cpu-gpu.md" \
+      2>&1 | tee "$RUN/logs/verify-${mat}-gpu.log"
+  else
+    echo "No Metal GPU executable: CPU-only for $mat" | tee "$RUN/logs/metal-unavailable-${mat}.log"
+  fi
+done
 echo "[KYOTO] cross-backend reference tests (GPU is SAP, not our online controller)"
 if [ -x ./build/ccp_scaling_metal ]; then
   ./build/ccp_scaling_metal "$RUN/csv/gpu-sap-hotspot.csv" 512 32 hotspot 1234 sap \
