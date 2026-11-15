@@ -17,6 +17,13 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN="output/kyoto-materials-${STAMP}-${MODE}"
 if [ -e "$RUN" ]; then echo "Run directory already exists: $RUN" >&2; exit 2; fi
 mkdir -p "$RUN/logs" "$RUN/csv"
+finalize_evidence() {
+  status=$?
+  trap - EXIT
+  python3 scripts/package_kyoto_results.py "$RUN" --exit-code "$status" || true
+  exit "$status"
+}
+trap finalize_evidence EXIT
 echo "[KYOTO] data directory: $RUN"
 {
   echo "timestamp_utc=$STAMP"
@@ -113,18 +120,3 @@ if [ -x ./build/ccp_scaling_metal ]; then
 else
   echo "Metal target unavailable. No GPU timing claim." | tee "$RUN/logs/gpu-unavailable.log"
 fi
-python3 - "$RUN" <<'PY'
-import hashlib, json, pathlib, sys, zipfile
-root=pathlib.Path(sys.argv[1])
-files=sorted(p for p in root.rglob("*") if p.is_file())
-manifest={"directory":str(root),"files":{
- str(p.relative_to(root)):{"size":p.stat().st_size,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()}
- for p in files}}
-(root/"SHA256_MANIFEST.json").write_text(json.dumps(manifest,indent=2)+"\n")
-archive=root.with_suffix(".zip")
-with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED,compresslevel=6) as z:
- for p in sorted(root.rglob("*")):
-  if p.is_file():z.write(p,p.relative_to(root.parent))
-print(f"[KYOTO] COMPLETE archive: {archive}")
-print("[KYOTO] Upload the ZIP; it contains raw CSV, full verbose logs, validation and hardware metadata.")
-PY
