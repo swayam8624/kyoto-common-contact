@@ -17,7 +17,11 @@ jobs:
       - name: Syntax-check macOS run script and Python evidence tools
         run: |
           bash -n scripts/run_kyoto_materials_mac.sh
-          python3 -m py_compile scripts/summarize_material_suite.py scripts/verify_material_cpu_gpu.py scripts/package_kyoto_results.py
+          python3 -m py_compile \
+            scripts/summarize_material_suite.py scripts/verify_material_cpu_gpu.py \
+            scripts/package_kyoto_results.py scripts/train_online_controller.py \
+            scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
+            scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py
       - name: Compile CPU benchmark with warnings
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
@@ -114,6 +118,74 @@ jobs:
         with:
           name: kyoto-linux-cpu-exploratory
           path: /tmp/kyoto-evidence/
+          retention-days: 30
+          if-no-files-found: warn
+  learned-training-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python for PyTorch training
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only CPU PyTorch and NumPy
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch numpy
+          python -c 'import torch, numpy; print("Torch",torch.__version__,"NumPy",numpy.__version__)'
+      - name: Compile exact CPU material replay with learned inference
+        run: |
+          cmake -S . -B /tmp/kyoto-ml-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build /tmp/kyoto-ml-build --target ccp_material_export ccp_material_replay --parallel 4
+          ctest --test-dir /tmp/kyoto-ml-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
+      - name: Generate independent material/seed teacher trajectories
+        run: |
+          mkdir -p /tmp/kyoto-ml/teacher /tmp/kyoto-ml/snapshots /tmp/kyoto-ml/heldout
+          for seed in 101 211 307 401 503; do
+            for material in cloth sponge cushion soft_ball spring mixed; do
+              stem="actual-${material}-baseline-n128-seed${seed}"
+              /tmp/kyoto-ml-build/ccp_material_export "/tmp/kyoto-ml/snapshots/${stem}.kmcb" "$material" 128 36 "$seed" baseline
+              /tmp/kyoto-ml-build/ccp_material_replay "/tmp/kyoto-ml/snapshots/${stem}.kmcb" "/tmp/kyoto-ml/teacher/${stem}-cpu.csv" 0
+            done
+          done
+      - name: Search PyTorch architectures with early stopping and strict holdout
+        run: |
+          python scripts/train_online_controller.py /tmp/kyoto-ml/teacher \
+            --output /tmp/kyoto-ml/model --search grid --max-trials 8 \
+            --search-epochs 45 --final-epochs 45 --patience 9 --seed 20261116 \
+            --device cpu --verbose
+      - name: Measure real learned controller on withheld CPU trajectories
+        run: |
+          python - <<'PY'
+          import csv, json, pathlib, subprocess
+          root=pathlib.Path('/tmp/kyoto-ml')
+          manifest=json.loads((root/'model/manifest.json').read_text())
+          heldout=set(manifest['groups']['test'])
+          files=[]
+          for file in sorted((root/'teacher').glob('*-cpu.csv')):
+              with file.open(newline='') as stream:
+                  row=next(csv.DictReader(stream))
+              if row['seed'] not in heldout:
+                  continue
+              snap=root/'snapshots'/file.name.replace('-cpu.csv','.kmcb')
+              result=root/'heldout'/file.name.replace('-cpu.csv','-evaluated.csv')
+              subprocess.run(['/tmp/kyoto-ml-build/ccp_material_replay',
+                             str(snap),str(result),'0',
+                             str(root/'model/controller.mlpc')],check=True)
+              files.append(str(result))
+          assert len(files)>=6, files
+          subprocess.run(['python','scripts/evaluate_learned_replay.py',*files,
+                          '--output',str(root/'HELDOUT_ACTUAL_RUNTIME.md'),
+                          '--warmup','6'],check=True)
+          PY
+      - name: Preserve complete learned experimental outcomes (including failures)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pytorch-learned-cpu-smoke
+          path: |
+            /tmp/kyoto-ml/
+            DEVLOG.md
           retention-days: 30
           if-no-files-found: warn
   metal-build:
