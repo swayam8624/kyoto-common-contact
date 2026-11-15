@@ -45,8 +45,8 @@ def report(csvfile):
         "Values are descriptive, not confidence intervals.",
         "",
         "| Material | Regime | Budget | Actual AABBs | Policy | Median ms | P95 ms | "
-        "Speedup vs Global Guard | Audits | Builds | Local repairs |",
-        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|",
+        "Speedup vs Global Guard | Audits | Builds | Local repairs | Parallel frames |",
+        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for key in sorted(all_frames):
         material,regime,budget,seed = key
@@ -71,11 +71,12 @@ def report(csvfile):
             actual = int(records[0]["primitives"])
             builds = sum(int(r["region_builds"])+int(r["guard_builds"]) for r in records)
             repairs = sum(int(r["selective_repairs"]) for r in records)
+            parallel = sum(int(r.get("parallel_workers",1))>1 for r in records)
             speedup = baseline/median(durations) if median(durations)>0 else float("inf")
             output.append(
                 f"| {material} | {regime} | {budget} | {actual} | {policy} | "
                 f"{median(durations):.5f} | {percentile(durations,.95):.5f} | "
-                f"{speedup:.2f}x | {audits}/{len(records)} | {builds} | {repairs} |"
+                f"{speedup:.2f}x | {audits}/{len(records)} | {builds} | {repairs} | {parallel} |"
             )
     output += [
         "",
