@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 namespace ccp::research {
@@ -19,10 +20,11 @@ class SelectiveGuard {
 public:
  struct Metrics {
   std::size_t fullBuilds{},partialRepairs{},cacheReuses{},dirtyObjects{},
-    pairChecks{},cachedPairs{},exactPairs{},rejectedCached{};
+    pairChecks{},cachedPairs{},exactPairs{},rejectedCached{},parallelWorkers{1};
  };
- explicit SelectiveGuard(double margin=.025,double displacementBudget=.045)
-  :margin_(margin),budget_(displacementBudget){
+ explicit SelectiveGuard(double margin=.025,double displacementBudget=.045,
+                          std::size_t maxWorkers=0)
+  :margin_(margin),budget_(displacementBudget),maxWorkers_(maxWorkers){
   if(!std::isfinite(margin)||margin<0||!std::isfinite(displacementBudget)||displacementBudget<0)
    throw std::invalid_argument("invalid selective guard margin/budget");
  }
@@ -81,15 +83,45 @@ public:
    for(auto p:cached_)if(!dirty[size_t(p.a)]&&!dirty[size_t(p.b)])
     rebuilt.push_back(p);
    // Every pair with at least one dirty endpoint is generated exactly once.
-   for(size_t i=0;i<next.size();++i)if(dirty[i]){
-    for(size_t j=0;j<next.size();++j){
-     if(j==i||(dirty[j]&&j<i))continue;
-     const auto& a=next[i];const auto& b=next[j];
-     if(!eligible(a,b))continue;
-     ++m.pairChecks;
-     if(overlap(a,b))rebuilt.push_back({
-      int(std::min(i,j)),int(std::max(i,j))});
+   // Parallel work is chosen ONLY when dirty*N is large enough to amortize
+   // thread startup. Each worker owns private output and check counters:
+   // shared cached envelopes remain read-only until threads join.
+   std::vector<size_t> dirtyIndices;
+   dirtyIndices.reserve(dirtyCount);
+   for(size_t i=0;i<next.size();++i)if(dirty[i])dirtyIndices.push_back(i);
+   const auto hardware=std::max(1u,std::thread::hardware_concurrency());
+   const size_t configured=maxWorkers_?maxWorkers_:size_t(hardware);
+   const size_t workers=dirtyCount*next.size()>=60000?
+     std::min({size_t(8),configured,dirtyIndices.size()}):size_t(1);
+   m.parallelWorkers=workers;
+   std::vector<std::vector<Pair>> localPairs(workers);
+   std::vector<size_t> localChecks(workers,0);
+   const auto work=[&](size_t worker){
+    auto& result=localPairs[worker];
+    size_t checks=0;
+    for(size_t k=worker;k<dirtyIndices.size();k+=workers){
+     const size_t i=dirtyIndices[k];
+     const auto& a=next[i];
+     for(size_t j=0;j<next.size();++j){
+      if(j==i||(dirty[j]&&j<i))continue;
+      const auto& b=next[j];
+      if(!eligible(a,b))continue;
+      ++checks;
+      if(overlap(a,b))result.push_back({
+       int(std::min(i,j)),int(std::max(i,j))});
+     }
     }
+    localChecks[worker]=checks;
+   };
+   if(workers==1)work(0);
+   else{
+    std::vector<std::thread> pool;pool.reserve(workers);
+    for(size_t t=0;t<workers;++t)pool.emplace_back(work,t);
+    for(auto& thread:pool)thread.join();
+   }
+   for(size_t t=0;t<workers;++t){
+    m.pairChecks+=localChecks[t];
+    rebuilt.insert(rebuilt.end(),localPairs[t].begin(),localPairs[t].end());
    }
    std::sort(rebuilt.begin(),rebuilt.end());
    rebuilt.erase(std::unique(rebuilt.begin(),rebuilt.end()),rebuilt.end());
@@ -131,6 +163,7 @@ private:
   e.max.x>=b.max.x&&e.max.y>=b.max.y&&e.max.z>=b.max.z;
  }
  double margin_{},budget_{};
+ std::size_t maxWorkers_{};
  bool valid_{};
  std::vector<int> ids_;
  std::vector<ccp::live::Bounds> envelopes_;
