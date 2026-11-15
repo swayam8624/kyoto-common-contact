@@ -216,13 +216,17 @@ int main(int argc,char** argv){
    if(one!=many || one!=sapWorkAware(s,threads))throw std::runtime_error("parallel SAP or work-aware scheduler differs from serial SAP");
    bool checked=n<=2048&&(frame%5==0);
    if(checked&&one!=exhaustive(s))throw std::runtime_error("SAP oracle failure");
+   // The simple crossover gate below avoids thread launch overhead for small
+   // scenes. Its 4096-object threshold is a provisional engineering guess,
+   // not an empirically fitted optimal threshold; held-out trials must tune it.
    // Repeat each measurement to reduce timer granularity effects. Timing
    // includes x-axis sorting, thread startup, pair materialization and merge.
-   for(unsigned variant=0;variant<(threads==1?1u:3u);++variant){
-    const unsigned count=variant==0?1u:threads;
-    const bool balanced=variant==2;
+   for(unsigned variant=0;variant<(threads==1?2u:4u);++variant){
+    const bool autoPolicy=variant==3||(threads==1&&variant==1);
+    const unsigned count=autoPolicy?(n<4096?1u:threads):(variant==0?1u:threads);
+    const bool balanced=(variant==2)||(autoPolicy&&count>1);
     const auto measured=timed(s,count,3,balanced);
-    out<<(balanced?"cpu_sap_work_aware":count==1?"cpu_sap_serial":"cpu_sap_threaded")<<','<<scene<<','<<n<<','<<frame<<','
+    out<<(autoPolicy?"cpu_sap_auto":balanced?"cpu_sap_work_aware":count==1?"cpu_sap_serial":"cpu_sap_threaded")<<','<<scene<<','<<n<<','<<frame<<','
        <<seed<<','<<count<<','<<measured.ms<<','<<measured.pairs<<','
        <<(checked?1:0)<<",0\n";
    }
