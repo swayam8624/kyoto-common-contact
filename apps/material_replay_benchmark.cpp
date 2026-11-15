@@ -173,7 +173,7 @@ const char* name(Kind kind){
 struct Observation {
  Pairs pairs;
  double ms{};
- size_t builds{},reuses{},repairs{},aabbTests{};
+ size_t builds{},reuses{},repairs{},aabbTests{},workers{1};
  int span{64};bool usedGlobal{};
 };
 class Method {
@@ -206,6 +206,7 @@ public:
    r.pairs.assign(result.begin(),result.end());
    r.builds=m.fullBuilds;r.reuses=m.cacheReuses;
    r.repairs=m.partialRepairs;r.aabbTests=m.pairChecks;
+   r.workers=m.parallelWorkers;
   }else{
    auto items=primitives(boxes);
    if(kind_==Kind::Online){
@@ -214,6 +215,7 @@ public:
     r.builds=result.builds+result.guardBuilds;
     r.reuses=result.reuses+result.guardReuses;
     r.repairs=result.selectiveRepairs;r.aabbTests=result.aabbTests;
+    r.workers=result.workers;
    }else{
     Metrics m;
     const auto& result=regional_.query(items,0,kind_!=Kind::Fixed,m,kind_==Kind::Hierarchy);
@@ -234,7 +236,7 @@ void run(const std::string& filename,const std::string& output,int verbose){
  std::ofstream csv(output);
  if(!csv)throw std::runtime_error("cannot create replay CSV");
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
-       "builds,reuses,selective_repairs,aabb_tests,online_span,online_path\n";
+       "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path\n";
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
@@ -268,7 +270,7 @@ void run(const std::string& filename,const std::string& output,int verbose){
    csv<<name(method)<<','<<header.material<<','<<header.n<<','<<frame<<','<<header.seed<<','
       <<observed.ms<<','<<observed.pairs.size()<<','<<hash<<','<<(audited?1:0)
       <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
-      <<observed.aabbTests<<','<<observed.span<<','
+      <<observed.aabbTests<<','<<observed.workers<<','<<observed.span<<','
       <<(observed.usedGlobal?"localguard":"region")<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
     std::cerr<<"[REPLAY] method="<<name(method)<<" frame="<<frame+1<<'/'
