@@ -83,3 +83,12 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 **Conclusion:** The precise time-breakdown instrumentation is now available; model overhead, wrong action choices, cache reset penalties and limited data diversity are primary research targets. This run is a **falsifying/negative evaluation** for promoting the current neural policy. Immediate next experiment: use more independent seeds, stress regimes, larger counts, and a switching-aware objective/trajectory cost model. Do not tune hyperparameters on these held-out seed results and then reuse seeds 809/1009 as untainted test sets.
 
+
+## 2026-11-16 — Independent-process stress harness CI validation (not extreme scaling proof)
+
+**Source:** GitHub Actions [run 43754092139](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43754092139), `cpu-reference` job, `kyoto-cpu-stress-smoke` artifact. A randomized 12-execution subset of the quick stress matrix tested individual policies on deforming cloth/sponge/soft-ball scenes, requested sizes 512 and 2,048, baseline/rapid regimes, fixed seeds, 24 frames, a 60-second per-policy timeout and a uniform 1,024-MB sampled RSS cap. **12/12 isolated executions completed and passed the exact current-AABB coverage checks.** The script wrote a full independent-method manifest, per-frame CSV and logs.
+
+**Important sampling issue:** The 100-ms peak-RSS polling interval returned zero for several ultra-short processes, so the reported 0-MB sample must never be interpreted as zero memory consumption. The stress output is a **harness correctness smoke test**, not a comparative ranking or a claim of constant-memory execution. Full 16k–100k Mac CPU physical workloads and fair timing/memory analysis remain **not executed**; hardware follow-up uses `scripts/run_kyoto_stress.py stress` and `extreme` with transparent censoring.
+
+**Workflow policy:** After two actual PyTorch learned-controller experiments, the costly `learned-training-smoke` CI job was made opt-in through GitHub Actions `workflow_dispatch`; all native C++/Metal compilation, exact-oracle regressions, and small independent stress-smoke checks still run on research branch pushes. No neural wins are accepted merely because a CI test passes.
+
