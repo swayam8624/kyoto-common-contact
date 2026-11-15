@@ -1,0 +1,218 @@
+// CPU replay of exact Float32 material snapshots used by the Metal benchmark.
+// Every algorithm processes identical immutable bounds. The replay AABBs are
+// ALREADY padded by the material exporter; all margins below are therefore 0.
+// All methods materialize full current sorted pair sets; every frame is
+// compared against independently executed SAP and sampled brute-force oracle.
+#include "ccp/generic_online.hpp"
+#include "ccp/selective_guard.hpp"
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <vector>
+namespace {
+using namespace ccp::research;
+using Clock=std::chrono::steady_clock;
+class MaterialReplay {
+ std::ifstream input_;
+public:
+ uint32_t n{},frames{},seed{},material{};
+ explicit MaterialReplay(const std::string& filename):input_(filename,std::ios::binary){
+  char magic[8]={};input_.read(magic,8);
+  if(!input_||std::string(magic,8)!="KYOTOM01")
+   throw std::runtime_error("invalid snapshot file: expected KYOTOM01 header");
+  for(auto* p:{&n,&frames,&seed,&material})
+   input_.read(reinterpret_cast<char*>(p),sizeof(uint32_t));
+  if(!input_||n<1||n>50000||frames<1||frames>10000||material>5)
+   throw std::runtime_error("invalid snapshot header dimensions");
+  auto start=input_.tellg();
+  input_.seekg(0,std::ios::end);
+  const auto bytes=input_.tellg()-start;
+  const auto expected=std::streamoff(n)*std::streamoff(frames)*std::streamoff(6*sizeof(float));
+  if(bytes!=expected)throw std::runtime_error("material snapshot length mismatch");
+  input_.seekg(start);
+ }
+ std::vector<Bounds> next(){
+  std::vector<Bounds> result;result.reserve(n);
+  for(uint32_t i=0;i<n;++i){
+   std::array<float,6> v{};
+   input_.read(reinterpret_cast<char*>(v.data()),sizeof(v));
+   if(!input_)throw std::runtime_error("material snapshot truncated");
+   for(float x:v)if(!std::isfinite(x))throw std::runtime_error("nonfinite material coordinate");
+   if(v[0]>v[3]||v[1]>v[4]||v[2]>v[5])
+    throw std::runtime_error("inverted material bounds");
+   result.push_back({int(i),{v[0],v[1],v[2]},{v[3],v[4],v[5]},1u,1u,true});
+  }
+  return result;
+ }
+};
+using Pairs=std::vector<Pair>;
+bool overlap(const Bounds& a,const Bounds& b){
+ return a.min.x<=b.max.x&&b.min.x<=a.max.x&&
+        a.min.y<=b.max.y&&b.min.y<=a.max.y&&
+        a.min.z<=b.max.z&&b.min.z<=a.max.z;
+}
+Pairs exactGuard(const Pairs& candidate,const std::vector<Bounds>& boxes){
+ Pairs out;out.reserve(candidate.size());
+ for(auto p:candidate)if(overlap(boxes.at(size_t(p.a)),boxes.at(size_t(p.b))))
+  out.push_back(p);
+ return out;
+}
+std::vector<Primitive> primitives(const std::vector<Bounds>& boxes,int span=64){
+ std::vector<Primitive> result;result.reserve(boxes.size());
+ for(size_t i=0;i<boxes.size();++i)result.push_back({boxes[i],int(i/size_t(span)),-1});
+ return result;
+}
+uint64_t pairHash(const Pairs& pairs){
+ uint64_t h=UINT64_C(14695981039346656037);
+ for(auto p:pairs){
+  for(uint32_t x:{uint32_t(p.a),uint32_t(p.b)}){
+   h^=uint64_t(x);h*=UINT64_C(1099511628211);
+  }
+ }
+ return h;
+}
+void requireSortedUnique(const Pairs& pairs,size_t count){
+ for(size_t i=0;i<pairs.size();++i){
+  const auto p=pairs[i];
+  if(p.a<0||p.b<=p.a||size_t(p.b)>=count)
+   throw std::runtime_error("invalid replay pair IDs");
+  if(i && !(pairs[i-1]<p))throw std::runtime_error("non-unique or unsorted replay pairs");
+ }
+}
+enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online};
+const char* name(Kind kind){
+ switch(kind){
+ case Kind::Sap:return "sap_rebuild";
+ case Kind::Global:return "global_guarded_exact";
+ case Kind::Selective:return "selective_guard_exact";
+ case Kind::Fixed:return "region_fixed";
+ case Kind::Adaptive:return "region_adaptive";
+ case Kind::Hierarchy:return "region_hierarchical";
+ case Kind::Online:return "online_cost_aware";
+ }
+ return "invalid";
+}
+struct Observation {
+ Pairs pairs;
+ double ms{};
+ size_t builds{},reuses{},repairs{},aabbTests{};
+ int span{64};bool usedGlobal{};
+};
+class Method {
+ Kind kind_;
+ ccp::live::BroadPhaseService global_;
+ ccp::research::SelectiveGuard selective_{0,.045};
+ RegionalCandidates regional_;
+ ccp::bench::GenericOnline online_{0};
+public:
+ explicit Method(Kind kind):kind_(kind){}
+ Observation run(const std::vector<Bounds>& boxes){
+  Observation r;
+  const auto start=Clock::now();
+  if(kind_==Kind::Sap)
+   r.pairs=ccp::live::candidates(boxes,true);
+  else if(kind_==Kind::Global){
+   ccp::live::QueryMetrics m;
+   const auto& cached=global_.query(boxes,{0,.045,ccp::live::UpdatePolicy::GuardedReuse},true,m);
+   r.pairs=exactGuard(cached,boxes);
+   r.builds=m.builds;r.reuses=m.reuses;r.aabbTests=m.pairTests;
+  }else if(kind_==Kind::Selective){
+   ccp::research::SelectiveGuard::Metrics m;
+   const auto& result=selective_.query(boxes,m);
+   r.pairs.assign(result.begin(),result.end());
+   r.builds=m.fullBuilds;r.reuses=m.cacheReuses;
+   r.repairs=m.partialRepairs;r.aabbTests=m.pairChecks;
+  }else{
+   auto items=primitives(boxes);
+   if(kind_==Kind::Online){
+    const auto result=online_.query(items);
+    r.pairs=result.pairs;r.span=result.span;r.usedGlobal=result.usedGlobal;
+    r.builds=result.builds+result.guardBuilds;
+    r.reuses=result.reuses+result.guardReuses;
+    r.repairs=result.selectiveRepairs;r.aabbTests=result.aabbTests;
+   }else{
+    Metrics m;
+    const auto& result=regional_.query(items,0,kind_!=Kind::Fixed,m,kind_==Kind::Hierarchy);
+    r.pairs.assign(result.begin(),result.end());
+    r.builds=m.regionalPairRebuilds;r.reuses=m.regionalPairReuses;
+    r.aabbTests=m.broadAabbTests;
+   }
+  }
+  r.ms=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
+  return r;
+ }
+};
+void run(const std::string& filename,const std::string& output,int verbose){
+ MaterialReplay header(filename);
+ if(std::filesystem::exists(output))throw std::runtime_error("refusing to overwrite CPU replay results");
+ std::filesystem::path file(output);
+ if(!file.parent_path().empty())std::filesystem::create_directories(file.parent_path());
+ std::ofstream csv(output);
+ if(!csv)throw std::runtime_error("cannot create replay CSV");
+ csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
+       "builds,reuses,selective_repairs,aabb_tests,online_span,online_path\n";
+ csv<<std::fixed<<std::setprecision(9);
+ std::vector<uint64_t> expectedHashes(header.frames,0);
+ std::vector<std::size_t> expectedCounts(header.frames,0);
+ for(Kind method:{Kind::Sap,Kind::Global,Kind::Selective,Kind::Fixed,Kind::Adaptive,
+                  Kind::Hierarchy,Kind::Online}){
+  MaterialReplay stream(filename);
+  Method algorithm(method);
+  double sum=0;
+  for(uint32_t frame=0;frame<header.frames;++frame){
+   const auto boxes=stream.next();
+   const auto observed=algorithm.run(boxes);
+   requireSortedUnique(observed.pairs,boxes.size());
+   const auto hash=pairHash(observed.pairs);
+   bool audited=frame%5==0;
+   if(method==Kind::Sap){
+    expectedHashes[frame]=hash;expectedCounts[frame]=observed.pairs.size();
+    if(audited&&header.n<=512){
+     const auto brute=ccp::live::candidates(boxes,false);
+     if(brute!=observed.pairs)
+      throw std::runtime_error("SAP disagrees with independent exhaustive AABB oracle");
+    }
+   }else if(hash!=expectedHashes[frame]||observed.pairs.size()!=expectedCounts[frame]){
+    throw std::runtime_error("replay pair mismatch: "+std::string(name(method))+
+                             " frame "+std::to_string(frame));
+   }
+   sum+=observed.ms;
+   csv<<name(method)<<','<<header.material<<','<<header.n<<','<<frame<<','<<header.seed<<','
+      <<observed.ms<<','<<observed.pairs.size()<<','<<hash<<','<<(audited?1:0)
+      <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
+      <<observed.aabbTests<<','<<observed.span<<','
+      <<(observed.usedGlobal?"localguard":"region")<<'\n';
+   if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
+    std::cerr<<"[REPLAY] method="<<name(method)<<" frame="<<frame+1<<'/'
+      <<header.frames<<" ms="<<observed.ms<<" pairs="<<observed.pairs.size()
+      <<" path="<<(observed.usedGlobal?"localguard":"region")
+      <<" oracle="<<(audited?"PASS":"SAP reference match")<<'\n';
+  }
+  std::cout<<"[RESULT] method="<<name(method)<<" mean_ms="<<sum/header.frames
+   <<" frames="<<header.frames<<" n="<<header.n<<"\n";
+ }
+ if(!csv)throw std::runtime_error("failed to write replay CSV");
+ std::cout<<"[PASS] exact pair hashes matched across all seven CPU policies for "
+   <<header.frames<<" frames: "<<output<<"\n";
+}
+}
+int main(int argc,char** argv){
+ try{
+  if(argc<3||argc>4)
+   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1]");
+  int verbose=argc==4?std::stoi(argv[3]):1;
+  if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
+  run(argv[1],argv[2],verbose);
+ }catch(const std::exception& e){
+  std::cerr<<"MATERIAL CPU REPLAY FAILED: "<<e.what()<<'\n';return 1;
+ }
+}
