@@ -159,7 +159,12 @@ def main():
              "--device",args.device,"--seed",20261116,"--verbose"]
     if args.mode=="exhaustive":command+=["--exhaustive"]
     else:command+=["--max-trials",trials]
-    call(command,logs/"torch-training.log",root,max(args.timeout,3600),quiet=False)
+    # The exhaustive 156-architecture/500-epoch search is an intentionally
+    # longer foreground job; never kill it after the ordinary 15-minute
+    # per-trajectory watchdog. Per-trial early stopping remains mandatory.
+    training_limit=max(args.timeout,86400 if args.mode=="exhaustive" else
+                       14400 if args.mode=="standard" else 3600)
+    call(command,logs/"torch-training.log",root,training_limit,quiet=False)
     manifest=json.loads((model_dir/"manifest.json").read_text())
     heldout_seeds=set(manifest["groups"]["test"])
     evidence=[]
