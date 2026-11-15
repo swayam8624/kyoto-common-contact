@@ -9,6 +9,7 @@ speedups or automatic deployment to the original coupled cloth solver.
 """
 from __future__ import annotations
 import argparse
+import atexit
 import datetime
 import json
 import os
@@ -17,6 +18,7 @@ import platform
 import subprocess
 import sys
 import time
+import threading
 
 MATERIALS=("cloth","sponge","cushion","soft_ball","spring","mixed")
 MODES={
@@ -41,6 +43,13 @@ def call(argv,logpath,cwd,timeout,quiet=False):
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,text=True,
                               errors="replace",bufsize=1)
+        exceeded={"value":False}
+        def abort_overlong():
+            exceeded["value"]=True
+            proc.kill()
+        timer=threading.Timer(timeout,abort_overlong)
+        timer.daemon=True
+        timer.start()
         try:
             # Buffered stdout remains in the log even if the tool fails.
             # Forward informational progress only, but preserve all output.
@@ -50,13 +59,14 @@ def call(argv,logpath,cwd,timeout,quiet=False):
                                  "[PASS]" in line or "[TRAIN]" in line or
                                  "[HELDOUT]" in line):
                     print(line.rstrip(),flush=True)
-                if time.monotonic()-started>timeout:
-                    proc.kill()
-                    raise TimeoutError(f"Command exceeded {timeout} s: {argv}")
             status=proc.wait(timeout=15)
         except BaseException:
             proc.kill();proc.wait()
             raise
+        finally:
+            timer.cancel()
+    if exceeded["value"]:
+        raise TimeoutError(f"Command exceeded {timeout} s; inspect {logpath}")
     if status!=0:raise RuntimeError(f"Command failed ({status}); inspect {logpath}")
     return time.monotonic()-started
 
@@ -78,6 +88,12 @@ def main():
     run=Path("output")/f"kyoto-learned-{utc}-{args.mode}"
     if run.exists():parser.error("refusing to overwrite existing research experiment")
     run.mkdir(parents=True)
+    done={"success":False}
+    def preserve():
+        subprocess.run([sys.executable,"scripts/package_kyoto_results.py",
+                        str(run),"--exit-code",0 if done["success"] else 1],
+                       cwd=root,check=False)
+    atexit.register(preserve)
     logs=run/"logs";logs.mkdir()
     teacher=run/"teacher";teacher.mkdir()
     snapshots=run/"snapshots";snapshots.mkdir()
@@ -99,6 +115,11 @@ def main():
     build=args.build.resolve()
     exporter=build/"ccp_material_export"
     replayer=build/"ccp_material_replay"
+    homebrew=Path("/opt/homebrew/opt/cmake/bin/cmake")
+    cmake=str(homebrew if homebrew.is_file() else "cmake")
+    call([cmake,"--build",build,"--target",
+          "ccp_material_export","ccp_material_replay","--parallel","4"],
+         logs/"native-ml-build.log",root,args.timeout,quiet=False)
     for executable in (exporter,replayer):
         if not executable.is_file():
             raise SystemExit(f"Missing native executable: {executable}. "
@@ -176,6 +197,7 @@ def main():
                      "regimes are audited. Raw evidence, every trial and "
                      f"negative results are in `{run}`.\n")
     print(f"[KYOTO-ML] SUCCESS: all real holdout results saved under {run}")
+    done["success"]=True
     return run
 
 if __name__=="__main__":
