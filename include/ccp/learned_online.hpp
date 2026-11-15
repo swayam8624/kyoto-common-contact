@@ -60,7 +60,9 @@ public:
   const auto raw=rawBounds(input);
   const auto tight=padded(raw,margin_);
   const auto features=features_.describe(tight);
+  const auto featureEnd=Clock::now();
   const auto predicted=model_.predict(features);
+  const auto inferenceEnd=Clock::now();
   int selected=active_;
   if(selected<0){
    selected=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
@@ -80,6 +82,7 @@ public:
    if(active_>=0)++switches_;
    result.switched=active_>=0;active_=selected;lastSwitch_=frame_;
   }
+  const auto decisionEnd=Clock::now();
   if(selected==0){
    result.pairs=ccp::live::candidates(tight,true);
   }else if(selected==1){
@@ -108,9 +111,15 @@ public:
    result.builds=m.regionalPairRebuilds;result.reuses=m.regionalPairReuses;
    result.dirty=m.dirtyRegions;result.aabbTests=m.broadAabbTests;
   }else throw std::logic_error("ML selector returned unsupported action");
+  const auto backendEnd=Clock::now();
   features_.observe(tight,result.pairs.size());
   result.learnedAction=learned::kActionNames[size_t(selected)];
-  result.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
+  const auto finished=Clock::now();
+  result.mlFeatureMs=std::chrono::duration<double,std::milli>(featureEnd-begin).count();
+  result.mlInferenceMs=std::chrono::duration<double,std::milli>(inferenceEnd-featureEnd).count();
+  result.mlDecisionMs=std::chrono::duration<double,std::milli>(decisionEnd-inferenceEnd).count();
+  result.mlBackendMs=std::chrono::duration<double,std::milli>(backendEnd-decisionEnd).count();
+  result.queryMs=std::chrono::duration<double,std::milli>(finished-begin).count();
   return result;
  }
  size_t switches()const{return switches_;}
