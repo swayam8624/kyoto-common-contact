@@ -211,11 +211,11 @@ int main(int argc,char** argv){
   const std::string regime=argc>=9?argv[8]:"baseline";
   const std::string onlyPolicy=argc>=10?argv[9]:"";
   if(!onlyPolicy.empty()&&onlyPolicy!="all"){
-   bool found=false;
-   for(Policy p:{Policy::SAP,Policy::Guard,Policy::SelectiveGuard,Policy::RegionFixed,
-                 Policy::RegionAdaptive,Policy::RegionHierarchy,Policy::Online})
-    found=found||onlyPolicy==name(p);
-   if(!found)throw std::invalid_argument("invalid independent stress policy");
+   const auto allowed=std::array<std::string,7>{
+    "sap_rebuild","global_guarded_exact","selective_guard_exact",
+    "region_fixed","region_adaptive","region_hierarchical","online_cost_aware"};
+   if(std::find(allowed.begin(),allowed.end(),onlyPolicy)==allowed.end())
+    throw std::invalid_argument("invalid independent stress policy");
   }
   if(kind!="all"&&kind!="mixed")ccp::materials::materialCode(kind);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
