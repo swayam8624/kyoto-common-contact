@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <cstddef>
 #include <vector>
+#include <string>
 namespace ccp::bench {
 using namespace ccp::research;
 using Clock=std::chrono::steady_clock;
@@ -28,6 +29,7 @@ struct Result {
  bool usedGlobal{};
  bool changedSpan{};
  bool switched{};
+ std::string learnedAction{};
 };
 // Generic scalable online extension: unlike the old 12x12 cloth controller,
 // works on any ordered material topology. The regions are stable contiguous
