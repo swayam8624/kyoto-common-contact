@@ -50,6 +50,25 @@ jobs:
           assert all(int(r['candidates'])>=0 for r in rows)
           print('CPU benchmark CSV PASS')
           PY
+      - name: Run repeatable exploratory CPU scaling matrix
+        run: |
+          mkdir -p /tmp/kyoto-executables
+          cp /tmp/ccp_scaling_cpu /tmp/ccp_scaling_regional /tmp/kyoto-executables/
+          python3 scripts/run_scaling_matrix.py \
+            --build /tmp/kyoto-executables \
+            --output /tmp/kyoto-evidence \
+            --methods cpu regional-fixed regional-adaptive regional-hier \
+            --scenes hotspot cluster \
+            --sizes 256 512 \
+            --frames 8 --repeats 3 --threads 4 --seed 1234
+      - name: Preserve immutable experimental evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-linux-cpu-exploratory
+          path: /tmp/kyoto-evidence/
+          retention-days: 30
+          if-no-files-found: warn
   metal-build:
     runs-on: macos-15
     steps:
