@@ -147,7 +147,9 @@ def split_samples(data,mode,seed):
 def tensors(rows,mean_,std_,device):
     x=np.stack([r["features"] for r in rows]).astype(np.float32)
     y=np.stack([np.log(r["costs"]) for r in rows]).astype(np.float32)
-    x=np.clip((x-mean_)/std_,-8,8)
+    x=np.clip((x-mean_)/std_,-8,8).astype(np.float32)
+    # NumPy float32 x minus float64 mean/std silently promotes to float64.
+    # Keep torch inputs float32, matching nn.Linear default weights exactly.
     return (torch.as_tensor(x,device=device),
             torch.as_tensor(y,device=device))
 
