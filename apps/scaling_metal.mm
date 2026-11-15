@@ -72,21 +72,36 @@ kernel void overlap_count(
  }
  counts[i]=found;
 }
+
+kernel void sap_count(
+  device const Box* boxes [[buffer(0)]],
+  device uint* counts [[buffer(1)]],
+  constant uint& n [[buffer(2)]],
+  uint i [[thread_position_in_grid]]) {
+ if(i>=n)return;
+ Box a=boxes[i];uint found=0;
+ for(uint j=i+1;j<n;++j) {
+  Box b=boxes[j];
+  if(b.lo.x>a.hi.x)break;
+  if(all(a.lo.xyz<=b.hi.xyz)&&all(b.lo.xyz<=a.hi.xyz))++found;
+ }
+ counts[i]=found;
+}
 )METAL";
 }
 int main(int argc,char** argv){
  @autoreleasepool {
  try{
-  if(argc!=6)throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED");
+  if(argc!=7)throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive]");
   const size_t n=positive(argv[2],16384),frames=positive(argv[3],10000);
-  const auto kind=std::string(argv[4]);const auto seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
+  const auto kind=std::string(argv[4]);const auto seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));\n  const std::string mode=argv[6];\n  if(mode!="sap"&&mode!="exhaustive")throw std::runtime_error("invalid Metal mode");
   id<MTLDevice> device=MTLCreateSystemDefaultDevice();
   if(!device)throw std::runtime_error("no Metal GPU found");
   NSError* err=nil;
   NSString* code=[NSString stringWithUTF8String:metalSource];
   id<MTLLibrary> library=[device newLibraryWithSource:code options:nil error:&err];
   if(!library)throw std::runtime_error([[err localizedDescription] UTF8String]);
-  id<MTLFunction> fn=[library newFunctionWithName:@"overlap_count"];
+  id<MTLFunction> fn=[library newFunctionWithName:(mode=="sap"?@"sap_count":@"overlap_count")];
   id<MTLComputePipelineState> pipeline=[device newComputePipelineStateWithFunction:fn error:&err];
   if(!pipeline)throw std::runtime_error([[err localizedDescription] UTF8String]);
   id<MTLCommandQueue> queue=[device newCommandQueue];
@@ -121,12 +136,12 @@ int main(int argc,char** argv){
    if(checked&&total!=oracle(boxes))throw std::runtime_error("GPU overlap oracle mismatch");
    const double gpu=([cmd GPUEndTime]>=[cmd GPUStartTime])?
     ([cmd GPUEndTime]-[cmd GPUStartTime])*1000.0:-1.;
-   out<<"metal_exhaustive_reference,"<<kind<<','<<n<<','<<frame<<','<<seed<<','
+   out<<(mode=="sap"?"metal_sap_sorted":"metal_exhaustive_reference")<<","<<kind<<','<<n<<','<<frame<<','<<seed<<','
       <<'"'<<[[device name] UTF8String]<<'"'<<','<<host<<','<<gpu<<','<<total<<','
       <<(checked?1:0)<<",0\n";
   }
   if(!out)throw std::runtime_error("CSV write failure");
-  std::cout<<"Metal reference run complete. GPU adaptive partitioning is NOT implemented.\n";
+  std::cout<<"Metal reference run complete. Metal SAP includes host sorting and upload; adaptive GPU partitioning is NOT implemented.\n";
  }catch(const std::exception& e){std::cerr<<"METAL BENCHMARK FAILED: "<<e.what()<<'\n';return 1;}
  }
 }
