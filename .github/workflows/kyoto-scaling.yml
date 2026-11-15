@@ -78,12 +78,16 @@ jobs:
         run: |
           mkdir -p /tmp/kyoto-material-evidence
           /tmp/kyoto-material-build/ccp_selective_guard_tests
-          /tmp/kyoto-material-build/ccp_material_benchmark /tmp/kyoto-material-evidence/materials.csv all 64 8 1234 1 1
-          for material in cloth sponge cushion soft_ball spring mixed; do
-            /tmp/kyoto-material-build/ccp_material_export "/tmp/kyoto-material-evidence/${material}.kmcb" "$material" 128 10 1234
-            /tmp/kyoto-material-build/ccp_material_replay "/tmp/kyoto-material-evidence/${material}.kmcb" "/tmp/kyoto-material-evidence/${material}-replay.csv" 1
+          for regime in baseline impact shear compression rapid relax; do
+            /tmp/kyoto-material-build/ccp_material_benchmark "/tmp/kyoto-material-evidence/materials-${regime}.csv" all 64 24 1234 2 0 "$regime"
           done
-          python3 scripts/summarize_material_suite.py /tmp/kyoto-material-evidence/materials.csv --output /tmp/kyoto-material-evidence/SUMMARY.md > /tmp/kyoto-material-evidence/summary.log
+          for material in cloth sponge cushion soft_ball spring mixed; do
+            for regime in baseline impact rapid; do
+              /tmp/kyoto-material-build/ccp_material_export "/tmp/kyoto-material-evidence/${material}-${regime}.kmcb" "$material" 128 20 1234 "$regime"
+              /tmp/kyoto-material-build/ccp_material_replay "/tmp/kyoto-material-evidence/${material}-${regime}.kmcb" "/tmp/kyoto-material-evidence/${material}-${regime}-replay.csv" 0
+            done
+          done
+          python3 scripts/summarize_material_suite.py /tmp/kyoto-material-evidence/materials-*.csv --output /tmp/kyoto-material-evidence/SUMMARY.md > /tmp/kyoto-material-evidence/summary.log
       - name: Preserve real material and exact CPU replay evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -117,6 +121,25 @@ jobs:
           xcrun clang++ -std=c++23 -O2 -fobjc-arc -Wall -Wextra -Wpedantic \
             apps/scaling_metal.mm -framework Foundation -framework Metal \
             -o /tmp/ccp_scaling_metal
+      - name: Validate embedded Metal compute shaders with installed Xcode Metal compiler
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path("apps/scaling_metal.mm").read_text()
+          start='const char* metalSource=R"METAL('
+          end=')METAL";'
+          if start not in text or end not in text:
+              raise SystemExit("Metal shader literal missing")
+          shader=text.split(start,1)[1].split(end,1)[0]
+          Path('/tmp/kyoto_broadphase.metal').write_text(shader)
+          print("Extracted",len(shader),"Metal shader characters")
+          PY
+          if xcrun --find metal >/dev/null 2>&1; then
+            xcrun -sdk macosx metal -c /tmp/kyoto_broadphase.metal -o /tmp/kyoto_broadphase.air
+            echo "Standalone Metal kernel compilation PASSED"
+          else
+            echo "Standalone Metal compiler unavailable in runner; ObjC++ compilation only"
+          fi
       - name: GPU runtime environment
         run: |
           system_profiler SPDisplaysDataType || true
