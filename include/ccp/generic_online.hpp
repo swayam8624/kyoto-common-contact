@@ -8,6 +8,8 @@
 #include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <stdexcept>
 #include <cstddef>
 #include <vector>
 namespace ccp::bench {
@@ -47,6 +49,7 @@ public:
   if(!std::isfinite(margin)||margin<0)throw std::invalid_argument("invalid online margin");
  }
  Result query(const std::vector<Primitive>& input){
+  const auto fullStart=Clock::now();
   ++frame_;
   // Two startup windows sample both real methods, then choose the cheaper
   // measured one. Short re-probes adapt to changed contact distributions.
@@ -74,8 +77,7 @@ public:
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
    r.guardBuilds=m.fullBuilds;r.guardReuses=m.cacheReuses;
    r.selectiveRepairs=m.partialRepairs;r.aabbTests=m.pairChecks;
-   globalEwma_=globalObservations_?globalEwma_*.85+r.queryMs*.15:r.queryMs;
-   ++globalObservations_;
+
   }else{
    std::vector<Primitive> reindexed=input;
    for(size_t i=0;i<reindexed.size();++i)reindexed[i].region=int(i/size_t(span_));
@@ -86,8 +88,7 @@ public:
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
    r.builds=m.regionalPairRebuilds;r.reuses=m.regionalPairReuses;
    r.dirty=m.dirtyRegions;r.aabbTests=m.broadAabbTests;
-   regionEwma_=regionObservations_?regionEwma_*.85+r.queryMs*.15:r.queryMs;
-   ++regionObservations_;
+
    // Explicit cost-based structural controller: avoid splitting when
    // bookkeeping dominates. Adjust only if measured regional work per
    // primitive is unusually high/low for several contiguous windows.
@@ -102,6 +103,17 @@ public:
      span_=desired;regions_.reset();lastEdit_=frame_;++edits_;r.changedSpan=true;
     }
    }
+  }
+  // The whole controller is charged: policy selection, temporary
+  // region mapping, candidate generation, certificate repair, cache resets.
+  // Never report only the inner backend query as online policy runtime.
+  r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-fullStart).count();
+  if(r.usedGlobal){
+   globalEwma_=globalObservations_?globalEwma_*.85+r.queryMs*.15:r.queryMs;
+   ++globalObservations_;
+  }else{
+   regionEwma_=regionObservations_?regionEwma_*.85+r.queryMs*.15:r.queryMs;
+   ++regionObservations_;
   }
   r.span=span_;r.switched=(frame_==lastModeSwitch_);
   return r;
