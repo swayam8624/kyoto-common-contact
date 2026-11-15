@@ -37,3 +37,12 @@ This is a **public experiment-and-decision log**, not private scratchpad reasoni
 Each completed run must record: UTC timestamp; Git SHA; OS/CPU/GPU/RAM; hardware thermal/clock/power state where available; material, regime, seed and primitive count; independent trial IDs; source inputs and SHA256; compared algorithms and exact policy semantics; training/validation/test split IDs; model hyperparameters, best epoch, train-vs-validation curves, prediction overhead; total wall and kernel timing boundaries; exact pair and physical correctness audits; memory peaks and timeouts; per-material median, P95 and confidence intervals; negative findings; the decision made; full raw evidence ZIP location.
 
 Do not use training loss, oracle lower-bound action selection, or an unseen GPU kernel speedup as a substitute for a measured end-to-end deployed online policy.
+
+## 2026-11-16 — First live PyTorch CI failures and repairs
+
+**Observed, reproducible failure:** GitHub Actions run [43752477908](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43752477908) on Linux compiled the learned C++ policy but the new material standalone-policy stress command failed to compile: an unqualified `Policy` in global `main` was ambiguous after importing the research namespace. Fixed by validating the policy CLI against an explicit string table; no collision algorithm semantics changed.
+
+**Observed, reproducible ML failure:** The same run successfully generated the independent teacher CSVs and installed CPU PyTorch, but the first MLP training failed with `RuntimeError: mat1 and mat2 must have the same dtype, but got Double and Float`. NumPy promoted float32 features back to float64 when applying float64 train-set normalization. Fixed by explicitly casting normalized features to `np.float32` before tensor construction. The original failed trial is **not** a performance result; the workflow artifacts contain partial raw evidence.
+
+**Decision:** Keep a blocking CI training-and-exact-C++-replay job on each research push. Do not recommend the full Mac training sweep until Linux Python training, native C++ learned ABI/oracles, and actual held-out replay have independently passed. Capture every subsequent failure here.
+
