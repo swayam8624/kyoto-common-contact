@@ -93,6 +93,11 @@ target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 # Standalone deterministic CPU scaling reference. This is intentionally
 # distinct from the coupled deformable simulation and the adaptive controller.
 find_package(Threads REQUIRED)
+# Selective local cache repair can distribute large dirty subsets across
+# independent CPU workers; use portable thread linkage on Linux/macOS.
+target_link_libraries(ccp_material_benchmark PRIVATE Threads::Threads)
+target_link_libraries(ccp_material_replay PRIVATE Threads::Threads)
+target_link_libraries(ccp_selective_guard_tests PRIVATE Threads::Threads)
 add_executable(ccp_scaling_regional apps/scaling_regional.cpp)
 target_link_libraries(ccp_scaling_regional PRIVATE ccp_multicloth)
 target_compile_options(ccp_scaling_regional PRIVATE -Wall -Wextra -Wpedantic)
