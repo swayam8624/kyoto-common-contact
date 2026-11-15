@@ -43,6 +43,12 @@ def main():
         run(args.replayer,samples,report,0,model)
         with report.open(newline="",encoding="utf-8") as stream:
             rows=list(csv.DictReader(stream))
+        if any(None in r for r in rows):
+            raise RuntimeError("C++ produced extra CSV fields absent from header")
+        for required in ("ml_bypassed","ml_feature_ms","ml_inference_ms",
+                         "ml_decision_ms","ml_backend_ms"):
+            if required not in rows[0]:
+                raise RuntimeError(f"Missing ML performance column: {required}")
         learned=[r for r in rows if r["backend"]=="ml_cost_aware"]
         baseline={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
         if len(learned)!=12 or len(baseline)!=12:
