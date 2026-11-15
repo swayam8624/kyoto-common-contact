@@ -21,20 +21,29 @@ bool lessPatch(const OnlinePatch& a,const OnlinePatch& b){
 }
 }
 int OnlinePartitioner::stableId(const OnlinePatch& p){
- if(p.sheet<0||p.sheet>=3||p.x<0||p.x>=12||p.y<0||p.y>=12 ||
-    (p.span!=3&&p.span!=6&&p.span!=12))
+ if(p.sheet<0||p.sheet>=3||p.x<0||p.x>=48||p.y<0||p.y>=48 ||
+    (p.span!=3&&p.span!=6&&p.span!=12&&p.span!=24&&p.span!=48))
   throw std::invalid_argument("invalid online patch identity");
  // Separate ID namespace for all levels and all cloth sheets, disjoint
  // from primitive IDs and from moving-sphere region IDs.
- const int level=p.span==12?0:p.span==6?1:2;
- return 5000+p.sheet*1000+level*200+p.y*12+p.x;
+ // Preserve the legacy 12-cell identifiers for its original patch
+ // levels; larger domains receive a disjoint ID namespace, encoding the span
+ // as well as sheet and cell coordinates to avoid cross-level collisions.
+ if(p.x<12&&p.y<12&&(p.span==3||p.span==6||p.span==12)){
+  const int level=p.span==12?0:p.span==6?1:2;
+  return 5000+p.sheet*1000+level*200+p.y*12+p.x;
+ }
+ return 60000+p.sheet*160000+p.span*2500+p.y*48+p.x;
 }
-void OnlinePartitioner::reset(int sheets){
+void OnlinePartitioner::reset(int sheets,int cellsPerSide){
  if(sheets<1||sheets>3)throw std::invalid_argument("online partition sheets must be 1..3");
+ if(cellsPerSide!=12&&cellsPerSide!=24&&cellsPerSide!=48)
+  throw std::invalid_argument("supported online patch domains: 12, 24 or 48 cells");
+ sheets_=sheets;cells_=cellsPerSide;minSpan_=cellsPerSide/4;
  patches_.clear();patches_.reserve(std::size_t(sheets)*8);
  for(int sheet=0;sheet<sheets;++sheet)
-  for(int y=0;y<12;y+=6)for(int x=0;x<12;x+=6)
-   patches_.push_back({sheet,x,y,6});
+  for(int y=0;y<cells_;y+=cells_/2)for(int x=0;x<cells_;x+=cells_/2)
+   patches_.push_back({sheet,x,y,cells_/2});
  std::sort(patches_.begin(),patches_.end(),lessPatch);
  lastPatchEditFrame_=-1000;lastModeSwitchFrame_=-1000;
  hierarchical_=true;
@@ -42,8 +51,8 @@ void OnlinePartitioner::reset(int sheets){
  flatSamples_=hierSamples_=0;
 }
 int OnlinePartitioner::regionForCell(int sheet,int x,int y) const{
- if(x<0||x>=12||y<0||y>=12)
-  throw std::invalid_argument("online patch cell out of 12x12 domain");
+ if(sheet<0||sheet>=sheets_||x<0||x>=cells_||y<0||y>=cells_)
+  throw std::invalid_argument("online patch cell outside configured domain");
  for(const auto& p:patches_)
   if(p.sheet==sheet&&x>=p.x&&x<p.x+p.span&&y>=p.y&&y<p.y+p.span)
    return stableId(p);
@@ -51,7 +60,7 @@ int OnlinePartitioner::regionForCell(int sheet,int x,int y) const{
 }
 void OnlinePartitioner::split(std::size_t index){
  const OnlinePatch source=patches_.at(index);
- if(source.span<=3)throw std::logic_error("minimum online patch cannot split");
+ if(source.span<=minSpan_)throw std::logic_error("minimum online patch cannot split");
  patches_.erase(patches_.begin()+static_cast<std::ptrdiff_t>(index));
  const int half=source.span/2;
  for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){
@@ -142,7 +151,7 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
   for(auto& p:patches_){
    const bool contactRich=p.contactsEwma>.30||p.candidatesEwma>14.;
    const double threshold=p.span>=12?260.:160.;
-   if(p.span>3&&p.workEwma>threshold&&contactRich){
+   if(p.span>minSpan_&&p.workEwma>threshold&&contactRich){
     ++p.hotWindows;p.quietWindows=0;
    }else if(p.workEwma<45.&&p.contactsEwma<.12){
     ++p.quietWindows;p.hotWindows=0;
@@ -154,7 +163,7 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
    // First consider a full four-sibling merge: fragment management costs
    // more than useful candidate culling once local contact activity subsides.
    bool merged=false;
-   for(int childSpan:{3,6}){
+   for(int childSpan:{minSpan_,minSpan_*2}){
     const int parentSpan=childSpan*2;
     for(const auto& source:patches_){
      if(source.span!=childSpan)continue;
@@ -190,7 +199,7 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
     double highest=0;
     for(std::size_t i=0;i<patches_.size();++i){
      const auto& p=patches_[i];
-     if(p.span>3&&p.hotWindows>=2&&p.workEwma>highest){
+     if(p.span>minSpan_&&p.hotWindows>=2&&p.workEwma>highest){
       highest=p.workEwma;selected=i;
      }
     }
