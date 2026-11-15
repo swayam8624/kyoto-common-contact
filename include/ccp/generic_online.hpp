@@ -41,8 +41,11 @@ class GenericOnline {
  double regionEwma_{0},globalEwma_{0};
  int regionObservations_{},globalObservations_{};
  std::size_t switches_{},edits_{};
- static constexpr double margin=.025;
+ double margin_{.025};
 public:
+ explicit GenericOnline(double margin=.025):guard_(margin,.045),margin_(margin){
+  if(!std::isfinite(margin)||margin<0)throw std::invalid_argument("invalid online margin");
+ }
  Result query(const std::vector<Primitive>& input){
   ++frame_;
   // Two startup windows sample both real methods, then choose the cheaper
@@ -78,7 +81,7 @@ public:
    for(size_t i=0;i<reindexed.size();++i)reindexed[i].region=int(i/size_t(span_));
    Metrics m;
    const auto start=Clock::now();
-   const auto& list=regions_.query(reindexed,margin,true,m,true,false);
+   const auto& list=regions_.query(reindexed,margin_,true,m,true,false);
    r.pairs.assign(list.begin(),list.end());
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
    r.builds=m.regionalPairRebuilds;r.reuses=m.regionalPairReuses;
