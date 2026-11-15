@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <numeric>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -102,6 +103,14 @@ std::vector<GPUPair> oraclePairs(const std::vector<GPUBox>& boxes){
   if(match)out.push_back({i,j});
  }
  return out;
+}
+uint64_t pairHash(const std::vector<GPUPair>& pairs){
+ uint64_t h=UINT64_C(14695981039346656037);
+ for(const auto& p:pairs)
+  for(uint32_t value:{p.a,p.b}){
+   h^=uint64_t(value);h*=UINT64_C(1099511628211);
+  }
+ return h;
 }
 const char* metalSource=R"METAL(
 #include <metal_stdlib>
@@ -207,12 +216,23 @@ int main(int argc,char** argv){
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
   if(std::filesystem::exists(path))throw std::runtime_error("refusing to overwrite GPU evidence CSV");
   std::ofstream out(path);if(!out)throw std::runtime_error("cannot open output CSV");
-  out<<"backend,scene,n,frame,seed,device,host_ms,gpu_ms,overlaps,oracle_checked,misses,pair_bytes\n";
+  out<<"backend,scene,n,frame,seed,device,host_ms,gpu_ms,overlaps,oracle_checked,misses,pair_bytes,pair_hash\n";
   out<<std::fixed<<std::setprecision(8);
   for(size_t frame=0;frame<frames;++frame){
    auto boxes=replay?material->read():scene(n,seed,int(frame),kind);
+   const auto originalBoxes=boxes;
+   std::vector<uint32_t> originalIDs(n);
+   std::iota(originalIDs.begin(),originalIDs.end(),0u);
    const auto begin=Clock::now();
-   if(mode=="sap")std::sort(boxes.begin(),boxes.end(),[](const GPUBox& a,const GPUBox& b){return a.lo[0]<b.lo[0];});
+   if(mode=="sap"){
+    std::sort(originalIDs.begin(),originalIDs.end(),[&](uint32_t a,uint32_t b){
+     return boxes[a].lo[0]<boxes[b].lo[0]||
+       (boxes[a].lo[0]==boxes[b].lo[0]&&a<b);
+    });
+    std::vector<GPUBox> ordered;ordered.reserve(n);
+    for(const auto index:originalIDs)ordered.push_back(boxes[index]);
+    boxes=std::move(ordered);
+   }
    std::copy(boxes.begin(),boxes.end(),static_cast<GPUBox*>([input contents]));
    id<MTLCommandBuffer> cmd=[queue commandBuffer];
    id<MTLComputeCommandEncoder> encoder=[cmd computeCommandEncoder];
@@ -255,18 +275,25 @@ int main(int argc,char** argv){
    // Read the entire pair set; sorted output has deterministic unique owners.
    const auto* gpuPairs=static_cast<const GPUPair*>([pairs contents]);
    std::vector<GPUPair> actual(gpuPairs,gpuPairs+total);
+   // Translate sorted GPU SAP indices back to STABLE material element IDs.
+   // This makes hashes comparable across CPU and GPU on the same binary file.
+   for(auto& p:actual){
+    const auto a=originalIDs[p.a],b=originalIDs[p.b];
+    p={std::min(a,b),std::max(a,b)};
+   }
    std::sort(actual.begin(),actual.end());
    if(std::adjacent_find(actual.begin(),actual.end())!=actual.end())
     throw std::runtime_error("GPU emitted duplicate candidate IDs");
-   const bool checked=n<=2048&&(frame%5==0);
-   if(checked&&actual!=oraclePairs(boxes))
-    throw std::runtime_error("GPU candidate PAIR SET differs from independent oracle");
    const double gpu=([cmd GPUEndTime]>=[cmd GPUStartTime]&&[pairCmd GPUEndTime]>=[pairCmd GPUStartTime])?
     ([cmd GPUEndTime]-[cmd GPUStartTime]+[pairCmd GPUEndTime]-[pairCmd GPUStartTime])*1000.0:-1.;
    const double host=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
+   const auto hash=pairHash(actual);
+   const bool checked=n<=2048&&(frame%5==0);
+   if(checked&&actual!=oraclePairs(originalBoxes))
+    throw std::runtime_error("GPU stable-ID pair set differs from independent CPU exhaustive oracle");
    out<<(mode=="sap"?"metal_sap_sorted":"metal_exhaustive_reference")<<","<<kind<<','<<n<<','<<frame<<','<<seed<<','
       <<'"'<<[[device name] UTF8String]<<'"'<<','<<host<<','<<gpu<<','<<total<<','
-      <<(checked?1:0)<<",0,"<<total*sizeof(GPUPair)<<"\n";
+      <<(checked?1:0)<<",0,"<<total*sizeof(GPUPair)<<","<<hash<<"\n";
   }
   if(!out)throw std::runtime_error("CSV write failure");
   std::cout<<"Metal GPU SAP now materializes exact pairs, including count/prefix/compaction. Adaptive GPU partitioning is NOT implemented.\n";
