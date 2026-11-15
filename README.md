@@ -22,7 +22,9 @@ bash scripts/run_kyoto_materials_mac.sh smoke
 KYOTO_VERBOSE=2 bash scripts/run_kyoto_materials_mac.sh standard
 ```
 
-**Read [the detailed Kyoto material research runbook](docs/KYOTO_MATERIAL_STRESS_TESTS.md) first.** The timestamped output ZIP is created even for partial failures and contains exact input snapshots, per-frame raw CSVs, CPU/GPU pair-hash verification, verbose logs, and hardware metadata. The new material physics is an approximate mass-spring test fixture, **not** validated FEM or a complete original-controller GPU port. Performance superiority is not presumed.
+**Read [the detailed Kyoto material research runbook](docs/KYOTO_MATERIAL_STRESS_TESTS.md) first.** The PyTorch learned-selector protocol, exact-model native ABI, exhaustive 156-configuration search, and held-out CPU runtime evaluation are documented in [Kyoto learned controller](docs/KYOTO_LEARNED_CONTROLLER.md), with all committed positive **and negative** research evidence in [DEVLOG.md](DEVLOG.md).
+
+The learned controller is an opt-in **certified backend chooser** for generalized material AABB workloads. The original coupled cloth `OnlineContactAware` algorithm remains the target research baseline and is NOT replaced by the neural module until separate physical correctness and performance gates pass. The timestamped output ZIP is created even for partial failures and contains exact input snapshots, per-frame raw CSVs, CPU/GPU pair-hash verification, verbose logs, and hardware metadata. The new material physics is an approximate mass-spring test fixture, **not** validated FEM or a complete original-controller GPU port. Performance superiority is not presumed.
 
 ## Research question
 
