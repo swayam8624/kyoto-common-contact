@@ -133,11 +133,13 @@ int positive(const char* s,int minimum,int maximum){
  return int(value);
 }
 void run(const std::string& material,int requested,int frames,unsigned seed,
-         int auditEvery,int verbose,std::ofstream& csv,const std::string& regime){
+         int auditEvery,int verbose,std::ofstream& csv,const std::string& regime,
+         const std::string& onlyPolicy){
  // All competing policies restart from identical deterministic initial states
  // with the same random seed and evolve independent, equal-time trajectories.
  for(Policy policy:{Policy::SAP,Policy::Guard,Policy::SelectiveGuard,Policy::RegionFixed,
                     Policy::RegionAdaptive,Policy::RegionHierarchy,Policy::Online}){
+  if(!onlyPolicy.empty()&&onlyPolicy!=name(policy))continue;
   World world(material,requested,seed,regime);
   BenchmarkPolicy method(policy);
   if(verbose)std::cerr<<"[BEGIN] material="<<material<<" policy="<<name(policy)
@@ -198,15 +200,23 @@ void run(const std::string& material,int requested,int frames,unsigned seed,
 }
 int main(int argc,char** argv){
  try{
-  if(argc<5||argc>9)throw std::runtime_error(
-    "usage: ccp_material_benchmark OUTPUT.csv MATERIAL[cloth|sponge|cushion|soft_ball|spring|mixed|all] ELEMENT_BUDGET FRAMES [SEED=1234] [AUDIT_EVERY=5] [VERBOSE=1] [REGIME=baseline]");
+  if(argc<5||argc>10)throw std::runtime_error(
+    "usage: ccp_material_benchmark OUTPUT.csv MATERIAL[cloth|sponge|cushion|soft_ball|spring|mixed|all] ELEMENT_BUDGET FRAMES [SEED=1234] [AUDIT_EVERY=5] [VERBOSE=1] [REGIME=baseline] [POLICY=all]");
   const std::filesystem::path path(argv[1]);
   const std::string kind=argv[2];
-  const int n=positive(argv[3],16,50000),frames=positive(argv[4],1,10000);
+  const int n=positive(argv[3],16,120000),frames=positive(argv[4],1,10000);
   const unsigned seed=argc>=6?unsigned(positive(argv[5],1,2000000000)):1234;
   const int audit=argc>=7?positive(argv[6],1,10000):5;
   const int verbose=argc>=8?positive(argv[7],0,2):1;
   const std::string regime=argc>=9?argv[8]:"baseline";
+  const std::string onlyPolicy=argc>=10?argv[9]:"";
+  if(!onlyPolicy.empty()&&onlyPolicy!="all"){
+   bool found=false;
+   for(Policy p:{Policy::SAP,Policy::Guard,Policy::SelectiveGuard,Policy::RegionFixed,
+                 Policy::RegionAdaptive,Policy::RegionHierarchy,Policy::Online})
+    found=found||onlyPolicy==name(p);
+   if(!found)throw std::invalid_argument("invalid independent stress policy");
+  }
   if(kind!="all"&&kind!="mixed")ccp::materials::materialCode(kind);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
   if(std::filesystem::exists(path)&&std::getenv("CCP_CTEST_SMOKE")==nullptr)
@@ -218,8 +228,8 @@ int main(int argc,char** argv){
         "online_span_changed,online_strategy_switch\n";
   const auto kinds=std::array<std::string,6>{"cloth","sponge","cushion","soft_ball","spring","mixed"};
   if(kind=="all"){
-   for(const auto& k:kinds)run(k,n,frames,seed,audit,verbose,csv,regime);
-  }else run(kind,n,frames,seed,audit,verbose,csv,regime);
+   for(const auto& k:kinds)run(k,n,frames,seed,audit,verbose,csv,regime,onlyPolicy=="all"?"":onlyPolicy);
+  }else run(kind,n,frames,seed,audit,verbose,csv,regime,onlyPolicy=="all"?"":onlyPolicy);
   csv.flush();if(!csv)throw std::runtime_error("final evidence flush failed");
   std::cout<<"[PASS] complete material suite, raw CSV: "<<path<<"\n";
   return 0;
