@@ -94,7 +94,9 @@ int main(int argc,char** argv){
  try{
   if(argc!=7)throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive]");
   const size_t n=positive(argv[2],16384),frames=positive(argv[3],10000);
-  const auto kind=std::string(argv[4]);const auto seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));\n  const std::string mode=argv[6];\n  if(mode!="sap"&&mode!="exhaustive")throw std::runtime_error("invalid Metal mode");
+  const auto kind=std::string(argv[4]);const auto seed=unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
+  const std::string mode=argv[6];
+  if(mode!="sap"&&mode!="exhaustive")throw std::runtime_error("invalid Metal mode");
   id<MTLDevice> device=MTLCreateSystemDefaultDevice();
   if(!device)throw std::runtime_error("no Metal GPU found");
   NSError* err=nil;
@@ -115,8 +117,9 @@ int main(int argc,char** argv){
   out<<std::fixed<<std::setprecision(8);
   for(size_t frame=0;frame<frames;++frame){
    auto boxes=scene(n,seed,int(frame),kind);
-   std::copy(boxes.begin(),boxes.end(),static_cast<GPUBox*>([input contents]));
    const auto begin=Clock::now();
+   if(mode=="sap")std::sort(boxes.begin(),boxes.end(),[](const GPUBox& a,const GPUBox& b){return a.lo[0]<b.lo[0];});
+   std::copy(boxes.begin(),boxes.end(),static_cast<GPUBox*>([input contents]));
    id<MTLCommandBuffer> cmd=[queue commandBuffer];
    id<MTLComputeCommandEncoder> encoder=[cmd computeCommandEncoder];
    if(!cmd||!encoder)throw std::runtime_error("Metal command creation failed");
