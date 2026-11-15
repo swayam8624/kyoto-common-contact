@@ -23,9 +23,9 @@ import threading
 MATERIALS=("cloth","sponge","cushion","soft_ball","spring","mixed")
 MODES={
   "smoke":{"seeds":(101,211,307,401,503),"regimes":("baseline",),
-           "budgets":(64,),"frames":12,"trials":1,"search_epochs":12},
+           "budgets":(64,512),"frames":12,"trials":1,"search_epochs":12},
   "quick":{"seeds":(101,211,307,401,503),"regimes":("baseline","impact"),
-           "budgets":(128,),"frames":48,"trials":12,"search_epochs":160},
+           "budgets":(256,512),"frames":48,"trials":12,"search_epochs":160},
   "standard":{"seeds":(101,211,307,401,503,607,701,809),
               "regimes":("baseline","impact","shear","compression"),
               "budgets":(256,1024),"frames":72,"trials":48,"search_epochs":300},
