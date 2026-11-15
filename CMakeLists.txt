@@ -43,6 +43,9 @@ target_link_libraries(ccp_selective_guard_tests PRIVATE ccp_live)
 target_compile_options(ccp_selective_guard_tests PRIVATE -Wall -Wextra -Wpedantic)
 
 # Heterogeneous, deformable mass-spring broad-phase research fixtures.
+add_executable(ccp_material_replay apps/material_replay_benchmark.cpp)
+target_link_libraries(ccp_material_replay PRIVATE ccp_multicloth)
+target_compile_options(ccp_material_replay PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_material_export apps/material_snapshot_export.cpp)
 target_link_libraries(ccp_material_export PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_export PRIVATE -Wall -Wextra -Wpedantic)
