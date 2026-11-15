@@ -11,6 +11,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ccp::materials {
@@ -46,6 +47,7 @@ class World {
  std::vector<Bond> bonds_;
  std::vector<Element> elements_;
  std::uint32_t seed_{};
+ std::string regime_{"baseline"};
  int step_{};
  static constexpr double pi=3.14159265358979323846264338;
  int node(Vec3 p,bool pin, double damping){
@@ -150,7 +152,11 @@ class World {
   }
  }
 public:
- World(const std::string& kind,int requested,std::uint32_t seed):seed_(seed){
+ World(const std::string& kind,int requested,std::uint32_t seed,std::string regime="baseline"):
+  seed_(seed),regime_(std::move(regime)){
+  if(regime_!="baseline"&&regime_!="impact"&&regime_!="shear"&&
+     regime_!="compression"&&regime_!="rapid"&&regime_!="relax")
+   throw std::invalid_argument("unknown material deformation regime");
   if(requested<16||requested>120000)throw std::invalid_argument("material element budget 16..120000");
   if(kind=="mixed"){
    const int each=std::max(16,requested/5);
@@ -179,7 +185,13 @@ public:
    if(n.pin)continue;
    const Vec3 velocity=mul(sub(n.x,n.previous),n.damping);
    n.previous=n.x;
-   n.x=add(n.x,add(velocity,{.00003*std::sin(t),.00003*std::cos(t),-.00015}));
+   Vec3 drive={.00003*std::sin(t),.00003*std::cos(t),-.00015};
+   if(regime_=="relax")drive={0,0,-.00006};
+   if(regime_=="impact"&&step_%48==0)drive.z+=.022;
+   if(regime_=="shear")drive.x+=.00045*n.x.y*std::sin(t*2.4);
+   if(regime_=="compression")drive.z-=.00045*(1.+std::sin(t*.8));
+   if(regime_=="rapid"&&step_%40<20)drive.x+=.0015*std::cos(t*4.0);
+   n.x=add(n.x,add(velocity,drive));
   }
   for(int iter=0;iter<3;++iter){
    for(const auto& b:bonds_){
@@ -195,8 +207,12 @@ public:
     if(!c.pin)c.x=sub(c.x,mul(correction,invB));
    }
    // Kinematic impactor gives repeatable transient contact-rich deformation.
-   const Vec3 center={.52*std::sin(.31*t),.32*std::cos(.27*t),1.20+.18*std::sin(.47*t)};
-   constexpr double obstacleRadius=.35;
+   const double jump=(regime_=="impact"||regime_=="rapid")?
+    (step_%60<30?-.56:.56):0.;
+   const Vec3 center={.52*std::sin(.31*t)+jump,
+    .32*std::cos(.27*t),1.20+.18*std::sin(.47*t)};
+   const double obstacleRadius=regime_=="relax"?0.0:
+     regime_=="compression"?.53:.35;
    for(auto& n:nodes_){
     if(n.pin)continue;
     Vec3 offset=sub(n.x,center);
