@@ -139,6 +139,25 @@ int main(){
    if(sheets>1)require(totalInter>0,"distinct cloth sheets actually resolve contacts");
    require(totalSphere>0,"cloth interacts with moving sphere obstacle");
   }
+  // Additional moving obstacle cases exercise the same certified broad
+  // phase without relying on a single two-sphere demonstration. They are
+  // correctness/finite-state checks, not a guarantee of calibrated physics.
+  for(int balls:{3,5,8}){
+    MultiCloth scene(2,balls,Policy::OnlineContactAware);
+    scene.setAuditing(true);
+    require(scene.sphereCount()==balls&&scene.spheres().size()==std::size_t(balls),
+            "multi-obstacle construction count incorrect");
+    for(int frame=0;frame<12;++frame){
+      scene.step();
+      require(scene.spheres().size()==std::size_t(balls),
+              "multi-obstacle dynamic update changed count");
+      require(scene.metrics().oracleChecked||frame%15!=0,
+              "first-frame oracle was unexpectedly disabled");
+      for(const auto& p:scene.positions())
+        require(std::isfinite(p.x)&&std::isfinite(p.y)&&std::isfinite(p.z),
+                "multi-obstacle scenario produced nonfinite cloth geometry");
+    }
+  }
   // Paired state equivalence: region policy must never alter physical
   // response versus independent SAP on the SAME dynamic geometry.
   MultiCloth standard(2,2,Policy::RebuildSAP),regional(2,2,Policy::RegionalCertified);
