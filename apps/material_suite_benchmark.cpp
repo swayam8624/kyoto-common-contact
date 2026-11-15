@@ -8,6 +8,7 @@
 #include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -290,7 +291,8 @@ int main(int argc,char** argv){
   const int verbose=argc>=8?positive(argv[7],0,2):1;
   if(kind!="all"&&kind!="mixed")ccp::materials::materialCode(kind);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
-  if(std::filesystem::exists(path))throw std::runtime_error("refusing to overwrite existing evidence CSV");
+  if(std::filesystem::exists(path)&&std::getenv("CCP_CTEST_SMOKE")==nullptr)
+   throw std::runtime_error("refusing to overwrite existing evidence CSV");
   std::ofstream csv(path);if(!csv)throw std::runtime_error("could not open evidence CSV");
   csv<<"material,requested_elements,primitives,nodes,bonds,seed,frame,policy,query_ms,"
         "pairs,oracle_checked,oracle_pairs,misses,extras,region_builds,region_reuses,"
