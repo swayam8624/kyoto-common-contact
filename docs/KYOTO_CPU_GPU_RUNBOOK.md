@@ -6,12 +6,12 @@ This branch is **implementation in progress**, not a completed large-scale empir
 
 | Executable | Actual algorithm | Hardware and threading | What it measures |
 | --- | --- | --- | --- |
-| `ccp_scaling_cpu` | Exact 3D SAP with serial and deterministic worker-partitioned passes | 1 CPU thread / specified C++ worker count | Includes sorting, thread creation/join, collision candidate materialization and deterministic merge |
+| `ccp_scaling_cpu` | Exact 3D SAP with serial, fixed-worker, work-aware and small-scene automatic paths | 1 CPU thread / specified C++ worker count | Includes sorting, thread creation/join, collision candidate materialization and deterministic merge |
 | `ccp_scaling_regional` | Project's real `RegionalCandidates`: certified region cache, fixed/adaptive padding, optional hierarchical top level | CPU, currently serial | End-to-end actual regional query including region building/cache work |
-| `ccp_scaling_metal` with `sap` | GPU Metal compute SAP after CPU x-sort | Apple GPU + host CPU sort | Host sorting/upload/encode/submit/wait time and GPU kernel duration separately |
-| `ccp_scaling_metal` with `exhaustive` | GPU exhaustive exact 3D AABB reference | Apple GPU | Reference throughput/correctness, **not a competitive scalable broad-phase strategy** |
+| `ccp_scaling_metal` with `sap` | GPU Metal compute SAP after CPU x-sort, with prefix-summed full pair emission | Apple GPU + host CPU sort | Host sorting/upload/encode/submit/wait, CPU prefix, GPU pair emission, and output readback; Metal kernel durations separately |
+| `ccp_scaling_metal` with `exhaustive` | GPU exhaustive 3D AABB reference, with full pair emission | Apple GPU | Reference throughput/correctness including pair output, **not a competitive scalable broad-phase strategy** |
 
-The GPU currently computes **overlap counts**, not a full pair list. Therefore GPU timings CANNOT be ranked as equivalent to CPU candidate-list materialization: the GPU must also generate and transfer actual pairs to make a fully fair end-to-end comparison. Host timing currently starts after snapshot generation, and ends after the GPU command completes; it includes host sort and copy in SAP mode but not count reduction/readback. GPU timing excludes host work. These boundaries must appear with every chart.
+Metal now performs **two GPU passes**: exact per-object count and collision pair compaction with CPU exclusive prefix offsets. Its host timing includes host sort (SAP), input copying, queue execution, readback and validation of duplicate pair IDs; its separately reported GPU time adds the durations of both compute kernels. The CPU benchmark also materializes exact candidate pairs. Equal snapshot numeric semantics and consistent timing methodology still require final cross-device audits, because the CPU benchmark uses float geometry while the regional core uses double.
 
 The real **online contact-work-aware partitioner** is not yet part of the multi-core/GPU scaling executables. `ccp_scaling_regional` exercises the underlying existing certified regional implementation, not the closed-loop online optimizer. The coupled cloth viewer still has a fixed 12×12-cell, at most three-sheet simulation. Scaling object AABBs alone is not scaling physical cloth.
 
@@ -44,7 +44,7 @@ All generators use independent reproducible snapshot construction with the same 
 
 ## Cautious exploratory scaling
 
-Use `sparse`, `cluster`, `hotspot`, `dense` in increasing sizes. Start at 256, 1k, 4k, 16k and progress only after memory/correctness checks. The `all_overlap` scenario is deliberately limited to 2048 objects in CPU/regional benchmark because exact candidate output is quadratic. GPU-only counting can go larger, but does not materialize output.
+Use `sparse`, `cluster`, `hotspot`, `dense` in increasing sizes. Start at 256, 1k, 4k, 16k and progress only after memory/correctness checks. The `all_overlap` scenario is deliberately limited to 2048 objects in CPU/regional benchmark because exact candidate output is quadratic. Metal produces full pair output and enforces a 16-million-pair safety cap.
 
 For each run, record git SHA, hardware/CPU cores, RAM, GPU model, macOS/Linux version, compiler and flags, power/thermal state, build mode, seed, frame count, thread count and output CSV checksum. Compare **same experiment/same algorithm output semantics only**. Run at least five independent process launches, randomize order, report median/dispersion, distinguish correctness-audited frames from unaudited ones.
 
@@ -52,7 +52,7 @@ For each run, record git SHA, hardware/CPU cores, RAM, GPU model, macOS/Linux ve
 
 - CPU serial and multithread SAP compare exact full pair vectors against an exhaustive AABB oracle in `--self-test`.
 - CPU and regional scaling executions audit every fifth frame when `N<=2048`. Larger benchmark frames are **not exhaustively validated** by these programs, and should not be presented as so.
-- Metal code audits every fifth frame at `N<=2048` against independent CPU brute-force **overlap count**. Count equality alone cannot rule out pair substitution (one missed pair and one extra can cancel). A full pair-set validation is necessary for publication-grade correctness.
+- Metal audits every fifth frame at `N<=2048` against independent CPU brute-force **full pair sets**. Larger frames are not exhaustively audited and must be clearly labeled.
 - Current Metal code is a reference workload. It does **not** simulate a GPU port of the full adaptive region algorithm.
 
 ## Engineering next milestones
@@ -62,7 +62,7 @@ For each run, record git SHA, hardware/CPU cores, RAM, GPU model, macOS/Linux ve
 3. Implement a strong incremental SAP baseline, not merely SAP rebuild.
 4. Generalize mesh dimensions and region ID namespace beyond 12×12 and three cloth sheets; prove partition coverage and stable/collision-free IDs.
 5. Parallelize region-pair work using independent thread-local buffers and deterministic consolidation, while keeping mutable cached certificates synchronized at frame boundaries.
-6. Port certified regional candidate generation to Metal using bounds, patch membership and prefix-summed pair compaction. Time transfers, allocation, execution and complete materialization, and compare exact candidate pairs.
+6. Port **the certified regional candidate algorithm**, not merely SAP, to Metal using bounds, patch membership and prefix-summed pair compaction. Time transfers, allocation, execution and complete materialization, and compare exact candidate pairs.
 7. Integrate true online controller feedback for both CPU multicore and GPU using the SAME state sequence; stress transient and steady contact regimes.
 8. Profile, train policy thresholds on separate scenes, preserve held-out validation and generate a presentation only from measured evidence.
 
