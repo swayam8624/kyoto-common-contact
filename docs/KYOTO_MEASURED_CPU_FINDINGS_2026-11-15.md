@@ -48,3 +48,18 @@ The two tables are **different run cohorts** and should not be pooled into a sin
 State only that parallel SAP shows a **measured crossover** and that the *present* regional method remains behind. This guides the next optimization and avoids claiming that Kyoto's original proposed online partitioner already wins.
 
 Produced from raw archived CSV, not a simulated estimate or fabricated table.
+
+## Stronger temporal baseline — incremental SAP (later run cohort)
+
+Workflow: [Kyoto scaling references, run 43741390835](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43741390835), `kyoto-linux-cpu-crossover` artifact ID `14171634711`. The new `cpu_sap_incremental` keeps an X-sorted order and repairs adjacent inversions across frames. The implementation compares the **complete candidate pair vector** against rebuilt serial SAP every frame and against the exhaustive reference on selected smaller frames.
+
+| Scenario | N | Serial rebuilt SAP | Incremental SAP | Four-thread fixed SAP | Work-aware SAP | Auto |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Cluster | 512 | 0.03410 | 0.04712 | 0.12898 | 0.12962 | 0.03087 |
+| Cluster | 4096 | 2.20391 | 1.98513 | 0.97910 | 1.06134 | 1.05059 |
+| Cluster | 16384 | 24.81983 | 24.13938 | 11.03380 | 11.25040 | 11.25665 |
+| Hotspot | 512 | 0.01621 | 0.02010 | 0.11441 | 0.11451 | 0.01273 |
+| Hotspot | 4096 | 1.27378 | 0.96550 | 0.77411 | 0.77106 | 0.76654 |
+| Hotspot | 16384 | 13.60797 | 12.28578 | 7.55936 | 6.81086 | 6.80570 |
+
+Times are again median of three run-level frame medians, in milliseconds. The new incremental baseline is stronger than full sorting on the 4,096/16,384-object scenes, but still slower than four-thread methods there; it can also be slower at 512 objects because the insertion-maintenance overhead is not free. It uses a simple adjacent inversion repair and is **not** a best-available published incremental SAP implementation. These are a *different CI run* from the table above: do not compare individual numbers across runs as a synchronized paired trial. GPU timings, the original adaptive-region controller's large-scale performance and independent cross-host replicates remain unmeasured.
