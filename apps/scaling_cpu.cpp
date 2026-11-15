@@ -104,14 +104,70 @@ Pairs sap(const Snapshot& s,unsigned workers){
  for(auto& v:local)result.insert(result.end(),v.begin(),v.end());
  canonical(result);return result;
 }
+
+// Work-aware SAP: create deterministic chunks according to estimated X-axis
+// candidate work, rather than giving each thread the same number of objects.
+// This is a CPU optimization candidate, not the original cloth controller.
+// No pair ownership overlaps: each chunk owns unique sorted left indices.
+Pairs sapWorkAware(const Snapshot& s,unsigned workers){
+ const auto order=sortedX(s);
+ const size_t n=order.size();
+ workers=std::max(1u,std::min(workers,unsigned(std::max(size_t(1),n))));
+ // The sorted low-X sequence is monotone. upper_bound returns the final
+ // possible X-overlap for each left endpoint, reducing load imbalance when a
+ // small subset of objects sits in a dense collision hotspot.
+ std::vector<size_t> cost(n),prefix(n+1,0);
+ for(size_t i=0;i<n;++i){
+  const float high=s.boxes[order[i]].hi[0];
+  const auto end=std::upper_bound(order.begin()+i+1,order.end(),high,
+   [&](float value,uint32_t id){return value<s.boxes[id].lo[0];});
+  cost[i]=size_t(end-(order.begin()+i+1));
+  prefix[i+1]=prefix[i]+cost[i]+1; // +1 ensures progress for sparse scenes
+ }
+ const size_t chunks=std::min(n,size_t(workers)*8);
+ std::vector<size_t> boundaries(chunks+1,0);
+ for(size_t c=1;c<chunks;++c){
+  const size_t target=prefix[n]*c/chunks;
+  boundaries[c]=size_t(std::lower_bound(prefix.begin(),prefix.end(),target)-prefix.begin());
+ }
+ boundaries[chunks]=n;
+ std::vector<Pairs> local(chunks);
+ std::atomic<size_t> next{0};
+ auto work=[&](){
+  while(true){
+   const size_t chunk=next.fetch_add(1,std::memory_order_relaxed);
+   if(chunk>=chunks)break;
+   auto& out=local[chunk];
+   for(size_t i=boundaries[chunk];i<boundaries[chunk+1];++i){
+    const uint32_t a=order[i];const Box& left=s.boxes[a];
+    for(size_t j=i+1;j<=i+cost[i];++j){
+     const uint32_t b=order[j];const Box& right=s.boxes[b];
+     if(overlap(left,right))out.push_back({std::min(a,b),std::max(a,b)});
+    }
+   }
+  }
+ };
+ std::vector<std::thread> pool;
+ if(workers==1)work();
+ else{
+  for(unsigned t=0;t<workers;++t)pool.emplace_back(work);
+  for(auto& thread:pool)thread.join();
+ }
+ size_t total=0;for(const auto& v:local)total+=v.size();
+ Pairs all;all.reserve(total);
+ for(const auto& v:local)all.insert(all.end(),v.begin(),v.end());
+ canonical(all);
+ return all;
+}
+
 // This is a *measured CPU benchmark* of SAP, NOT the project's online policy.
 // Integrating the actual adaptive regional implementation is a separate task.
 struct Result{double ms;size_t pairs;};
-Result timed(const Snapshot& s,unsigned threads,int runs){
+Result timed(const Snapshot& s,unsigned threads,int runs,bool balanced=false){
  std::vector<double> samples;size_t pairs=0;
  for(int r=0;r<runs;++r){
   const auto start=Clock::now();
-  const auto output=sap(s,threads);
+  const auto output=balanced?sapWorkAware(s,threads):sap(s,threads);
   const auto elapsed=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
   samples.push_back(elapsed);pairs=output.size();
  }
@@ -132,6 +188,7 @@ void selfTest(){
    for(unsigned t:{1u,2u,3u,8u}){
     const auto actual=sap(s,t);
     if(actual!=truth)throw std::runtime_error(std::string("SAP mismatch: ")+scene);
+    if(sapWorkAware(s,t)!=truth)throw std::runtime_error(std::string("work-aware SAP mismatch: ")+scene);
    }
   }
  std::cout<<"PASS: serial and threaded SAP match exhaustive pair oracle on all test scenes\n";
@@ -156,15 +213,16 @@ int main(int argc,char** argv){
    const auto s=makeScene(n,seed,frame,scene);
    const auto one=sap(s,1);
    const auto many=sap(s,threads);
-   if(one!=many)throw std::runtime_error("parallel SAP differs from serial SAP");
+   if(one!=many || one!=sapWorkAware(s,threads))throw std::runtime_error("parallel SAP or work-aware scheduler differs from serial SAP");
    bool checked=n<=2048&&(frame%5==0);
    if(checked&&one!=exhaustive(s))throw std::runtime_error("SAP oracle failure");
    // Repeat each measurement to reduce timer granularity effects. Timing
    // includes x-axis sorting, thread startup, pair materialization and merge.
-   for(unsigned variant=0;variant<(threads==1?1u:2u);++variant){
+   for(unsigned variant=0;variant<(threads==1?1u:3u);++variant){
     const unsigned count=variant==0?1u:threads;
-    const auto measured=timed(s,count,3);
-    out<<(count==1?"cpu_sap_serial":"cpu_sap_threaded")<<','<<scene<<','<<n<<','<<frame<<','
+    const bool balanced=variant==2;
+    const auto measured=timed(s,count,3,balanced);
+    out<<(balanced?"cpu_sap_work_aware":count==1?"cpu_sap_serial":"cpu_sap_threaded")<<','<<scene<<','<<n<<','<<frame<<','
        <<seed<<','<<count<<','<<measured.ms<<','<<measured.pairs<<','
        <<(checked?1:0)<<",0\n";
    }
