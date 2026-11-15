@@ -23,6 +23,12 @@
 #include <vector>
 namespace {
 struct alignas(16) GPUBox {float lo[4],hi[4];};
+// Match Metal Region's 48-byte layout: Box (32) + four uint32 fields.
+struct alignas(16) GPURegion {
+ GPUBox envelope;
+ uint32_t begin{},end{},reserved0{},reserved1{};
+};
+static_assert(sizeof(GPURegion)==48);
 struct GPUPair {uint32_t a,b; bool operator<(const GPUPair& q)const{return a<q.a||(a==q.a&&b<q.b);} bool operator==(const GPUPair& q)const{return a==q.a&&b==q.b;}};
 using Clock=std::chrono::steady_clock;
 class MaterialReplay {
@@ -180,6 +186,54 @@ kernel void exhaustive_pairs(
   }
  }
 }
+
+struct Region {Box box;uint start,end,pad0,pad1;};
+kernel void region_count(
+  device const Box* boxes [[buffer(0)]],
+  device uint* counts [[buffer(1)]],
+  constant uint& n [[buffer(2)]],
+  device const Region* regions [[buffer(3)]],
+  constant uint& regionCount [[buffer(4)]],
+  uint i [[thread_position_in_grid]]) {
+ if(i>=n)return;
+ const Box a=boxes[i];uint found=0;
+ // Regions are sorted by the minimum X of the conservative union envelope.
+ // Every actual overlap must occur in an intersecting region envelope.
+ for(uint r=0;r<regionCount;++r){
+  const Region reg=regions[r];
+  if(reg.box.lo.x>a.hi.x)break;
+  if(!all(a.lo.xyz<=reg.box.hi.xyz)||!all(reg.box.lo.xyz<=a.hi.xyz))continue;
+  for(uint j=reg.start;j<reg.end;++j){
+   if(j<=i)continue;
+   Box b=boxes[j];
+   if(all(a.lo.xyz<=b.hi.xyz)&&all(b.lo.xyz<=a.hi.xyz))++found;
+  }
+ }
+ counts[i]=found;
+}
+kernel void region_pairs(
+  device const Box* boxes [[buffer(0)]],
+  device Pair* output [[buffer(1)]],
+  constant uint& n [[buffer(2)]],
+  device const uint* offsets [[buffer(3)]],
+  device const Region* regions [[buffer(4)]],
+  constant uint& regionCount [[buffer(5)]],
+  uint i [[thread_position_in_grid]]) {
+ if(i>=n)return;
+ const Box a=boxes[i];uint cursor=offsets[i];
+ for(uint r=0;r<regionCount;++r){
+  const Region reg=regions[r];
+  if(reg.box.lo.x>a.hi.x)break;
+  if(!all(a.lo.xyz<=reg.box.hi.xyz)||!all(reg.box.lo.xyz<=a.hi.xyz))continue;
+  for(uint j=reg.start;j<reg.end;++j){
+   if(j<=i)continue;
+   Box b=boxes[j];
+   if(all(a.lo.xyz<=b.hi.xyz)&&all(b.lo.xyz<=a.hi.xyz)){
+    output[cursor]=Pair{i,j};++cursor;
+   }
+  }
+ }
+}
 )METAL";
 }
 int main(int argc,char** argv){
@@ -187,7 +241,7 @@ int main(int argc,char** argv){
  try{
   const bool replay=argc==5&&std::string(argv[1])=="--replay";
   if(!replay&&argc!=7)
-   throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive] OR --replay MATERIAL.kmcb OUTPUT.csv MODE[sap|exhaustive]");
+   throw std::runtime_error("usage: ccp_scaling_metal OUTPUT.csv N FRAMES SCENE SEED MODE[sap|exhaustive|region|online] OR --replay MATERIAL.kmcb OUTPUT.csv MODE[sap|exhaustive|region|online]");
   std::unique_ptr<MaterialReplay> material;
   if(replay)material=std::make_unique<MaterialReplay>(argv[2]);
   const size_t n=replay?material->count:positive(argv[2],16384);
@@ -195,29 +249,36 @@ int main(int argc,char** argv){
   const auto kind=replay?std::string("material_replay_")+std::to_string(material->material):std::string(argv[4]);
   const unsigned seed=replay?material->seed:unsigned(positive(argv[5],std::numeric_limits<unsigned>::max()));
   const std::string mode=replay?argv[4]:argv[6];
-  if(mode!="sap"&&mode!="exhaustive")throw std::runtime_error("invalid Metal mode");
+  if(mode!="sap"&&mode!="exhaustive"&&mode!="region"&&mode!="online")
+   throw std::runtime_error("invalid Metal mode");
   id<MTLDevice> device=MTLCreateSystemDefaultDevice();
   if(!device)throw std::runtime_error("no Metal GPU found");
   NSError* err=nil;
   NSString* code=[NSString stringWithUTF8String:metalSource];
   id<MTLLibrary> library=[device newLibraryWithSource:code options:nil error:&err];
   if(!library)throw std::runtime_error([[err localizedDescription] UTF8String]);
-  id<MTLFunction> fn=[library newFunctionWithName:(mode=="sap"?@"sap_count":@"overlap_count")];
+  const bool regional=(mode=="region"||mode=="online");
+  id<MTLFunction> fn=[library newFunctionWithName:regional?@"region_count":
+                         mode=="sap"?@"sap_count":@"overlap_count"];
   id<MTLComputePipelineState> pipeline=[device newComputePipelineStateWithFunction:fn error:&err];
-  id<MTLFunction> pairFn=[library newFunctionWithName:(mode=="sap"?@"sap_pairs":@"exhaustive_pairs")];
+  id<MTLFunction> pairFn=[library newFunctionWithName:regional?@"region_pairs":
+                             mode=="sap"?@"sap_pairs":@"exhaustive_pairs"];
   id<MTLComputePipelineState> pairPipeline=[device newComputePipelineStateWithFunction:pairFn error:&err];
   if(!pipeline||!pairPipeline)throw std::runtime_error([[err localizedDescription] UTF8String]);
   id<MTLCommandQueue> queue=[device newCommandQueue];
   id<MTLBuffer> input=[device newBufferWithLength:n*sizeof(GPUBox) options:MTLResourceStorageModeShared];
   id<MTLBuffer> counts=[device newBufferWithLength:n*sizeof(uint32_t) options:MTLResourceStorageModeShared];
   id<MTLBuffer> offsets=[device newBufferWithLength:n*sizeof(uint32_t) options:MTLResourceStorageModeShared];
-  if(!queue||!input||!counts||!offsets)throw std::runtime_error("Metal resource allocation failed");
+  id<MTLBuffer> regionData=[device newBufferWithLength:((n+15)/16)*sizeof(GPURegion) options:MTLResourceStorageModeShared];
+  if(!queue||!input||!counts||!offsets||!regionData)throw std::runtime_error("Metal resource allocation failed");
   std::filesystem::path path(replay?argv[3]:argv[1]);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
   if(std::filesystem::exists(path))throw std::runtime_error("refusing to overwrite GPU evidence CSV");
   std::ofstream out(path);if(!out)throw std::runtime_error("cannot open output CSV");
-  out<<"backend,scene,n,frame,seed,device,host_ms,gpu_ms,overlaps,oracle_checked,misses,pair_bytes,pair_hash\n";
+  out<<"backend,scene,n,frame,seed,device,host_ms,gpu_ms,overlaps,oracle_checked,misses,pair_bytes,pair_hash,region_span,region_count,online_changed\n";
   out<<std::fixed<<std::setprecision(8);
+  uint32_t currentSpan=64;
+  int lastOnlineEdit=-1000;
   for(size_t frame=0;frame<frames;++frame){
    auto boxes=replay?material->read():scene(n,seed,int(frame),kind);
    const auto originalBoxes=boxes;
@@ -234,6 +295,30 @@ int main(int argc,char** argv){
     boxes=std::move(ordered);
    }
    std::copy(boxes.begin(),boxes.end(),static_cast<GPUBox*>([input contents]));
+   uint32_t regionCount=0;
+   if(regional){
+    std::vector<GPURegion> unions;
+    unions.reserve((n+currentSpan-1)/currentSpan);
+    for(size_t first=0;first<n;first+=currentSpan){
+     const size_t stop=std::min(n,first+currentSpan);
+     GPURegion reg{};
+     reg.begin=uint32_t(first);reg.end=uint32_t(stop);
+     reg.envelope=boxes[first];
+     for(size_t k=first+1;k<stop;++k)
+      for(int axis=0;axis<3;++axis){
+       reg.envelope.lo[axis]=std::min(reg.envelope.lo[axis],boxes[k].lo[axis]);
+       reg.envelope.hi[axis]=std::max(reg.envelope.hi[axis],boxes[k].hi[axis]);
+      }
+     unions.push_back(reg);
+    }
+    std::sort(unions.begin(),unions.end(),[](const GPURegion& a,const GPURegion& b){
+     return a.envelope.lo[0]<b.envelope.lo[0]||
+       (a.envelope.lo[0]==b.envelope.lo[0]&&a.begin<b.begin);
+    });
+    regionCount=uint32_t(unions.size());
+    if(regionCount>(n+15)/16)throw std::runtime_error("region allocation overflow");
+    std::copy(unions.begin(),unions.end(),static_cast<GPURegion*>([regionData contents]));
+   }
    id<MTLCommandBuffer> cmd=[queue commandBuffer];
    id<MTLComputeCommandEncoder> encoder=[cmd computeCommandEncoder];
    if(!cmd||!encoder)throw std::runtime_error("Metal command creation failed");
@@ -242,6 +327,10 @@ int main(int argc,char** argv){
    [encoder setBuffer:counts offset:0 atIndex:1];
    const uint32_t count=uint32_t(n);
    [encoder setBytes:&count length:sizeof(count) atIndex:2];
+   if(regional){
+    [encoder setBuffer:regionData offset:0 atIndex:3];
+    [encoder setBytes:&regionCount length:sizeof(regionCount) atIndex:4];
+   }
    const NSUInteger group=std::min(NSUInteger(pipeline.maxTotalThreadsPerThreadgroup),NSUInteger(256));
    [encoder dispatchThreads:MTLSizeMake(n,1,1) threadsPerThreadgroup:MTLSizeMake(group,1,1)];
    [encoder endEncoding];[cmd commit];[cmd waitUntilCompleted];
@@ -268,6 +357,10 @@ int main(int argc,char** argv){
    [pairEncoder setBuffer:pairs offset:0 atIndex:1];
    [pairEncoder setBytes:&count length:sizeof(count) atIndex:2];
    [pairEncoder setBuffer:offsets offset:0 atIndex:3];
+   if(regional){
+    [pairEncoder setBuffer:regionData offset:0 atIndex:4];
+    [pairEncoder setBytes:&regionCount length:sizeof(regionCount) atIndex:5];
+   }
    const NSUInteger pairGroup=std::min(NSUInteger(pairPipeline.maxTotalThreadsPerThreadgroup),NSUInteger(256));
    [pairEncoder dispatchThreads:MTLSizeMake(n,1,1) threadsPerThreadgroup:MTLSizeMake(pairGroup,1,1)];
    [pairEncoder endEncoding];[pairCmd commit];[pairCmd waitUntilCompleted];
@@ -291,12 +384,28 @@ int main(int argc,char** argv){
    const bool checked=n<=2048&&(frame%5==0);
    if(checked&&actual!=oraclePairs(originalBoxes))
     throw std::runtime_error("GPU stable-ID pair set differs from independent CPU exhaustive oracle");
-   out<<(mode=="sap"?"metal_sap_sorted":"metal_exhaustive_reference")<<","<<kind<<','<<n<<','<<frame<<','<<seed<<','
+   // GPU online regional control sees ONLY past observed candidate density,
+   // and pays future region-build costs. This is a candidate-work proxy,
+   // not the original CPU cloth controller's confirmed physical contacts.
+   bool changed=false;
+   const uint32_t measuredSpan=currentSpan;
+   if(mode=="online"&&int(frame)-lastOnlineEdit>=24&&frame%12==11){
+    const double density=double(total)/double(n);
+    uint32_t desired=currentSpan;
+    if(density>20. && currentSpan>16)desired=currentSpan/2;
+    else if(density<3.&&currentSpan<256)desired=currentSpan*2;
+    if(desired!=currentSpan){
+     currentSpan=desired;changed=true;lastOnlineEdit=int(frame);
+    }
+   }
+   out<<(mode=="sap"?"metal_sap_sorted":mode=="exhaustive"?"metal_exhaustive_reference":
+          mode=="region"?"metal_region_fixed":"metal_region_online")
+      <<","<<kind<<','<<n<<','<<frame<<','<<seed<<','
       <<'"'<<[[device name] UTF8String]<<'"'<<','<<host<<','<<gpu<<','<<total<<','
-      <<(checked?1:0)<<",0,"<<total*sizeof(GPUPair)<<","<<hash<<"\n";
+      <<(checked?1:0)<<",0,"<<total*sizeof(GPUPair)<<","<<hash<<","<<measuredSpan<<","<<regionCount<<","<<(changed?1:0)<<"\n";
   }
   if(!out)throw std::runtime_error("CSV write failure");
-  std::cout<<"Metal GPU SAP now materializes exact pairs, including count/prefix/compaction. Adaptive GPU partitioning is NOT implemented.\n";
+  std::cout<<"Metal benchmark materializes exact pairs for SAP, region-pruned and an experimental online span controller. The ORIGINAL cloth-specific online controller is NOT on the GPU.\n";
  }catch(const std::exception& e){std::cerr<<"METAL BENCHMARK FAILED: "<<e.what()<<'\n';return 1;}
  }
 }
