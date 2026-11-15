@@ -79,12 +79,14 @@ for mat in cloth sponge cushion soft_ball spring mixed; do
   ./build/ccp_material_replay "$snapshot" "$cpu" 1 \
     2>&1 | tee "$RUN/logs/replay-${mat}-cpu.log"
   if [ -x ./build/ccp_scaling_metal ]; then
-    gpu="$RUN/csv/actual-${mat}-metal-sap.csv"
-    ./build/ccp_scaling_metal --replay "$snapshot" "$gpu" sap \
-      2>&1 | tee "$RUN/logs/replay-${mat}-gpu.log"
-    python3 scripts/verify_material_cpu_gpu.py "$cpu" "$gpu" \
-      --output "$RUN/verification/${mat}-cpu-gpu.md" \
-      2>&1 | tee "$RUN/logs/verify-${mat}-gpu.log"
+    for backend in sap region online; do
+      gpu="$RUN/csv/actual-${mat}-metal-${backend}.csv"
+      ./build/ccp_scaling_metal --replay "$snapshot" "$gpu" "$backend" \
+        2>&1 | tee "$RUN/logs/replay-${mat}-gpu-${backend}.log"
+      python3 scripts/verify_material_cpu_gpu.py "$cpu" "$gpu" \
+        --output "$RUN/verification/${mat}-cpu-metal-${backend}.md" \
+        2>&1 | tee "$RUN/logs/verify-${mat}-gpu-${backend}.log"
+    done
   else
     echo "No Metal GPU executable: CPU-only for $mat" | tee "$RUN/logs/metal-unavailable-${mat}.log"
   fi
