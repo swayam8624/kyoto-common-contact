@@ -1,5 +1,6 @@
 name: Kyoto scaling references
 on:
+  workflow_dispatch:
   push:
     branches:
       - research/kyoto-scale-evidence
@@ -96,6 +97,32 @@ jobs:
             done
           done
           python3 scripts/summarize_material_suite.py /tmp/kyoto-material-evidence/materials-*.csv --output /tmp/kyoto-material-evidence/SUMMARY.md > /tmp/kyoto-material-evidence/summary.log
+      - name: Isolated resource-capped CPU stress runner regression
+        run: |
+          python3 scripts/run_kyoto_stress.py quick \
+            --build /tmp/kyoto-material-build \
+            --output /tmp/kyoto-stress-smoke \
+            --max-seconds-per-policy 60 \
+            --max-rss-mb 1024 \
+            --max-experiments 12
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          doc=json.loads(Path('/tmp/kyoto-stress-smoke/manifest.json').read_text())
+          assert len(doc['results'])==12
+          successes=[r for r in doc['results'] if r['status']=='success']
+          assert len(successes)>=10, doc['results']
+          assert all(r['oracle_checks']>0 for r in successes)
+          print('Resource-capped stress runner PASS, exact AABB checks:',len(successes))
+          PY
+      - name: Preserve independently capped stress experiments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-cpu-stress-smoke
+          path: /tmp/kyoto-stress-smoke/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Preserve real material and exact CPU replay evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,6 +148,9 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
   learned-training-smoke:
+    # Full PyTorch downloads/training are expensive; trigger explicitly.
+    # CPU and macOS correctness jobs still run on every research push.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
