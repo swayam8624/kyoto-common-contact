@@ -65,6 +65,35 @@ KYOTO_VERBOSE=2 bash scripts/run_kyoto_materials_mac.sh standard
 
 All run artifacts are placed under a timestamped `output/kyoto-materials-YYYYMMDDTHHMMSSZ-MODE/` directory. The script **also creates a ZIP** beside that directory, even if an experiment fails. The ZIP includes raw CSVs, frame-level diagnostic logs, failure context, hardware description, CMake and CTest logs, CPU/GPU verifier reports, exact serialized AABB streams, and SHA256 manifests. Upload the ZIP for independent performance analysis.
 
+## macOS Xcode / Anaconda toolchain troubleshooting
+
+On November 15, an Apple Silicon run failed **before any benchmark executed** because the shell invoked Anaconda's CMake 3.28 although Homebrew had installed CMake 4.5.0. Its Objective-C++ compiler test failed at the linker with `ld: library 'c++' not found`. This does not indicate anything about the Online algorithm.
+
+The macOS runner now resolves `brew --prefix` and executes the installed Homebrew CMake/CTest directly. It discovers `clang++` and the macOS SDK via `xcrun`, supplies the SDK explicitly to CMake, and uses `build/kyoto-material-macos` rather than any cached Anaconda-generated `build/CMakeCache.txt`. Before configuration, an Objective-C++ program is compiled **and linked** against that SDK; a failure is preserved in a timestamped diagnostic ZIP instead of continuing with invalid performance results.
+
+After pulling the updated branch, run:
+
+```bash
+# Recommended: exit the active "(base)" conda environment if shown.
+conda deactivate
+git pull --ff-only origin research/kyoto-scale-evidence
+KYOTO_VERBOSE=2 bash scripts/run_kyoto_materials_mac.sh smoke
+```
+
+Conda deactivation is recommended to reduce unrelated package search pollution, but the script uses explicit CMake paths even if conda remains active.
+
+If the **new** toolchain probe still reports a missing libc++ library, inspect:
+
+```bash
+xcode-select -p
+xcodebuild -version
+xcrun --sdk macosx --show-sdk-path
+ls -l "$(xcrun --sdk macosx --show-sdk-path)/usr/lib/libc++.tbd"
+/opt/homebrew/opt/cmake/bin/cmake --version
+```
+
+If the Xcode path or SDK is truly missing, repair/select the installed full Xcode toolchain before retrying. **Do not** create an empty `libc++.tbd`, insert random dylib symlinks, or suppress linker errors. The new ZIP contains `logs/toolchain-environment.txt` and `logs/toolchain-probe.log` for identifying the exact environment failure.
+
 ## Individual commands (after building)
 
 ```bash
