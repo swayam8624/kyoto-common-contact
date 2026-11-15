@@ -105,7 +105,8 @@ include(CTest)
 if(BUILD_TESTING)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
-    COMMAND ccp_material_benchmark ${CMAKE_CURRENT_BINARY_DIR}/material-ci-smoke.csv all 48 4 1234 1 0)
+    COMMAND ${CMAKE_COMMAND} -E env CCP_CTEST_SMOKE=1
+      $<TARGET_FILE:ccp_material_benchmark> ${CMAKE_CURRENT_BINARY_DIR}/material-ci-smoke.csv all 48 4 1234 1 0)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
