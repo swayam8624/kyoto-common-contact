@@ -37,6 +37,11 @@ add_library(ccp_multicloth src/research_multicloth.cpp src/online_partitioner.cp
 target_link_libraries(ccp_multicloth PUBLIC ccp_live)
 target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+# Selective guard can repair isolated cache escapes without full rebuild.
+add_executable(ccp_selective_guard_tests tests/selective_guard_tests.cpp)
+target_link_libraries(ccp_selective_guard_tests PRIVATE ccp_live)
+target_compile_options(ccp_selective_guard_tests PRIVATE -Wall -Wextra -Wpedantic)
+
 # Heterogeneous, deformable mass-spring broad-phase research fixtures.
 add_executable(ccp_material_benchmark apps/material_suite_benchmark.cpp)
 target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
@@ -98,6 +103,7 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
     COMMAND ccp_material_benchmark ${CMAKE_CURRENT_BINARY_DIR}/material-ci-smoke.csv all 48 4 1234 1 0)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
