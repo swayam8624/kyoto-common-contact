@@ -7,10 +7,10 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 MODE="${1:-standard}"
 case "$MODE" in
-  smoke) SIZES=(64) ; FRAMES=8 ; AUDIT=1 ; CLOTH_FRAMES=16 ;;
-  quick) SIZES=(256 1024) ; FRAMES=36 ; AUDIT=4 ; CLOTH_FRAMES=48 ;;
-  standard) SIZES=(256 1024 4096) ; FRAMES=96 ; AUDIT=8 ; CLOTH_FRAMES=80 ;;
-  stress) SIZES=(512 2048 8192 16000) ; FRAMES=180 ; AUDIT=12 ; CLOTH_FRAMES=120 ;;
+  smoke) SIZES=(64) ; FRAMES=8 ; AUDIT=1 ; CLOTH_FRAMES=16 ; REGIMES=(baseline) ; GPU_REGIMES=(baseline) ;;
+  quick) SIZES=(256 1024) ; FRAMES=36 ; AUDIT=4 ; CLOTH_FRAMES=48 ; REGIMES=(baseline impact) ; GPU_REGIMES=(baseline) ;;
+  standard) SIZES=(256 1024 4096) ; FRAMES=96 ; AUDIT=8 ; CLOTH_FRAMES=80 ; REGIMES=(baseline impact shear compression) ; GPU_REGIMES=(baseline impact) ;;
+  stress) SIZES=(512 2048 8192 16000) ; FRAMES=180 ; AUDIT=12 ; CLOTH_FRAMES=120 ; REGIMES=(baseline impact shear compression rapid relax) ; GPU_REGIMES=(baseline impact compression rapid) ;;
   *) echo "Usage: $0 [smoke|quick|standard|stress]" >&2 ; exit 2 ;;
 esac
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -53,6 +53,16 @@ for n in "${SIZES[@]}"; do
 done
 CSVFILES=()
 for n in "${SIZES[@]}"; do CSVFILES+=("$RUN/csv/materials-n${n}.csv"); done
+for regime in "${REGIMES[@]}"; do
+  if [ "$regime" = baseline ]; then continue; fi
+  case "$MODE" in smoke) extraN=64; extraFrames=8;; quick) extraN=256; extraFrames=36;;
+    standard) extraN=1024; extraFrames=96;; stress) extraN=2048; extraFrames=180;; esac
+  outfile="$RUN/csv/materials-${regime}-n${extraN}.csv"
+  echo "[KYOTO] deformation stress regime=$regime n=$extraN"
+  ./build/ccp_material_benchmark "$outfile" all "$extraN" "$extraFrames" 1234 "$AUDIT" 1 "$regime" \
+    2>&1 | tee "$RUN/logs/materials-${regime}.log"
+  CSVFILES+=("$outfile")
+done
 python3 scripts/summarize_material_suite.py "${CSVFILES[@]}" \
   --output "$RUN/MATERIAL_RESULTS.md" > "$RUN/logs/material-summary.log"
 echo "[KYOTO] coupled cloth - original Online controller vs Global Guard / SAP"
@@ -60,7 +70,8 @@ echo "[KYOTO] coupled cloth - original Online controller vs Global Guard / SAP"
   2>&1 | tee "$RUN/logs/coupled-2-obstacles.log"
 ./build/ccp_multicloth_benchmark "$RUN/csv/coupled-5-obstacles.csv" "$CLOTH_FRAMES" 5 \
   2>&1 | tee "$RUN/logs/coupled-5-obstacles.log"
-./build/ccp_online_trace "$RUN/csv/online-original-trace.csv" "$CLOTH_FRAMES" \
+TRACE_FRAMES=$(( CLOTH_FRAMES < 60 ? 60 : CLOTH_FRAMES ))
+./build/ccp_online_trace "$RUN/csv/online-original-trace.csv" "$TRACE_FRAMES" \
   2>&1 | tee "$RUN/logs/online-trace.log"
 echo "[KYOTO] exact material snapshots shared between CPU and Metal"
 case "$MODE" in
@@ -70,28 +81,30 @@ case "$MODE" in
  stress) REPLAY_BUDGET=4096 ; REPLAY_FRAMES=120 ;;
 esac
 mkdir -p "$RUN/snapshots" "$RUN/verification"
+for regime in "${GPU_REGIMES[@]}"; do
 for mat in cloth sponge cushion soft_ball spring mixed; do
-  snapshot="$RUN/snapshots/${mat}.kmcb"
-  cpu="$RUN/csv/actual-${mat}-cpu.csv"
+  snapshot="$RUN/snapshots/${mat}-${regime}.kmcb"
+  cpu="$RUN/csv/actual-${mat}-${regime}-cpu.csv"
   echo "[KYOTO] serializing $mat Float32 AABB trajectories"
-  ./build/ccp_material_export "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 \
-    2>&1 | tee "$RUN/logs/export-${mat}.log"
+  ./build/ccp_material_export "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 "$regime" \
+    2>&1 | tee "$RUN/logs/export-${mat}-${regime}.log"
   ./build/ccp_material_replay "$snapshot" "$cpu" 1 \
-    2>&1 | tee "$RUN/logs/replay-${mat}-cpu.log"
+    2>&1 | tee "$RUN/logs/replay-${mat}-${regime}-cpu.log"
   if [ -x ./build/ccp_scaling_metal ]; then
     for backend in sap region online; do
-      gpu="$RUN/csv/actual-${mat}-metal-${backend}.csv"
+      gpu="$RUN/csv/actual-${mat}-${regime}-metal-${backend}.csv"
       ./build/ccp_scaling_metal --replay "$snapshot" "$gpu" "$backend" \
-        2>&1 | tee "$RUN/logs/replay-${mat}-gpu-${backend}.log"
+        2>&1 | tee "$RUN/logs/replay-${mat}-${regime}-gpu-${backend}.log"
       python3 scripts/verify_material_cpu_gpu.py "$cpu" "$gpu" \
-        --output "$RUN/verification/${mat}-cpu-metal-${backend}.md" \
-        2>&1 | tee "$RUN/logs/verify-${mat}-gpu-${backend}.log"
+        --output "$RUN/verification/${mat}-${regime}-cpu-metal-${backend}.md" \
+        2>&1 | tee "$RUN/logs/verify-${mat}-${regime}-gpu-${backend}.log"
     done
   else
-    echo "No Metal GPU executable: CPU-only for $mat" | tee "$RUN/logs/metal-unavailable-${mat}.log"
+    echo "No Metal GPU executable: CPU-only for $mat" | tee "$RUN/logs/metal-unavailable-${mat}-${regime}.log"
   fi
 done
-echo "[KYOTO] cross-backend reference tests (GPU is SAP, not our online controller)"
+done
+echo "[KYOTO] cross-backend reference tests (synthetic GPU SAP/complete oracle controls)"
 if [ -x ./build/ccp_scaling_metal ]; then
   ./build/ccp_scaling_metal "$RUN/csv/gpu-sap-hotspot.csv" 512 32 hotspot 1234 sap \
     2>&1 | tee "$RUN/logs/gpu-sap.log"
