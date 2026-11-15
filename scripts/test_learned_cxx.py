@@ -39,7 +39,7 @@ def main():
         create_model(model)
         samples=root/"cloth.kmcb"
         report=root/"cpu.csv"
-        run(args.exporter,samples,"cloth",64,12,4321,"impact")
+        run(args.exporter,samples,"cloth",512,12,4321,"impact")
         run(args.replayer,samples,report,0,model)
         with report.open(newline="",encoding="utf-8") as stream:
             rows=list(csv.DictReader(stream))
@@ -48,7 +48,7 @@ def main():
         if len(learned)!=12 or len(baseline)!=12:
             raise RuntimeError("ML regression missing expected 12 frames")
         for row in learned:
-            if row["chosen_backend"]!="global_guarded_exact":
+            if row["chosen_backend"]!="global_guarded_exact" or row["ml_bypassed"]!="0":
                 raise RuntimeError("Linear ML controller did not choose expected action")
             truth=baseline[row["frame"]]
             if row["pair_hash"]!=truth["pair_hash"] or row["pairs"]!=truth["pairs"]:
