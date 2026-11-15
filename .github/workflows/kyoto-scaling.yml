@@ -18,8 +18,25 @@ jobs:
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
             apps/scaling_cpu.cpp -o /tmp/ccp_scaling_cpu
+      - name: Compile certified regional benchmark against real solver core
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread -Iinclude \
+            apps/scaling_regional.cpp src/research_multicloth.cpp \
+            src/online_partitioner.cpp src/live_cloth.cpp -o /tmp/ccp_scaling_regional
       - name: Oracle regression tests
         run: /tmp/ccp_scaling_cpu --self-test
+      - name: Run real regional certified benchmark
+        run: |
+          /tmp/ccp_scaling_regional /tmp/regional.csv 256 4 hotspot 1234 0.6 hierarchical
+          python3 - <<'PY'
+          import csv
+          with open('/tmp/regional.csv', newline='') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==4
+          assert all(r['backend']=='cpu_region_hierarchical' for r in rows)
+          assert all(int(r['misses'])==0 for r in rows)
+          print('Certified region benchmark CSV PASS')
+          PY
       - name: Smoke benchmark
         run: |
           /tmp/ccp_scaling_cpu /tmp/cpu.csv 256 3 4 hotspot 1234
