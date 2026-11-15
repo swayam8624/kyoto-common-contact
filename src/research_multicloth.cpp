@@ -392,8 +392,8 @@ MultiCloth::MultiCloth(int sheetCount,int sphereCount,Policy policy):policy_(pol
  reset(sheetCount,sphereCount);
 }
 void MultiCloth::reset(int sheetCount,int sphereCount){
- if(sheetCount<1||sheetCount>3||sphereCount<1||sphereCount>2)
-  throw std::invalid_argument("supported configuration: 1-3 cloths and 1-2 moving spheres");
+ if(sheetCount<1||sheetCount>3||sphereCount<1||sphereCount>8)
+  throw std::invalid_argument("supported configuration: 1-3 cloths and 1-8 moving spheres");
  sheets_=sheetCount;balls_=sphereCount;frame_=0;
  positions_.clear();previous_.clear();inverseMasses_.clear();
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
@@ -599,8 +599,19 @@ void MultiCloth::displacePatchForTest(int sheet,int minX,int minY,int width,Vec3
 void MultiCloth::updateSpheres(double t){
  spheres_.clear();
  spheres_.push_back({{0.43*std::sin(.92*t),.15*std::cos(1.12*t),.97+.08*std::sin(.71*t)},.68});
- if(balls_==2)spheres_.push_back({
+ if(balls_>=2)spheres_.push_back({
   {-.53+.35*std::cos(1.40*t),.36+.36*std::sin(.81*t),1.31+.11*std::cos(.65*t)},.43});
+ // Optional smaller moving obstacles provide additional spatially localized
+ // interaction regimes. They share the same sphere collision category and
+ // preserve original 1/2-sphere trajectories and test baselines unchanged.
+ for(int i=2;i<balls_;++i){
+  const double theta=2.399963229728653*double(i-2);
+  const double orbit=.48+.08*double(i%3);
+  spheres_.push_back({{
+   orbit*std::cos(theta+.41*t),
+   orbit*std::sin(theta+.38*t),
+   1.10+.12*std::sin(theta+.73*t)},.16+.025*double(i%2)});
+ }
 }
 std::vector<Primitive> MultiCloth::makePrimitives()const{
  std::vector<Primitive> out;out.reserve(triangles_.size()+spheres_.size());
