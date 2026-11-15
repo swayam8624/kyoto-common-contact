@@ -22,7 +22,7 @@ METHODS = ("cpu", "regional-fixed", "regional-adaptive", "regional-hier",
            "metal-sap", "metal-exhaustive")
 SCENES = ("sparse", "cluster", "dense", "hotspot", "all_overlap")
 METHOD_LABELS = {
-    "cpu": {"cpu_sap_serial", "cpu_sap_threaded", "cpu_sap_work_aware", "cpu_sap_auto"},
+    "cpu": {"cpu_sap_serial", "cpu_sap_threaded", "cpu_sap_work_aware", "cpu_sap_auto", "cpu_sap_incremental"},
     "regional-fixed": {"cpu_region_fixed"},
     "regional-adaptive": {"cpu_region_adaptive"},
     "regional-hier": {"cpu_region_hierarchical"},
