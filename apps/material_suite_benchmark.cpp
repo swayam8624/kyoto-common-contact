@@ -101,6 +101,7 @@ public:
    r.queryMs=std::chrono::duration<double,std::milli>(Clock::now()-begin).count();
    r.guardBuilds=m.fullBuilds;r.guardReuses=m.cacheReuses;
    r.selectiveRepairs=m.partialRepairs;r.dirty=m.dirtyObjects;
+   r.workers=m.parallelWorkers;
    r.aabbTests=m.pairChecks;
   }else if(policy_==Policy::Guard){
    auto bounds=rawBounds(input);
@@ -173,7 +174,7 @@ void run(const std::string& material,int requested,int frames,unsigned seed,
       <<output.pairs.size()<<','<<(audit?1:0)<<','<<reference<<','
       <<misses<<','<<extras<<','<<output.builds<<','<<output.reuses<<','
       <<output.dirty<<','<<output.guardBuilds<<','<<output.guardReuses<<','
-      <<output.aabbTests<<','<<output.selectiveRepairs<<','<<output.span<<','<<(output.usedGlobal?"global":"regional")
+      <<output.aabbTests<<','<<output.selectiveRepairs<<','<<output.workers<<','<<output.span<<','<<(output.usedGlobal?"global":"regional")
       <<','<<(output.changedSpan?1:0)<<','<<(output.switched?1:0)<<'\n';
    if(!csv)throw std::runtime_error("CSV output error");
    sum+=output.queryMs;maxPairs=std::max(maxPairs,output.pairs.size());
@@ -213,7 +214,7 @@ int main(int argc,char** argv){
   std::ofstream csv(path);if(!csv)throw std::runtime_error("could not open evidence CSV");
   csv<<"material,regime,requested_elements,primitives,nodes,bonds,seed,frame,policy,query_ms,"
         "pairs,oracle_checked,oracle_pairs,misses,extras,region_builds,region_reuses,"
-        "dirty_regions,guard_builds,guard_reuses,aabb_tests,selective_repairs,online_span,online_path,"
+        "dirty_regions,guard_builds,guard_reuses,aabb_tests,selective_repairs,parallel_workers,online_span,online_path,"
         "online_span_changed,online_strategy_switch\n";
   const auto kinds=std::array<std::string,6>{"cloth","sponge","cushion","soft_ball","spring","mixed"};
   if(kind=="all"){
