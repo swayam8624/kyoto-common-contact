@@ -1,6 +1,7 @@
 // Standalone, reproducible CPU broad-phase scaling benchmark.
 // Measures immutable 3D AABB snapshots; does not measure full cloth dynamics.
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -105,6 +106,37 @@ Pairs sap(const Snapshot& s,unsigned workers){
  canonical(result);return result;
 }
 
+
+// Incremental SAP retains sorted indices across frames and repairs inversions
+// after motion. It is a temporal-coherence baseline, separate from adaptive
+// regional patch policy. Adversarial motion can trigger quadratic swaps.
+class IncrementalSAP {
+ std::vector<uint32_t> order_;
+public:
+ Pairs update(const Snapshot& s){
+  if(order_.size()!=s.boxes.size())order_=sortedX(s);
+  else{
+   auto less=[&](uint32_t a,uint32_t b){
+    const float x=s.boxes[a].lo[0],y=s.boxes[b].lo[0];
+    return x<y||(x==y&&a<b);
+   };
+   for(size_t i=1;i<order_.size();++i)
+    for(size_t k=i;k>0&&less(order_[k],order_[k-1]);--k)
+     std::swap(order_[k],order_[k-1]);
+  }
+  Pairs result;
+  for(size_t i=0;i<order_.size();++i){
+   const auto a=order_[i];const auto& left=s.boxes[a];
+   for(size_t j=i+1;j<order_.size();++j){
+    const auto b=order_[j];const auto& right=s.boxes[b];
+    if(right.lo[0]>left.hi[0])break;
+    if(overlap(left,right))result.push_back({std::min(a,b),std::max(a,b)});
+   }
+  }
+  canonical(result);return result;
+ }
+};
+
 // Work-aware SAP: create deterministic chunks according to estimated X-axis
 // candidate work, rather than giving each thread the same number of objects.
 // This is a CPU optimization candidate, not the original cloth controller.
@@ -181,7 +213,8 @@ size_t positive(const std::string& arg,const char* label,size_t max){
  return size_t(value);
 }
 void selfTest(){
- for(auto scene:{"sparse","cluster","dense","hotspot","all_overlap"})
+ for(auto scene:{"sparse","cluster","dense","hotspot","all_overlap"}){
+  IncrementalSAP incremental;
   for(int frame=0;frame<3;++frame){
    const auto s=makeScene(96,1234,frame,scene);
    const auto truth=exhaustive(s);
@@ -190,8 +223,11 @@ void selfTest(){
     if(actual!=truth)throw std::runtime_error(std::string("SAP mismatch: ")+scene);
     if(sapWorkAware(s,t)!=truth)throw std::runtime_error(std::string("work-aware SAP mismatch: ")+scene);
    }
+   if(incremental.update(s)!=truth)
+    throw std::runtime_error(std::string("incremental SAP mismatch: ")+scene);
   }
- std::cout<<"PASS: serial and threaded SAP match exhaustive pair oracle on all test scenes\n";
+ }
+ std::cout<<"PASS: serial, threaded, and incremental SAP match exhaustive pair oracle on all test scenes\n";
 }
 }
 int main(int argc,char** argv){
@@ -209,6 +245,7 @@ int main(int argc,char** argv){
   std::ofstream out(path);if(!out)throw std::runtime_error("CSV open failed");
   out<<"backend,scene,n,frame,seed,threads,ms,candidates,oracle_checked,misses\n";
   out<<std::fixed<<std::setprecision(8);
+  std::array<IncrementalSAP,3> persistent;
   for(int frame=0;frame<frames;++frame){
    const auto s=makeScene(n,seed,frame,scene);
    const auto one=sap(s,1);
@@ -216,6 +253,20 @@ int main(int argc,char** argv){
    if(one!=many || one!=sapWorkAware(s,threads))throw std::runtime_error("parallel SAP or work-aware scheduler differs from serial SAP");
    bool checked=n<=2048&&(frame%5==0);
    if(checked&&one!=exhaustive(s))throw std::runtime_error("SAP oracle failure");
+   // Three independent persistent index states are advanced once per
+   // frame. Their median is reported; each retains temporal state across frames.
+   std::vector<double> incTimes;
+   for(auto& baseline:persistent){
+    const auto started=Clock::now();
+    const auto candidate=baseline.update(s);
+    const double delta=std::chrono::duration<double,std::milli>(Clock::now()-started).count();
+    if(candidate!=one)throw std::runtime_error("incremental SAP differs from reference pair set");
+    incTimes.push_back(delta);
+   }
+   std::sort(incTimes.begin(),incTimes.end());
+   out<<"cpu_sap_incremental,"<<scene<<','<<n<<','<<frame<<','
+      <<seed<<",1,"<<incTimes[1]<<','<<one.size()<<','
+      <<(checked?1:0)<<",0\n";
    // The simple crossover gate below avoids thread launch overhead for small
    // scenes. Its 4096-object threshold is a provisional engineering guess,
    // not an empirically fitted optimal threshold; held-out trials must tune it.
