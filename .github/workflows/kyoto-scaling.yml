@@ -70,6 +70,28 @@ jobs:
             --scenes hotspot cluster \
             --sizes 512 4096 16384 \
             --frames 6 --repeats 3 --threads 4 --seed 20261
+      - name: Build actual material physics/snapshot/replay test executables
+        run: |
+          cmake -S . -B /tmp/kyoto-material-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build /tmp/kyoto-material-build --target ccp_material_benchmark ccp_material_export ccp_material_replay ccp_selective_guard_tests --parallel 4
+      - name: Verify all six deformable-material families and selective cache repairs
+        run: |
+          mkdir -p /tmp/kyoto-material-evidence
+          /tmp/kyoto-material-build/ccp_selective_guard_tests
+          /tmp/kyoto-material-build/ccp_material_benchmark /tmp/kyoto-material-evidence/materials.csv all 64 8 1234 1 1
+          for material in cloth sponge cushion soft_ball spring mixed; do
+            /tmp/kyoto-material-build/ccp_material_export "/tmp/kyoto-material-evidence/${material}.kmcb" "$material" 128 10 1234
+            /tmp/kyoto-material-build/ccp_material_replay "/tmp/kyoto-material-evidence/${material}.kmcb" "/tmp/kyoto-material-evidence/${material}-replay.csv" 1
+          done
+          python3 scripts/summarize_material_suite.py /tmp/kyoto-material-evidence/materials.csv --output /tmp/kyoto-material-evidence/SUMMARY.md > /tmp/kyoto-material-evidence/summary.log
+      - name: Preserve real material and exact CPU replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-material-cpu-regressions
+          path: /tmp/kyoto-material-evidence/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Preserve larger CPU crossover experiments
         if: always()
         uses: actions/upload-artifact@v4
