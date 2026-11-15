@@ -61,6 +61,23 @@ jobs:
             --scenes hotspot cluster \
             --sizes 256 512 \
             --frames 8 --repeats 3 --threads 4 --seed 1234
+      - name: Explore larger workload and thread-crossover behavior
+        run: |
+          python3 scripts/run_scaling_matrix.py \
+            --build /tmp/kyoto-executables \
+            --output /tmp/kyoto-scale-crossover \
+            --methods cpu \
+            --scenes hotspot cluster \
+            --sizes 512 4096 16384 \
+            --frames 6 --repeats 3 --threads 4 --seed 20261
+      - name: Preserve larger CPU crossover experiments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-linux-cpu-crossover
+          path: /tmp/kyoto-scale-crossover/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Preserve immutable experimental evidence
         if: always()
         uses: actions/upload-artifact@v4
