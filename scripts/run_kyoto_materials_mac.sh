@@ -6,6 +6,8 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 MODE="${1:-standard}"
+VERBOSE="${KYOTO_VERBOSE:-1}"
+case "$VERBOSE" in 0|1|2) ;; *) echo "KYOTO_VERBOSE must be 0, 1 or 2" >&2; exit 2;; esac
 case "$MODE" in
   smoke) SIZES=(64) ; FRAMES=8 ; AUDIT=1 ; CLOTH_FRAMES=16 ; REGIMES=(baseline) ; GPU_REGIMES=(baseline) ;;
   quick) SIZES=(256 1024) ; FRAMES=36 ; AUDIT=4 ; CLOTH_FRAMES=48 ; REGIMES=(baseline impact) ; GPU_REGIMES=(baseline) ;;
@@ -55,7 +57,7 @@ echo "[KYOTO] comparing exact current-AABB pairs for six deformable material fam
 for n in "${SIZES[@]}"; do
   outfile="$RUN/csv/materials-n${n}.csv"
   echo "[KYOTO] material CPU comparison, target elements=$n, frames=$FRAMES"
-  ./build/ccp_material_benchmark "$outfile" all "$n" "$FRAMES" 1234 "$AUDIT" 1 \
+  ./build/ccp_material_benchmark "$outfile" all "$n" "$FRAMES" 1234 "$AUDIT" "$VERBOSE" \
     2>&1 | tee "$RUN/logs/materials-n${n}.log"
 done
 CSVFILES=()
@@ -66,7 +68,7 @@ for regime in "${REGIMES[@]}"; do
     standard) extraN=1024; extraFrames=96;; stress) extraN=2048; extraFrames=180;; esac
   outfile="$RUN/csv/materials-${regime}-n${extraN}.csv"
   echo "[KYOTO] deformation stress regime=$regime n=$extraN"
-  ./build/ccp_material_benchmark "$outfile" all "$extraN" "$extraFrames" 1234 "$AUDIT" 1 "$regime" \
+  ./build/ccp_material_benchmark "$outfile" all "$extraN" "$extraFrames" 1234 "$AUDIT" "$VERBOSE" "$regime" \
     2>&1 | tee "$RUN/logs/materials-${regime}.log"
   CSVFILES+=("$outfile")
 done
@@ -95,7 +97,7 @@ for mat in cloth sponge cushion soft_ball spring mixed; do
   echo "[KYOTO] serializing $mat Float32 AABB trajectories"
   ./build/ccp_material_export "$snapshot" "$mat" "$REPLAY_BUDGET" "$REPLAY_FRAMES" 1234 "$regime" \
     2>&1 | tee "$RUN/logs/export-${mat}-${regime}.log"
-  ./build/ccp_material_replay "$snapshot" "$cpu" 1 \
+  ./build/ccp_material_replay "$snapshot" "$cpu" "$VERBOSE" \
     2>&1 | tee "$RUN/logs/replay-${mat}-${regime}-cpu.log"
   if [ -x ./build/ccp_scaling_metal ]; then
     for backend in sap region online; do
