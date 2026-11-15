@@ -11,6 +11,19 @@ The macOS viewer requires the existing GLFW and Bullet installations. Headless c
 
 Current presentation: [20-slide research deck](output/Online_Common_Broad_Phase_Research_Layout_Final.pptx). See the [measured results](output/review-2026-11-02/RESULTS.md), [verification record](output/review-2026-11-02/VERIFICATION.md), and [layout validation receipt](.presentation-refine-2026-11-02/validation-final.json).
 
+## Kyoto soft-material + CPU/GPU research branch (November 2026)
+
+The experimental `research/kyoto-scale-evidence` branch contains a reproducible six-material comparison with cloth, sponge, cushion, soft ball, helical spring and mixed-material fixtures; six deformation regimes; exact-pair correctness oracles; a new selective local guard-repair baseline; a generalized online cost controller; original coupled cloth comparisons; and Apple Metal SAP/region/online candidate kernels.
+
+Run on Apple Silicon after a Release build (or let the script build automatically):
+
+```sh
+bash scripts/run_kyoto_materials_mac.sh smoke
+KYOTO_VERBOSE=2 bash scripts/run_kyoto_materials_mac.sh standard
+```
+
+**Read [the detailed Kyoto material research runbook](docs/KYOTO_MATERIAL_STRESS_TESTS.md) first.** The timestamped output ZIP is created even for partial failures and contains exact input snapshots, per-frame raw CSVs, CPU/GPU pair-hash verification, verbose logs, and hardware metadata. The new material physics is an approximate mass-spring test fixture, **not** validated FEM or a complete original-controller GPU port. Performance superiority is not presumed.
+
 ## Research question
 
 Can one geometric bounds-and-request interface reduce the **total collision workload**, with runtime changes in region size and search strategy, while preserving the contact pairs required by its caller?
