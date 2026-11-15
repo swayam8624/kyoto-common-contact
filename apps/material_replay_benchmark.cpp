@@ -202,10 +202,10 @@ public:
  }
  Observation run(const std::vector<Bounds>& boxes){
   Observation r;
-  const auto fullStart=Clock::now();
+  // Common training-feature bookkeeping is outside EVERY method's timed
+  // section. The learned controller independently computes its OWN features
+  // inside the measured query: never charge an extra duplicate O(N) pass.
   r.features=features_.describe(boxes);
-  // Existing teacher timings EXCLUDE feature collection. Only learned
-  // selector wall time INCLUDES it and network inference.
   const auto start=Clock::now();
   if(kind_==Kind::Learned){
    const auto result=learned_->query(primitives(boxes));
@@ -251,9 +251,7 @@ public:
   }
   const auto backendEnd=Clock::now();
   features_.observe(boxes,r.pairs.size());
-  r.ms=std::chrono::duration<double,std::milli>(
-   (kind_==Kind::Learned?Clock::now():backendEnd)-
-   (kind_==Kind::Learned?fullStart:start)).count();
+  r.ms=std::chrono::duration<double,std::milli>(backendEnd-start).count();
   return r;
  }
 };
