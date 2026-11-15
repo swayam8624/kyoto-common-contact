@@ -27,14 +27,15 @@ void writeU32(std::ofstream& out,uint32_t n){
 }
 int main(int argc,char** argv){
  try{
-  if(argc!=6)throw std::runtime_error("usage: ccp_material_export OUTPUT.kmcb MATERIAL ELEMENTS FRAMES SEED");
+  if(argc!=6&&argc!=7)throw std::runtime_error("usage: ccp_material_export OUTPUT.kmcb MATERIAL ELEMENTS FRAMES SEED [REGIME=baseline]");
   const std::filesystem::path dest(argv[1]);
   const std::string material=argv[2];
   if(material!="mixed")ccp::materials::materialCode(material);
   const int budget=number(argv[3],16,50000);
   const int frames=number(argv[4],1,10000);
   const uint32_t seed=uint32_t(number(argv[5],1,2000000000));
-  ccp::materials::World world(material,budget,seed);
+  const std::string regime=argc==7?argv[6]:"baseline";
+  ccp::materials::World world(material,budget,seed,regime);
   if(world.elements()>std::numeric_limits<uint32_t>::max())
    throw std::runtime_error("too many material AABBs");
   if(!dest.parent_path().empty())std::filesystem::create_directories(dest.parent_path());
@@ -66,7 +67,7 @@ int main(int argc,char** argv){
   }
   out.flush();
   if(!out)throw std::runtime_error("material snapshot write failed");
-  std::cout<<"[PASS] material snapshots: "<<dest<<" N="<<world.elements()
+  std::cout<<"[PASS] material snapshots: "<<dest<<" regime="<<regime<<" N="<<world.elements()
    <<" frames="<<frames<<" seed="<<seed<<"\n";
  }catch(const std::exception& e){
   std::cerr<<"MATERIAL EXPORT FAILED: "<<e.what()<<'\n';return 1;
