@@ -146,6 +146,7 @@ int main(int argc,char** argv){
   const unsigned threads=unsigned(positive(argv[4],"THREADS",256));
   const std::string scene=argv[5];
   const auto seed=unsigned(positive(argv[6],"SEED",std::numeric_limits<unsigned>::max()));
+  if(scene=="all_overlap"&&n>2048)throw std::runtime_error("all_overlap safety limit N=2048");
   std::filesystem::path path(argv[1]);
   if(!path.parent_path().empty())std::filesystem::create_directories(path.parent_path());
   std::ofstream out(path);if(!out)throw std::runtime_error("CSV open failed");
@@ -160,8 +161,8 @@ int main(int argc,char** argv){
    if(checked&&one!=exhaustive(s))throw std::runtime_error("SAP oracle failure");
    // Repeat each measurement to reduce timer granularity effects. Timing
    // includes x-axis sorting, thread startup, pair materialization and merge.
-   for(unsigned count:{1u,threads}){
-    if(count==1&&threads==1)continue; // avoid duplicate rows
+   for(unsigned variant=0;variant<(threads==1?1u:2u);++variant){
+    const unsigned count=variant==0?1u:threads;
     const auto measured=timed(s,count,3);
     out<<(count==1?"cpu_sap_serial":"cpu_sap_threaded")<<','<<scene<<','<<n<<','<<frame<<','
        <<seed<<','<<count<<','<<measured.ms<<','<<measured.pairs<<','
