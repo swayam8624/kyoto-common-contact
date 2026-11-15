@@ -22,7 +22,7 @@ METHODS = ("cpu", "regional-fixed", "regional-adaptive", "regional-hier",
            "metal-sap", "metal-exhaustive")
 SCENES = ("sparse", "cluster", "dense", "hotspot", "all_overlap")
 METHOD_LABELS = {
-    "cpu": {"cpu_sap_serial", "cpu_sap_threaded", "cpu_sap_work_aware"},
+    "cpu": {"cpu_sap_serial", "cpu_sap_threaded", "cpu_sap_work_aware", "cpu_sap_auto"},
     "regional-fixed": {"cpu_region_fixed"},
     "regional-adaptive": {"cpu_region_adaptive"},
     "regional-hier": {"cpu_region_hierarchical"},
@@ -64,7 +64,7 @@ def validate_csv(path, method, frames, n, threads):
         rows = list(csv.DictReader(stream))
     expected_labels = METHOD_LABELS[method]
     if method == "cpu" and threads == 1:
-        expected_labels = {"cpu_sap_serial"}
+        expected_labels = {"cpu_sap_serial", "cpu_sap_auto"}
     if not rows:
         raise RuntimeError(f"Empty benchmark CSV: {path}")
     if {r["backend"] for r in rows} != expected_labels:
