@@ -37,6 +37,8 @@ Six deterministic forcing regimes are supported: `baseline`, `impact`, `shear`, 
 - `bullet_dbvt_persistent`: actual Bullet DBVT proxy updates when Bullet is installed; uses no substitute implementation. Appears in **serialized CPU replay**, not always in the initial material simulation CSV
 - `metal_sap_sorted`, `metal_region_fixed`, `metal_region_online`: real Metal GPU compute kernels; count, exclusive prefix, full pair materialization, sorted stable IDs and pair-hash verification are required.
 
+**Multicore cache repair:** Selective Guard also supports deterministic parallel repair of large dirty-object subsets. Work is partitioned by dirty endpoint across thread-local pair buffers, merged after all workers join, with identical pair-set semantics to the serial path. It falls back to one thread for small workloads to avoid thread-start overhead. The CI regression forces eight workers on 2,048 primitives, verifies full exact-pair equality against serial repair and an independent current-AABB SAP reference, and records `parallel_workers` in the CSV. This parallelism currently applies to **selective guard repair**, not the original cloth-specific regional query, which remains serial; do not imply the entire simulator is parallel.
+
 The new local repair has an independent 280-frame adversarial oracle test with teleports, mask changes and object ID reordering. It passes only if the exact pair set always matches an independently constructed SAP/exhaustive reference. It is an **engineering hypothesis**, not a claim that it is faster than Global Guard in all scenes.
 
 ## Quick macOS setup
