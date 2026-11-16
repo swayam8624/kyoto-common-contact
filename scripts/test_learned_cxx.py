@@ -37,9 +37,10 @@ def main():
     # Explicitly reject an obsolete replay ABI before any oracle fixtures.
     signature=subprocess.run([str(args.replayer),"--capabilities"],
                              capture_output=True,text=True,timeout=10,check=False)
-    required={"KYOTO_REPLAY_ABLATION_V3","sap_persistent_coherent",
+    required={"KYOTO_REPLAY_ABLATION_V4","sap_persistent_coherent",
               "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
-              "guard_sap_measured_probe","hybrid_probed","hybrid_switched"}
+              "guard_sap_measured_probe","guard_sap_bounded_trial",
+              "hybrid_probed","hybrid_switched"}
     if signature.returncode!=0 or not required.issubset(set(signature.stdout.split())):
         raise RuntimeError("Replay executable is stale; rebuild it with the current learned_online.hpp")
     with tempfile.TemporaryDirectory(prefix="kyoto-learned-smoke-") as tmp:
@@ -67,6 +68,16 @@ def main():
             truth=oracle_by_frame[row["frame"]]
             if row["pairs"]!=truth["pairs"] or row["pair_hash"]!=truth["pair_hash"]:
                 raise RuntimeError("Persistent SAP lost exact candidate pair equivalence")
+        bounded_trial=[r for r in rows if r["backend"]=="guard_sap_bounded_trial"]
+        if len(bounded_trial)!=12:
+            raise RuntimeError("Bounded single-backend Guard/SAP policy missing")
+        for row in bounded_trial:
+            truth=oracle_by_frame[row["frame"]]
+            if row["pair_hash"]!=truth["pair_hash"] or row["pairs"]!=truth["pairs"]:
+                raise RuntimeError("Bounded Guard/SAP trial lost exact AABB-pair parity")
+            if row["chosen_backend"] not in (
+                    "global_guarded_exact","sap_persistent_coherent"):
+                raise RuntimeError("Bounded Guard/SAP trial selected invalid backend")
         hybrid=[r for r in rows if r["backend"]=="guard_sap_measured_probe"]
         if len(hybrid)!=12:
             raise RuntimeError("Causal Guard-SAP probe policy missing")
@@ -160,6 +171,13 @@ def main():
             rapid_rows=list(csv.DictReader(source))
         rapid_oracle={r["frame"]:r for r in rapid_rows
                       if r["backend"]=="sap_rebuild"}
+        rapid_bounded=[r for r in rapid_rows if r["backend"]=="guard_sap_bounded_trial"]
+        if len(rapid_bounded)!=20:
+            raise RuntimeError("Rapid bounded Guard/SAP trial missing")
+        for row in rapid_bounded:
+            truth=rapid_oracle[row["frame"]]
+            if row["pair_hash"]!=truth["pair_hash"] or row["pairs"]!=truth["pairs"]:
+                raise RuntimeError("Bounded Guard/SAP trial lost rapid-motion pair parity")
         rapid_hybrid=[r for r in rapid_rows if r["backend"]=="guard_sap_measured_probe"]
         if len(rapid_hybrid)!=20:
             raise RuntimeError("Rapid-motion causal hybrid evidence missing")
