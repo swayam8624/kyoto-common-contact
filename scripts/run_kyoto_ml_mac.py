@@ -104,12 +104,19 @@ def main():
     done={"success":False}
     def preserve():
         archive=run.with_suffix(".zip")
-        if archive.exists():
-            print(f"[KYOTO-ML] Original archive preserved: {archive}",flush=True)
+        if done["success"] and archive.exists():
+            print(f"[KYOTO-ML] Existing full archive preserved: {archive}",flush=True)
             return
-        subprocess.run([sys.executable,"scripts/package_kyoto_results.py",
-                        str(run),"--exit-code",str(0 if done["success"] else 1)],
-                       cwd=root,check=False)
+        arguments=[sys.executable,"scripts/package_kyoto_results.py",
+                   str(run),"--exit-code",str(0 if done["success"] else 1)]
+        if not done["success"]:
+            # An interrupted 1080-scene exhaustive run can hold several GB.
+            # A compact diagnostic ZIP must never destroy or repackage
+            # all the teacher and snapshot files needed for exact resume.
+            arguments.append("--diagnostics-only")
+            print("[KYOTO-ML] Interrupted/failed run: preserving existing "
+                  "raw files; packaging only small diagnostics.",flush=True)
+        subprocess.run(arguments,cwd=root,check=False)
     atexit.register(preserve)
     logs=run/"logs";logs.mkdir(exist_ok=True)
     teacher=run/"teacher";teacher.mkdir(exist_ok=True)
@@ -132,7 +139,8 @@ def main():
         raise RuntimeError("Existing run has no environment.json: unsafe resume")
     if environment.exists():
         previous=json.loads(environment.read_text(encoding="utf-8"))
-        if previous.get("mode")!=args.mode or previous.get("configuration")!=mode:
+        if (previous.get("mode")!=args.mode or
+            previous.get("configuration")!=json.loads(json.dumps(mode))):
             raise RuntimeError("Configuration differs from original run; no resume")
         # Keep original git revision, hardware, and all prior experiment metadata.
         metadata=previous
@@ -154,6 +162,30 @@ def main():
     # generation. Otherwise generate unique independently seeded trajectories.
     if args.resume_cpu_data and args.resume_run:
         parser.error("--resume-cpu-data cannot be combined with --resume-run")
+    if args.resume_run:
+        # This also catches the original unpatched foreground trainer, which
+        # cannot acquire the advisory lock introduced in newer revisions.
+        try:
+            listing=subprocess.check_output(["ps","-ax","-o","pid=","-o",
+                                             "command=","-ww"],
+                                            text=True,stderr=subprocess.DEVNULL)
+            model_text=str(run/"model")
+            running=[]
+            for line in listing.splitlines():
+                if "train_online_controller.py" not in line:continue
+                if model_text not in line and str((run/"model").resolve()) not in line:
+                    continue
+                candidate=line.strip().split(None,1)
+                if candidate and candidate[0].isdigit() and int(candidate[0])!=os.getpid():
+                    running.append(candidate[0])
+            if running:
+                raise RuntimeError("Training already active for the same output folder "
+                                   "(PID "+",".join(running)+"). Do not run two models "
+                                   "against the same trials.jsonl. Check ps and wait or "
+                                   "stop the first run before resuming.")
+        except subprocess.CalledProcessError:
+            print("[KYOTO-ML] Could not inspect process list; manually verify "
+                  "old training has stopped before --resume-run.",flush=True)
     if args.resume_cpu_data:
         source=args.resume_cpu_data.resolve()
         if not source.is_dir():raise SystemExit("resume directory unavailable")
