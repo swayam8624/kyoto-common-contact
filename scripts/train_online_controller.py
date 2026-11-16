@@ -168,7 +168,7 @@ def model_for(config:Config):
     return nn.Sequential(*layers)
 
 def train_one(config,train,val,mean_,std_,device,seed,max_epochs,patience,min_delta,
-              collect=False):
+              collect=False,progress=None,progress_every=25):
     random.seed(seed);np.random.seed(seed);torch.manual_seed(seed)
     model=model_for(config).to(device)
     x,y=tensors(train,mean_,std_,device)
@@ -196,6 +196,8 @@ def train_one(config,train,val,mean_,std_,device,seed,max_epochs,patience,min_de
             validation=float(loss(model(vx),vy))
         history.append({"epoch":epoch,"train_huber":total/len(indices),
                         "validation_huber":validation})
+        if progress and (epoch==1 or epoch%progress_every==0 or epoch==max_epochs):
+            progress(epoch,max_epochs,total/len(indices),validation,best,stale)
         if validation<best-min_delta:
             best=validation;best_epoch=epoch;stale=0
             best_state={key:val.detach().cpu().clone()
@@ -292,11 +294,21 @@ def main():
     parser.add_argument("--device",choices=("cpu","mps","cuda","auto"),default="cpu")
     parser.add_argument("--verbose",action="store_true")
     parser.add_argument("--no-devlog",action="store_true")
+    parser.add_argument("--resume",action="store_true",
+                        help="Continue a stopped search from existing validated trials.jsonl")
+    parser.add_argument("--progress-every",type=int,default=25,
+                        help="Print ongoing training epoch diagnostics (default 25)")
     args=parser.parse_args()
-    if args.max_trials<1 or args.search_epochs<1 or args.final_epochs<1 or args.patience<1:
+    if (args.max_trials<1 or args.search_epochs<1 or args.final_epochs<1 or
+        args.patience<1 or args.progress_every<1):
         parser.error("invalid search budget")
-    if args.output.exists() and any(args.output.iterdir()):
-        parser.error("output directory must be new/empty, never overwrite prior evidence")
+    if args.resume:
+        if not (args.output.is_dir() and (args.output/"trials.jsonl").is_file()):
+            parser.error("--resume requires original model directory with trials.jsonl")
+        if (args.output/"manifest.json").exists():
+            parser.error("model manifest already exists: training completed; run C++ holdout evaluation")
+    elif args.output.exists() and any(args.output.iterdir()):
+        parser.error("output directory must be new/empty; --resume explicitly for interrupted runs")
     args.output.mkdir(parents=True,exist_ok=True)
     run_id=args.output.name
     data,metadata=load(args.inputs)
@@ -318,22 +330,95 @@ def main():
     if args.search=="single":configs=[Config(2,16,1e-3,1e-4,0.,128)]
     if not args.exhaustive:configs=configs[:args.max_trials]
     trials_path=args.output/"trials.jsonl"
+    # Strict search contract is persisted BEFORE the first neural trial.
+    # Older runs (like the user's first 34/156 exhaustive grid) only have
+    # trials.jsonl; they are recoverable after each existing record's index,
+    # configuration and validation score have been checked.
+    data_digest=hashlib.sha256(
+        json.dumps([(row["path"],row["sha256"]) for row in metadata],
+                   separators=(",",":")).encode("utf-8")).hexdigest()
+    contract={"schema":1,"dataset_sha256":data_digest,
+              "seed":args.seed,"split":args.split,"groups":groups,
+              "search":args.search,"device":device,
+              "search_epochs":args.search_epochs,"final_epochs":args.final_epochs,
+              "patience":args.patience,"configurations":[asdict(c) for c in configs]}
+    contract_file=args.output/"search_contract.json"
+    if args.resume:
+        if contract_file.is_file():
+            previous=json.loads(contract_file.read_text(encoding="utf-8"))
+            if previous!=contract:
+                raise RuntimeError(
+                  "Refusing to resume: original datasets, split, device, grid or "
+                  "training settings differ from search_contract.json")
+        else:
+            print("[RESUME WARNING] Legacy run has no search_contract.json. "
+                  "Validating all trial indices/configurations, then anchoring "
+                  "the currently present dataset hashes and settings.",flush=True)
+    else:
+        if contract_file.exists():
+            raise RuntimeError("refusing to overwrite experiment contract")
+    if not contract_file.exists():
+        with contract_file.open("x",encoding="utf-8") as stream:
+            json.dump(contract,stream,indent=2)
+            stream.write("\n")
+    completed=[]
+    if args.resume:
+        with trials_path.open(encoding="utf-8") as stream:
+            for line_no,line in enumerate(stream,1):
+                if not line.strip():continue
+                try:record=json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError(
+                      f"Truncated trials.jsonl at line {line_no}; preserve the "
+                      "original file and inspect before resuming") from exc
+                index=len(completed)
+                if index>=len(configs) or record.get("trial")!=index or (
+                    record.get("configuration")!=asdict(configs[index])):
+                    raise RuntimeError(
+                      f"Search grid mismatch at trial line {line_no}; "
+                      "refusing to duplicate or overwrite prior trials")
+                value=float(record["val_huber"])
+                epoch=int(record["best_epoch"])
+                if not math.isfinite(value) or not 1<=epoch<=args.search_epochs:
+                    raise RuntimeError(
+                      f"Invalid recorded validation score/epoch at line {line_no}")
+                completed.append(record)
     best=float("inf");winner=None;winner_epoch=0
-    for index,config in enumerate(configs):
+    for index,record in enumerate(completed):
+        if record["val_huber"]<best:
+            best=record["val_huber"]
+            winner=configs[index]
+            winner_epoch=record["best_epoch"]
+    if args.resume:
+        print(f"[RESUME] Reusing {len(completed)}/{len(configs)} completed "
+              f"hyperparameter trials. Best validation loss {best:.6f}. "
+              "Original data and previous trial lines are unchanged.",flush=True)
+    for index in range(len(completed),len(configs)):
+        config=configs[index]
         began=time.perf_counter()
+        def progress(epoch,maximum,train_loss,val_loss,best_loss,stale):
+            if args.verbose:
+                print(f"[TRAIN-EPOCH] trial={index+1}/{len(configs)} "
+                      f"epoch={epoch}/{maximum} train_huber={train_loss:.6f} "
+                      f"val_huber={val_loss:.6f} best_so_far={best_loss:.6f} "
+                      f"stale_epochs={stale} elapsed_s={time.perf_counter()-began:.1f}",
+                      flush=True)
         # Validation grouping is unchanged for every trial. Holdout test is
         # never inspected until the winning architecture is frozen.
         candidate,score,epoch,_=train_one(config,train,val,feature_mean,feature_std,
-                device,args.seed+index,args.search_epochs,args.patience,1e-4)
+                device,args.seed+index,args.search_epochs,args.patience,1e-4,
+                progress=progress,progress_every=args.progress_every)
         record={"trial":index,"configuration":asdict(config),"val_huber":score,
                 "best_epoch":epoch,"wall_seconds":time.perf_counter()-began}
         with trials_path.open("a",encoding="utf-8") as handle:
             handle.write(json.dumps(record)+"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         if score<best:
             best=score;winner=config;winner_epoch=epoch
-        if args.verbose:
-            print(f"[TRAIN] trial={index+1}/{len(configs)} val_huber={score:.6f} "
-                  f"best_epoch={epoch} best_so_far={best:.6f}",flush=True)
+        print(f"[TRAIN] trial={index+1}/{len(configs)} val_huber={score:.6f} "
+              f"best_epoch={epoch} best_so_far={best:.6f} "
+              f"elapsed_s={record['wall_seconds']:.1f}",flush=True)
     assert winner is not None
     # Select epoch by validation, then fit once on train+validation for a
     # fixed, preselected duration. No test examples influence training.
