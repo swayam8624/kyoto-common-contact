@@ -52,7 +52,8 @@ def main():
                 raise RuntimeError(f"Missing ML performance column: {required}")
         learned=[r for r in rows if r["backend"]=="ml_cost_aware"]
         baseline={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
-        if len(learned)!=12 or len(baseline)!=12:
+        conservative=[r for r in rows if r["backend"]=="ml_cost_aware_conservative"]
+        if len(conservative)!=12 or len(learned)!=12 or len(baseline)!=12:
             raise RuntimeError("ML regression missing expected 12 frames")
         for row in learned:
             if row["chosen_backend"]!="global_guarded_exact" or row["ml_bypassed"]!="0":
@@ -111,12 +112,23 @@ def main():
                     or r["pair_hash"]!=ref["pair_hash"]):
                 raise RuntimeError("Direct-Bounds hierarchical region lost pair parity")
 
+        # The conservative policy starts with Guard and must preserve the
+        # exact pair oracle even when the model prefers hierarchical region.
+        cons=[r for r in region_rows
+              if r["backend"]=="ml_cost_aware_conservative"]
+        if len(cons)!=12:
+            raise RuntimeError("Conservative learned controller missing frames")
+        for r in cons:
+            ref=region_by_frame[r["frame"]]
+            if (r["chosen_backend"]!="global_guarded_exact"
+                    or r["pairs"]!=ref["pairs"] or r["pair_hash"]!=ref["pair_hash"]):
+                raise RuntimeError("Guard-first conservative policy lost pair parity")
         bad=root/"corrupt.mlpc"
         bad.write_text("MALFORMED_MODEL\n",encoding="utf-8")
         run(args.replayer,samples,root/"rejected.csv",0,bad,success=False)
         print("PASS: direct-Bounds learned wrapper, optimized small-N Guard "
               "fallback, hierarchical region parity, 38 fully compared "
-              "oracle frames, detailed timing fields and malformed-model rejection")
+              "oracle frames across both original/conservative variants, detailed timing fields and malformed-model rejection")
 
 if __name__=="__main__":
     main()
