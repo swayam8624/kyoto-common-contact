@@ -152,7 +152,66 @@ public:
  }
 };
 #endif
-enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
+
+// Persistent SAP maintains the previous x-axis order across frames. In
+// coherent motion, insertion repair can be much cheaper than rebuilding the
+// sort. In adversarial motion, cap the repair shifts and fall back to std::sort,
+// so a reverse-ordered frame cannot trigger quadratic sorting work.
+// Output contract is identical to the independent fresh-sort SAP oracle.
+class PersistentSAP {
+ std::vector<int> order_;
+ std::vector<int> ids_;
+public:
+ Pairs query(const std::vector<Bounds>& boxes){
+  const size_t n=boxes.size();
+  if(ids_.size()!=n){
+   ids_.clear();ids_.reserve(n);order_.resize(n);
+   for(size_t i=0;i<n;++i){ids_.push_back(boxes[i].id);order_[i]=int(i);}
+  }else{
+   for(size_t i=0;i<n;++i)
+    if(ids_[i]!=boxes[i].id)
+     throw std::runtime_error("persistent SAP requires stable ordered primitive IDs");
+  }
+  const auto less=[&](int ai,int bi){
+   const auto& a=boxes[size_t(ai)],&b=boxes[size_t(bi)];
+   if(a.min.x!=b.min.x)return a.min.x<b.min.x;
+   return a.id<b.id;
+  };
+  // Initially sorted order is unknown. Later, use bounded insertion repair.
+  // Bound the number of shifts by 8N; after that fall back to full sorting.
+  const size_t shiftCap=n>std::numeric_limits<size_t>::max()/8?
+                         std::numeric_limits<size_t>::max():n*8;
+  size_t shifts=0;
+  bool exceeded=false;
+  for(size_t i=1;i<n;++i){
+   const int item=order_[i];
+   size_t j=i;
+   while(j>0&&less(item,order_[j-1])){
+    order_[j]=order_[j-1];--j;
+    if(++shifts>shiftCap){exceeded=true;break;}
+   }
+   order_[j]=item;
+   if(exceeded)break;
+  }
+  if(exceeded)
+   std::sort(order_.begin(),order_.end(),less);
+  Pairs out;
+  for(size_t i=0;i<n;++i){
+   const auto& a=boxes[size_t(order_[i])];
+   for(size_t j=i+1;j<n;++j){
+    const auto& b=boxes[size_t(order_[j])];
+    if(b.min.x>a.max.x)break;
+    if((a.mask&b.category)==0||(b.mask&a.category)==0)continue;
+    if(overlap(a,b))out.push_back({std::min(a.id,b.id),std::max(a.id,b.id)});
+   }
+  }
+  std::sort(out.begin(),out.end());
+  out.erase(std::unique(out.begin(),out.end()),out.end());
+  return out;
+ }
+};
+
+enum class Kind {Sap,PersistentSap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -160,6 +219,7 @@ enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,Le
 const char* name(Kind kind){
  switch(kind){
  case Kind::Sap:return "sap_rebuild";
+ case Kind::PersistentSap:return "sap_persistent_coherent";
  case Kind::Global:return "global_guarded_exact";
  case Kind::Selective:return "selective_guard_exact";
  case Kind::Fixed:return "region_fixed";
@@ -185,6 +245,7 @@ struct Observation {
 };
 class Method {
  Kind kind_;
+ PersistentSAP persistentSap_;
  ccp::live::BroadPhaseService global_;
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
@@ -227,6 +288,8 @@ public:
    r.mlBookkeepingMs=result.mlBookkeepingMs;r.mlInnerMs=result.queryMs;
   }else if(kind_==Kind::Sap)
    r.pairs=ccp::live::candidates(boxes,true);
+  else if(kind_==Kind::PersistentSap)
+   r.pairs=persistentSap_.query(boxes);
 #ifdef CCP_HAVE_BULLET
   else if(kind_==Kind::Bullet)r.pairs=bullet_.query(boxes);
 #endif
@@ -284,7 +347,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
- std::vector<Kind> methods={Kind::Sap,Kind::Global,Kind::Selective,
+ std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::Global,Kind::Selective,
   Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online};
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
