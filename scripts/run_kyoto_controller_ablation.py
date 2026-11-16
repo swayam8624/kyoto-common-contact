@@ -24,7 +24,10 @@ from collections import Counter
 from datetime import datetime, timezone
 from statistics import mean
 
-from evaluate_learned_replay import evaluate, render
+try:
+    from .evaluate_learned_replay import evaluate, render
+except ImportError:
+    from evaluate_learned_replay import evaluate, render
 
 MATERIALS=("cloth","sponge","cushion","soft_ball","spring","mixed")
 REGIMES=("baseline","impact","shear","compression","rapid","relax")
@@ -32,6 +35,61 @@ BUDGETS=(128,512,2048)
 DEFAULT_SEEDS=(1201,1301,1409,1511)
 TIMES=("ml_feature_ms","ml_inference_ms","ml_decision_ms","ml_backend_ms",
        "ml_bookkeeping_ms","ml_wrapper_ms")
+REPLAY_ABI="KYOTO_REPLAY_ABLATION_V2"
+REQUIRED_POLICIES=frozenset(("sap_rebuild","sap_persistent_coherent",
+    "global_guarded_exact","ml_cost_aware","ml_cost_aware_conservative"))
+REQUIRED_COLUMNS=frozenset(("backend","frame","ms","pairs","pair_hash","misses",
+    "chosen_backend","ml_switched","ml_bypassed",*TIMES))
+REQUIRED_CAPABILITIES=frozenset((REPLAY_ABI,"sap_persistent_coherent",
+    "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms"))
+
+
+def verify_replayer(replayer: Path, root: Path) -> None:
+    """Fail before generating data if compilation failed or the binary is old.
+
+    A failed 'cmake --build' leaves the previous executable on disk. Merely
+    checking Path.is_file() cannot detect that dangerous stale-binary case.
+    """
+    sources=[root/"apps/material_replay_benchmark.cpp",
+             root/"include/ccp/learned_online.hpp"]
+    for src in sources:
+        if src.is_file() and src.stat().st_mtime_ns>replayer.stat().st_mtime_ns:
+            raise RuntimeError(
+                f"Replay executable is older than {src}. "
+                "Rebuild ccp_material_replay successfully before benchmarking.")
+    try:
+        probe=subprocess.run([str(replayer),"--capabilities"],
+                             capture_output=True,text=True,timeout=10,check=False)
+    except (OSError,subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"Cannot probe replay executable: {replayer}") from exc
+    tokens=set(probe.stdout.split())
+    if probe.returncode!=0 or not REQUIRED_CAPABILITIES.issubset(tokens):
+        raise RuntimeError(
+            "Replay executable is outdated or missing required capabilities "
+            f"({REPLAY_ABI}); stop and rebuild from the synced "
+            "include/ccp/learned_online.hpp and apps/material_replay_benchmark.cpp. "
+            f"Executable: {replayer}; stdout={probe.stdout!r}; "
+            f"stderr={probe.stderr[:350]!r}")
+
+
+def verify_replay_csv(path: Path) -> None:
+    """Never silently reuse an old replay after a failed build/resume."""
+    with path.open(newline="",encoding="utf-8") as stream:
+        reader=csv.DictReader(stream)
+        columns=set(reader.fieldnames or [])
+        missing=REQUIRED_COLUMNS-columns
+        if missing:
+            raise RuntimeError(
+                f"Stale or incomplete replay CSV {path}: missing {sorted(missing)}. "
+                "Preserve this output and use a NEW --output directory after rebuilding.")
+        observed={row["backend"] for row in reader}
+        missing_policies=REQUIRED_POLICIES-observed
+        if missing_policies:
+            raise RuntimeError(
+                f"Stale replay CSV {path}: missing policies {sorted(missing_policies)}. "
+                "Use a NEW --output directory; old results are not valid "
+                "for the coherent-SAP/controller ablation.")
+
 
 
 def checked(argv, log: Path, timeout: int) -> None:
@@ -114,6 +172,11 @@ def main() -> None:
     if not model.is_file():parser.error(f"Missing trained model: {model}")
     if any(not p.is_file() for p in (exporter,replayer)):
         parser.error("Build ccp_material_export and ccp_material_replay first")
+    # Fail BEFORE creating an output directory or any material snapshots.
+    try:
+        verify_replayer(replayer,Path(__file__).resolve().parent.parent)
+    except RuntimeError as exc:
+        parser.error(str(exc))
     if args.frames<=args.warmup+4 or args.warmup<0 or args.bootstrap<100:
         parser.error("Need frames > warmup + 4, warmup>=0, and bootstrap>=100")
     if any(s<0 for s in args.seeds) or len(set(args.seeds))!=len(args.seeds):
@@ -130,6 +193,9 @@ def main() -> None:
     if args.max_experiments:combos=combos[:args.max_experiments]
     if not combos:parser.error("Empty experiment matrix")
     contract={"model_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+              "replayer_sha256":hashlib.sha256(replayer.read_bytes()).hexdigest(),
+              "exporter_sha256":hashlib.sha256(exporter.read_bytes()).hexdigest(),
+              "replayer_abi":REPLAY_ABI,
               "source_model_path":str(model),"seeds":sorted(args.seeds),
               "materials":sorted(set(args.materials)),"regimes":sorted(set(args.regimes)),
               "budgets":sorted(set(args.budgets)),"frames":args.frames,
@@ -164,11 +230,15 @@ def main() -> None:
                 os.replace(tmp,snapshot)
             finally:
                 tmp.unlink(missing_ok=True)
+        if report.exists():
+            verify_replay_csv(report)
         if not report.exists():
             tmp=report.with_name(report.name+".partial")
             try:
                 checked([replayer,snapshot,tmp,0,model],
                         output/"logs"/f"{stem}-replay.log",args.timeout)
+                # Reject stale/wrong ABI results BEFORE making them permanent.
+                verify_replay_csv(tmp)
                 os.replace(tmp,report)
             finally:
                 tmp.unlink(missing_ok=True)
@@ -224,12 +294,14 @@ def main() -> None:
     summary["fresh_seeds"]=sorted({x[0] for x in combos})
     summary["interpretation"]=("Exploratory fresh-seed pilot, no retuning on these scenes; "
         "scene-bootstrap interval does not give seed-independent uncertainty.")
+    # Finish all validation and timing before publishing either final report.
+    # A failed run must not leave a plausible-looking completed-results file.
+    timing=metrics(paths,args.warmup)
     analysis=output/"FRESH_SEED_RESULTS"
     analysis.with_suffix(".md").write_text(render(scenes,summary),encoding="utf-8")
     analysis.with_suffix(".json").write_text(
         json.dumps({"aggregate":summary,"scenes":scenes},indent=2)+"\n",
         encoding="utf-8")
-    timing=metrics(paths,args.warmup)
     (output/"COMPONENT_TIMING.json").write_text(
         json.dumps(timing,indent=2)+"\n",encoding="utf-8")
     print("[ABLATION] COMPLETED: new output, original exhaustive data untouched",flush=True)
