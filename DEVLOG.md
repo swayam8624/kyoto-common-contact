@@ -181,3 +181,33 @@ python scripts/run_kyoto_controller_ablation.py --model output/kyoto-learned-202
 ```
 Only after independently inspected correctness and pilot performance should a larger prespecified fresh-seed matrix be considered. Avoid original held-out seeds 101/1009, avoid treating paired frames as independent seeds, and retain separate positive and negative results.
 
+
+## 2026-11-17 — Mac pilot build failure, stale-binary replay and fail-closed recovery
+
+**Observed in user-uploaded Mac build log `Pasted markdown(20261116-231333).md`:** CMake failed building `apps/material_replay_benchmark.cpp` because the user's local `include/ccp/learned_online.hpp` was left on an older revision. The then-current benchmark invoked `LearnedOnline(model,0.,.10,.30,24,true)` and `learned_->query(boxes)`, while the local header only accepted five constructor arguments and a `std::vector<Primitive>` query. The previous update command had **omitted the header**, a concrete instruction error. Third-party Bullet compound-literal warnings were unrelated; the two type errors caused build failure.
+
+**After build failure:** CTest ran against an OLD surviving `ccp_material_replay` binary and failed the new `ml_bookkeeping_ms` schema check. The pilot script nevertheless exported/replayed all 36 scenes with that surviving executable. Uploaded `FRESH_SEED_RESULTS.json` from four fresh seeds (1201, 1301, 1409, 1511) gave **0.8693999×** per-trajectory Guard/old ML geomean, **8/36** mean wins, **1.1024954×** aggregate total scene mean Guard/old ML ratio. Its nine methods OMIT `sap_persistent_coherent` and `ml_cost_aware_conservative`, conclusively proving the new benchmark was NOT evaluated. Final script raised `missing new timing field ml_bookkeeping_ms`. Preserve this pilot as **legacy/exploratory** and NEVER claim that persistent SAP or the new direct-Bounds/conservative ablation achieved these numbers.
+
+**Fail-closed repair committed:** C++ `ccp_material_replay --capabilities` returns a versioned contract (`KYOTO_REPLAY_ABLATION_V2` plus the required method/metric names). `scripts/run_kyoto_controller_ablation.py` probes this contract *before creating output or exporting scenes*, compares replay executable timestamp against modified C++ sources, records exporter/replayer SHA-256 hashes in the immutable ablation contract, requires all current columns and baseline policies for newly generated OR resumed CSVs, and validates the component-timing results before publishing final reports. A stale existing report stops with a clear instruction to use a **new output directory**; original evidence is never removed or overwritten.
+
+**Regression protection:** `scripts/test_ablation_preflight.py` contains five tests (reject old executable, accept current capability, reject old missing-column CSV, reject absent coherent-SAP backend, accept complete schema); `scripts/test_learned_cxx.py` now checks the real replay binary contract before its exact-pair oracle fixtures. The normal GitHub Actions cpu-reference job includes these tests. These changes were committed; successful macOS revalidation and any new speedup measurements are still **pending**, not claimed.
+
+**One-time safe user repair commands, preserving uncommitted training scripts and original data:**
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git fetch origin
+git restore --source=origin/research/kyoto-scale-evidence -- \
+  include/ccp/learned_online.hpp apps/material_replay_benchmark.cpp \
+  scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
+  scripts/run_kyoto_controller_ablation.py scripts/test_ablation_preflight.py
+source .venv-kyoto-ml/bin/activate
+cmake --build build/kyoto-material-macos --target ccp_material_export ccp_material_replay --parallel 4 && \
+ctest --test-dir build/kyoto-material-macos --output-on-failure -R learned_cpp_model_and_exact_pair_oracle && \
+python -m unittest scripts.test_ablation_preflight -v && \
+python scripts/run_kyoto_controller_ablation.py \
+  --model output/kyoto-learned-20261116T050002Z-exhaustive/model/controller.mlpc \
+  --output output/kyoto-coherent-pilot-20261117-verified \
+  --max-experiments 36
+```
+Do not pass `--resume` with the old 36-CSV folder: it contains an obsolete evidence contract and schema. The guarded command chain stops on build/test failure.
+
