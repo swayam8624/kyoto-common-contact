@@ -211,3 +211,23 @@ python scripts/run_kyoto_controller_ablation.py \
 ```
 Do not pass `--resume` with the old 36-CSV folder: it contains an obsolete evidence contract and schema. The guarded command chain stops on build/test failure.
 
+
+## 2026-11-17 — Second local Mac sync failure: generic Result ABI field omitted
+
+The user restored `include/ccp/learned_online.hpp`, `apps/material_replay_benchmark.cpp`, and evaluation scripts but **did not restore `include/ccp/generic_online.hpp`**, which declares `ccp::bench::Result::mlBookkeepingMs` on the remote research branch. Xcode therefore failed compilation with two concrete errors at `learned_online.hpp:155` and `material_replay_benchmark.cpp:288`: `no member named 'mlBookkeepingMs' in 'ccp::bench::Result'`. Unrelated Bullet C99 compound-literal warnings are not the cause. Because the guarded `&&` command stopped on failed build, **no new verified ablation was generated**.
+
+**Root cause:** another incomplete manual restore command, not a missing declaration in the remote source; GitHub's full source already contains the correct field. The full remote cpu-reference workflow [43978445834](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43978445834) completed successfully including C++ build and regression tests at branch head `8df423f`. Expanding stale-binary checks to include `generic_online.hpp`, `learned_policy.hpp`, and `live_cloth.hpp` is committed separately. None of this establishes a macOS speedup yet.
+
+**Minimal safe remedy** (do not reset local training files, experiments, or locally edited DEVLOG):
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git fetch origin
+git restore --source=origin/research/kyoto-scale-evidence -- include/ccp/generic_online.hpp scripts/run_kyoto_controller_ablation.py
+cmake --build build/kyoto-material-macos --target ccp_material_export ccp_material_replay --parallel 4 && \
+ctest --test-dir build/kyoto-material-macos --output-on-failure -R learned_cpp_model_and_exact_pair_oracle && \
+python -m unittest scripts.test_ablation_preflight -v && \
+python scripts/run_kyoto_controller_ablation.py \
+ --model output/kyoto-learned-20261116T050002Z-exhaustive/model/controller.mlpc \
+ --output output/kyoto-coherent-pilot-20261117-verified --max-experiments 36
+```
+
