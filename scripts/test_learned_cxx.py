@@ -131,6 +131,25 @@ def main():
             if (r["chosen_backend"]!="global_guarded_exact"
                     or r["pairs"]!=ref["pairs"] or r["pair_hash"]!=ref["pair_hash"]):
                 raise RuntimeError("Guard-first conservative policy lost pair parity")
+        # Adversarial high-motion material: the persistent order changes enough
+        # to exercise bounded insertion repair and occasional full-sort fallback.
+        rapid=root/"rapid.kmcb"
+        rapid_report=root/"rapid.csv"
+        run(args.exporter,rapid,"mixed",512,20,89211,"rapid")
+        run(args.replayer,rapid,rapid_report,0,model)
+        with rapid_report.open(newline="",encoding="utf-8") as source:
+            rapid_rows=list(csv.DictReader(source))
+        rapid_oracle={r["frame"]:r for r in rapid_rows
+                      if r["backend"]=="sap_rebuild"}
+        rapid_persistent=[r for r in rapid_rows
+                          if r["backend"]=="sap_persistent_coherent"]
+        if len(rapid_persistent)!=20:
+            raise RuntimeError("Rapid-motion persistent SAP baseline missing")
+        for r in rapid_persistent:
+            ref=rapid_oracle[r["frame"]]
+            if (r["pairs"]!=ref["pairs"] or r["pair_hash"]!=ref["pair_hash"]
+                    or int(r["misses"])!=0):
+                raise RuntimeError("Persistent SAP failed in rapidly deforming scene")
         bad=root/"corrupt.mlpc"
         bad.write_text("MALFORMED_MODEL\n",encoding="utf-8")
         run(args.replayer,samples,root/"rejected.csv",0,bad,success=False)
