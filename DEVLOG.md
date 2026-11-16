@@ -158,3 +158,26 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 
 **Comparator terminology clarification:** The `evaluate_learned_replay.py` field `ml_vs_best_static_posthoc_mean_speedup` is misnamed: its comparator set includes the standalone **dynamic** generalized `online_cost_aware` heuristic, as well as static SAP/Guard/regional/Bullet backends. Thus the 4/216 result means “faster than every separately run baseline policy in that trajectory,” *not* exclusively static algorithms. Future report output should rename or document this field without changing its numeric semantics.
+
+## 2026-11-17 — New exact persistent SAP baseline and fresh-seed hybrid-controller ablation
+
+**Changes committed:** `apps/material_replay_benchmark.cpp` now includes `sap_persistent_coherent`, a distinct persistent Sweep-and-Prune baseline retaining previous x-axis endpoint order across deforming frames. It uses stable primitive ID verification, bounded insertion-order repair (maximum 8N shifts) with a full sort fallback on adversarial reorder, 3D inclusive AABB overlap and symmetric category/mask filtering, canonical sorted unique ID pairs, and the exact same material-replay pair hash oracle as the other methods. This is not integrated as a trained MLP output (the existing MLP has four outputs); therefore cannot claim the learned controller exploits temporal SAP yet. The event-driven kinetic-SAP literature is a more complex research direction, not an implementation claim for this baseline.
+
+**Evaluation changes:** `scripts/evaluate_learned_replay.py` includes persistent SAP among posthoc individual baselines; `scripts/run_kyoto_controller_ablation.py` reports fresh-seed persistent SAP vs Guard and current ML variants. `scripts/test_learned_cxx.py` now verifies exact pair hashes in material-impact (12 frames) and rapid mixed deformation (20 frames). Existing direct-Bounds/no-copy learned replay and a guard-first conservative MLP variant remain separate previously implemented ablations, not invented wins.
+
+**Motivation from sources:** the [Broadmark benchmarking paper](https://diglib.eg.org/bitstreams/d1ac9824-285d-4dfa-8184-17e165bdacfd/download) distinguishes fresh SAP and incremental SAP and warns against narrow benchmark choice; [SOFA Sweep and Prune documentation](https://sofa-framework.github.io/doc/components/collision/detection/algorithm/detection-sweep-and-prune/) describes persistent internal SAP state versus direct output; [Adaptive Collision Culling via Context-Aware SAP](https://pubmed.ncbi.nlm.nih.gov/28574360/) describes adapting axes/partitioning for clustered distributions. These sources motivate experiments, not measured improvements or established novelty of this simple implementation.
+
+**Critical limitations:** This commit has not yet been benchmarked on the user's Apple Silicon machine nor on unseen held-out material seeds. No numerical speedup claim follows from code changes. The current 156-trial model has seen neither this new backend as a label nor action-specific destination cache miss penalties in its supervised targets. Absolute dominance of all separately warmed baselines in every scene is not assured or generally possible with nonzero selection overhead and unknown future motion; optimization should instead target predeclared workload-weighted mean/P95 latency with guaranteed exact-pair output, documented worst-case fallback, and evaluation on fresh datasets.
+
+**Reproducible Mac commands (do not overwrite original run):**
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git fetch origin
+git restore --source=origin/research/kyoto-scale-evidence -- apps/material_replay_benchmark.cpp scripts/evaluate_learned_replay.py scripts/run_kyoto_controller_ablation.py scripts/test_learned_cxx.py
+source .venv-kyoto-ml/bin/activate
+cmake --build build/kyoto-material-macos --target ccp_material_export ccp_material_replay --parallel 4
+ctest --test-dir build/kyoto-material-macos --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
+python scripts/run_kyoto_controller_ablation.py --model output/kyoto-learned-20261116T050002Z-exhaustive/model/controller.mlpc --output output/kyoto-coherent-pilot-20261117 --max-experiments 36
+```
+Only after independently inspected correctness and pilot performance should a larger prespecified fresh-seed matrix be considered. Avoid original held-out seeds 101/1009, avoid treating paired frames as independent seeds, and retain separate positive and negative results.
+
