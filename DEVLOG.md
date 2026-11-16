@@ -156,3 +156,5 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 **Next action:** pause new 156-trial training; first compare true direct-Guard/no-copy bypass, per-component overhead, no-switch ablation, and a cheap causal non-neural cost gate on **fresh unseen scenes**. Only evaluate contextual bandit or long-horizon RL after actual switched reward demonstrates a persistent advantage, with full oracle parity and repeated seeded P95 evidence.
 
+
+**Comparator terminology clarification:** The `evaluate_learned_replay.py` field `ml_vs_best_static_posthoc_mean_speedup` is misnamed: its comparator set includes the standalone **dynamic** generalized `online_cost_aware` heuristic, as well as static SAP/Guard/regional/Bullet backends. Thus the 4/216 result means “faster than every separately run baseline policy in that trajectory,” *not* exclusively static algorithms. Future report output should rename or document this field without changing its numeric semantics.
