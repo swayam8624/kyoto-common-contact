@@ -23,7 +23,7 @@ jobs:
             scripts/package_kyoto_results.py scripts/train_online_controller.py \
             scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
             scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py \
-            scripts/test_ml_recovery.py
+            scripts/test_ml_recovery.py scripts/run_kyoto_controller_ablation.py
           python3 -m unittest scripts.test_ml_recovery -v
       - name: Compile CPU benchmark with warnings
         run: |
@@ -85,6 +85,7 @@ jobs:
         run: |
           cmake -S . -B /tmp/kyoto-material-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
           cmake --build /tmp/kyoto-material-build --target ccp_material_benchmark ccp_material_export ccp_material_replay ccp_selective_guard_tests --parallel 4
+          ctest --test-dir /tmp/kyoto-material-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
       - name: Verify all six deformable-material families and selective cache repairs
         run: |
           mkdir -p /tmp/kyoto-material-evidence
