@@ -178,8 +178,29 @@ def main() -> None:
     ratio_total=sum(s["measured_mean_ms"]["global_guarded_exact"] for s in scenes)/sum(
         s["measured_mean_ms"]["ml_cost_aware"] for s in scenes)
     summary["aggregate_total_scene_mean_guard_over_ml"]=ratio_total
+    # An independent policy variant is evaluated on exactly the same
+    # replay frames: guard-first, stronger hysteresis, longer cooldown.
+    # Treat this as a predeclared exploratory A/B result, not a free win.
+    if all("ml_cost_aware_conservative" in s["measured_mean_ms"] for s in scenes):
+        guard_ratio=[
+            s["measured_mean_ms"]["global_guarded_exact"]/
+            s["measured_mean_ms"]["ml_cost_aware_conservative"]
+            for s in scenes
+        ]
+        default_ratio=[
+            s["measured_mean_ms"]["ml_cost_aware"]/
+            s["measured_mean_ms"]["ml_cost_aware_conservative"]
+            for s in scenes
+        ]
+        summary["conservative_vs_global_geomean"]=math.exp(mean(map(math.log,guard_ratio)))
+        summary["conservative_vs_default_ml_geomean"]=math.exp(mean(map(math.log,default_ratio)))
+        summary["conservative_vs_global_scene_wins"]=sum(x>1 for x in guard_ratio)
+        summary["conservative_vs_default_scene_wins"]=sum(x>1 for x in default_ratio)
+        summary["conservative_vs_global_total_scene_mean"]=(sum(
+            s["measured_mean_ms"]["global_guarded_exact"] for s in scenes)/sum(
+            s["measured_mean_ms"]["ml_cost_aware_conservative"] for s in scenes))
     summary["model_sha256"]=contract["model_sha256"]
-    summary["fresh_seeds"]=sorted(args.seeds)
+    summary["fresh_seeds"]=sorted({x[0] for x in combos})
     summary["interpretation"]=("Exploratory fresh-seed pilot, no retuning on these scenes; "
         "scene-bootstrap interval does not give seed-independent uncertainty.")
     analysis=output/"FRESH_SEED_RESULTS"
@@ -195,6 +216,11 @@ def main() -> None:
     print("[ABLATION] per-trajectory geo Guard/ML:",
           f'{summary["per_trajectory_paired_geometric_mean_ml_vs_global"]:.4f}x',flush=True)
     print("[ABLATION] sum of scene means Guard/ML:",f"{ratio_total:.4f}x",flush=True)
+    if "conservative_vs_global_geomean" in summary:
+        print("[ABLATION] conservative Guard/ML geomean:",
+              f'{summary["conservative_vs_global_geomean"]:.4f}x',flush=True)
+        print("[ABLATION] conservative vs default ML geomean:",
+              f'{summary["conservative_vs_default_ml_geomean"]:.4f}x',flush=True)
     print("[ABLATION] controller switches:",timing["switches"],flush=True)
     print("[ABLATION] full evidence:",output,flush=True)
 
