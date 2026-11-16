@@ -11,6 +11,7 @@ C++-loadable MLP weights. Strict failures for incomplete/uncertified data.
 from __future__ import annotations
 import argparse
 import csv
+import fcntl
 import hashlib
 import itertools
 import json
@@ -310,6 +311,16 @@ def main():
     elif args.output.exists() and any(args.output.iterdir()):
         parser.error("output directory must be new/empty; --resume explicitly for interrupted runs")
     args.output.mkdir(parents=True,exist_ok=True)
+    # Exclusive advisory lock prevents concurrent *new-version* trainers
+    # from appending the same trials.jsonl after a user reconnects.
+    # The original pre-lock Mac process is detected by the outer runner's
+    # process-list guard. Keep the descriptor open for the entire main().
+    lock_file=(args.output/".training.lock").open("a+")
+    try:
+        fcntl.flock(lock_file.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        raise RuntimeError("Another PyTorch trainer is already using this model "
+                           "directory; refuse concurrent resume") from exc
     run_id=args.output.name
     data,metadata=load(args.inputs)
     train,val,test,groups=split_samples(data,args.split,args.seed)
