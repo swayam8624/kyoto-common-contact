@@ -91,7 +91,7 @@ def main():
     done={"success":False}
     def preserve():
         subprocess.run([sys.executable,"scripts/package_kyoto_results.py",
-                        str(run),"--exit-code",0 if done["success"] else 1],
+                        str(run),"--exit-code",str(0 if done["success"] else 1)],
                        cwd=root,check=False)
     atexit.register(preserve)
     logs=run/"logs";logs.mkdir()
