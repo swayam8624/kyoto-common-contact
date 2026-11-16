@@ -15,7 +15,7 @@ from collections import defaultdict,Counter
 from pathlib import Path
 from statistics import mean,median
 
-STATIC=("sap_rebuild","sap_persistent_coherent","global_guarded_exact","selective_guard_exact",
+STATIC=("sap_rebuild","sap_persistent_coherent","guard_sap_measured_probe","global_guarded_exact","selective_guard_exact",
         "region_fixed","region_adaptive","region_hierarchical",
         "online_cost_aware","bullet_dbvt_persistent")
 LEARNED="ml_cost_aware"
