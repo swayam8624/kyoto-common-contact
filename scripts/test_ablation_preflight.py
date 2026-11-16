@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from scripts.run_kyoto_controller_ablation import (
-    REPLAY_ABI, verify_replayer, verify_replay_csv,
+    REPLAY_ABI, verify_replayer, verify_replay_csv, choose_combos,
 )
 
 
@@ -57,6 +57,26 @@ class AblationPreflightTests(unittest.TestCase):
                 w.writerow({"backend":policy,"frame":0,"ms":1.0})
         with self.assertRaisesRegex(RuntimeError,"sap_persistent_coherent"):
             verify_replay_csv(report)
+
+    def test_balanced_selection_covers_every_cell_and_independent_seeds(self):
+        seeds=[1709,1801,1907,2003]
+        materials=["cloth","spring"]
+        regimes=["impact","relax","rapid"]
+        budgets=[128,512,2048]
+        a=choose_combos(seeds,materials,regimes,budgets,20261117,18,"balanced")
+        self.assertEqual(a,choose_combos(seeds,materials,regimes,budgets,20261117,18,"balanced"))
+        self.assertEqual(len(a),18)
+        self.assertEqual(len({(m,r,n) for _,m,r,n in a}),18)
+        b=choose_combos(seeds,materials,regimes,budgets,20261117,36,"balanced")
+        for m in materials:
+            for r in regimes:
+                for n in budgets:
+                    actual=[seed for seed,mat,reg,budget in b
+                            if (mat,reg,budget)==(m,r,n)]
+                    self.assertEqual(len(actual),2)
+                    self.assertEqual(len(set(actual)),2)
+        self.assertEqual(len(choose_combos(seeds,materials,regimes,budgets,
+                                          20261117,0,"balanced")),72)
 
     def test_accepts_complete_replay_schema(self):
         report=self.root/"complete.csv"
