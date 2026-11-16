@@ -211,7 +211,89 @@ public:
  }
 };
 
-enum class Kind {Sap,PersistentSap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
+// Exploratory causal hybrid: never queries a learned model, never uses
+// a hindsight framewise oracle, and does not rely on material labels.
+// Guard is used by default. Only large, potentially expensive workloads
+// trigger occasional measured probes against a persistent x-axis SAP.
+// Crucially, probes execute both algorithms and FULL probe overhead remains
+// in the measured wall time. Every returned pair list is exact.
+class ProbedGuardSAP {
+ ccp::live::BroadPhaseService guard_;
+ PersistentSAP sap_;
+ int frame_{},lastProbe_{-10000};
+ bool useSAP_{};
+ double lastGuardMs_{};
+ static bool inside(const Bounds& raw,const Bounds& envelope){
+  return raw.id==envelope.id &&
+    raw.category==envelope.category && raw.mask==envelope.mask &&
+    raw.movable==envelope.movable &&
+    raw.min.x>=envelope.min.x && raw.min.y>=envelope.min.y &&
+    raw.min.z>=envelope.min.z && raw.max.x<=envelope.max.x &&
+    raw.max.y<=envelope.max.y && raw.max.z<=envelope.max.z;
+ }
+ double sampleEscapeFraction(const std::vector<Bounds>& boxes) const {
+  const auto& envelopes=guard_.envelopes();
+  if(envelopes.size()!=boxes.size()||boxes.empty())return 1.;
+  const size_t samples=std::min(size_t{32},boxes.size());
+  size_t escaped=0;
+  for(size_t i=0;i<samples;++i){
+   const size_t index=samples==1?0:i*(boxes.size()-1)/(samples-1);
+   if(!inside(boxes[index],envelopes[index]))++escaped;
+  }
+  return double(escaped)/double(samples);
+ }
+ Pairs queryGuard(const std::vector<Bounds>& boxes){
+  ccp::live::QueryMetrics metrics;
+  const auto& candidates=guard_.query(
+    boxes,{0.,.045,ccp::live::UpdatePolicy::GuardedReuse},true,metrics);
+  return exactGuard(candidates,boxes);
+ }
+public:
+ struct Outcome {
+  Pairs pairs;
+  const char* action{};
+  bool switched{},probed{};
+ };
+ Outcome query(const std::vector<Bounds>& boxes){
+  ++frame_;
+  const bool previouslySAP=useSAP_;
+  // A short-list certificate check is a causal trigger, not a truth oracle:
+  // a false negative merely defers exploration and never misses collisions.
+  const bool canProbe=boxes.size()>=384 && frame_>1 &&
+     frame_-lastProbe_>=24 &&
+     (sampleEscapeFraction(boxes)>=.25 || lastGuardMs_>.5);
+  if(canProbe){
+   lastProbe_=frame_;
+   const auto startGuard=Clock::now();
+   Pairs fromGuard=queryGuard(boxes);
+   const auto afterGuard=Clock::now();
+   Pairs fromSAP=sap_.query(boxes);
+   const auto afterSAP=Clock::now();
+   const double guardMs=std::chrono::duration<double,std::milli>(
+                         afterGuard-startGuard).count();
+   const double sapMs=std::chrono::duration<double,std::milli>(
+                         afterSAP-afterGuard).count();
+   lastGuardMs_=guardMs;
+   // 12% hysteresis: switching must be meaningfully better.
+   // In contrast to an offline optimum, both probe costs are charged.
+   if(useSAP_){
+    if(guardMs*1.12<sapMs)useSAP_=false;
+   }else if(sapMs*1.12<guardMs)useSAP_=true;
+   return {useSAP_?std::move(fromSAP):std::move(fromGuard),
+           useSAP_?"sap_persistent_coherent":"global_guarded_exact",
+           useSAP_!=previouslySAP,true};
+  }
+  if(useSAP_)
+   return {sap_.query(boxes),"sap_persistent_coherent",false,false};
+  const auto began=Clock::now();
+  auto pairs=queryGuard(boxes);
+  lastGuardMs_=std::chrono::duration<double,std::milli>(
+                Clock::now()-began).count();
+  return {std::move(pairs),"global_guarded_exact",false,false};
+ }
+};
+
+enum class Kind {Sap,PersistentSap,GuardSapProbe,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -220,6 +302,7 @@ const char* name(Kind kind){
  switch(kind){
  case Kind::Sap:return "sap_rebuild";
  case Kind::PersistentSap:return "sap_persistent_coherent";
+ case Kind::GuardSapProbe:return "guard_sap_measured_probe";
  case Kind::Global:return "global_guarded_exact";
  case Kind::Selective:return "selective_guard_exact";
  case Kind::Fixed:return "region_fixed";
@@ -241,11 +324,12 @@ struct Observation {
  int span{64};bool usedGlobal{};
  ccp::learned::Features features{};
  std::string selected{"none"};
- bool switched{},bypassed{};
+ bool switched{},bypassed{},hybridProbed{},hybridSwitched{};
 };
 class Method {
  Kind kind_;
  PersistentSAP persistentSap_;
+ ProbedGuardSAP guardSapProbe_;
  ccp::live::BroadPhaseService global_;
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
@@ -290,6 +374,14 @@ public:
    r.pairs=ccp::live::candidates(boxes,true);
   else if(kind_==Kind::PersistentSap)
    r.pairs=persistentSap_.query(boxes);
+  else if(kind_==Kind::GuardSapProbe){
+   auto outcome=guardSapProbe_.query(boxes);
+   r.pairs=std::move(outcome.pairs);
+   r.selected=outcome.action;
+   r.hybridSwitched=outcome.switched;
+   r.hybridProbed=outcome.probed;
+   r.usedGlobal=r.selected=="global_guarded_exact";
+  }
 #ifdef CCP_HAVE_BULLET
   else if(kind_==Kind::Bullet)r.pairs=bullet_.query(boxes);
 #endif
@@ -341,13 +433,13 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
        "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,"
        "chosen_backend,ml_switched,ml_bypassed,ml_feature_ms,ml_inference_ms,"
-       "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms";
+       "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms,hybrid_probed,hybrid_switched";
  for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
  csv<<'\n';
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
- std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::Global,Kind::Selective,
+ std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::Global,Kind::Selective,
   Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online};
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
@@ -386,7 +478,8 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<observed.selected<<','<<(observed.switched?1:0)<<','<<(observed.bypassed?1:0)<<','
       <<observed.mlFeatureMs<<','<<observed.mlInferenceMs<<','
       <<observed.mlDecisionMs<<','<<observed.mlBackendMs<<','
-      <<observed.mlBookkeepingMs<<','<<observed.mlWrapperMs;
+      <<observed.mlBookkeepingMs<<','<<observed.mlWrapperMs<<','
+      <<(observed.hybridProbed?1:0)<<','<<(observed.hybridSwitched?1:0);
    for(double f:observed.features)csv<<','<<f;
    csv<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
@@ -408,8 +501,9 @@ int main(int argc,char** argv){
   // Machine-readable executable ABI check: fail fast if an older binary is
   // accidentally used after a compile failure. No snapshots or model needed.
   if(argc==2&&std::string(argv[1])=="--capabilities"){
-   std::cout<<"KYOTO_REPLAY_ABLATION_V2 sap_persistent_coherent "
-               "ml_cost_aware_conservative ml_bookkeeping_ms ml_wrapper_ms\n";
+   std::cout<<"KYOTO_REPLAY_ABLATION_V3 sap_persistent_coherent "
+               "ml_cost_aware_conservative guard_sap_measured_probe "
+               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched\n";
    return 0;
   }
   if(argc<3||argc>5)
