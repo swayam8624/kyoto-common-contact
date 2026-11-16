@@ -231,3 +231,38 @@ python scripts/run_kyoto_controller_ablation.py \
  --output output/kyoto-coherent-pilot-20261117-verified --max-experiments 36
 ```
 
+
+## 2026-11-17 — Verified 36-scene Mac pilot; guard/SAP measured-probe hybrid exploratory baseline
+
+**Primary evidence:** user-uploaded `Pasted markdown(20261116-232610).md`, `FRESH_SEED_RESULTS(1).json` and `COMPONENT_TIMING.json`. Mac successfully compiled current `ccp_material_replay`, passed the actual `learned_cpp_model_and_exact_pair_oracle` CTest and all five preflight tests. New complete output: `output/kyoto-coherent-pilot-20261117-verified`. 36 scenes, 4 fresh (at that time) seeds `1201,1301,1409,1511`, 92 timed frames each (total 3312) across 6 materials and 6 deformation regimes but nonuniform random coverage (e.g. rapid only 1/36). Every algorithm's candidate-pair hash matched the independent exact replay reference on every tested frame.
+
+**Observed results versus direct Global Guard**, per-trajectory geometric means: original ML **0.897686×** (11/36 wins); Guard-first conservative ML **0.973629×** (12/36 wins); coherent persistent SAP **0.479104×** (9/36 wins); conservative versus original ML **1.084599×**. Aggregate ratio of summed 36 scene mean costs: ML **1.109035×**, conservative ML **1.136092×**, persistent SAP **0.744959×** against Guard. These measures weight workloads differently. The 95% scene bootstrap of original MLP was [0.8104,0.9931], but 36 scenes share only four seeds; this is NOT a seed-independent CI.
+
+**Tail:** P95 per-trajectory geometric means versus Guard: original MLP **0.8314×** (15/36 P95 wins), conservative MLP **0.9723×** (17/36), coherent persistent SAP **1.0773×** (27/36). Persistent SAP may be promising for reducing Guard's costly rebuild spikes, notwithstanding its poorer mean on low-motion scenes. On cloth compression 2048 true AABBs, Guard 5.1563ms, coherent SAP 1.8042ms (**2.858×**); cloth impact 2048, Guard 2.538ms, coherent SAP 1.4077ms (**1.803×**). Other baselines can win other scenes; Global Guard is the fastest separately run policy on 20/36 of the pilot.
+
+**Measured ML costs per timed frame:** causal feature generation **9.5035 microseconds**, neural prediction **0.7662 microseconds**, decision logic **0.02356 microseconds**, post-backend bookkeeping **1.675 microseconds**, outer-wrapper **2.4535 microseconds**. Backend core work mean **0.852583 ms** across heterogeneous scenes. The original ML selected direct Guard 2885/3312 frames (**87.1%**), bypassed neural inference for 828, and switched 46 times. Thus refining the model's hidden-layer count is unlikely to be the most effective immediate next experiment.
+
+**Hindsight ceiling:** selecting the fastest separately warmed baseline per *whole* scene would achieve ~**1.3469×** aggregate-time ratio versus Guard on this biased 36-scene set, or 1.1271× per-scene geometric ratio. These are unrealizable oracle upper bounds *for a particular comparator set*, not a deployment or general theoretical bound. The evaluator retains legacy `ml_vs_best_static_posthoc_mean_speedup` for compatibility but adds the precise `ml_vs_best_competing_policy_posthoc_mean_speedup`: the comparator set includes dynamic generalized-online and measured-probe variants, not just static algorithms.
+
+**New exploratory benchmark-only policy:** `guard_sap_measured_probe` in `apps/material_replay_benchmark.cpp`. Starts with exact Guard; for >=384 AABBs samples up to 32 current raw boxes against existing Guard envelope certificates; when >=25% sampled boxes escape or last observed Guard query exceeds 0.5ms, samples the current costs of Guard and independently maintained persistent SAP no more often than every 24 frames. Both algorithms execute on probe frames, **both costs are charged** in the method's measured wall time, switching requires 12% improvement, and all outputs go through the complete per-frame pair oracle. It never uses future frames, material names, or teacher prediction labels. This simple causal rule may fail on sudden workload changes and is NOT represented as novel by itself. Outputs `hybrid_probed` and `hybrid_switched` per frame, plus aggregate counters and comparisons.
+
+**Data-design repair:** `run_kyoto_controller_ablation.py --sampling balanced` samples every material×regime×size cell once before repeating any cell with a different seed; SHA-stamped replay ABI `KYOTO_REPLAY_ABLATION_V3` prevents mixing binaries and requires hybrid output columns. Unit tests verify balanced coverage and distinct seed repeats. Earlier `--sampling random` remains the default for legacy reproducibility. CI runs include the C++ exact oracle and Python tests on actual source; the user has NOT yet run this hybrid on Mac and **no improvement is claimed**. Keep the former 36 scenes as already-inspected exploratory development data.
+
+**Next independent Mac study** (new seeds not previously analyzed; new output; no training):
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git fetch origin
+git restore --source=origin/research/kyoto-scale-evidence -- \
+ apps/material_replay_benchmark.cpp scripts/test_learned_cxx.py \
+ scripts/test_ablation_preflight.py scripts/run_kyoto_controller_ablation.py \
+ scripts/evaluate_learned_replay.py
+cmake --build build/kyoto-material-macos --target ccp_material_export ccp_material_replay --parallel 4 && \
+ ctest --test-dir build/kyoto-material-macos --output-on-failure -R learned_cpp_model_and_exact_pair_oracle && \
+ python -m unittest scripts.test_ablation_preflight -v && \
+ python scripts/run_kyoto_controller_ablation.py \
+  --model output/kyoto-learned-20261116T050002Z-exhaustive/model/controller.mlpc \
+  --output output/kyoto-guard-sap-balanced-20261117 \
+  --seeds 1709 1801 1907 2003 --sampling balanced --max-experiments 108
+```
+Report P95, per-material/regime/budget performance, exact oracle parity, probes/switches, and overhead; if the hybrid loses, keep that result and investigate. Neither hybrid nor existing MLP is yet shown to win in every case or integrate into coupled cloth solving.
+
