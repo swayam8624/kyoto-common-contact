@@ -50,8 +50,14 @@ def verify_replayer(replayer: Path, root: Path) -> None:
     A failed 'cmake --build' leaves the previous executable on disk. Merely
     checking Path.is_file() cannot detect that dangerous stale-binary case.
     """
+    # Track every directly related interface, not only the leaf controller.
+    # In particular, Result::mlBookkeepingMs is declared in generic_online.hpp;
+    # updating learned_online.hpp without it caused a real macOS build failure.
     sources=[root/"apps/material_replay_benchmark.cpp",
-             root/"include/ccp/learned_online.hpp"]
+             root/"include/ccp/learned_online.hpp",
+             root/"include/ccp/generic_online.hpp",
+             root/"include/ccp/learned_policy.hpp",
+             root/"include/ccp/live_cloth.hpp"]
     for src in sources:
         if src.is_file() and src.stat().st_mtime_ns>replayer.stat().st_mtime_ns:
             raise RuntimeError(
