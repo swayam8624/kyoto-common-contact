@@ -152,7 +152,7 @@ public:
  }
 };
 #endif
-enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned
+enum class Kind {Sap,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -167,6 +167,7 @@ const char* name(Kind kind){
  case Kind::Hierarchy:return "region_hierarchical";
  case Kind::Online:return "online_cost_aware";
  case Kind::Learned:return "ml_cost_aware";
+ case Kind::LearnedConservative:return "ml_cost_aware_conservative";
 #ifdef CCP_HAVE_BULLET
  case Kind::Bullet:return "bullet_dbvt_persistent";
 #endif
@@ -195,9 +196,15 @@ class Method {
 #endif
 public:
  explicit Method(Kind kind,const std::string& model=""):kind_(kind){
-  if(kind==Kind::Learned){
+  if(kind==Kind::Learned||kind==Kind::LearnedConservative){
    if(model.empty())throw std::invalid_argument("ML model required for learned method");
-   learned_=std::make_unique<ccp::bench::LearnedOnline>(model,0.);
+   // Experimental conservative control (not a claim of superiority):
+   // begin with the strong verified Guard baseline, require a much larger
+   // cost advantage, and amortize cache invalidation over longer windows.
+   // Compare against default ML and all standalone methods on fresh seeds.
+   if(kind==Kind::LearnedConservative)
+    learned_=std::make_unique<ccp::bench::LearnedOnline>(model,0.,.10,.30,24,true);
+   else learned_=std::make_unique<ccp::bench::LearnedOnline>(model,0.);
   }
  }
  Observation run(const std::vector<Bounds>& boxes){
@@ -207,7 +214,7 @@ public:
   // inside the measured query: never charge an extra duplicate O(N) pass.
   r.features=features_.describe(boxes);
   const auto start=Clock::now();
-  if(kind_==Kind::Learned){
+  if(kind_==Kind::Learned||kind_==Kind::LearnedConservative){
    const auto result=learned_->query(boxes);
    r.pairs=result.pairs;r.span=result.span;r.usedGlobal=result.usedGlobal;
    r.builds=result.builds+result.guardBuilds;
@@ -255,7 +262,8 @@ public:
   const auto backendEnd=Clock::now();
   features_.observe(boxes,r.pairs.size());
   r.ms=std::chrono::duration<double,std::milli>(backendEnd-start).count();
-  if(kind_==Kind::Learned)r.mlWrapperMs=std::max(0.,r.ms-r.mlInnerMs);
+  if(kind_==Kind::Learned||kind_==Kind::LearnedConservative)
+   r.mlWrapperMs=std::max(0.,r.ms-r.mlInnerMs);
   return r;
  }
 };
@@ -281,7 +289,10 @@ void run(const std::string& filename,const std::string& output,int verbose,
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
 #endif
- if(!model.empty())methods.push_back(Kind::Learned);
+ if(!model.empty()){
+  methods.push_back(Kind::Learned);
+  methods.push_back(Kind::LearnedConservative);
+ }
  for(Kind method:methods){
   MaterialReplay stream(filename);
   Method algorithm(method,model);
