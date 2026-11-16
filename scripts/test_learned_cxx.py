@@ -33,6 +33,14 @@ def main():
     arg.add_argument("exporter",type=Path)
     arg.add_argument("replayer",type=Path)
     args=arg.parse_args()
+    # If a CMake build failed, the old executable may still exist on disk.
+    # Explicitly reject an obsolete replay ABI before any oracle fixtures.
+    signature=subprocess.run([str(args.replayer),"--capabilities"],
+                             capture_output=True,text=True,timeout=10,check=False)
+    required={"KYOTO_REPLAY_ABLATION_V2","sap_persistent_coherent",
+              "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms"}
+    if signature.returncode!=0 or not required.issubset(set(signature.stdout.split())):
+        raise RuntimeError("Replay executable is stale; rebuild it with the current learned_online.hpp")
     with tempfile.TemporaryDirectory(prefix="kyoto-learned-smoke-") as tmp:
         root=Path(tmp)
         model=root/"constant.mlpc"
