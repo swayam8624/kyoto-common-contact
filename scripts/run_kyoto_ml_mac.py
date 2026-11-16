@@ -146,6 +146,22 @@ def main():
         metadata=previous
     else:
         environment.write_text(json.dumps(metadata,indent=2)+"\n",encoding="utf-8")
+    if args.resume_run:
+        # Append provenance without overwriting the original experiment's
+        # machine/compiler/model seed manifest. The latest source revision
+        # may differ from the revision of the first 34 trials.
+        event={"resumed_at_utc":utc,
+               "original_source_sha":metadata.get("source_sha","unknown"),
+               "recovery_source_sha":subprocess.check_output(
+                    ["git","rev-parse","HEAD"],text=True).strip(),
+               "recovery_source_dirty":bool(subprocess.check_output(
+                    ["git","status","--porcelain"],text=True).strip()),
+               "reason":"non-destructive continuation of interrupted PyTorch grid",
+               "output":str(run)}
+        with (run/"resume_events.jsonl").open("a",encoding="utf-8") as history:
+            history.write(json.dumps(event)+"\n")
+        print("[KYOTO-ML] Recovery revision recorded. Previous run files "
+              "remain unchanged.",flush=True)
     build=args.build.resolve()
     exporter=build/"ccp_material_export"
     replayer=build/"ccp_material_replay"
