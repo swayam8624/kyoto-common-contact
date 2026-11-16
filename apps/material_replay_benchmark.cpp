@@ -175,7 +175,7 @@ const char* name(Kind kind){
 }
 struct Observation {
  Pairs pairs;
- double ms{},mlFeatureMs{},mlInferenceMs{},mlDecisionMs{},mlBackendMs{};
+ double ms{},mlFeatureMs{},mlInferenceMs{},mlDecisionMs{},mlBackendMs{},mlBookkeepingMs{},mlWrapperMs{},mlInnerMs{};
  size_t builds{},reuses{},repairs{},aabbTests{},workers{1};
  int span{64};bool usedGlobal{};
  ccp::learned::Features features{};
@@ -208,7 +208,7 @@ public:
   r.features=features_.describe(boxes);
   const auto start=Clock::now();
   if(kind_==Kind::Learned){
-   const auto result=learned_->query(primitives(boxes));
+   const auto result=learned_->query(boxes);
    r.pairs=result.pairs;r.span=result.span;r.usedGlobal=result.usedGlobal;
    r.builds=result.builds+result.guardBuilds;
    r.reuses=result.reuses+result.guardReuses;
@@ -217,6 +217,7 @@ public:
    r.switched=result.switched;r.bypassed=result.learnedBypassed;
    r.mlFeatureMs=result.mlFeatureMs;r.mlInferenceMs=result.mlInferenceMs;
    r.mlDecisionMs=result.mlDecisionMs;r.mlBackendMs=result.mlBackendMs;
+   r.mlBookkeepingMs=result.mlBookkeepingMs;r.mlInnerMs=result.queryMs;
   }else if(kind_==Kind::Sap)
    r.pairs=ccp::live::candidates(boxes,true);
 #ifdef CCP_HAVE_BULLET
@@ -254,6 +255,7 @@ public:
   const auto backendEnd=Clock::now();
   features_.observe(boxes,r.pairs.size());
   r.ms=std::chrono::duration<double,std::milli>(backendEnd-start).count();
+  if(kind_==Kind::Learned)r.mlWrapperMs=std::max(0.,r.ms-r.mlInnerMs);
   return r;
  }
 };
@@ -268,7 +270,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
        "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,"
        "chosen_backend,ml_switched,ml_bypassed,ml_feature_ms,ml_inference_ms,"
-       "ml_decision_ms,ml_backend_ms";
+       "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms";
  for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
  csv<<'\n';
  csv<<std::fixed<<std::setprecision(9);
@@ -309,7 +311,8 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<(observed.usedGlobal?"localguard":"region")<<','
       <<observed.selected<<','<<(observed.switched?1:0)<<','<<(observed.bypassed?1:0)<<','
       <<observed.mlFeatureMs<<','<<observed.mlInferenceMs<<','
-      <<observed.mlDecisionMs<<','<<observed.mlBackendMs;
+      <<observed.mlDecisionMs<<','<<observed.mlBackendMs<<','
+      <<observed.mlBookkeepingMs<<','<<observed.mlWrapperMs;
    for(double f:observed.features)csv<<','<<f;
    csv<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
