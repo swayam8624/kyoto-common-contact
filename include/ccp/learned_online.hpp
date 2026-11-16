@@ -54,11 +54,21 @@ public:
      hysteresis_>=1||cooldown_<0)
    throw std::invalid_argument("invalid learned policy control parameters");
  }
+ // Snapshot-replay already owns validated Bounds. Do not allocate a second
+ // Primitive vector, copy it back to Bounds, or pad a zero-margin scene.
+ Result query(const std::vector<Bounds>& raw){return queryBounds(raw,nullptr);}
+ // Preserve the original API and region/sheet metadata for coupled callers.
  Result query(const std::vector<Primitive>& input){
+  return queryBounds(rawBounds(input),&input);
+ }
+private:
+ Result queryBounds(const std::vector<Bounds>& raw,
+                    const std::vector<Primitive>* original){
   const auto begin=Clock::now();
   ++frame_;
-  const auto raw=rawBounds(input);
-  const auto tight=padded(raw,margin_);
+  std::vector<Bounds> expanded;
+  if(margin_>0.)expanded=padded(raw,margin_);
+  const std::vector<Bounds>& tight=margin_==0.?raw:expanded;
   // At tiny N the measured decision overhead can dominate the entire
   // guarded query. Deterministically use the safe guarded method rather
   // than paying for neural inference. This gate was developed AFTER
@@ -115,7 +125,13 @@ public:
    result.workers=m.parallelWorkers;
   }else if(selected==3){
    Metrics m;
-   auto actual=input;
+   std::vector<Primitive> actual;
+   if(original)actual=*original;
+   else{
+    actual.reserve(raw.size());
+    for(size_t i=0;i<raw.size();++i)
+     actual.push_back({raw[i],int(i/64),-1});
+   }
    for(size_t i=0;i<actual.size();++i)actual[i].region=int(i/64);
    const auto& output=regional_.query(actual,margin_,true,m,true);
    result.pairs.assign(output.begin(),output.end());
@@ -131,9 +147,11 @@ public:
   result.mlInferenceMs=std::chrono::duration<double,std::milli>(inferenceEnd-featureEnd).count();
   result.mlDecisionMs=std::chrono::duration<double,std::milli>(decisionEnd-inferenceEnd).count();
   result.mlBackendMs=std::chrono::duration<double,std::milli>(backendEnd-decisionEnd).count();
+  result.mlBookkeepingMs=std::chrono::duration<double,std::milli>(finished-backendEnd).count();
   result.queryMs=std::chrono::duration<double,std::milli>(finished-begin).count();
   return result;
  }
+public:
  size_t switches()const{return switches_;}
 };
 } // namespace ccp::bench
