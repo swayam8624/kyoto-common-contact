@@ -50,6 +50,14 @@ def main():
                          "ml_wrapper_ms"):
             if required not in rows[0]:
                 raise RuntimeError(f"Missing ML performance column: {required}")
+        persistent=[r for r in rows if r["backend"]=="sap_persistent_coherent"]
+        if len(persistent)!=12:
+            raise RuntimeError("Temporally coherent persistent SAP baseline missing")
+        oracle_by_frame={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
+        for row in persistent:
+            truth=oracle_by_frame[row["frame"]]
+            if row["pairs"]!=truth["pairs"] or row["pair_hash"]!=truth["pair_hash"]:
+                raise RuntimeError("Persistent SAP lost exact candidate pair equivalence")
         learned=[r for r in rows if r["backend"]=="ml_cost_aware"]
         baseline={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
         conservative=[r for r in rows if r["backend"]=="ml_cost_aware_conservative"]
