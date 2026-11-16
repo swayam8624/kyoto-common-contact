@@ -293,7 +293,131 @@ public:
  }
 };
 
-enum class Kind {Sap,PersistentSap,GuardSapProbe,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
+
+// One-backend-per-frame causal exploration. The old hybrid double-executed
+// Guard and SAP on probe frames and compared a stale-Guard cache with warmed
+// SAP, confounding probe cost and cache state. This candidate instead records
+// Guard costs while Guard is continuously active; it tests SAP only after
+// repeated expensive Guard rebuilds. It can abandon a bad trial after two
+// SAP frames. There is NO per-frame hindsight oracle or material label.
+// Thresholds are exploratory and MUST be validated on never-inspected seeds.
+class GuardSAPBoundedTrial {
+ ccp::live::BroadPhaseService guard_;
+ PersistentSAP sap_;
+ enum class Mode { Guard, Trial, Sap };
+ Mode mode_{Mode::Guard};
+ int frame_{},guardRebuildStreak_{},trialFrames_{},sapFrames_{};
+ int quietFrames_{},sapBadFrames_{},cooldown_{};
+ double guardEWMA_{},sapEWMA_{};
+ bool guardSeen_{},sapSeen_{},lastActionSAP_{};
+ std::array<Bounds,24> lastSample_{};
+ bool sampleValid_{};
+ static bool moved(const Bounds& a,const Bounds& b){
+  // A fraction of the guarded-displacement budget, in the same world units.
+  constexpr double d=.01125;
+  return std::abs(a.min.x-b.min.x)>d ||
+         std::abs(a.min.y-b.min.y)>d ||
+         std::abs(a.min.z-b.min.z)>d ||
+         std::abs(a.max.x-b.max.x)>d ||
+         std::abs(a.max.y-b.max.y)>d ||
+         std::abs(a.max.z-b.max.z)>d;
+ }
+ bool motionQuiet(const std::vector<Bounds>& boxes){
+  const size_t count=std::min(lastSample_.size(),boxes.size());
+  size_t moving=0;
+  for(size_t i=0;i<count;++i){
+   const auto index=count==1?size_t{0}:
+      i*(boxes.size()-1)/(count-1);
+   const auto& b=boxes[index];
+   if(sampleValid_&&moved(lastSample_[i],b))++moving;
+   lastSample_[i]=b;
+  }
+  const bool hadHistory=sampleValid_;
+  sampleValid_=true;
+  // Require at least five-sixths of sampled elements to move very little.
+  return hadHistory&&moving*6<=count;
+ }
+public:
+ struct Outcome {
+  Pairs pairs;
+  const char* action{};
+  bool switched{},trialFrame{};
+ };
+ Outcome query(const std::vector<Bounds>& boxes){
+  ++frame_;
+  if(cooldown_>0)--cooldown_;
+  bool actionSAP=mode_!=Mode::Guard;
+  Pairs result;
+  bool trialFrame=mode_==Mode::Trial;
+  if(!actionSAP){
+   ccp::live::QueryMetrics metrics;
+   const auto began=Clock::now();
+   const auto& candidates=guard_.query(
+      boxes,{0.,.045,ccp::live::UpdatePolicy::GuardedReuse},true,metrics);
+   result=exactGuard(candidates,boxes);
+   const auto elapsed=std::chrono::duration<double,std::milli>(
+                          Clock::now()-began).count();
+   guardEWMA_=guardSeen_?guardEWMA_*.7+elapsed*.3:elapsed;
+   guardSeen_=true;
+   if(metrics.builds && elapsed>=.25)
+    ++guardRebuildStreak_;
+   else guardRebuildStreak_=0;
+   // Require several costly actual rebuilds, not one outlier.
+   // No extra algorithm is executed on this decision frame.
+   if(boxes.size()>=384 && cooldown_==0 &&
+      guardRebuildStreak_>=3 && guardEWMA_>=.35){
+    mode_=Mode::Trial;
+    trialFrames_=0;quietFrames_=0;sapBadFrames_=0;
+    sapEWMA_=0.;sapSeen_=false;
+    sampleValid_=false;
+    guardRebuildStreak_=0;
+   }
+  }else{
+   const auto began=Clock::now();
+   result=sap_.query(boxes);
+   const auto elapsed=std::chrono::duration<double,std::milli>(
+                         Clock::now()-began).count();
+   sapEWMA_=sapSeen_?sapEWMA_*.7+elapsed*.3:elapsed;
+   sapSeen_=true;
+   if(mode_==Mode::Trial){
+    ++trialFrames_;
+    // Exclude the very first SAP initialization cost from the comparison.
+    // A clearly losing SAP trial terminates after two SAP frames.
+    if(trialFrames_>=2 && sapEWMA_>guardEWMA_*1.2){
+     mode_=Mode::Guard;
+     cooldown_=12;guardRebuildStreak_=0;sampleValid_=false;
+    }else if(trialFrames_>=8){
+     if(sapEWMA_<guardEWMA_*.85){
+      mode_=Mode::Sap;sapFrames_=0;quietFrames_=0;sapBadFrames_=0;
+     }else{
+      mode_=Mode::Guard;cooldown_=12;
+      guardRebuildStreak_=0;sampleValid_=false;
+     }
+    }
+   }else{
+    ++sapFrames_;
+    if(motionQuiet(boxes))++quietFrames_;
+    else quietFrames_=0;
+    if(sapEWMA_>guardEWMA_*1.2)++sapBadFrames_;
+    else sapBadFrames_=0;
+    // The historical Guard EWMA is only a warning signal, NEVER a
+    // hypothetical "warm Guard" runtime claim. Returning to Guard
+    // incurs any real cache refresh cost on the next query.
+    if(quietFrames_>=6 || sapBadFrames_>=6){
+     mode_=Mode::Guard;cooldown_=12;
+     guardRebuildStreak_=0;sampleValid_=false;
+    }
+   }
+  }
+  const bool changed=frame_>1&&actionSAP!=lastActionSAP_;
+  lastActionSAP_=actionSAP;
+  return {std::move(result),
+          actionSAP?"sap_persistent_coherent":"global_guarded_exact",
+          changed,trialFrame};
+ }
+};
+
+enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -303,6 +427,7 @@ const char* name(Kind kind){
  case Kind::Sap:return "sap_rebuild";
  case Kind::PersistentSap:return "sap_persistent_coherent";
  case Kind::GuardSapProbe:return "guard_sap_measured_probe";
+ case Kind::GuardSapTrial:return "guard_sap_bounded_trial";
  case Kind::Global:return "global_guarded_exact";
  case Kind::Selective:return "selective_guard_exact";
  case Kind::Fixed:return "region_fixed";
@@ -330,6 +455,7 @@ class Method {
  Kind kind_;
  PersistentSAP persistentSap_;
  ProbedGuardSAP guardSapProbe_;
+ GuardSAPBoundedTrial guardSapTrial_;
  ccp::live::BroadPhaseService global_;
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
@@ -380,6 +506,14 @@ public:
    r.selected=outcome.action;
    r.hybridSwitched=outcome.switched;
    r.hybridProbed=outcome.probed;
+   r.usedGlobal=r.selected=="global_guarded_exact";
+  }
+  else if(kind_==Kind::GuardSapTrial){
+   auto outcome=guardSapTrial_.query(boxes);
+   r.pairs=std::move(outcome.pairs);
+   r.selected=outcome.action;
+   r.hybridSwitched=outcome.switched;
+   r.hybridProbed=outcome.trialFrame;
    r.usedGlobal=r.selected=="global_guarded_exact";
   }
 #ifdef CCP_HAVE_BULLET
@@ -439,7 +573,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
- std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::Global,Kind::Selective,
+ std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::GuardSapTrial,Kind::Global,Kind::Selective,
   Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online};
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
@@ -501,8 +635,8 @@ int main(int argc,char** argv){
   // Machine-readable executable ABI check: fail fast if an older binary is
   // accidentally used after a compile failure. No snapshots or model needed.
   if(argc==2&&std::string(argv[1])=="--capabilities"){
-   std::cout<<"KYOTO_REPLAY_ABLATION_V3 sap_persistent_coherent "
-               "ml_cost_aware_conservative guard_sap_measured_probe "
+   std::cout<<"KYOTO_REPLAY_ABLATION_V4 sap_persistent_coherent "
+               "ml_cost_aware_conservative guard_sap_measured_probe guard_sap_bounded_trial "
                "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched\n";
    return 0;
   }
