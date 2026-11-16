@@ -95,6 +95,48 @@ This last option is intentionally expensive: it generates many complete geometri
 
 Output is `output/kyoto-learned-<UTC>-<mode>/`, plus a ZIP (even on failure) via `scripts/package_kyoto_results.py`. Upload the ZIP. Raw snapshots, per-frame CSV, trial logs and complete metadata are required to claim any gain.
 
+## Resuming the November 16 Mac exhaustive run (do not regenerate data)
+
+The user's Mac logs establish that **quick and standard completed**. Their post-success `TypeError: expected str, bytes or os.PathLike object, not int` was a ZIP-packaging callback bug, fixed on the research branch. The standard 96-scene holdout geometric-mean throughput relative to Global Guard was **0.917×**, so no learned overall win is claimed.
+
+The **exhaustive** experiment `output/kyoto-learned-20261116T050002Z-exhaustive` has 1,080 immutable teacher/snapshot pairs and at least **34 of 156** trial records. The log ending at trial 34 is **not itself a traceback or proof of a frozen process**. The old trainer only printed after whole trials. First check whether the original Python process is still running:
+
+```bash
+ps -axo pid,etime,%cpu,%mem,command | grep -E '[t]rain_online_controller.py|[r]un_kyoto_ml_mac.py'
+wc -l output/kyoto-learned-20261116T050002Z-exhaustive/model/trials.jsonl
+tail -n 3 output/kyoto-learned-20261116T050002Z-exhaustive/logs/torch-training.log
+```
+
+If a training process remains active, **do not launch another one**. The process may be spending substantial time on a 500-epoch configuration using PyTorch's MPS backend; inspect Activity Monitor, CPU/GPU usage and the live log before choosing to interrupt.
+
+If the previous training process has **fully exited**, update just the recovery scripts. This route preserves any locally appended/uncommitted `DEVLOG.md`:
+
+```bash
+git fetch origin research/kyoto-scale-evidence
+git restore --source=origin/research/kyoto-scale-evidence -- \
+  scripts/run_kyoto_ml_mac.py \
+  scripts/train_online_controller.py \
+  scripts/package_kyoto_results.py
+
+python scripts/run_kyoto_ml_mac.py exhaustive \
+  --resume-run output/kyoto-learned-20261116T050002Z-exhaustive
+```
+
+This does not delete, re-export, or overwrite the 1,080 complete snapshots or teacher CSVs. It compares the existing trial indices and full hyperparameters against the original deterministic shuffled grid, then restarts **the first incomplete trial** (trial 35 if precisely 34 have been completed). From then onward it prints `[TRAIN-EPOCH]` diagnostics every 25 epochs, followed by `[TRAIN]` results for completed trials. New trials append durably to `model/trials.jsonl`. Original logs append rather than being truncated. The Python trainer also rejects changes to previously recorded training settings and dataset hashes after creating its search contract.
+
+If the exhaustive run is interrupted again, a **small diagnostic-only ZIP** is written beside the run directory while the large snapshots and full teacher data remain untouched and resumable. On success, the original full evidence ZIP is produced with visible packaging progress. A full ZIP may be substantial for an exhaustive experiment.
+
+To package *already complete* quick/standard runs without rerunning their training:
+
+```bash
+python scripts/package_kyoto_results.py \
+  output/kyoto-learned-20261115T195351Z-quick --exit-code 0
+python scripts/package_kyoto_results.py \
+  output/kyoto-learned-20261115T195639Z-standard --exit-code 0
+```
+
+If sharing only debugging logs rather than every original binary snapshot, append `--diagnostics-only` to create a smaller diagnostic ZIP. That smaller archive is **not complete raw evidence**; source data remain in the experiment directory.
+
 ## Isolated large-scale stress experiments
 
 The claim that opponents "fail at too many elements whereas ours is futureproof" is a **hypothesis**, never a preset conclusion. For fair comparisons, use `scripts/run_kyoto_stress.py`, which runs **one exact algorithm per isolated process** with the same material, dynamic regime, seed, frame count, per-process timeout and sampled RSS cap, and independent pair coverage checks. 
