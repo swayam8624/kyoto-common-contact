@@ -199,6 +199,27 @@ def main() -> None:
         summary["conservative_vs_global_total_scene_mean"]=(sum(
             s["measured_mean_ms"]["global_guarded_exact"] for s in scenes)/sum(
             s["measured_mean_ms"]["ml_cost_aware_conservative"] for s in scenes))
+    # Persistent SAP is an independent temporally coherent baseline, not
+    # a neural-controller action. Evaluate it alongside Guard, including
+    # the controller's inability to consistently beat this alternative.
+    if all("sap_persistent_coherent" in scene["measured_mean_ms"] for scene in scenes):
+        coherent_vs_global=[
+            scene["measured_mean_ms"]["global_guarded_exact"]/
+            scene["measured_mean_ms"]["sap_persistent_coherent"]
+            for scene in scenes]
+        learned_vs_coherent=[
+            scene["measured_mean_ms"]["sap_persistent_coherent"]/
+            scene["measured_mean_ms"]["ml_cost_aware"]
+            for scene in scenes]
+        summary["coherent_sap_vs_global_geomean"]=math.exp(mean(map(math.log,coherent_vs_global)))
+        summary["coherent_sap_vs_global_scene_wins"]=sum(v>1 for v in coherent_vs_global)
+        summary["coherent_sap_vs_global_total_scene_mean"]=(sum(
+            scene["measured_mean_ms"]["global_guarded_exact"] for scene in scenes)/sum(
+            scene["measured_mean_ms"]["sap_persistent_coherent"] for scene in scenes))
+        summary["learned_vs_coherent_sap_geomean"]=math.exp(mean(map(math.log,learned_vs_coherent)))
+        summary["learned_vs_coherent_sap_scene_wins"]=sum(v>1 for v in learned_vs_coherent)
+        summary["comparator_warning"]=("Persistent SAP has its own continuously maintained sort "
+            "and is a standalone algorithm; it was not an available action in the trained 4-output MLP.")
     summary["model_sha256"]=contract["model_sha256"]
     summary["fresh_seeds"]=sorted({x[0] for x in combos})
     summary["interpretation"]=("Exploratory fresh-seed pilot, no retuning on these scenes; "
@@ -221,6 +242,11 @@ def main() -> None:
               f'{summary["conservative_vs_global_geomean"]:.4f}x',flush=True)
         print("[ABLATION] conservative vs default ML geomean:",
               f'{summary["conservative_vs_default_ml_geomean"]:.4f}x',flush=True)
+    if "coherent_sap_vs_global_geomean" in summary:
+        print("[ABLATION] persistent SAP vs Guard geomean:",
+              f'{summary["coherent_sap_vs_global_geomean"]:.4f}x',flush=True)
+        print("[ABLATION] existing ML vs persistent SAP geomean:",
+              f'{summary["learned_vs_coherent_sap_geomean"]:.4f}x',flush=True)
     print("[ABLATION] controller switches:",timing["switches"],flush=True)
     print("[ABLATION] full evidence:",output,flush=True)
 
