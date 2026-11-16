@@ -22,7 +22,9 @@ jobs:
             scripts/summarize_material_suite.py scripts/verify_material_cpu_gpu.py \
             scripts/package_kyoto_results.py scripts/train_online_controller.py \
             scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
-            scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py
+            scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py \
+            scripts/test_ml_recovery.py
+          python3 -m unittest scripts.test_ml_recovery -v
       - name: Compile CPU benchmark with warnings
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
