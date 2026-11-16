@@ -37,8 +37,9 @@ def main():
     # Explicitly reject an obsolete replay ABI before any oracle fixtures.
     signature=subprocess.run([str(args.replayer),"--capabilities"],
                              capture_output=True,text=True,timeout=10,check=False)
-    required={"KYOTO_REPLAY_ABLATION_V2","sap_persistent_coherent",
-              "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms"}
+    required={"KYOTO_REPLAY_ABLATION_V3","sap_persistent_coherent",
+              "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
+              "guard_sap_measured_probe","hybrid_probed","hybrid_switched"}
     if signature.returncode!=0 or not required.issubset(set(signature.stdout.split())):
         raise RuntimeError("Replay executable is stale; rebuild it with the current learned_online.hpp")
     with tempfile.TemporaryDirectory(prefix="kyoto-learned-smoke-") as tmp:
@@ -66,6 +67,16 @@ def main():
             truth=oracle_by_frame[row["frame"]]
             if row["pairs"]!=truth["pairs"] or row["pair_hash"]!=truth["pair_hash"]:
                 raise RuntimeError("Persistent SAP lost exact candidate pair equivalence")
+        hybrid=[r for r in rows if r["backend"]=="guard_sap_measured_probe"]
+        if len(hybrid)!=12:
+            raise RuntimeError("Causal Guard-SAP probe policy missing")
+        for row in hybrid:
+            truth=oracle_by_frame[row["frame"]]
+            if row["pair_hash"]!=truth["pair_hash"] or row["pairs"]!=truth["pairs"]:
+                raise RuntimeError("Guard-SAP hybrid lost exact AABB-pair parity")
+            if row["chosen_backend"] not in (
+                    "global_guarded_exact","sap_persistent_coherent"):
+                raise RuntimeError("Guard-SAP hybrid returned unknown action")
         learned=[r for r in rows if r["backend"]=="ml_cost_aware"]
         baseline={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
         conservative=[r for r in rows if r["backend"]=="ml_cost_aware_conservative"]
@@ -149,6 +160,13 @@ def main():
             rapid_rows=list(csv.DictReader(source))
         rapid_oracle={r["frame"]:r for r in rapid_rows
                       if r["backend"]=="sap_rebuild"}
+        rapid_hybrid=[r for r in rapid_rows if r["backend"]=="guard_sap_measured_probe"]
+        if len(rapid_hybrid)!=20:
+            raise RuntimeError("Rapid-motion causal hybrid evidence missing")
+        for row in rapid_hybrid:
+            ref=rapid_oracle[row["frame"]]
+            if row["pairs"]!=ref["pairs"] or row["pair_hash"]!=ref["pair_hash"]:
+                raise RuntimeError("Causal Guard-SAP hybrid failed under rapid deformation")
         rapid_persistent=[r for r in rapid_rows
                           if r["backend"]=="sap_persistent_coherent"]
         if len(rapid_persistent)!=20:
