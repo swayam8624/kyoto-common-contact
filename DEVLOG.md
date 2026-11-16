@@ -107,3 +107,14 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 **Scientific decision:** Keep the 0.917x standard loss as a valid negative observation, with no claim that exhaustive hyperparameter search will necessarily reverse it. Do not tune on held-out seeds after seeing these numbers and reuse them as untainted independent evaluation without relabeling the study as exploratory.
 
+
+## 2026-11-16 — Verified interruption recovery in real PyTorch CI
+
+**Reproduction:** [GitHub Actions workflow 43827512066](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43827512066) passed all three scaling jobs: Linux CPU reference/oracle tests, macOS Metal shader compilation, and a manually gated CPU PyTorch training-and-resume integration. The separate native core regression [workflow 43827512053](https://github.com/swayam8624/kyoto-common-contact/actions/runs/43827512053) passed both Linux and macOS jobs.
+
+**Saved-trial replay test:** The CI job trained 12 real hyperparameter configurations, then constructed a representative *legacy* interrupted model directory containing the first two `trials.jsonl` rows, no model file and no modern `search_contract.json`. Running the trainer with `--resume --max-trials 3` validated the retained trial indices/configurations, printed the explicit legacy warning, computed only trial 3, successfully exported a native C++ model and validated that the resulting trial history was **exactly [0,1,2]**. All original teacher CSVs were untouched. This verifies recovery semantics using actual PyTorch and real collision-data teacher trajectories; the user's specific 34/156 Mac run was not independently executable on CI because its locally generated dataset was not uploaded.
+
+**Packaging/append-only test:** `scripts/test_ml_recovery.py` additionally passed in Linux CI. It proved an interrupted diagnostic ZIP omits heavy original snapshots/teacher CSV while preserving the originals, completed full archives include those data, existing archives cannot be overwritten, and re-entered subprocess logs append rather than erase previous trial records.
+
+**Decision:** New Mac CLI `python scripts/run_kyoto_ml_mac.py exhaustive --resume-run output/kyoto-learned-20261116T050002Z-exhaustive` is now released for local use **only after checking that the prior train process has fully stopped**. It resumes from the count actually present in the local trials file, validates the deterministic original hyperparameter grid, and emits epoch-level progress. Do not delete the 1,080 existing scenes. The expensive routine PyTorch CI job is restored to explicit `workflow_dispatch` only after this successful one-time recovery test.
+
