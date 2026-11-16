@@ -23,6 +23,7 @@ class LearnedOnline {
  RegionalCandidates regional_;
  double margin_{},penaltyMs_{},hysteresis_{};
  int cooldown_{},frame_{},lastSwitch_{-10000},active_{-1};
+ bool startWithGuard_{};
  size_t switches_{};
  static bool overlap(const Bounds& a,const Bounds& b){
   return a.min.x<=b.max.x&&b.min.x<=a.max.x&&
@@ -44,11 +45,11 @@ class LearnedOnline {
 public:
  LearnedOnline(const std::string& path,double margin=0.,
                double switchPenaltyMs=.03,double hysteresis=.12,
-               int cooldownFrames=12):
+               int cooldownFrames=12,bool startWithGuard=false):
   model_(learned::Network::load(path)),
   selective_(margin,.045),
   margin_(margin),penaltyMs_(switchPenaltyMs),
-  hysteresis_(hysteresis),cooldown_(cooldownFrames){
+  hysteresis_(hysteresis),cooldown_(cooldownFrames),startWithGuard_(startWithGuard){
   if(margin<0||!std::isfinite(margin)||!std::isfinite(penaltyMs_)||
      penaltyMs_<0||!std::isfinite(hysteresis_)||hysteresis_<0||
      hysteresis_>=1||cooldown_<0)
@@ -78,13 +79,17 @@ private:
   const bool bypass=tight.size()<kSmallSceneCutoff;
   const auto features=bypass?learned::Features{}:features_.describe(tight);
   const auto featureEnd=Clock::now();
-  const auto predicted=bypass?std::array<double,learned::kActions>{}:
-                               model_.predict(features);
+  // While a cooldown forbids changing backend, still update causal
+  // geometry history but do NOT pay for ignored neural inference.
+  const bool decisionDue=!bypass && !(active_<0&&startWithGuard_) &&
+                         (active_<0||frame_-lastSwitch_>=cooldown_);
+  const auto predicted=decisionDue?model_.predict(features):
+                                    std::array<double,learned::kActions>{};
   const auto inferenceEnd=Clock::now();
   int selected=bypass?1:active_;
   if(!bypass){
    if(selected<0){
-    selected=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
+    selected=startWithGuard_?1:int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
    }else if(frame_-lastSwitch_>=cooldown_){
     const int fastest=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
     if(fastest!=active_ && predicted[size_t(fastest)]+penaltyMs_<
