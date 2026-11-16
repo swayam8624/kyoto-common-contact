@@ -35,16 +35,17 @@ BUDGETS=(128,512,2048)
 DEFAULT_SEEDS=(1201,1301,1409,1511)
 TIMES=("ml_feature_ms","ml_inference_ms","ml_decision_ms","ml_backend_ms",
        "ml_bookkeeping_ms","ml_wrapper_ms")
-REPLAY_ABI="KYOTO_REPLAY_ABLATION_V3"
+REPLAY_ABI="KYOTO_REPLAY_ABLATION_V4"
 REQUIRED_POLICIES=frozenset(("sap_rebuild","sap_persistent_coherent",
     "global_guarded_exact","ml_cost_aware","ml_cost_aware_conservative",
-    "guard_sap_measured_probe"))
+    "guard_sap_measured_probe","guard_sap_bounded_trial"))
 REQUIRED_COLUMNS=frozenset(("backend","frame","ms","pairs","pair_hash","misses",
     "chosen_backend","ml_switched","ml_bypassed",
     "hybrid_probed","hybrid_switched",*TIMES))
 REQUIRED_CAPABILITIES=frozenset((REPLAY_ABI,"sap_persistent_coherent",
     "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
-    "guard_sap_measured_probe","hybrid_probed","hybrid_switched"))
+    "guard_sap_measured_probe","guard_sap_bounded_trial",
+    "hybrid_probed","hybrid_switched"))
 
 
 def verify_replayer(replayer: Path, root: Path) -> None:
@@ -365,6 +366,39 @@ def main() -> None:
         summary["guard_sap_probe_count"]=probes
         summary["guard_sap_probe_switches"]=hybrid_switches
         summary["guard_sap_probe_sap_frames"]=hybrid_sap_frames
+    # Each method has its own live cache; all trials are charged. A new
+    # policy never gets to substitute measured time from a separate backend.
+    if all("guard_sap_bounded_trial" in e["measured_mean_ms"] for e in scenes):
+        trial_ratios=[e["measured_mean_ms"]["global_guarded_exact"]/
+                      e["measured_mean_ms"]["guard_sap_bounded_trial"]
+                      for e in scenes]
+        summary["guard_sap_bounded_trial_vs_global_geomean"]=math.exp(
+            mean(map(math.log,trial_ratios)))
+        summary["guard_sap_bounded_trial_vs_global_scene_wins"]=sum(
+            r>1 for r in trial_ratios)
+        summary["guard_sap_bounded_trial_vs_global_total_scene_mean"]=(
+            sum(e["measured_mean_ms"]["global_guarded_exact"] for e in scenes)/
+            sum(e["measured_mean_ms"]["guard_sap_bounded_trial"] for e in scenes))
+        summary["bounded_trial_vs_conservative_ml_geomean"]=math.exp(mean(
+            math.log(e["measured_mean_ms"]["ml_cost_aware_conservative"]/
+                     e["measured_mean_ms"]["guard_sap_bounded_trial"])
+            for e in scenes))
+        active=trial_frames=switches=0
+        for csv_path in paths:
+            with csv_path.open(newline="",encoding="utf-8") as stream:
+                for row in csv.DictReader(stream):
+                    if row["backend"]!="guard_sap_bounded_trial" or int(row["frame"])<args.warmup:
+                        continue
+                    active+=int(row["chosen_backend"]=="sap_persistent_coherent")
+                    trial_frames+=int(row["hybrid_probed"])
+                    switches+=int(row["hybrid_switched"])
+        summary["guard_sap_bounded_trial_sap_frames"]=active
+        summary["guard_sap_bounded_trial_trial_frames"]=trial_frames
+        summary["guard_sap_bounded_trial_switches"]=switches
+        summary["bounded_trial_warning"]=(
+            "No future information; one backend executes per frame. "
+            "Initial Guard costs and later SAP costs are from different "
+            "cache states; these are exploratory causal observations.")
     summary["model_sha256"]=contract["model_sha256"]
     summary["fresh_seeds"]=sorted({x[0] for x in combos})
     summary["interpretation"]=("Exploratory fresh-seed pilot, no retuning on these scenes; "
@@ -399,6 +433,11 @@ def main() -> None:
               f'{summary["guard_sap_probe_vs_global_geomean"]:.4f}x',flush=True)
         print("[ABLATION] hybrid probes/switches:",
               summary["guard_sap_probe_count"],summary["guard_sap_probe_switches"],flush=True)
+    if "guard_sap_bounded_trial_vs_global_geomean" in summary:
+        print("[ABLATION] bounded one-backend trial vs Guard geomean:",
+              f'{summary["guard_sap_bounded_trial_vs_global_geomean"]:.4f}x',
+              "trial frames:",summary["guard_sap_bounded_trial_trial_frames"],
+              "switches:",summary["guard_sap_bounded_trial_switches"],flush=True)
     print("[ABLATION] controller switches:",timing["switches"],flush=True)
     print("[ABLATION] full evidence:",output,flush=True)
 
