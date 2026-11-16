@@ -101,6 +101,38 @@ def verify_replay_csv(path: Path) -> None:
 
 
 
+def choose_combos(seeds: list[int], materials: list[str],
+                  regimes: list[str], budgets: list[int],
+                  sample_seed: int, max_experiments: int,
+                  sampling: str) -> list[tuple[int,str,str,int]]:
+    """Predeclared sample; balanced covers each material/regime/budget
+    cell once before a second seed can enter that cell. No outcome labels
+    or previously measured runtimes influence this selection.
+    """
+    combos=list(itertools.product(sorted(seeds),sorted(set(materials)),
+                                  sorted(set(regimes)),sorted(set(budgets))))
+    rng=random.Random(sample_seed)
+    if sampling=="random":
+        rng.shuffle(combos)
+    elif sampling=="balanced":
+        groups={}
+        for combo in combos:
+            groups.setdefault(combo[1:],[]).append(combo)
+        for key in groups:
+            rng.shuffle(groups[key])
+        keys=sorted(groups)
+        rng.shuffle(keys)
+        combos=[]
+        for sample_idx in range(len(seeds)):
+            for key in keys:
+                group=groups[key]
+                if sample_idx<len(group):
+                    combos.append(group[sample_idx])
+    else:
+        raise ValueError(f"Unknown sampling: {sampling}")
+    return combos[:max_experiments] if max_experiments else combos
+
+
 def checked(argv, log: Path, timeout: int) -> None:
     began=time.monotonic()
     with log.open("w",encoding="utf-8") as stream:
@@ -168,6 +200,8 @@ def main() -> None:
     parser.add_argument("--max-experiments",type=int,default=36,
                         help="Deterministic shuffled pilot; 0 means complete Cartesian matrix")
     parser.add_argument("--sample-seed",type=int,default=20261117)
+    parser.add_argument("--sampling",choices=("random","balanced"),default="random",
+                        help="balanced covers all material/regime/size cells before any repeat")
     parser.add_argument("--bootstrap",type=int,default=2000)
     parser.add_argument("--timeout",type=int,default=300)
     parser.add_argument("--resume",action="store_true",
@@ -196,10 +230,8 @@ def main() -> None:
         parser.error("Primitive budgets must be in 1..50000 (exporter may impose tighter limits)")
     if args.max_experiments<0 or args.timeout<10:
         parser.error("Invalid max experiments or timeout")
-    combos=list(itertools.product(sorted(args.seeds),sorted(set(args.materials)),
-                                  sorted(set(args.regimes)),sorted(set(args.budgets))))
-    random.Random(args.sample_seed).shuffle(combos)
-    if args.max_experiments:combos=combos[:args.max_experiments]
+    combos=choose_combos(args.seeds,args.materials,args.regimes,args.budgets,
+                        args.sample_seed,args.max_experiments,args.sampling)
     if not combos:parser.error("Empty experiment matrix")
     contract={"model_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
               "replayer_sha256":hashlib.sha256(replayer.read_bytes()).hexdigest(),
@@ -209,7 +241,7 @@ def main() -> None:
               "materials":sorted(set(args.materials)),"regimes":sorted(set(args.regimes)),
               "budgets":sorted(set(args.budgets)),"frames":args.frames,
               "warmup":args.warmup,"max_experiments":args.max_experiments,
-              "sample_seed":args.sample_seed,
+              "sample_seed":args.sample_seed,"sampling":args.sampling,
               "combos":[list(x) for x in combos],
               "evidence":"New deterministic material snapshot experiments; no model tuning",
               "source_exhaustive_run_unchanged":True}
