@@ -405,6 +405,13 @@ void run(const std::string& filename,const std::string& output,int verbose,
 }
 int main(int argc,char** argv){
  try{
+  // Machine-readable executable ABI check: fail fast if an older binary is
+  // accidentally used after a compile failure. No snapshots or model needed.
+  if(argc==2&&std::string(argv[1])=="--capabilities"){
+   std::cout<<"KYOTO_REPLAY_ABLATION_V2 sap_persistent_coherent "
+               "ml_cost_aware_conservative ml_bookkeeping_ms ml_wrapper_ms\n";
+   return 0;
+  }
   if(argc<3||argc>5)
    throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt]");
   int verbose=argc==4?std::stoi(argv[3]):1;
