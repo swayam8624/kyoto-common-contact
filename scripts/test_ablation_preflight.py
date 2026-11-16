@@ -32,7 +32,8 @@ class AblationPreflightTests(unittest.TestCase):
     def test_accepts_current_capability_signature(self):
         self.write_binary(
             f"{REPLAY_ABI} sap_persistent_coherent ml_cost_aware_conservative "
-            "guard_sap_measured_probe hybrid_probed hybrid_switched "
+            "guard_sap_measured_probe guard_sap_bounded_trial "
+            "hybrid_probed hybrid_switched "
             "ml_bookkeeping_ms ml_wrapper_ms")
         verify_replayer(self.bin,self.root)
 
