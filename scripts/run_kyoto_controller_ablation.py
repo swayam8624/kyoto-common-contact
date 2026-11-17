@@ -16,6 +16,7 @@ import itertools
 import json
 import math
 import os
+import platform
 from pathlib import Path
 import random
 import subprocess
@@ -249,6 +250,11 @@ def main() -> None:
               "replayer_sha256":hashlib.sha256(replayer.read_bytes()).hexdigest(),
               "exporter_sha256":hashlib.sha256(exporter.read_bytes()).hexdigest(),
               "replayer_abi":REPLAY_ABI,
+              "environment":{"platform":platform.platform(),
+                             "machine":platform.machine(),
+                             "processor":platform.processor(),
+                             "python":platform.python_version(),
+                             "logical_cpus":os.cpu_count()},
               "source_model_path":str(model),"seeds":sorted(args.seeds),
               "materials":sorted(set(args.materials)),"regimes":sorted(set(args.regimes)),
               "budgets":sorted(set(args.budgets)),"frames":args.frames,
