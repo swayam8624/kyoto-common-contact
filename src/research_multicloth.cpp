@@ -399,7 +399,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
  pinned_.clear();initialPins_.clear();constraints_.clear();spheres_.clear();
  grab_={};
- regional_.reset();global_.invalidate();metrics_={};
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};metrics_={};
  const double spacing=2.2/(kSide-1);
  for(int layer=0;layer<sheets_;++layer){
   const int base=static_cast<int>(positions_.size());
@@ -469,7 +469,7 @@ void MultiCloth::setPolicy(Policy policy){
   patchCellSpan_=0;
   setPatchCellSpan(span);
  }
- regional_.reset();global_.invalidate();
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};
 }
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
 void MultiCloth::setHierarchicalRegions(bool enabled){
@@ -938,6 +938,18 @@ void MultiCloth::step(){
    const auto& actual=global_.query(bounds,{kMargin,.045,live::UpdatePolicy::GuardedReuse},
                                      true,globalMetrics);
    pairs=actual;
+  }else if(policy_==Policy::FinalBounded){
+   // Match the actual solver's padded-AABB candidate contract; the frozen
+   // V4 replay controller itself accepts already-padded input geometry.
+   // Both Guard and SAP paths must see the same geometry and contact filters.
+   auto paddedBounds=bounds;
+   for(auto& box:paddedBounds){
+    box.min=sub(box.min,{kMargin*.5,kMargin*.5,kMargin*.5});
+    box.max=add(box.max,{kMargin*.5,kMargin*.5,kMargin*.5});
+   }
+   const auto outcome=finalBounded_.query(paddedBounds);
+   pairs=std::move(outcome.pairs);
+   metrics_.lastEvent=outcome.action;
   }else{
    // Pad only the query copy. The independent brute-force oracle below
    // starts from RAW geometry bounds and must not pad a second time.
