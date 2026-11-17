@@ -78,6 +78,24 @@ def main() -> int:
         root = pathlib.Path(temp)
         run(executable, root / "one-sheet-span3.csv", 1, 1, 12, 3)
         run(executable, root / "two-sheet-span6.csv", 2, 1, 12, 6)
+        report = root / "topology-report.html"
+        analysis = subprocess.run(
+            [
+                sys.executable,
+                str(pathlib.Path(__file__).with_name("analyze_cbp_topology.py")),
+                str(root / "one-sheet-span3.csv"),
+                str(root / "two-sheet-span6.csv"),
+                "--html", str(report),
+            ],
+            capture_output=True, text=True, check=False, timeout=20,
+        )
+        if analysis.returncode:
+            raise AssertionError(
+                f"Topology reporter failed:\n{analysis.stdout}\n{analysis.stderr}"
+            )
+        text = report.read_text(encoding="utf-8")
+        if "Portfolio decisions" not in text or "V4 / method" not in text:
+            raise AssertionError("Offline research report omitted measured evidence")
     print(
         "PASS CBP topology replay: exact 7-method parity over 24 coupled "
         "cloth frames; real sheet/cell patch identities and immutable CSV"
