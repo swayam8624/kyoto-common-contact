@@ -49,3 +49,18 @@ docs/ONLINE_CONTROLLER_RESULTS.md
 /.presentation-refine-2026-11-02/renders/
 /.presentation-refine-2026-11-02/final-renders*/
 /output/review-2026-11-02/**/*.ppm
+
+# Clean release branch: legacy copies were removed in commit 24c8c640.
+# The original release and experiment branches still contain the historical
+# presentations and intermediate assets. Prevent accidental recommits.
+/.presentation-*/
+/.render3d/
+/output/**
+**/.venv/
+**/venv/
+**/pydeps/
+**/.pytest_cache/
+**/.mypy_cache/
+**/*.gif
+**/*.mp4
+**/*.kmcb

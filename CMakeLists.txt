@@ -37,8 +37,32 @@ add_library(ccp_multicloth src/research_multicloth.cpp src/online_partitioner.cp
 target_link_libraries(ccp_multicloth PUBLIC ccp_live)
 target_include_directories(ccp_multicloth PUBLIC include)
 target_compile_options(ccp_multicloth PRIVATE -Wall -Wextra -Wpedantic)
+# Selective guard can repair isolated cache escapes without full rebuild.
+add_executable(ccp_selective_guard_tests tests/selective_guard_tests.cpp)
+target_link_libraries(ccp_selective_guard_tests PRIVATE ccp_live)
+target_compile_options(ccp_selective_guard_tests PRIVATE -Wall -Wextra -Wpedantic)
+
+# Heterogeneous, deformable mass-spring broad-phase research fixtures.
+# Final reusable policy also has an independent direct API oracle regression.
+add_executable(ccp_final_broadphase_api_tests tests/final_broadphase_api_tests.cpp)
+target_link_libraries(ccp_final_broadphase_api_tests PRIVATE ccp_live)
+target_compile_options(ccp_final_broadphase_api_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_material_replay apps/material_replay_benchmark.cpp)
+target_link_libraries(ccp_material_replay PRIVATE ccp_multicloth)
+target_compile_options(ccp_material_replay PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_material_export apps/material_snapshot_export.cpp)
+target_link_libraries(ccp_material_export PRIVATE ccp_multicloth)
+target_compile_options(ccp_material_export PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_material_benchmark apps/material_suite_benchmark.cpp)
+target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
+target_compile_options(ccp_material_benchmark PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
+# Evidence-only mesh exporter: actual coupled solver positions for every
+# supported policy, with per-frame physics diagnostics and SAP state parity.
+add_executable(ccp_visual_multicloth_export apps/visual_multicloth_export.cpp)
+target_link_libraries(ccp_visual_multicloth_export PRIVATE ccp_multicloth)
+target_compile_options(ccp_visual_multicloth_export PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_online_trace apps/online_controller_trace.cpp)
 target_link_libraries(ccp_online_trace PRIVATE ccp_multicloth)
 add_executable(ccp_cloth_stability_probe apps/cloth_stability_probe.cpp)
@@ -54,6 +78,9 @@ target_link_libraries(ccp_patch_sweep PRIVATE ccp_multicloth)
 option(CCP_REQUIRE_BULLET "Fail configuration if the Bullet reference is unavailable" OFF)
 find_package(Bullet QUIET)
 if(Bullet_FOUND)
+  target_link_libraries(ccp_material_replay PRIVATE ${BULLET_LIBRARIES})
+  target_include_directories(ccp_material_replay PRIVATE ${BULLET_INCLUDE_DIRS})
+  target_compile_definitions(ccp_material_replay PRIVATE CCP_HAVE_BULLET=1)
   add_executable(ccp_broadphase_leaderboard apps/broadphase_leaderboard.cpp)
   target_link_libraries(ccp_broadphase_leaderboard PRIVATE ccp_live ccp_multicloth ${BULLET_LIBRARIES})
   target_include_directories(ccp_broadphase_leaderboard PRIVATE ${BULLET_INCLUDE_DIRS})
@@ -71,10 +98,47 @@ target_compile_options(common_bounds_demo PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(mesh_bounds_query apps/mesh_bounds_query.cpp)
 target_compile_options(mesh_bounds_query PRIVATE -Wall -Wextra -Wpedantic)
 
+
+# Standalone deterministic CPU scaling reference. This is intentionally
+# distinct from the coupled deformable simulation and the adaptive controller.
+find_package(Threads REQUIRED)
+# Selective local cache repair can distribute large dirty subsets across
+# independent CPU workers; use portable thread linkage on Linux/macOS.
+target_link_libraries(ccp_material_benchmark PRIVATE Threads::Threads)
+target_link_libraries(ccp_material_replay PRIVATE Threads::Threads)
+target_link_libraries(ccp_selective_guard_tests PRIVATE Threads::Threads)
+add_executable(ccp_scaling_regional apps/scaling_regional.cpp)
+target_link_libraries(ccp_scaling_regional PRIVATE ccp_multicloth)
+target_compile_options(ccp_scaling_regional PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_scaling_cpu apps/scaling_cpu.cpp)
+target_link_libraries(ccp_scaling_cpu PRIVATE Threads::Threads)
+target_compile_options(ccp_scaling_cpu PRIVATE -Wall -Wextra -Wpedantic)
+
+# Native Apple GPU reference uses actual Metal compute, not simulated GPU data.
+# Its exhaustive kernel is a correctness/performance control, not an optimized
+# counterpart to the adaptive CPU approach.
+if(APPLE)
+  enable_language(OBJCXX)
+  add_executable(ccp_scaling_metal apps/scaling_metal.mm)
+  target_link_libraries(ccp_scaling_metal PRIVATE "-framework Foundation" "-framework Metal")
+  target_compile_options(ccp_scaling_metal PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
+  add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
+  add_test(NAME deformable_material_suite_oracle
+    COMMAND ${CMAKE_COMMAND} -E env CCP_CTEST_SMOKE=1
+      $<TARGET_FILE:ccp_material_benchmark> ${CMAKE_CURRENT_BINARY_DIR}/material-ci-smoke.csv all 48 4 1234 1 0)
+  add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME learned_cpp_model_and_exact_pair_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_learned_cxx.py
+        $<TARGET_FILE:ccp_material_export>
+        $<TARGET_FILE:ccp_material_replay>)
     add_test(NAME evidence_csv_contracts
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_evidence_summarizers.py)
   endif()

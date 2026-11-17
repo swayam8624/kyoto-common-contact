@@ -1,0 +1,62 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "kyoto-final-cpu",
+      "displayName": "Final exact CPU broad phase",
+      "binaryDir": "${sourceDir}/build/kyoto-final-cpu",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "CCP_REQUIRE_BULLET": "OFF"
+      }
+    },
+    {
+      "name": "kyoto-visual",
+      "displayName": "Kyoto visual + coupled mesh evidence",
+      "binaryDir": "${sourceDir}/build/kyoto-visual",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "CCP_REQUIRE_BULLET": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "kyoto-final-cpu",
+      "configurePreset": "kyoto-final-cpu",
+      "targets": [
+        "ccp_final_broadphase_api_tests",
+        "ccp_material_export",
+        "ccp_material_replay"
+      ],
+      "jobs": 4
+    },
+    {
+      "name": "kyoto-visual",
+      "configurePreset": "kyoto-visual",
+      "targets": [
+        "ccp_visual_multicloth_export",
+        "ccp_material_export",
+        "ccp_material_replay",
+        "ccp_final_broadphase_api_tests"
+      ],
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "kyoto-final-cpu",
+      "configurePreset": "kyoto-final-cpu",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "name": "final_broadphase_public_api_exact_pair_oracle|learned_cpp_model_and_exact_pair_oracle"
+        }
+      }
+    }
+  ]
+}

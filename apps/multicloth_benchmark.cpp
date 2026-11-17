@@ -67,9 +67,11 @@ const char* name(int method){
 }
 int main(int argc,char** argv){
  try{
-  if(argc<2||argc>3)throw std::runtime_error("usage: ccp_multicloth_benchmark CSV [frames=48]");
+  if(argc<2||argc>4)throw std::runtime_error("usage: ccp_multicloth_benchmark CSV [frames=48] [spheres=2]");
   const int frames=argc==3?std::stoi(argv[2]):48;
   if(frames<12||frames>600)throw std::runtime_error("frame range 12..600");
+  const int spheres=argc==4?std::stoi(argv[3]):2;
+  if(spheres<1||spheres>8)throw std::runtime_error("sphere count 1..8");
   std::filesystem::path file(argv[1]);
   if(!file.parent_path().empty())std::filesystem::create_directories(file.parent_path());
   std::ofstream csv(file);
@@ -82,7 +84,7 @@ int main(int argc,char** argv){
         "meanOnlinePatches,meanSplits,meanMerges,meanStrategySwitches,meanOnlineDecisionMs\n";
   constexpr int warmup=8;
   for(int sheets=1;sheets<=3;++sheets){
-   MultiCloth reference(sheets,2,Policy::RebuildSAP);
+   MultiCloth reference(sheets,spheres,Policy::RebuildSAP);
    reference.setAuditing(true);
    std::vector<std::vector<Vec3>> states;
    std::vector<ccp::research::Metrics> baselineStats;
@@ -94,7 +96,7 @@ int main(int argc,char** argv){
    }
    for(int method=0;method<7;++method){
     Aggregate result;
-    MultiCloth sim(sheets,2,method==0?Policy::RebuildSAP:
+    MultiCloth sim(sheets,spheres,method==0?Policy::RebuildSAP:
                    method==1?Policy::GlobalGuard:
                    method==6?Policy::OnlineContactAware:Policy::RegionalCertified);
     sim.setAdaptive(method==3||method==5||method==6);
@@ -114,7 +116,7 @@ int main(int argc,char** argv){
     }
     if(result.frames==0)throw std::runtime_error("no benchmark frames");
     const double n=double(result.frames);
-    csv<<sheets<<','<<2<<','<<name(method)<<','<<result.frames<<','
+    csv<<sheets<<','<<spheres<<','<<name(method)<<','<<result.frames<<','
        <<result.broad/n<<','<<result.precise/n<<','<<result.step/n<<','
        <<result.pairs/n<<','<<result.inter/n<<','<<result.sphere/n<<','
        <<result.builds/n<<','<<result.reuses/n<<','<<result.rejected/n<<','

@@ -1,0 +1,293 @@
+name: Kyoto scaling references
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/kyoto-scale-evidence
+  pull_request:
+    paths:
+      - 'apps/scaling_cpu.cpp'
+      - 'apps/scaling_metal.mm'
+      - '.github/workflows/kyoto-scaling.yml'
+
+jobs:
+  cpu-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check macOS run script and Python evidence tools
+        run: |
+          bash -n scripts/run_kyoto_materials_mac.sh
+          python3 -m py_compile \
+            scripts/summarize_material_suite.py scripts/verify_material_cpu_gpu.py \
+            scripts/package_kyoto_results.py scripts/train_online_controller.py \
+            scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
+            scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py \
+            scripts/test_ml_recovery.py scripts/run_kyoto_controller_ablation.py \
+            scripts/test_ablation_preflight.py
+          python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight -v
+      - name: Compile CPU benchmark with warnings
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
+            apps/scaling_cpu.cpp -o /tmp/ccp_scaling_cpu
+      - name: Compile certified regional benchmark against real solver core
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread -Iinclude \
+            apps/scaling_regional.cpp src/research_multicloth.cpp \
+            src/online_partitioner.cpp src/live_cloth.cpp -o /tmp/ccp_scaling_regional
+      - name: Oracle regression tests
+        run: /tmp/ccp_scaling_cpu --self-test
+      - name: Run real regional certified benchmark
+        run: |
+          /tmp/ccp_scaling_regional /tmp/regional.csv 256 4 hotspot 1234 0.6 hierarchical
+          python3 - <<'PY'
+          import csv
+          with open('/tmp/regional.csv', newline='') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==4
+          assert all(r['backend']=='cpu_region_hierarchical' for r in rows)
+          assert all(int(r['misses'])==0 for r in rows)
+          print('Certified region benchmark CSV PASS')
+          PY
+      - name: Smoke benchmark
+        run: |
+          /tmp/ccp_scaling_cpu /tmp/cpu.csv 256 3 4 hotspot 1234
+          python3 - <<'PY'
+          import csv
+          with open('/tmp/cpu.csv', newline='') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==15, rows
+          assert {r['backend'] for r in rows}=={'cpu_sap_serial','cpu_sap_threaded','cpu_sap_work_aware','cpu_sap_auto','cpu_sap_incremental'}
+          assert all(int(r['misses'])==0 for r in rows)
+          assert all(int(r['candidates'])>=0 for r in rows)
+          print('CPU benchmark CSV PASS')
+          PY
+      - name: Run repeatable exploratory CPU scaling matrix
+        run: |
+          mkdir -p /tmp/kyoto-executables
+          cp /tmp/ccp_scaling_cpu /tmp/ccp_scaling_regional /tmp/kyoto-executables/
+          python3 scripts/run_scaling_matrix.py \
+            --build /tmp/kyoto-executables \
+            --output /tmp/kyoto-evidence \
+            --methods cpu regional-fixed regional-adaptive regional-hier \
+            --scenes hotspot cluster \
+            --sizes 256 512 \
+            --frames 8 --repeats 3 --threads 4 --seed 1234
+      - name: Explore larger workload and thread-crossover behavior
+        run: |
+          python3 scripts/run_scaling_matrix.py \
+            --build /tmp/kyoto-executables \
+            --output /tmp/kyoto-scale-crossover \
+            --methods cpu \
+            --scenes hotspot cluster \
+            --sizes 512 4096 16384 \
+            --frames 6 --repeats 3 --threads 4 --seed 20261
+      - name: Build actual material physics/snapshot/replay test executables
+        run: |
+          cmake -S . -B /tmp/kyoto-material-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build /tmp/kyoto-material-build --target ccp_material_benchmark ccp_material_export ccp_material_replay ccp_selective_guard_tests --parallel 4
+          ctest --test-dir /tmp/kyoto-material-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
+      - name: Verify all six deformable-material families and selective cache repairs
+        run: |
+          mkdir -p /tmp/kyoto-material-evidence
+          /tmp/kyoto-material-build/ccp_selective_guard_tests
+          for regime in baseline impact shear compression rapid relax; do
+            /tmp/kyoto-material-build/ccp_material_benchmark "/tmp/kyoto-material-evidence/materials-${regime}.csv" all 64 24 1234 2 0 "$regime"
+          done
+          for material in cloth sponge cushion soft_ball spring mixed; do
+            for regime in baseline impact rapid; do
+              /tmp/kyoto-material-build/ccp_material_export "/tmp/kyoto-material-evidence/${material}-${regime}.kmcb" "$material" 128 20 1234 "$regime"
+              /tmp/kyoto-material-build/ccp_material_replay "/tmp/kyoto-material-evidence/${material}-${regime}.kmcb" "/tmp/kyoto-material-evidence/${material}-${regime}-replay.csv" 0
+            done
+          done
+          python3 scripts/summarize_material_suite.py /tmp/kyoto-material-evidence/materials-*.csv --output /tmp/kyoto-material-evidence/SUMMARY.md > /tmp/kyoto-material-evidence/summary.log
+      - name: Isolated resource-capped CPU stress runner regression
+        run: |
+          python3 scripts/run_kyoto_stress.py quick \
+            --build /tmp/kyoto-material-build \
+            --output /tmp/kyoto-stress-smoke \
+            --max-seconds-per-policy 60 \
+            --max-rss-mb 1024 \
+            --max-experiments 12
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          doc=json.loads(Path('/tmp/kyoto-stress-smoke/manifest.json').read_text())
+          assert len(doc['results'])==12
+          successes=[r for r in doc['results'] if r['status']=='success']
+          assert len(successes)>=10, doc['results']
+          assert all(r['oracle_checks']>0 for r in successes)
+          print('Resource-capped stress runner PASS, exact AABB checks:',len(successes))
+          PY
+      - name: Preserve independently capped stress experiments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-cpu-stress-smoke
+          path: /tmp/kyoto-stress-smoke/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Preserve real material and exact CPU replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-material-cpu-regressions
+          path: /tmp/kyoto-material-evidence/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Preserve larger CPU crossover experiments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-linux-cpu-crossover
+          path: /tmp/kyoto-scale-crossover/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Preserve immutable experimental evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-linux-cpu-exploratory
+          path: /tmp/kyoto-evidence/
+          retention-days: 30
+          if-no-files-found: warn
+  learned-training-smoke:
+    # Full PyTorch downloads/training are expensive; trigger explicitly.
+    # CPU and macOS correctness jobs still run on every research push.
+    # Expensive PyTorch training is opt-in; standard native/Metal/recovery
+    # regressions run automatically. The one-off resume test passed on 2026-11-16.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python for PyTorch training
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only CPU PyTorch and NumPy
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch numpy
+          python -c 'import torch, numpy; print("Torch",torch.__version__,"NumPy",numpy.__version__)'
+      - name: Compile exact CPU material replay with learned inference
+        run: |
+          cmake -S . -B /tmp/kyoto-ml-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build /tmp/kyoto-ml-build --target ccp_material_export ccp_material_replay --parallel 4
+          ctest --test-dir /tmp/kyoto-ml-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
+      - name: Generate independent material/seed teacher trajectories
+        run: |
+          mkdir -p /tmp/kyoto-ml/teacher /tmp/kyoto-ml/snapshots /tmp/kyoto-ml/heldout
+          # Entirely new seeds: none belonged to the earlier negative trial.
+          # Test both cheap (<384 AABBs) and true neural-inference workloads.
+          for seed in 607 701 809 907 1009 1103 1201 1301; do
+            for material in cloth sponge cushion soft_ball spring mixed; do
+              for budget in 128 512; do
+                stem="actual-${material}-baseline-n${budget}-seed${seed}"
+                /tmp/kyoto-ml-build/ccp_material_export "/tmp/kyoto-ml/snapshots/${stem}.kmcb" "$material" "$budget" 36 "$seed" baseline
+                /tmp/kyoto-ml-build/ccp_material_replay "/tmp/kyoto-ml/snapshots/${stem}.kmcb" "/tmp/kyoto-ml/teacher/${stem}-cpu.csv" 0
+              done
+            done
+          done
+      - name: Search PyTorch architectures with early stopping and strict holdout
+        run: |
+          python scripts/train_online_controller.py /tmp/kyoto-ml/teacher \
+            --output /tmp/kyoto-ml/model --search grid --max-trials 12 \
+            --search-epochs 90 --final-epochs 90 --patience 16 --seed 20261116 \
+            --device cpu --verbose
+      - name: Verify legacy 34-trial-style resume without rerunning saved trials
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kyoto-ml')
+          saved=(root/'model/trials.jsonl').read_text().splitlines()
+          assert len(saved)==12, len(saved)
+          legacy=root/'legacy-partial-model'
+          legacy.mkdir()
+          (legacy/'trials.jsonl').write_text('\n'.join(saved[:2])+'\n')
+          print('Created legacy partial-search fixture with first 2/3 valid trials')
+          PY
+          python scripts/train_online_controller.py /tmp/kyoto-ml/teacher \
+            --output /tmp/kyoto-ml/legacy-partial-model \
+            --search grid --max-trials 3 \
+            --search-epochs 90 --final-epochs 90 --patience 16 \
+            --seed 20261116 --device cpu --resume --progress-every 10 \
+            --no-devlog --verbose
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('/tmp/kyoto-ml/legacy-partial-model')
+          lines=[json.loads(x) for x in (path/'trials.jsonl').read_text().splitlines()]
+          assert len(lines)==3 and [r['trial'] for r in lines]==[0,1,2]
+          assert (path/'search_contract.json').exists()
+          assert (path/'manifest.json').exists()
+          print('PASS: first two completed trial receipts reused intact, '
+                'third executed, model exported, original teacher CSVs untouched')
+          PY
+      - name: Measure real learned controller on withheld CPU trajectories
+        run: |
+          python - <<'PY'
+          import csv, json, pathlib, subprocess
+          root=pathlib.Path('/tmp/kyoto-ml')
+          manifest=json.loads((root/'model/manifest.json').read_text())
+          heldout=set(manifest['groups']['test'])
+          files=[]
+          for file in sorted((root/'teacher').glob('*-cpu.csv')):
+              with file.open(newline='') as stream:
+                  row=next(csv.DictReader(stream))
+              if row['seed'] not in heldout:
+                  continue
+              snap=root/'snapshots'/file.name.replace('-cpu.csv','.kmcb')
+              result=root/'heldout'/file.name.replace('-cpu.csv','-evaluated.csv')
+              subprocess.run(['/tmp/kyoto-ml-build/ccp_material_replay',
+                             str(snap),str(result),'0',
+                             str(root/'model/controller.mlpc')],check=True)
+              files.append(str(result))
+          assert len(files)>=12, files
+          subprocess.run(['python','scripts/evaluate_learned_replay.py',*files,
+                          '--output',str(root/'HELDOUT_ACTUAL_RUNTIME.md'),
+                          '--warmup','6'],check=True)
+          PY
+      - name: Preserve complete learned experimental outcomes (including failures)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pytorch-learned-cpu-smoke
+          path: |
+            /tmp/kyoto-ml/
+            DEVLOG.md
+          retention-days: 30
+          if-no-files-found: warn
+  metal-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Apple Metal objective-C++ benchmark
+        run: |
+          xcrun clang++ -std=c++23 -O2 -fobjc-arc -Wall -Wextra -Wpedantic \
+            apps/scaling_metal.mm -framework Foundation -framework Metal \
+            -o /tmp/ccp_scaling_metal
+      - name: Validate embedded Metal compute shaders with installed Xcode Metal compiler
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path("apps/scaling_metal.mm").read_text()
+          start='const char* metalSource=R"METAL('
+          end=')METAL";'
+          if start not in text or end not in text:
+              raise SystemExit("Metal shader literal missing")
+          shader=text.split(start,1)[1].split(end,1)[0]
+          Path('/tmp/kyoto_broadphase.metal').write_text(shader)
+          print("Extracted",len(shader),"Metal shader characters")
+          PY
+          if xcrun --find metal >/dev/null 2>&1; then
+            xcrun -sdk macosx metal -c /tmp/kyoto_broadphase.metal -o /tmp/kyoto_broadphase.air
+            echo "Standalone Metal kernel compilation PASSED"
+          else
+            echo "Standalone Metal compiler unavailable in runner; ObjC++ compilation only"
+          fi
+      - name: GPU runtime environment
+        run: |
+          system_profiler SPDisplaysDataType || true
+          # The hosted runner may not expose a compute-capable Metal device.
+          # Compilation is a required gate; real GPU measurements must be run
+          # on an identified physical GPU and preserved as raw CSV + metadata.
