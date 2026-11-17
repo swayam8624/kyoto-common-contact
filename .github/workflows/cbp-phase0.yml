@@ -61,6 +61,12 @@ jobs:
           /tmp/cbp-manager-bench 128 16 > /tmp/cbp-manager-smoke.csv
           test "$(wc -l < /tmp/cbp-manager-smoke.csv)" -eq 25
           cat /tmp/cbp-manager-smoke.csv
+      - name: Bounded 256-object transition comparison (diagnostic only)
+        timeout-minutes: 3
+        run: |
+          /tmp/cbp-manager-bench 256 24 > /tmp/cbp-manager-256.csv
+          test "$(wc -l < /tmp/cbp-manager-256.csv)" -eq 25
+          cat /tmp/cbp-manager-256.csv
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
