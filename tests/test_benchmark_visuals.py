@@ -54,7 +54,7 @@ class VisualDataTests(unittest.TestCase):
         }
 
     def mesh_evidence(self,alter=False):
-        source=self.root/"physical";source.mkdir()
+        source=self.root/"physical";source.mkdir(exist_ok=True)
         for method in ("sap_rebuild","global_guarded"):
             header={
                 "type":"mesh_header","schema":1,"policy":method,
@@ -87,8 +87,8 @@ class VisualDataTests(unittest.TestCase):
 
     def fixtures(self,wrong=False):
         run=self.root/"run"
-        (run/"snapshots").mkdir(parents=True)
-        (run/"replays").mkdir()
+        (run/"snapshots").mkdir(parents=True,exist_ok=True)
+        (run/"replays").mkdir(exist_ok=True)
         for material in MATERIALS:
             for regime in REGIMES:
                 stem=f"actual-{material}-{regime}-n512-seed1001"
