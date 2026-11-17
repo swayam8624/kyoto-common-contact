@@ -28,8 +28,8 @@ jobs:
             scripts/test_ml_recovery.py scripts/run_kyoto_controller_ablation.py \
             scripts/test_ablation_preflight.py scripts/analyze_kyoto_rumble.py \
             scripts/test_rumble_analysis.py scripts/test_rumble_adversarial.py \
-            scripts/test_rumble_endtoend.py
-          python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight scripts.test_rumble_analysis -v
+            scripts/test_rumble_endtoend.py scripts/test_rumble_launcher.py
+          python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight scripts.test_rumble_analysis scripts.test_rumble_launcher -v
       - name: Compile CPU benchmark with warnings
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
@@ -269,6 +269,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Verify fresh/resume Mac Bash strict-mode rumble launcher
+        run: python3 -m unittest scripts.test_rumble_launcher -v
       - name: Compile Apple Metal objective-C++ benchmark
         run: |
           xcrun clang++ -std=c++23 -O2 -fobjc-arc -Wall -Wextra -Wpedantic \
