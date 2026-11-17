@@ -1,4 +1,4 @@
-name: CBP Phase 0 exact regional oracle
+name: CBP exact spatial index regressions
 on:
   push:
     branches: [research/common-broadphase-orchestrator]
@@ -6,6 +6,8 @@ on:
     paths:
       - 'include/ccp/cbp_region_router.hpp'
       - 'tests/cbp_region_router_tests.cpp'
+      - 'tests/cbp_shared_bvh_tests.cpp'
+      - 'apps/cbp_cross_microbench.cpp'
       - '.github/workflows/cbp-phase0.yml'
       - 'CMakeLists.txt'
   workflow_dispatch:
@@ -20,9 +22,24 @@ jobs:
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
             -Iinclude tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-tests
           /tmp/cbp-region-tests
+      - name: Build and run shared BVH oracle (optimized Werror)
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-tests
+          /tmp/cbp-bvh-tests
+      - name: Compile short A/B benchmark (not a performance gate)
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude apps/cbp_cross_microbench.cpp -o /tmp/cbp-bench
+          /tmp/cbp-bench 64 24 > /tmp/cbp-bench-smoke.csv
+          test "$(wc -l < /tmp/cbp-bench-smoke.csv)" -eq 7
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
             -fno-omit-frame-pointer -Iinclude \
             tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-sanitizers
           /tmp/cbp-region-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-sanitizers
+          /tmp/cbp-bvh-sanitizers
