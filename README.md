@@ -33,8 +33,8 @@ SAP on every frame; a timing or fidelity advantage in the complete solver
 is **not** assumed.
 
 The runner performs a **short** correctness gate (not another massive
-tournament), captures six materials in six motion regimes and all seven
-original coupled-cloth broad-phase policies, and exports two true-data
+tournament), captures six materials in six motion regimes and all eight
+coupled-cloth broad-phase policies, including the final V4 selector, and exports two true-data
 looping GIFs with MP4 variants when FFmpeg is available:
 
 - `output/kyoto-final-showcase/videos/all-materials-six-regimes.gif`:
