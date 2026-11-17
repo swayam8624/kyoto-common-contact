@@ -43,6 +43,10 @@ target_link_libraries(ccp_selective_guard_tests PRIVATE ccp_live)
 target_compile_options(ccp_selective_guard_tests PRIVATE -Wall -Wextra -Wpedantic)
 
 # Heterogeneous, deformable mass-spring broad-phase research fixtures.
+# Final reusable policy also has an independent direct API oracle regression.
+add_executable(ccp_final_broadphase_api_tests tests/final_broadphase_api_tests.cpp)
+target_link_libraries(ccp_final_broadphase_api_tests PRIVATE ccp_live)
+target_compile_options(ccp_final_broadphase_api_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_material_replay apps/material_replay_benchmark.cpp)
 target_link_libraries(ccp_material_replay PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_replay PRIVATE -Wall -Wextra -Wpedantic)
@@ -54,6 +58,11 @@ target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_benchmark PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
+# Evidence-only mesh exporter: actual coupled solver positions for every
+# supported policy, with per-frame physics diagnostics and SAP state parity.
+add_executable(ccp_visual_multicloth_export apps/visual_multicloth_export.cpp)
+target_link_libraries(ccp_visual_multicloth_export PRIVATE ccp_multicloth)
+target_compile_options(ccp_visual_multicloth_export PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_online_trace apps/online_controller_trace.cpp)
 target_link_libraries(ccp_online_trace PRIVATE ccp_multicloth)
 add_executable(ccp_cloth_stability_probe apps/cloth_stability_probe.cpp)
@@ -117,6 +126,7 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
     COMMAND ${CMAKE_COMMAND} -E env CCP_CTEST_SMOKE=1

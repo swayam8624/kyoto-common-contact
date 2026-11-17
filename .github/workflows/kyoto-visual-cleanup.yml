@@ -1,0 +1,67 @@
+name: Kyoto visual, benchmark & lean-repo correctness
+on:
+  push:
+    branches:
+      - feature/kyoto-benchmark-visual-cleanup
+  workflow_dispatch:
+
+jobs:
+  visual-and-physics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimal renderer dependency
+        run: python3 -m pip install --user Pillow
+      - name: Syntax and evidence-pipeline unit tests
+        run: |
+          bash -n scripts/run_kyoto_visual_package.sh
+          python3 -m py_compile             scripts/render_kyoto_visuals.py             benchmarks/import_mesh_sequence.py             benchmarks/score_replay.py benchmarks/quality_report.py             tests/test_benchmark_visuals.py
+          python3 -m unittest tests.test_benchmark_visuals -v
+          python3 scripts/audit_repository.py --fail-on-generated
+          cmake --list-presets
+      - name: Build real mesh exporter and validated final broad phase
+        run: |
+          cmake -S . -B /tmp/kyoto-visual -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build /tmp/kyoto-visual --parallel 4 --target             ccp_visual_multicloth_export ccp_material_export             ccp_material_replay ccp_final_broadphase_api_tests
+          ctest --test-dir /tmp/kyoto-visual --output-on-failure             -R 'learned_cpp_model_and_exact_pair_oracle|final_broadphase_public_api_exact_pair_oracle'
+      - name: Real coupled solver mesh evidence, quality, and looping GIF
+        run: |
+          /tmp/kyoto-visual/ccp_visual_multicloth_export /tmp/kyoto-visual-mesh 12 2 2
+          python3 benchmarks/quality_report.py /tmp/kyoto-visual-mesh --output /tmp/kyoto-visual-quality
+          python3 scripts/render_kyoto_visuals.py solver             --input-dir /tmp/kyoto-visual-mesh             --output /tmp/kyoto-solver-smoke --frame-limit 3
+          test -s /tmp/kyoto-solver-smoke.gif
+          test -s /tmp/kyoto-visual-quality/SOLVER_QUALITY.json
+      - name: Full one-command 36-case real showcase smoke and output manifest
+        run: |
+          KYOTO_SHOWCASE_BUILD=/tmp/kyoto-visual \
+          KYOTO_SHOWCASE_FRAMES=24 \
+          KYOTO_SHOWCASE_SOLVER_FRAMES=12 \
+            bash scripts/run_kyoto_visual_package.sh /tmp/kyoto-showcase-e2e
+          test -s /tmp/kyoto-showcase-e2e/SHOWCASE_MANIFEST.json
+          test -s /tmp/kyoto-showcase-e2e/videos/all-materials-six-regimes.gif
+          test -s /tmp/kyoto-showcase-e2e/videos/all-eight-solver-policies.gif
+          test -s /tmp/kyoto-showcase-e2e/reports/REPLAY_SCORES.json
+          test -s /tmp/kyoto-showcase-e2e/reports/SOLVER_QUALITY.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/kyoto-showcase-e2e')
+          manifest=json.loads((root/'SHOWCASE_MANIFEST.json').read_text())
+          assert manifest['snapshot_count']==36
+          assert len(list((root/'replays').glob('*.csv')))==36
+          assert len(list((root/'meshes').glob('*.jsonl')))==8
+          print('PASS: 36 exact AABB replay scenes, 8 coupled mesh policies, 2 looping GIFs, metrics')
+          PY
+
+      - name: Upload real synchronized GIF/MP4 and correctness evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-real-mesh-and-material-loop-preview
+          retention-days: 30
+          path: |
+            /tmp/kyoto-showcase-e2e/videos/*.gif
+            /tmp/kyoto-showcase-e2e/videos/*.mp4
+            /tmp/kyoto-showcase-e2e/reports/*.md
+            /tmp/kyoto-showcase-e2e/reports/*.json
+            /tmp/kyoto-showcase-e2e/SHOWCASE_MANIFEST.json

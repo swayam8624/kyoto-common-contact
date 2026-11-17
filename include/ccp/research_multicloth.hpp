@@ -7,6 +7,7 @@
 // candidate is a region-selective, certificate-checked candidate *policy*;
 // novelty beyond existing BVH/fat-bound techniques requires literature proof.
 #include "ccp/live_cloth.hpp"
+#include "ccp/final_broadphase.hpp"
 #include "ccp/online_partitioner.hpp"
 #include <array>
 #include <cstddef>
@@ -18,7 +19,7 @@ namespace ccp::research {
 using Vec3 = live::Vec3;
 using Bounds = live::Bounds;
 using Pair = live::Pair;
-enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware };
+enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware, FinalBounded };
 struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
 // Snapshot of the last completed physical timestep. Most counters accumulate
@@ -143,6 +144,7 @@ private:
   OnlinePartitioner online_;
   void assignOnlineRegionIds();
   live::BroadPhaseService global_;
+  ccp::final_broadphase::GuardSAPBoundedTrial finalBounded_;
   Metrics metrics_;
   void updateSpheres(double t);
   std::vector<Primitive> makePrimitives() const;
