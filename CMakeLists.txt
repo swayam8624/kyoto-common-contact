@@ -145,6 +145,11 @@ target_compile_options(ccp_cbp_cost_manager_tests PRIVATE -Wall -Wextra -Wpedant
 add_executable(ccp_cbp_manager_bench apps/cbp_manager_microbench.cpp)
 target_include_directories(ccp_cbp_manager_bench PRIVATE include)
 target_compile_options(ccp_cbp_manager_bench PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Identical immutable KYOTOM01 material replays against frozen V4.
+add_executable(ccp_cbp_kmcb_replay apps/cbp_kmcb_replay.cpp)
+target_link_libraries(ccp_cbp_kmcb_replay PRIVATE ccp_live)
+target_include_directories(ccp_cbp_kmcb_replay PRIVATE include)
+target_compile_options(ccp_cbp_kmcb_replay PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -167,6 +172,9 @@ if(BUILD_TESTING)
         $<TARGET_FILE:ccp_material_replay>)
     add_test(NAME evidence_csv_contracts
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_evidence_summarizers.py)
+    add_test(NAME cbp_kmcb_snapshot_contract
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_kmcb_smoke.py
+        $<TARGET_FILE:ccp_cbp_kmcb_replay>)
   endif()
   add_executable(ccp_multicloth_tests tests/research_multicloth_tests.cpp)
   target_link_libraries(ccp_multicloth_tests PRIVATE ccp_multicloth)
