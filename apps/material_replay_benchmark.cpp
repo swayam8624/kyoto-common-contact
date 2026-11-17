@@ -5,6 +5,7 @@
 // compared against independently executed SAP and sampled brute-force oracle.
 #include "ccp/generic_online.hpp"
 #include "ccp/learned_online.hpp"
+#include "ccp/experimental_field.hpp"
 #include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <array>
@@ -17,6 +18,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -417,7 +419,8 @@ public:
  }
 };
 
-enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative
+enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative,
+ RefitBVH,AdaptiveBVH,SpatialGrid,DeltaJoin,PatchCertificate,SignalPatchCertificate
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -436,6 +439,12 @@ const char* name(Kind kind){
  case Kind::Online:return "online_cost_aware";
  case Kind::Learned:return "ml_cost_aware";
  case Kind::LearnedConservative:return "ml_cost_aware_conservative";
+ case Kind::RefitBVH:return "bvh_refit_exact";
+ case Kind::AdaptiveBVH:return "bvh_adaptive_exact";
+ case Kind::SpatialGrid:return "grid_spatial_hash_exact";
+ case Kind::DeltaJoin:return "delta_spatial_join_exact";
+ case Kind::PatchCertificate:return "patch_certificate_fixed";
+ case Kind::SignalPatchCertificate:return "patch_certificate_signal";
 #ifdef CCP_HAVE_BULLET
  case Kind::Bullet:return "bullet_dbvt_persistent";
 #endif
@@ -450,12 +459,19 @@ struct Observation {
  ccp::learned::Features features{};
  std::string selected{"none"};
  bool switched{},bypassed{},hybridProbed{},hybridSwitched{};
+ size_t fieldEvents{};
 };
 class Method {
  Kind kind_;
  PersistentSAP persistentSap_;
  ProbedGuardSAP guardSapProbe_;
  GuardSAPBoundedTrial guardSapTrial_;
+ ccp::experiment::RefitBVH bvhRefit_{false};
+ ccp::experiment::RefitBVH bvhAdaptive_{true};
+ ccp::experiment::SpatialGrid spatialGrid_;
+ ccp::experiment::DeltaJoin deltaJoin_;
+ ccp::experiment::PatchCertificate patchFixed_{false};
+ ccp::experiment::PatchCertificate patchSignal_{true};
  ccp::live::BroadPhaseService global_;
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
@@ -500,6 +516,27 @@ public:
    r.pairs=ccp::live::candidates(boxes,true);
   else if(kind_==Kind::PersistentSap)
    r.pairs=persistentSap_.query(boxes);
+  else if(kind_==Kind::RefitBVH||kind_==Kind::AdaptiveBVH||
+          kind_==Kind::SpatialGrid||kind_==Kind::DeltaJoin||
+          kind_==Kind::PatchCertificate||kind_==Kind::SignalPatchCertificate){
+   ccp::experiment::Statistics st;
+   if(kind_==Kind::RefitBVH){
+    r.pairs=bvhRefit_.query(boxes);st=bvhRefit_.statistics();
+   }else if(kind_==Kind::AdaptiveBVH){
+    r.pairs=bvhAdaptive_.query(boxes);st=bvhAdaptive_.statistics();
+   }else if(kind_==Kind::SpatialGrid){
+    r.pairs=spatialGrid_.query(boxes);st=spatialGrid_.statistics();
+   }else if(kind_==Kind::DeltaJoin){
+    r.pairs=deltaJoin_.query(boxes);st=deltaJoin_.statistics();
+   }else if(kind_==Kind::PatchCertificate){
+    r.pairs=patchFixed_.query(boxes);st=patchFixed_.statistics();
+   }else{
+    r.pairs=patchSignal_.query(boxes);st=patchSignal_.statistics();
+   }
+   r.builds=st.builds;r.reuses=st.reuses;r.repairs=st.repairs;
+   r.aabbTests=st.aabbTests;r.fieldEvents=st.events;
+   r.selected=name(kind_);
+  }
   else if(kind_==Kind::GuardSapProbe){
    auto outcome=guardSapProbe_.query(boxes);
    r.pairs=std::move(outcome.pairs);
@@ -557,7 +594,7 @@ public:
  }
 };
 void run(const std::string& filename,const std::string& output,int verbose,
-         const std::string& model){
+         const std::string& model,std::uint64_t orderSeed){
  MaterialReplay header(filename);
  if(std::filesystem::exists(output))throw std::runtime_error("refusing to overwrite CPU replay results");
  std::filesystem::path file(output);
@@ -567,20 +604,43 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<"backend,material,n,frame,seed,ms,pairs,pair_hash,oracle_checked,misses,"
        "builds,reuses,selective_repairs,aabb_tests,parallel_workers,online_span,online_path,"
        "chosen_backend,ml_switched,ml_bypassed,ml_feature_ms,ml_inference_ms,"
-       "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms,hybrid_probed,hybrid_switched";
+       "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms,hybrid_probed,hybrid_switched,field_events";
  for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
  csv<<'\n';
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
  std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::GuardSapTrial,Kind::Global,Kind::Selective,
-  Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online};
+  Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online,
+  Kind::RefitBVH,Kind::AdaptiveBVH,Kind::SpatialGrid,Kind::DeltaJoin,
+  Kind::PatchCertificate,Kind::SignalPatchCertificate};
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
 #endif
  if(!model.empty()){
   methods.push_back(Kind::Learned);
   methods.push_back(Kind::LearnedConservative);
+ }
+ // An independent exact SAP oracle is computed BEFORE timing randomized
+ // policies. The oracle is not in any method's measurement interval.
+ // Randomizing method *order*, not frame order, preserves live state.
+ {
+  MaterialReplay reference(filename);
+  for(uint32_t frame=0;frame<header.frames;++frame){
+   const auto boxes=reference.next();
+   const auto expected=ccp::live::candidates(boxes,true);
+   expectedHashes[frame]=pairHash(expected);
+   expectedCounts[frame]=expected.size();
+   if(frame%5==0&&header.n<=512){
+    const auto brute=ccp::live::candidates(boxes,false);
+    if(brute!=expected)
+     throw std::runtime_error("reference SAP disagrees with exhaustive oracle");
+   }
+  }
+ }
+ if(orderSeed){
+  std::mt19937_64 rng(orderSeed);
+  std::shuffle(methods.begin(),methods.end(),rng);
  }
  for(Kind method:methods){
   MaterialReplay stream(filename);
@@ -592,14 +652,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
    requireSortedUnique(observed.pairs,boxes.size());
    const auto hash=pairHash(observed.pairs);
    bool audited=frame%5==0;
-   if(method==Kind::Sap){
-    expectedHashes[frame]=hash;expectedCounts[frame]=observed.pairs.size();
-    if(audited&&header.n<=512){
-     const auto brute=ccp::live::candidates(boxes,false);
-     if(brute!=observed.pairs)
-      throw std::runtime_error("SAP disagrees with independent exhaustive AABB oracle");
-    }
-   }else if(hash!=expectedHashes[frame]||observed.pairs.size()!=expectedCounts[frame]){
+   if(hash!=expectedHashes[frame]||observed.pairs.size()!=expectedCounts[frame]){
     throw std::runtime_error("replay pair mismatch: "+std::string(name(method))+
                              " frame "+std::to_string(frame));
    }
@@ -613,7 +666,8 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<observed.mlFeatureMs<<','<<observed.mlInferenceMs<<','
       <<observed.mlDecisionMs<<','<<observed.mlBackendMs<<','
       <<observed.mlBookkeepingMs<<','<<observed.mlWrapperMs<<','
-      <<(observed.hybridProbed?1:0)<<','<<(observed.hybridSwitched?1:0);
+      <<(observed.hybridProbed?1:0)<<','<<(observed.hybridSwitched?1:0)
+      <<','<<observed.fieldEvents;
    for(double f:observed.features)csv<<','<<f;
    csv<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
@@ -635,16 +689,19 @@ int main(int argc,char** argv){
   // Machine-readable executable ABI check: fail fast if an older binary is
   // accidentally used after a compile failure. No snapshots or model needed.
   if(argc==2&&std::string(argv[1])=="--capabilities"){
-   std::cout<<"KYOTO_REPLAY_ABLATION_V4 sap_persistent_coherent "
+   std::cout<<"KYOTO_REPLAY_ABLATION_V5 sap_persistent_coherent "
                "ml_cost_aware_conservative guard_sap_measured_probe guard_sap_bounded_trial "
-               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched\n";
+               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched "
+               "field_events randomized_method_order bvh_refit_exact "
+               "bvh_adaptive_exact grid_spatial_hash_exact delta_spatial_join_exact "
+               "patch_certificate_fixed patch_certificate_signal\n";
    return 0;
   }
-  if(argc<3||argc>5)
-   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt]");
-  int verbose=argc==4?std::stoi(argv[3]):1;
+  if(argc<3||argc>6)
+   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt] [ORDER_SEED=0]");
+  int verbose=argc>=4?std::stoi(argv[3]):1;
   if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
-  run(argv[1],argv[2],verbose,argc==5?argv[4]:"");
+  run(argv[1],argv[2],verbose,argc>=5?argv[4]:"",argc==6?std::stoull(argv[5]):0);
  }catch(const std::exception& e){
   std::cerr<<"MATERIAL CPU REPLAY FAILED: "<<e.what()<<'\n';return 1;
  }
