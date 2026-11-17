@@ -12,6 +12,8 @@
 #include "ccp/cbp_cost_manager.hpp"
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cstdint>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -62,6 +64,26 @@ Pairs independentBrute(const std::vector<Bounds>& boxes){
       ccp::cbp::overlap(boxes[i],boxes[j]))
     result.push_back({boxes[i].id,boxes[j].id});
  return result;
+}
+std::uint64_t snapshotHash(const std::vector<Bounds>& boxes){
+ // Deterministic fingerprint of the *entire current query*, independent of
+ // mesh grouping. Compare across span sweeps to detect altered trajectories.
+ // Not a cryptographic hash; exact pair-list oracle remains independent.
+ std::uint64_t value=14695981039346656037ULL;
+ const auto mix=[&](std::uint64_t word)mutable{
+  value^=word;
+  value*=1099511628211ULL;
+ };
+ for(const auto& box:boxes){
+  mix(static_cast<std::uint32_t>(box.id));
+  for(double coordinate:{box.min.x,box.min.y,box.min.z,
+                          box.max.x,box.max.y,box.max.z})
+   mix(std::bit_cast<std::uint64_t>(coordinate));
+  mix(box.category);
+  mix(box.mask);
+  mix(static_cast<std::uint64_t>(box.movable));
+ }
+ return value;
 }
 double ms(Clock::time_point a,Clock::time_point b){
  return std::chrono::duration<double,std::milli>(b-a).count();
@@ -135,7 +157,7 @@ int main(int argc,char** argv){
 
   std::ofstream out(destination);
   if(!out)throw std::runtime_error("failed to open topology CSV output");
-  out<<"frame,sheets,spheres,triangles,primitives,patch_span,regions,"
+  out<<"frame,snapshot_hash,sheets,spheres,triangles,primitives,patch_span,regions,"
         "method,query_ms,pairs,oracle_equal,v4_action,"
         "causal_choice,causal_density,causal_motion,"
         "portfolio_choice,portfolio_trial,portfolio_accepted,"
@@ -162,6 +184,7 @@ int main(int argc,char** argv){
    }
    std::map<int,int> regionOccupancy;
    for(int label:labels)++regionOccupancy[label];
+   const auto geometryFingerprint=snapshotHash(boxes);
    std::array<Pairs,7> results;
    std::array<double,7> times{};
    std::array<ccp::cbp::Telemetry,7> work{};
@@ -211,7 +234,8 @@ int main(int argc,char** argv){
    for(int method=0;method<7;++method){
     const auto index=static_cast<std::size_t>(method);
     const auto w=work[index];
-    out<<(frame+1)<<','<<sheets<<','<<spheres<<','<<source.triangles().size()
+    out<<(frame+1)<<','<<std::hex<<geometryFingerprint<<std::dec
+       <<','<<sheets<<','<<spheres<<','<<source.triangles().size()
        <<','<<boxes.size()<<','<<span<<','<<regionOccupancy.size()
        <<','<<methods[index]<<','<<times[index]<<','<<results[index].size()
        <<",1,"<<(method==1?v4Action:"none")
