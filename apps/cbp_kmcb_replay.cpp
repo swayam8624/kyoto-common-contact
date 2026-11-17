@@ -215,7 +215,8 @@ int main(int argc,char** argv){
             <<s.cacheFrames<<','<<s.bvhFrames<<','<<s.exhaustiveFrames
             <<",verified\n";
   }
-  if(trace&&!trace)throw std::runtime_error("Trace CSV failed");
+  if(trace.is_open()&&!trace.good())
+   throw std::runtime_error("Trace CSV failed");
   std::cerr<<"[CBP MATERIAL] exact current-AABB pair parity for all 6 methods;"
            <<" ID-block regions are a surrogate, not real mesh topology\n";
  }catch(const std::exception& e){
