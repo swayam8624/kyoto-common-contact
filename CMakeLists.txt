@@ -124,14 +124,22 @@ if(APPLE)
   target_compile_options(ccp_scaling_metal PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# Experimental CBP Phase-0 regional correctness oracle; no extra libraries.
+# Experimental CBP: Phase-0 exhaustive control and Phase-1 shared spatial BVH.
+# These header-only targets do not need the native renderer, Bullet or ML.
 add_executable(ccp_cbp_router_tests tests/cbp_region_router_tests.cpp)
 target_include_directories(ccp_cbp_router_tests PRIVATE include)
 target_compile_options(ccp_cbp_router_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(ccp_cbp_shared_bvh_tests tests/cbp_shared_bvh_tests.cpp)
+target_include_directories(ccp_cbp_shared_bvh_tests PRIVATE include)
+target_compile_options(ccp_cbp_shared_bvh_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_cbp_cross_bench apps/cbp_cross_microbench.cpp)
+target_include_directories(ccp_cbp_cross_bench PRIVATE include)
+target_compile_options(ccp_cbp_cross_bench PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME cbp_exact_region_oracle COMMAND ccp_cbp_router_tests)
+  add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
