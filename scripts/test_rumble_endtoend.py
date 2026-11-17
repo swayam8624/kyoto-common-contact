@@ -41,7 +41,7 @@ def test(build):
         must={"patch_certificate_signal","bvh_adaptive_exact",
               "delta_spatial_join_exact","grid_spatial_hash_exact",
               "ml_cost_aware","guard_sap_bounded_trial",
-              "global_guarded_aa_control"}
+              "global_guarded_aa_control","unified_certified_hierarchy_v0"}
         if not must.issubset(names):
             raise RuntimeError(f"Missing contenders: {sorted(must-names)}")
         if not (out/"RUMBLE_PATTERNS.md").exists():
