@@ -48,10 +48,14 @@ def main() -> int:
         "sap_rebuild", "v4_guard_sap_bounded_trial", "region_exhaustive",
         "region_shared_bvh", "region_certified_cache", "causal_cbp",
     }
+    # Older six-policy traces remain valid immutable evidence.
+    # New instrumented replays add a separately timed V4+regional portfolio.
+    if "portfolio_v4_regional" in by_method:
+        expected.add("portfolio_v4_regional")
     if set(by_method) != expected:
-        raise ValueError("All six reference methods must appear in the trace")
+        raise ValueError("Missing or unrecognized replay policy")
     for frame, entries in by_frame.items():
-        if len(entries) != 6 or {r["method"] for r in entries} != expected:
+        if len(entries) != len(expected) or {r["method"] for r in entries} != expected:
             raise ValueError(f"Incomplete or duplicate frame {frame}")
         if len({r["exact_pairs"] for r in entries}) != 1:
             raise ValueError(f"Pair-count mismatch at frame {frame}")
@@ -79,6 +83,16 @@ def main() -> int:
     print()
     print(f"V4 actions: {dict(actions)}; SAP trial frames={trials}; backend switches={switches}.")
     print(f"CBP choices: {dict(modes)}; transitions={sum(int(r['switched']) for r in manager)}.")
+    if "portfolio_v4_regional" in by_method:
+        portfolio = by_method["portfolio_v4_regional"]
+        choices = collections.Counter(r["portfolio_mode"] for r in portfolio)
+        trials = sum(int(r["portfolio_trial"]) for r in portfolio)
+        accepted = sum(int(r["portfolio_accepted"]) for r in portfolio)
+        rejected = sum(int(r["portfolio_rejected"]) for r in portfolio)
+        print(f"V4+regional portfolio choices: {dict(choices)}; trial frames={trials}; "
+              f"accepted trials={accepted}; rejected trials={rejected}.")
+        print("Portfolio trials are executed, timed, and charged on-policy; "
+              "no alternative algorithm runs inside the manager.")
     densities = [number(r, "manager_sample_density") for r in manager]
     motions = [number(r, "manager_sample_motion") for r in manager]
     print(f"CBP sampled cross-region overlap density: min={min(densities):.3f}, "
