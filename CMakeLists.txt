@@ -56,6 +56,10 @@ target_compile_options(ccp_material_export PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_material_benchmark apps/material_suite_benchmark.cpp)
 target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_benchmark PRIVATE -Wall -Wextra -Wpedantic)
+# Real coupled XPBD geometry and contact diagnostics for the visual evidence suite.
+add_executable(ccp_solver_visual_export apps/solver_visual_export.cpp)
+target_link_libraries(ccp_solver_visual_export PRIVATE ccp_multicloth)
+target_compile_options(ccp_solver_visual_export PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_multicloth_benchmark apps/multicloth_benchmark.cpp)
 target_link_libraries(ccp_multicloth_benchmark PRIVATE ccp_multicloth)
 # Evidence-only mesh exporter: actual coupled solver positions for every
