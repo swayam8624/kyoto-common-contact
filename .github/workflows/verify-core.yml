@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/kyoto-meeting-validated-demo
+      - research/kyoto-exact-event-field-rumble
 jobs:
   headless:
     runs-on: ubuntu-latest
