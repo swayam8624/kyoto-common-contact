@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report *measured* held-out switched-ML runtime against static baselines.
+"""Report *measured* held-out switched-ML runtime against separately run policies.
 
 No invented extrapolations: aggregates paired full-frame elapsed time and exact
 pair checks from actual ccp_material_replay CSVs with an ML artifact enabled.
@@ -15,7 +15,7 @@ from collections import defaultdict,Counter
 from pathlib import Path
 from statistics import mean,median
 
-STATIC=("sap_rebuild","global_guarded_exact","selective_guard_exact",
+COMPARATORS=("sap_rebuild","sap_persistent_coherent","guard_sap_measured_probe","guard_sap_bounded_trial","global_guarded_exact","selective_guard_exact",
         "region_fixed","region_adaptive","region_hierarchical",
         "online_cost_aware","bullet_dbvt_persistent")
 LEARNED="ml_cost_aware"
@@ -68,8 +68,15 @@ def evaluate(paths,warmup,bootstrap,seed):
             "measured_p95_ms":{key:quantile(values,.95) for key,values in samples.items()},
             "ml_vs_global_mean_speedup":means["global_guarded_exact"]/means[LEARNED],
             "ml_vs_original_online_mean_speedup":means["online_cost_aware"]/means[LEARNED],
+            # Best alternative includes *dynamic* generalized-online and
+            # measured-probe hybrid. It is a hindsight comparator over full
+            # trajectories, never a deployable per-frame oracle.
+            "ml_vs_best_competing_policy_posthoc_mean_speedup":
+                min(value for key,value in means.items() if key in COMPARATORS)/means[LEARNED],
+            # Legacy API alias: retained for previous consumers, despite its
+            # misleading "static" name; do not use this label in publications.
             "ml_vs_best_static_posthoc_mean_speedup":
-                min(value for key,value in means.items() if key in STATIC)/means[LEARNED],
+                min(value for key,value in means.items() if key in COMPARATORS)/means[LEARNED],
             "ml_action_counts":dict(selection),"ml_switches":changes,
             "every_policy_pairs_verified":True})
     if not scenes:raise ValueError("no replay evidence")
@@ -87,7 +94,8 @@ def evaluate(paths,warmup,bootstrap,seed):
       "ml_trajectories_faster_than_global":sum(r>1 for r in ratios),
       "ml_trajectories_slower_than_global":sum(r<1 for r in ratios),
       "cannot_claim_general_superiority":True,
-      "warning":"Posthoc best static algorithm is a hindsight comparator, NOT deployable; "
+      "warning":"Posthoc best separately run competing policy includes dynamic policies "
+                "and is a hindsight full-trajectory comparator, NOT deployable; "
                 "model selection overhead is INCLUDED in learned runtime. "
                 "Independent trajectories/seed splits and memory still need verification."
     }

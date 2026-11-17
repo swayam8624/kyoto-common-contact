@@ -38,7 +38,10 @@ MODES={
 def call(argv,logpath,cwd,timeout,quiet=False):
     print("[KYOTO-ML] EXEC:", " ".join(map(str,argv)),flush=True)
     started=time.monotonic()
-    with logpath.open("w",encoding="utf-8") as log:
+    # Preserve the original failing/stopped run's logs on every restart.
+    with logpath.open("a",encoding="utf-8") as log:
+        if logpath.stat().st_size:
+            log.write("\n[RESUME] new invocation; previous log contents preserved\n")
         proc=subprocess.Popen([str(a) for a in argv],cwd=cwd,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,text=True,
@@ -78,7 +81,9 @@ def main():
     parser.add_argument("--timeout",type=int,default=900)
     parser.add_argument("--device",choices=("cpu","mps","auto"),default="auto")
     parser.add_argument("--resume-cpu-data",type=Path,
-                        help="Use pre-generated complete teacher CSV and snapshot directory")
+                        help="Use a separate completed teacher/snapshot directory")
+    parser.add_argument("--resume-run",type=Path,
+                        help="Continue THIS existing output/kyoto-learned-* directory without redoing data/trials")
     args=parser.parse_args()
     if args.timeout<30:parser.error("timeout must be at least 30 seconds per command")
     root=Path(__file__).resolve().parents[1]
@@ -86,18 +91,37 @@ def main():
     mode=MODES[args.mode]
     utc=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run=Path("output")/f"kyoto-learned-{utc}-{args.mode}"
-    if run.exists():parser.error("refusing to overwrite existing research experiment")
-    run.mkdir(parents=True)
+    if args.resume_run:
+        run=args.resume_run
+        if not run.is_dir():
+            parser.error("--resume-run must point to an existing Kyoto output directory")
+        if not run.name.endswith("-"+args.mode):
+            parser.error("--resume-run directory and selected mode do not match")
+        print(f"[KYOTO-ML] RESUMING original run: {run}",flush=True)
+    elif run.exists():
+        parser.error("refusing to overwrite existing research experiment")
+    run.mkdir(parents=True,exist_ok=True)
     done={"success":False}
     def preserve():
-        subprocess.run([sys.executable,"scripts/package_kyoto_results.py",
-                        str(run),"--exit-code",0 if done["success"] else 1],
-                       cwd=root,check=False)
+        archive=run.with_suffix(".zip")
+        if done["success"] and archive.exists():
+            print(f"[KYOTO-ML] Existing full archive preserved: {archive}",flush=True)
+            return
+        arguments=[sys.executable,"scripts/package_kyoto_results.py",
+                   str(run),"--exit-code",str(0 if done["success"] else 1)]
+        if not done["success"]:
+            # An interrupted 1080-scene exhaustive run can hold several GB.
+            # A compact diagnostic ZIP must never destroy or repackage
+            # all the teacher and snapshot files needed for exact resume.
+            arguments.append("--diagnostics-only")
+            print("[KYOTO-ML] Interrupted/failed run: preserving existing "
+                  "raw files; packaging only small diagnostics.",flush=True)
+        subprocess.run(arguments,cwd=root,check=False)
     atexit.register(preserve)
-    logs=run/"logs";logs.mkdir()
-    teacher=run/"teacher";teacher.mkdir()
-    snapshots=run/"snapshots";snapshots.mkdir()
-    holdout=run/"heldout";holdout.mkdir()
+    logs=run/"logs";logs.mkdir(exist_ok=True)
+    teacher=run/"teacher";teacher.mkdir(exist_ok=True)
+    snapshots=run/"snapshots";snapshots.mkdir(exist_ok=True)
+    holdout=run/"heldout";holdout.mkdir(exist_ok=True)
     try:
         import torch
         print("[KYOTO-ML] PyTorch:",torch.__version__,
@@ -110,8 +134,34 @@ def main():
               "source_sha":subprocess.check_output(
                   ["git","rev-parse","HEAD"],text=True).strip(),
               "configuration":mode}
-    (run/"environment.json").write_text(
-        json.dumps(metadata,indent=2)+"\n",encoding="utf-8")
+    environment=run/"environment.json"
+    if args.resume_run and not environment.exists():
+        raise RuntimeError("Existing run has no environment.json: unsafe resume")
+    if environment.exists():
+        previous=json.loads(environment.read_text(encoding="utf-8"))
+        if (previous.get("mode")!=args.mode or
+            previous.get("configuration")!=json.loads(json.dumps(mode))):
+            raise RuntimeError("Configuration differs from original run; no resume")
+        # Keep original git revision, hardware, and all prior experiment metadata.
+        metadata=previous
+    else:
+        environment.write_text(json.dumps(metadata,indent=2)+"\n",encoding="utf-8")
+    if args.resume_run:
+        # Append provenance without overwriting the original experiment's
+        # machine/compiler/model seed manifest. The latest source revision
+        # may differ from the revision of the first 34 trials.
+        event={"resumed_at_utc":utc,
+               "original_source_sha":metadata.get("source_sha","unknown"),
+               "recovery_source_sha":subprocess.check_output(
+                    ["git","rev-parse","HEAD"],text=True).strip(),
+               "recovery_source_dirty":bool(subprocess.check_output(
+                    ["git","status","--porcelain"],text=True).strip()),
+               "reason":"non-destructive continuation of interrupted PyTorch grid",
+               "output":str(run)}
+        with (run/"resume_events.jsonl").open("a",encoding="utf-8") as history:
+            history.write(json.dumps(event)+"\n")
+        print("[KYOTO-ML] Recovery revision recorded. Previous run files "
+              "remain unchanged.",flush=True)
     build=args.build.resolve()
     exporter=build/"ccp_material_export"
     replayer=build/"ccp_material_replay"
@@ -126,6 +176,32 @@ def main():
                              "Run the updated Kyoto material smoke script first.")
     # User-supplied complete runs can be evaluated without redundant geometry
     # generation. Otherwise generate unique independently seeded trajectories.
+    if args.resume_cpu_data and args.resume_run:
+        parser.error("--resume-cpu-data cannot be combined with --resume-run")
+    if args.resume_run:
+        # This also catches the original unpatched foreground trainer, which
+        # cannot acquire the advisory lock introduced in newer revisions.
+        try:
+            listing=subprocess.check_output(["ps","-ax","-o","pid=","-o",
+                                             "command=","-ww"],
+                                            text=True,stderr=subprocess.DEVNULL)
+            model_text=str(run/"model")
+            running=[]
+            for line in listing.splitlines():
+                if "train_online_controller.py" not in line:continue
+                if model_text not in line and str((run/"model").resolve()) not in line:
+                    continue
+                candidate=line.strip().split(None,1)
+                if candidate and candidate[0].isdigit() and int(candidate[0])!=os.getpid():
+                    running.append(candidate[0])
+            if running:
+                raise RuntimeError("Training already active for the same output folder "
+                                   "(PID "+",".join(running)+"). Do not run two models "
+                                   "against the same trials.jsonl. Check ps and wait or "
+                                   "stop the first run before resuming.")
+        except subprocess.CalledProcessError:
+            print("[KYOTO-ML] Could not inspect process list; manually verify "
+                  "old training has stopped before --resume-run.",flush=True)
     if args.resume_cpu_data:
         source=args.resume_cpu_data.resolve()
         if not source.is_dir():raise SystemExit("resume directory unavailable")
@@ -145,10 +221,16 @@ def main():
             snapshot=snapshots/(stem+".kmcb")
             evidence=teacher/(stem+"-cpu.csv")
             print(f"[KYOTO-ML] DATA {number}/{len(combinations)}: {stem}",flush=True)
-            call([exporter,snapshot,material,budget,mode["frames"],seed,regime],
-                 logs/(stem+"-export.log"),root,args.timeout,quiet=True)
-            call([replayer,snapshot,evidence,0],
-                 logs/(stem+"-teacher.log"),root,args.timeout,quiet=True)
+            if not snapshot.exists():
+                call([exporter,snapshot,material,budget,mode["frames"],seed,regime],
+                     logs/(stem+"-export.log"),root,args.timeout,quiet=True)
+            else:
+                print(f"[KYOTO-ML] REUSE immutable snapshot {snapshot}",flush=True)
+            if not evidence.exists():
+                call([replayer,snapshot,evidence,0],
+                     logs/(stem+"-teacher.log"),root,args.timeout,quiet=True)
+            else:
+                print(f"[KYOTO-ML] REUSE teacher CSV {evidence}",flush=True)
     trials=args.max_trials if args.max_trials is not None else mode["trials"]
     model_dir=run/"model"
     command=[sys.executable,"scripts/train_online_controller.py",teacher,
@@ -164,8 +246,16 @@ def main():
     # per-trajectory watchdog. Per-trial early stopping remains mandatory.
     training_limit=max(args.timeout,86400 if args.mode=="exhaustive" else
                        14400 if args.mode=="standard" else 3600)
-    call(command,logs/"torch-training.log",root,training_limit,quiet=False)
-    manifest=json.loads((model_dir/"manifest.json").read_text())
+    existing_model=model_dir/"controller.mlpc"
+    existing_manifest=model_dir/"manifest.json"
+    if existing_model.exists() and existing_manifest.exists():
+        print("[KYOTO-ML] REUSE completed model; skip all training",flush=True)
+    else:
+        if args.resume_run:
+            command.append("--resume")
+            command+=["--progress-every","25"]
+        call(command,logs/"torch-training.log",root,training_limit,quiet=False)
+    manifest=json.loads(existing_manifest.read_text())
     heldout_seeds=set(manifest["groups"]["test"])
     evidence=[]
     for source in sorted(teacher.glob("*-cpu.csv")):
@@ -176,18 +266,27 @@ def main():
         if row["seed"] not in heldout_seeds:continue
         snapshot=snapshots/source.name.replace("-cpu.csv",".kmcb")
         output=holdout/source.name.replace("-cpu.csv","-evaluated.csv")
-        call([replayer,snapshot,output,0,model_dir/"controller.mlpc"],
-             logs/(output.stem+".log"),root,args.timeout,quiet=True)
+        if output.exists():
+            print(f"[KYOTO-ML] REUSE heldout evaluated CSV {output}",flush=True)
+        else:
+            call([replayer,snapshot,output,0,model_dir/"controller.mlpc"],
+                 logs/(output.stem+".log"),root,args.timeout,quiet=True)
         evidence.append(output)
     if not evidence:raise RuntimeError("No heldout actual C++ replay experiments")
     report=run/"HELDOUT_ACTUAL_RUNTIME.md"
-    call([sys.executable,"scripts/evaluate_learned_replay.py",*evidence,
-          "--output",report,"--warmup",min(8,mode["frames"]//4)],
-         logs/"heldout-evaluation.log",root,args.timeout,quiet=False)
+    if report.exists() and report.with_suffix(".json").exists():
+        print("[KYOTO-ML] REUSE completed actual heldout evaluation",flush=True)
+    else:
+        call([sys.executable,"scripts/evaluate_learned_replay.py",*evidence,
+              "--output",report,"--warmup",min(8,mode["frames"]//4)],
+             logs/"heldout-evaluation.log",root,args.timeout,quiet=False)
     evaluation=json.loads(report.with_suffix(".json").read_text())
-    with Path("DEVLOG.md").open("a",encoding="utf-8") as handle:
+    devlog=Path("DEVLOG.md")
+    marker=f"### Actual C++ learned controller heldout — {run.name}"
+    if marker not in (devlog.read_text(encoding="utf-8") if devlog.exists() else ""):
+      with devlog.open("a",encoding="utf-8") as handle:
         h=evaluation["aggregate"]
-        handle.write(f"\n### Actual C++ learned controller heldout — {utc}\n\n")
+        handle.write(f"\n{marker}\n\n")
         handle.write(f"- Source commit `{metadata['source_sha']}`; run `{run}`; "
                      f"seeds in heldout={sorted(heldout_seeds)}.\n")
         handle.write(f"- Deployed ML policy vs Global Guard: "

@@ -92,3 +92,63 @@ Do not use training loss, oracle lower-bound action selection, or an unseen GPU 
 
 **Workflow policy:** After two actual PyTorch learned-controller experiments, the costly `learned-training-smoke` CI job was made opt-in through GitHub Actions `workflow_dispatch`; all native C++/Metal compilation, exact-oracle regressions, and small independent stress-smoke checks still run on research branch pushes. No neural wins are accepted merely because a CI test passes.
 
+
+### PyTorch learned-selector experiment model
+
+- Status: **trained_heldout_not_deployed**. Dataset and trials remain in output/kyoto-learned-20261115T195342Z-smoke/model; no performance result is assumed from training alone.
+- Source commit: `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; split: `seed`; independent groups: {"grouping": "seed", "test": ["101"], "train": ["211", "307", "503"], "validation": ["401"]}.
+- Data: {'train': 432, 'validation': 144, 'test': 144} validated paired teacher frame samples; trials: 1.
+- Best validation model: `{'depth': 1, 'width': 8, 'lr': 0.0003, 'weight_decay': 0.0, 'dropout': 0.0, 'batch': 64}`.
+- Held-out *counterfactual* quality (not real switched runtime): `{"actual_mean_chosen_ms": 0.1362743402777778, "counterfactual_regret_mean_ms": 0.07510822222222223, "counterfactual_regret_p95_ms": 0.2810767499999999, "oracle_unattainable_mean_ms": 0.06116611805555556, "predicted_cost_mean_ms": 0.6637435555458069, "samples": 144, "static_policy_mean_ms": {"global_guarded_exact": 0.13591263194444445, "region_hierarchical": 0.12360764583333333, "sap_rebuild": 0.23500256944444445, "selective_guard_exact": 0.11595718055555555}, "top1_cost_choice_accuracy": 0.09722222222222222}`.
+- Decision: evaluate artifact on unseen CPU replay trajectories with `ccp_material_replay ... MODEL.txt` and compare measured `ml_cost_aware` time against Global Guard, original online, Bullet and region baselines. Do not deploy without an exact-pair oracle and positive aggregate gain.
+
+### Actual C++ learned controller heldout — 20261115T195342Z
+
+- Source commit `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; run `output/kyoto-learned-20261115T195342Z-smoke`; seeds in heldout=['101'].
+- Deployed ML policy vs Global Guard: 0.6631x (trajectory-bootstrap 95% CI [0.4541329014949279, 0.9111604569483469]); win/loss scenes 2/10.
+- No software deployment decision until full coupled simulation and additional independent machines/physics regimes are audited. Raw evidence, every trial and negative results are in `output/kyoto-learned-20261115T195342Z-smoke`.
+
+### PyTorch learned-selector experiment model
+
+- Status: **trained_heldout_not_deployed**. Dataset and trials remain in output/kyoto-learned-20261115T195351Z-quick/model; no performance result is assumed from training alone.
+- Source commit: `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; split: `seed`; independent groups: {"grouping": "seed", "test": ["101"], "train": ["211", "307", "503"], "validation": ["401"]}.
+- Data: {'train': 3456, 'validation': 1152, 'test': 1152} validated paired teacher frame samples; trials: 12.
+- Best validation model: `{'depth': 2, 'width': 32, 'lr': 0.001, 'weight_decay': 0.001, 'dropout': 0.0, 'batch': 64}`.
+- Held-out *counterfactual* quality (not real switched runtime): `{"actual_mean_chosen_ms": 0.14933185763888887, "counterfactual_regret_mean_ms": 0.07430096180555555, "counterfactual_regret_p95_ms": 0.4972168500000002, "oracle_unattainable_mean_ms": 0.07503089583333335, "predicted_cost_mean_ms": 0.070590540766716, "samples": 1152, "static_policy_mean_ms": {"global_guarded_exact": 0.18807838628472226, "region_hierarchical": 0.19581611024305556, "sap_rebuild": 0.3192722265625, "selective_guard_exact": 0.16794049131944444}, "top1_cost_choice_accuracy": 0.7925347222222222}`.
+- Decision: evaluate artifact on unseen CPU replay trajectories with `ccp_material_replay ... MODEL.txt` and compare measured `ml_cost_aware` time against Global Guard, original online, Bullet and region baselines. Do not deploy without an exact-pair oracle and positive aggregate gain.
+
+### Actual C++ learned controller heldout — 20261115T195351Z
+
+- Source commit `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; run `output/kyoto-learned-20261115T195351Z-quick`; seeds in heldout=['101'].
+- Deployed ML policy vs Global Guard: 0.8274x (trajectory-bootstrap 95% CI [0.7294555138621414, 0.9317946433266455]); win/loss scenes 4/20.
+- No software deployment decision until full coupled simulation and additional independent machines/physics regimes are audited. Raw evidence, every trial and negative results are in `output/kyoto-learned-20261115T195351Z-quick`.
+
+### PyTorch learned-selector experiment model
+
+- Status: **trained_heldout_not_deployed**. Dataset and trials remain in output/kyoto-learned-20261115T195639Z-standard/model; no performance result is assumed from training alone.
+- Source commit: `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; split: `seed`; independent groups: {"grouping": "seed", "test": ["101", "701"], "train": ["211", "401", "607", "809"], "validation": ["307", "503"]}.
+- Data: {'train': 13824, 'validation': 6912, 'test': 6912} validated paired teacher frame samples; trials: 48.
+- Best validation model: `{'depth': 2, 'width': 32, 'lr': 0.001, 'weight_decay': 0.001, 'dropout': 0.0, 'batch': 64}`.
+- Held-out *counterfactual* quality (not real switched runtime): `{"actual_mean_chosen_ms": 0.5071949188368056, "counterfactual_regret_mean_ms": 0.27018194574652776, "counterfactual_regret_p95_ms": 1.48641075, "oracle_unattainable_mean_ms": 0.2370129730902778, "predicted_cost_mean_ms": 0.264241486787796, "samples": 6912, "static_policy_mean_ms": {"global_guarded_exact": 0.6548175, "region_hierarchical": 0.5867893728298611, "sap_rebuild": 0.7709311927083334, "selective_guard_exact": 0.6018722575231481}, "top1_cost_choice_accuracy": 0.7264178240740741}`.
+- Decision: evaluate artifact on unseen CPU replay trajectories with `ccp_material_replay ... MODEL.txt` and compare measured `ml_cost_aware` time against Global Guard, original online, Bullet and region baselines. Do not deploy without an exact-pair oracle and positive aggregate gain.
+
+### Actual C++ learned controller heldout — 20261115T195639Z
+
+- Source commit `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; run `output/kyoto-learned-20261115T195639Z-standard`; seeds in heldout=['101', '701'].
+- Deployed ML policy vs Global Guard: 0.9166x (trajectory-bootstrap 95% CI [0.8619406255454529, 0.9718419040137002]); win/loss scenes 21/75.
+- No software deployment decision until full coupled simulation and additional independent machines/physics regimes are audited. Raw evidence, every trial and negative results are in `output/kyoto-learned-20261115T195639Z-standard`.
+
+### PyTorch learned-selector experiment model
+
+- Status: **trained_heldout_not_deployed**. Dataset and trials remain in output/kyoto-learned-20261116T050002Z-exhaustive/model; no performance result is assumed from training alone.
+- Source commit: `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; split: `seed`; independent groups: {"grouping": "seed", "test": ["1009", "101"], "train": ["211", "307", "401", "607", "701", "907"], "validation": ["503", "809"]}.
+- Data: {'train': 64800, 'validation': 21600, 'test': 21600} validated paired teacher frame samples; trials: 156.
+- Best validation model: `{'depth': 2, 'width': 32, 'lr': 0.001, 'weight_decay': 0.0001, 'dropout': 0.0, 'batch': 64}`.
+- Held-out *counterfactual* quality (not real switched runtime): `{"actual_mean_chosen_ms": 0.9833209346296297, "counterfactual_regret_mean_ms": 0.5714720162037038, "counterfactual_regret_p95_ms": 3.339113649999995, "oracle_unattainable_mean_ms": 0.4118489184259259, "predicted_cost_mean_ms": 0.39697563648223877, "samples": 21600, "static_policy_mean_ms": {"global_guarded_exact": 1.3116734668055556, "region_hierarchical": 0.9923994484722223, "sap_rebuild": 1.3119416033333333, "selective_guard_exact": 1.1330003532870372}, "top1_cost_choice_accuracy": 0.7651388888888889}`.
+- Decision: evaluate artifact on unseen CPU replay trajectories with `ccp_material_replay ... MODEL.txt` and compare measured `ml_cost_aware` time against Global Guard, original online, Bullet and region baselines. Do not deploy without an exact-pair oracle and positive aggregate gain.
+
+### Actual C++ learned controller heldout — kyoto-learned-20261116T050002Z-exhaustive
+
+- Source commit `bcb3ed6f6ba7eb5878820bb4ed1a9d2e451a3136`; run `output/kyoto-learned-20261116T050002Z-exhaustive`; seeds in heldout=['1009', '101'].
+- Deployed ML policy vs Global Guard: 0.8782x (trajectory-bootstrap 95% CI [0.8443870538665724, 0.9136256793322202]); win/loss scenes 54/162.
+- No software deployment decision until full coupled simulation and additional independent machines/physics regimes are audited. Raw evidence, every trial and negative results are in `output/kyoto-learned-20261116T050002Z-exhaustive`.

@@ -23,7 +23,7 @@ inline std::vector<Bounds> rawBounds(const std::vector<Primitive>& items){
 }
 struct Result {
  double queryMs{};
- double mlFeatureMs{},mlInferenceMs{},mlBackendMs{},mlDecisionMs{};
+ double mlFeatureMs{},mlInferenceMs{},mlBackendMs{},mlDecisionMs{},mlBookkeepingMs{};
  std::vector<Pair> pairs;
  std::size_t builds{},reuses{},dirty{},guardBuilds{},guardReuses{},selectiveRepairs{},aabbTests{},workers{1};
  int span{64};

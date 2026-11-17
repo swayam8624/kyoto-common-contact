@@ -23,6 +23,7 @@ class LearnedOnline {
  RegionalCandidates regional_;
  double margin_{},penaltyMs_{},hysteresis_{};
  int cooldown_{},frame_{},lastSwitch_{-10000},active_{-1};
+ bool startWithGuard_{};
  size_t switches_{};
  static bool overlap(const Bounds& a,const Bounds& b){
   return a.min.x<=b.max.x&&b.min.x<=a.max.x&&
@@ -44,21 +45,31 @@ class LearnedOnline {
 public:
  LearnedOnline(const std::string& path,double margin=0.,
                double switchPenaltyMs=.03,double hysteresis=.12,
-               int cooldownFrames=12):
+               int cooldownFrames=12,bool startWithGuard=false):
   model_(learned::Network::load(path)),
   selective_(margin,.045),
   margin_(margin),penaltyMs_(switchPenaltyMs),
-  hysteresis_(hysteresis),cooldown_(cooldownFrames){
+  hysteresis_(hysteresis),cooldown_(cooldownFrames),startWithGuard_(startWithGuard){
   if(margin<0||!std::isfinite(margin)||!std::isfinite(penaltyMs_)||
      penaltyMs_<0||!std::isfinite(hysteresis_)||hysteresis_<0||
      hysteresis_>=1||cooldown_<0)
    throw std::invalid_argument("invalid learned policy control parameters");
  }
+ // Snapshot-replay already owns validated Bounds. Do not allocate a second
+ // Primitive vector, copy it back to Bounds, or pad a zero-margin scene.
+ Result query(const std::vector<Bounds>& raw){return queryBounds(raw,nullptr);}
+ // Preserve the original API and region/sheet metadata for coupled callers.
  Result query(const std::vector<Primitive>& input){
+  return queryBounds(rawBounds(input),&input);
+ }
+private:
+ Result queryBounds(const std::vector<Bounds>& raw,
+                    const std::vector<Primitive>* original){
   const auto begin=Clock::now();
   ++frame_;
-  const auto raw=rawBounds(input);
-  const auto tight=padded(raw,margin_);
+  std::vector<Bounds> expanded;
+  if(margin_>0.)expanded=padded(raw,margin_);
+  const std::vector<Bounds>& tight=margin_==0.?raw:expanded;
   // At tiny N the measured decision overhead can dominate the entire
   // guarded query. Deterministically use the safe guarded method rather
   // than paying for neural inference. This gate was developed AFTER
@@ -68,13 +79,17 @@ public:
   const bool bypass=tight.size()<kSmallSceneCutoff;
   const auto features=bypass?learned::Features{}:features_.describe(tight);
   const auto featureEnd=Clock::now();
-  const auto predicted=bypass?std::array<double,learned::kActions>{}:
-                               model_.predict(features);
+  // While a cooldown forbids changing backend, still update causal
+  // geometry history but do NOT pay for ignored neural inference.
+  const bool decisionDue=!bypass && !(active_<0&&startWithGuard_) &&
+                         (active_<0||frame_-lastSwitch_>=cooldown_);
+  const auto predicted=decisionDue?model_.predict(features):
+                                    std::array<double,learned::kActions>{};
   const auto inferenceEnd=Clock::now();
   int selected=bypass?1:active_;
   if(!bypass){
    if(selected<0){
-    selected=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
+    selected=startWithGuard_?1:int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
    }else if(frame_-lastSwitch_>=cooldown_){
     const int fastest=int(std::min_element(predicted.begin(),predicted.end())-predicted.begin());
     if(fastest!=active_ && predicted[size_t(fastest)]+penaltyMs_<
@@ -115,7 +130,13 @@ public:
    result.workers=m.parallelWorkers;
   }else if(selected==3){
    Metrics m;
-   auto actual=input;
+   std::vector<Primitive> actual;
+   if(original)actual=*original;
+   else{
+    actual.reserve(raw.size());
+    for(size_t i=0;i<raw.size();++i)
+     actual.push_back({raw[i],int(i/64),-1});
+   }
    for(size_t i=0;i<actual.size();++i)actual[i].region=int(i/64);
    const auto& output=regional_.query(actual,margin_,true,m,true);
    result.pairs.assign(output.begin(),output.end());
@@ -131,9 +152,11 @@ public:
   result.mlInferenceMs=std::chrono::duration<double,std::milli>(inferenceEnd-featureEnd).count();
   result.mlDecisionMs=std::chrono::duration<double,std::milli>(decisionEnd-inferenceEnd).count();
   result.mlBackendMs=std::chrono::duration<double,std::milli>(backendEnd-decisionEnd).count();
+  result.mlBookkeepingMs=std::chrono::duration<double,std::milli>(finished-backendEnd).count();
   result.queryMs=std::chrono::duration<double,std::milli>(finished-begin).count();
   return result;
  }
+public:
  size_t switches()const{return switches_;}
 };
 } // namespace ccp::bench
