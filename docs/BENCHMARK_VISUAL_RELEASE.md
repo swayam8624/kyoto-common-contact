@@ -6,13 +6,15 @@ presentation package, **not** another eight-hour controller search.
 
 ## What is actually new and executable
 
-* \`apps/visual_multicloth_export.cpp\` independently runs **seven** existing
+* \`apps/visual_multicloth_export.cpp\` independently runs **eight** available
   coupled cloth/sphere solver policies from identical initial states, exports
   every vertex, triangle, sphere and per-frame physics/quality diagnostic as
   JSONL, and **fails** if any policy's positions differ from SAP by >1e-7.
-  The final standalone V4 selector is **not** silently injected into that
-  coupled physics solver; that would require a different integration test.
-* \`scripts/render_kyoto_visuals.py solver\` builds a real seven-panel
+  The final V4 selector is now **explicitly integrated** as the optional
+  `Policy::FinalBounded` solver backend. The shared-physics exporter checks
+  its geometry against SAP for every frame. This does **not** establish
+  faster end-to-end solver performance, nor fewer physical folds.
+* \`scripts/render_kyoto_visuals.py solver\` builds a real eight-panel
   synchronized mesh animation showing movements, contact responses,
   candidate counts, strain, near-degenerate triangles and the maximum
   physical-state difference from SAP. The video/GIF loops when supported by
@@ -65,7 +67,7 @@ The runner compiles only the actual exporter, replayer, validated V4 API
 and coupled mesh exporter; it runs a short exact-pair smoke test, then
 exports 36 material/regime snapshots with 48 frames each at target 128
 and records honest method times. Afterward it captures 42 frames from
-**each** of the seven coupled mesh policies, verifies exact solver-state
+**each** of the eight coupled mesh policies, verifies exact solver-state
 parity, renders GIF/MP4, and writes scores/manifest.
 
 The output is stored **only in the new worktree**, with an
@@ -84,8 +86,8 @@ output/kyoto-final-showcase/
   videos/
     all-materials-six-regimes.gif
     all-materials-six-regimes.mp4        # if ffmpeg is installed
-    all-seven-solver-policies.gif
-    all-seven-solver-policies.mp4        # if ffmpeg is installed
+    all-eight-solver-policies.gif
+    all-eight-solver-policies.mp4        # if ffmpeg is installed
   reports/
     REPLAY_SCORES.md
     REPLAY_SCORES.json
