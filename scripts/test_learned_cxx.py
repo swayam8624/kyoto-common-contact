@@ -37,10 +37,14 @@ def main():
     # Explicitly reject an obsolete replay ABI before any oracle fixtures.
     signature=subprocess.run([str(args.replayer),"--capabilities"],
                              capture_output=True,text=True,timeout=10,check=False)
-    required={"KYOTO_REPLAY_ABLATION_V4","sap_persistent_coherent",
+    required={"KYOTO_REPLAY_ABLATION_V5","sap_persistent_coherent",
               "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
               "guard_sap_measured_probe","guard_sap_bounded_trial",
-              "hybrid_probed","hybrid_switched"}
+              "hybrid_probed","hybrid_switched","field_events",
+              "randomized_method_order","global_guarded_aa_control",
+              "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
+              "delta_spatial_join_exact","patch_certificate_fixed",
+              "patch_certificate_signal"}
     if signature.returncode!=0 or not required.issubset(set(signature.stdout.split())):
         raise RuntimeError("Replay executable is stale; rebuild it with the current learned_online.hpp")
     with tempfile.TemporaryDirectory(prefix="kyoto-learned-smoke-") as tmp:
@@ -60,6 +64,33 @@ def main():
                          "ml_wrapper_ms"):
             if required not in rows[0]:
                 raise RuntimeError(f"Missing ML performance column: {required}")
+        new_exact=(
+            "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
+            "delta_spatial_join_exact","patch_certificate_fixed",
+            "patch_certificate_signal","global_guarded_aa_control")
+        reference={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
+        for label in new_exact:
+            matching=[r for r in rows if r["backend"]==label]
+            if len(matching)!=12:
+                raise RuntimeError(f"{label}: expected 12 exact benchmark frames")
+            for row in matching:
+                expected=reference[row["frame"]]
+                if row["pairs"]!=expected["pairs"] or row["pair_hash"]!=expected["pair_hash"]:
+                    raise RuntimeError(f"{label}: exact candidate pairs differ")
+        # Repeated same-snapshot randomized method orders must remain correct.
+        # The main parser supports the old positional interface as well.
+        random_report=root/"randomized.csv"
+        run(args.replayer,samples,random_report,0,model,987654321)
+        with random_report.open(newline="",encoding="utf-8") as stream:
+            randomized=list(csv.DictReader(stream))
+        unique_before=list(dict.fromkeys(r["backend"] for r in rows))
+        unique_after=list(dict.fromkeys(r["backend"] for r in randomized))
+        if set(unique_before)!=set(unique_after) or unique_before==unique_after:
+            raise RuntimeError("Method ordering was not randomized reproducibly")
+        expected_hash={(r["backend"],r["frame"]):r["pair_hash"] for r in rows}
+        for row in randomized:
+            if row["pair_hash"]!=expected_hash[(row["backend"],row["frame"])]:
+                raise RuntimeError("Randomization invalidated pair correctness")
         persistent=[r for r in rows if r["backend"]=="sap_persistent_coherent"]
         if len(persistent)!=12:
             raise RuntimeError("Temporally coherent persistent SAP baseline missing")
