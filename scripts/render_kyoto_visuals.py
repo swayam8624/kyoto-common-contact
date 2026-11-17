@@ -33,7 +33,7 @@ except ImportError as exc:
 
 MATERIALS=("cloth","sponge","cushion","soft_ball","spring","mixed")
 REGIMES=("baseline","compression","shear","impact","rapid","relax")
-DEFAULT_METHODS=("sap_rebuild","global_guarded_exact","guard_sap_bounded_trial","bvh_refit_exact")
+DEFAULT_METHODS=("sap_rebuild","global_guarded_exact","sap_persistent_coherent","guard_sap_bounded_trial")
 COLORS=("#65c5ff","#ffb86e","#e2a7ff","#89dab3","#f9e678","#ffa1ac")
 DARK="#0d1422"
 WHITE="#eaf0fb"
