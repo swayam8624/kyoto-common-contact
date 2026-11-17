@@ -202,7 +202,7 @@ future-time kinetic scheduling has been implemented.
 Do not use inspected V5 seeds 3203/3217/3251/3299/3313/3343/3371/3407
 as an independent confirmation of V6. The new runner
 `scripts/run_kyoto_unified_v6_mac.sh` uses 8 untouched seeds
-4103/4111/4127/4153/4177/4201/4217/4231.
+4103/4111/4127/4153/4177/4201/4217/4231 **for the pilot only**. A complete independent confirmation must instead set `KYOTO_V6_SEEDS="5101 5113 5147 5153 5171 5197 5231 5261"` and use a distinct output directory; pilot and confirmation must not share inspected seeds.
 
 1. Compile with Release optimizations, Bullet DBVT installed, and the
    `KYOTO_REPLAY_ABLATION_V6` capability signature.
@@ -214,8 +214,13 @@ as an independent confirmation of V6. The new runner
 4. Inspect per-frame dirty counts, candidate-pair list size, mode
    transitions, total query mean and P95, memory and A/A control.
 5. Only after correctness and credible speed is observed, freeze the
-   implementation and run all 864 newly seeded cells × 3 repeats in an
-   uninspected output directory. Report failures as failures.
+   implementation and run all 864 cells across EIGHT DIFFERENT,
+   previously uninspected seed IDs × 3 repeats in an entirely new
+   output directory. Report failures as failures.
+   Example: `KYOTO_V6_SEEDS="5101 5113 5147 5153 5171 5197 5231 5261"
+   KYOTO_V6_MAX_EXPERIMENTS=0 KYOTO_V6_REPEATS=3
+   bash scripts/run_kyoto_unified_v6_mac.sh "$MODEL"
+   output/kyoto-v6-independent-confirmation`.
 6. Integrate into the full coupled cloth/soft-body solver and compare
    narrow-phase contacts, collision correctness and end-to-end step time.
 
