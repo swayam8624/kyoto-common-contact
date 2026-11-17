@@ -44,6 +44,22 @@ SAP and the six new policies are **not** extra output neurons of that old
 trained model. A learned multi-action controller should be trained only
 after the benchmark identifies useful causally observable decision features.
 
+## Analytic kinetic deadline (separate, solver-bound component)
+
+The standalone header `include/ccp/kinetic_certificates.hpp` implements a
+conservative lower bound on earliest AABB overlap time from **guaranteed**
+per-axis speed and acceleration bounds, and
+`tests/kinetic_certificates_tests.cpp` verifies acceleration, immobility,
+separation on multiple axes, inclusive touching and invalid inputs.
+This utility is intentionally **not** entered as an extra replay method:
+the current exported snapshots do not contain guaranteed future-motion
+bounds. Calling previous observed velocity a guaranteed future bound
+would produce a dangerously unfair and potentially incorrect shortcut.
+
+Once a solver supplies certified motion tubes, we can benchmark truly
+event-driven contact re-certification separately from the exact
+snapshot-only methods.
+
 ## Safety and exactness guarantees
 
 * The independent reference SAP computes an exact pair set before measuring
