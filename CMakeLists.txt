@@ -150,6 +150,12 @@ add_executable(ccp_cbp_portfolio_tests tests/cbp_portfolio_tests.cpp)
 target_link_libraries(ccp_cbp_portfolio_tests PRIVATE ccp_live)
 target_include_directories(ccp_cbp_portfolio_tests PRIVATE include)
 target_compile_options(ccp_cbp_portfolio_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Actual mesh topology IDs from a coupled multi-cloth solver; same-input
+# broad-phase comparisons, separate from solver advance and rendering.
+add_executable(ccp_cbp_topology_replay apps/cbp_topology_replay.cpp)
+target_link_libraries(ccp_cbp_topology_replay PRIVATE ccp_multicloth)
+target_include_directories(ccp_cbp_topology_replay PRIVATE include)
+target_compile_options(ccp_cbp_topology_replay PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Identical immutable KYOTOM01 material replays against frozen V4.
 add_executable(ccp_cbp_kmcb_replay apps/cbp_kmcb_replay.cpp)
 target_link_libraries(ccp_cbp_kmcb_replay PRIVATE ccp_live)
@@ -178,6 +184,9 @@ if(BUILD_TESTING)
         $<TARGET_FILE:ccp_material_replay>)
     add_test(NAME evidence_csv_contracts
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_evidence_summarizers.py)
+    add_test(NAME cbp_mesh_topology_replay_contract
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_topology_replay.py
+        $<TARGET_FILE:ccp_cbp_topology_replay>)
     add_test(NAME cbp_kmcb_snapshot_contract
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_kmcb_smoke.py
         $<TARGET_FILE:ccp_cbp_kmcb_replay>)
