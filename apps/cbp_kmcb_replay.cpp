@@ -118,7 +118,11 @@ int main(int argc,char** argv){
     throw std::runtime_error("Refusing to overwrite existing trace CSV");
    trace.open(path);
    if(!trace)throw std::runtime_error("Cannot create trace CSV");
-   trace<<"frame,method,query_ms,exact_pairs,manager_mode,switched,selector_ms,migration_ms\n";
+   trace<<"frame,method,query_ms,exact_pairs,manager_mode,switched,selector_ms,migration_ms,"
+           "v4_action,v4_trial,v4_switched,manager_sample_density,manager_sample_motion,"
+           "manager_sample_count,manager_backend_ms,local_primitive_tests,cross_primitive_tests,"
+           "regions,index_builds,index_changed_leaves,index_ancestor_refits,"
+           "cache_graph_builds,cache_quiet_reuses,cache_dirty,cache_potential_pairs\n";
   }
 
   ccp::final_broadphase::GuardSAPBoundedTrial frozenV4;
@@ -138,6 +142,9 @@ int main(int argc,char** argv){
    const auto boxes=source.next();
    std::array<Pairs,6> outcomes{};
    std::array<double,6> times{};
+   std::array<ccp::cbp::Telemetry,6> perMethodWork{};
+   std::string v4Action="unknown";
+   bool v4Trial=false,v4Switched=false;
    for(int k=0;k<6;++k){
     const int method=(frame+k)%6;
     const auto start=Clock::now();
@@ -145,15 +152,23 @@ int main(int argc,char** argv){
      case 0:
       outcomes[0]=ccp::live::candidates(boxes,true);
       break;
-     case 1:
-      outcomes[1]=frozenV4.query(boxes).pairs;
+     case 1: {
+      auto v4=frozenV4.query(boxes);
+      v4Action=v4.action;
+      v4Trial=v4.trialFrame;
+      v4Switched=v4.switched;
+      outcomes[1]=std::move(v4.pairs);
       break;
+     }
      case 2:case 3:case 4:
       outcomes[static_cast<std::size_t>(method)]=
         fixed[static_cast<std::size_t>(method-2)].query(boxes,labels);
+      perMethodWork[static_cast<std::size_t>(method)]=
+        fixed[static_cast<std::size_t>(method-2)].telemetry();
       break;
      case 5:
       outcomes[5]=manager.query(boxes,labels);
+      perMethodWork[5]=manager.backendWork();
       break;
      default:throw std::logic_error("Invalid method");
     }
@@ -192,7 +207,24 @@ int main(int argc,char** argv){
           <<(method==5?CausalCostRouter::name(d.chosen):"none")<<','
           <<(method==5&&d.switched?1:0)<<','
           <<(method==5?d.decisionMs:0.)<<','
-          <<(method==5?d.migrationMs:0.)<<'\n';
+          <<(method==5?d.migrationMs:0.)<<','
+          <<(method==1?v4Action:"none")<<','
+          <<(method==1&&v4Trial?1:0)<<','
+          <<(method==1&&v4Switched?1:0)<<','
+          <<(method==5?d.sampledDensity:0.)<<','
+          <<(method==5?d.sampledMotion:0.)<<','
+          <<(method==5?d.densitySamples:0)<<','
+          <<(method==5?d.backendMs:0.)<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].localTests<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].crossTests<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].regions<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].indexBuilds<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].indexChangedLeaves<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].indexAncestorRefits<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].cacheGraphBuilds<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].cacheQuietReuses<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].cacheDirtyPrimitives<<','
+          <<perMethodWork[static_cast<std::size_t>(method)].cachePotentialPairs<<'\n';
     }
    }
   }
