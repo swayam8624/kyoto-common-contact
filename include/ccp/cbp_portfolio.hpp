@@ -34,7 +34,7 @@ class CbpPortfolio {
  PortfolioMode returnMode_{PortfolioMode::FrozenV4};
  std::size_t frames_{},activeFrames_{},nextProbe_{12},lastN_{};
  std::size_t switches_{},trials_{},accepted_{},rejected_{};
- std::size_t trialFrames_{},aboveTolerance_{};
+ std::size_t trialFrames_{};
  bool initialized_{},trialActive_{},returnNext_{};
  double activeEwma_{},trialTotalMs_{},referenceCostMs_{};
  static constexpr std::size_t kWarmup=12,kTrialLength=4,kCooldown=48;
@@ -121,7 +121,7 @@ public:
   frames_=activeFrames_=switches_=trials_=accepted_=rejected_=0;
   nextProbe_=kWarmup;
   initialized_=trialActive_=returnNext_=false;
-  trialFrames_=aboveTolerance_=0;
+  trialFrames_=0;
   activeEwma_=trialTotalMs_=referenceCostMs_=0.;
   lastN_=0;
   last_={};
