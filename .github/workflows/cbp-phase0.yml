@@ -7,7 +7,11 @@ on:
       - 'include/ccp/cbp_region_router.hpp'
       - 'tests/cbp_region_router_tests.cpp'
       - 'tests/cbp_shared_bvh_tests.cpp'
+      - 'tests/cbp_certified_cache_tests.cpp'
       - 'apps/cbp_cross_microbench.cpp'
+      - 'include/ccp/cbp_certified_cache.hpp'
+      - 'include/ccp/cbp_spatial_index.hpp'
+      - 'include/ccp/cbp_region_router.hpp'
       - '.github/workflows/cbp-phase0.yml'
       - 'CMakeLists.txt'
   workflow_dispatch:
@@ -27,6 +31,11 @@ jobs:
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
             -Iinclude tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-tests
           /tmp/cbp-bvh-tests
+      - name: Build and run certified potential-graph oracle (optimized Werror)
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude tests/cbp_certified_cache_tests.cpp -o /tmp/cbp-cert-tests
+          /tmp/cbp-cert-tests
       - name: Compile short A/B benchmark (not a performance gate)
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
@@ -43,3 +52,7 @@ jobs:
             -fno-omit-frame-pointer -Iinclude \
             tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-sanitizers
           /tmp/cbp-bvh-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_certified_cache_tests.cpp -o /tmp/cbp-cert-sanitizers
+          /tmp/cbp-cert-sanitizers
