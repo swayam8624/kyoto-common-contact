@@ -13,6 +13,7 @@
 // Routing and all tests are exposed as telemetry. Keep V4 frozen.
 #include "ccp/live_cloth.hpp"
 #include "ccp/cbp_spatial_index.hpp"
+#include "ccp/cbp_certified_cache.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -49,13 +50,15 @@ inline void emit(const Bounds& a,const Bounds& b,Pairs& out){
 
 enum class Kernel { Exhaustive, PersistentSAP };
 // Exhaustive preserves Phase-0 as a direct A/B diagnostic control.
-enum class CrossMode { Exhaustive, SharedBVH };
+enum class CrossMode { Exhaustive, SharedBVH, CertifiedCache };
 struct Telemetry {
  std::size_t regions{},localTests{},crossTests{},regionPairTests{},
              regionPairsPruned{},localExhaustiveRegions{},localSapRegions{},
              topologyResets{},coldSapInitializations{},
              indexBuilds{},indexChangedLeaves{},indexAncestorRefits{},
-             indexNodePairVisits{},indexBoundsPruned{},indexSameRegionPruned{};
+             indexNodePairVisits{},indexBoundsPruned{},indexSameRegionPruned{},
+             cacheGraphBuilds{},cacheQuietReuses{},cacheDirtyPrimitives{},
+             cacheEdgesRemoved{},cacheEdgesInserted{},cachePotentialPairs{};
 };
 
 class RegionRouter {
@@ -69,6 +72,7 @@ class RegionRouter {
  std::vector<int> ids_,labels_;
  std::map<int,Kernel> overrides_;
  SharedCrossBVH sharedIndex_;
+ CertifiedCrossCache crossCache_;
  CrossMode crossMode_{CrossMode::SharedBVH};
  Telemetry last_{};
  std::size_t resets_{};
@@ -137,10 +141,11 @@ class RegionRouter {
 public:
  void setKernel(int regionId,Kernel kernel){overrides_[regionId]=kernel;}
  void setCrossMode(CrossMode mode){crossMode_=mode;}
+ void setCachePadding(double p){crossCache_.setPadding(p);}
  CrossMode crossMode() const{return crossMode_;}
  void clearOverrides(){overrides_.clear();}
  void setSapThreshold(std::size_t count){sapThreshold_=count;}
- void reset(){regions_.clear();ids_.clear();labels_.clear();sharedIndex_.clear();resets_=0;last_={};}
+ void reset(){regions_.clear();ids_.clear();labels_.clear();sharedIndex_.clear();crossCache_.reset();resets_=0;last_={};}
  Telemetry telemetry() const{return last_;}
 
  Pairs query(const std::vector<Bounds>& boxes,const std::vector<int>& regionLabels){
@@ -185,6 +190,22 @@ public:
    last_.indexNodePairVisits=w.nodePairVisits;
    last_.indexBoundsPruned=w.boundsPruned;
    last_.indexSameRegionPruned=w.sameRegionPruned;
+  }else if(crossMode_==CrossMode::CertifiedCache){
+   // Certified potential-contact graph: dirty objects are repaired by
+   // one-to-many BVH queries, not by scanning all other primitives.
+   // This remains experimental and is not selected automatically.
+   crossCache_.appendExactCrossPairs(boxes,regionLabels,out);
+   const auto w=crossCache_.work();
+   last_.crossTests=w.currentPairTests;
+   last_.indexNodePairVisits=w.indexNodeVisits;
+   last_.indexChangedLeaves=w.indexLeafUpdates;
+   last_.indexAncestorRefits=w.indexAncestorRefits;
+   last_.cacheGraphBuilds=w.graphBuilds;
+   last_.cacheQuietReuses=w.quietReuses;
+   last_.cacheDirtyPrimitives=w.dirtyPrimitives;
+   last_.cacheEdgesRemoved=w.incidentEdgesRemoved;
+   last_.cacheEdgesInserted=w.incidentEdgesInserted;
+   last_.cachePotentialPairs=w.potentialPairCount;
   }else{
    // Phase-0 reference: exact but potentially O(sum |R_a|*|R_b|).
    // Keep this for same-input correctness and measured A/B comparisons.
