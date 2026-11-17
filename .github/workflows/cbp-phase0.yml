@@ -10,6 +10,9 @@ on:
       - 'tests/cbp_certified_cache_tests.cpp'
       - 'apps/cbp_cross_microbench.cpp'
       - 'include/ccp/cbp_certified_cache.hpp'
+      - 'include/ccp/cbp_cost_manager.hpp'
+      - 'tests/cbp_cost_manager_tests.cpp'
+      - 'apps/cbp_manager_microbench.cpp'
       - 'include/ccp/cbp_spatial_index.hpp'
       - 'include/ccp/cbp_region_router.hpp'
       - '.github/workflows/cbp-phase0.yml'
@@ -47,6 +50,17 @@ jobs:
         run: |
           /tmp/cbp-bench 256 64 > /tmp/cbp-bench-256.csv
           cat /tmp/cbp-bench-256.csv
+      - name: Causal single-backend manager independent oracle (Werror)
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror             -Iinclude tests/cbp_cost_manager_tests.cpp -o /tmp/cbp-manager-tests
+          /tmp/cbp-manager-tests
+      - name: Bounded in-scene transitions (four exact methods)
+        timeout-minutes: 2
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror             -Iinclude apps/cbp_manager_microbench.cpp -o /tmp/cbp-manager-bench
+          /tmp/cbp-manager-bench 128 16 > /tmp/cbp-manager-smoke.csv
+          test "$(wc -l < /tmp/cbp-manager-smoke.csv)" -eq 25
+          cat /tmp/cbp-manager-smoke.csv
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
@@ -61,3 +75,5 @@ jobs:
             -fno-omit-frame-pointer -Iinclude \
             tests/cbp_certified_cache_tests.cpp -o /tmp/cbp-cert-sanitizers
           /tmp/cbp-cert-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude             tests/cbp_cost_manager_tests.cpp -o /tmp/cbp-manager-sanitizers
+          /tmp/cbp-manager-sanitizers
