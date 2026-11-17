@@ -89,6 +89,27 @@ def main() -> int:
             raise AssertionError(f"Expected 126 trace rows, got {len(trace_rows)}")
         if not any(row["method"] == "causal_cbp" for row in trace_rows):
             raise AssertionError("Missing causal manager trace")
+        for row in trace_rows:
+            if row["method"] == "v4_guard_sap_bounded_trial":
+                if row["v4_action"] != "global_guarded_exact":
+                    raise AssertionError("V4 cannot initiate SAP trials below 384 primitives")
+            if row["method"] == "causal_cbp":
+                if row["manager_mode"] not in {
+                    "exhaustive", "shared_bvh", "certified_cache"
+                }:
+                    raise AssertionError("Invalid causal backend choice")
+                for field in ("manager_sample_density", "manager_sample_motion"):
+                    if not 0.0 <= float(row[field]) <= 1.0:
+                        raise AssertionError(f"Invalid {field}")
+        diagnostic = subprocess.run(
+            [sys.executable, str(pathlib.Path(__file__).with_name(
+                "analyze_cbp_pilot.py")), str(trace)],
+            text=True, capture_output=True, check=False,
+        )
+        if diagnostic.returncode or "V4 actions:" not in diagnostic.stdout:
+            raise AssertionError(
+                f"Pilot diagnostic failed:\n{diagnostic.stdout}\n{diagnostic.stderr}"
+            )
 
         # Overwrite protection is intentional: benchmark evidence is immutable.
         again = subprocess.run(cmd, text=True, capture_output=True, check=False)
@@ -115,7 +136,7 @@ def main() -> int:
 
     print(
         "PASS CBP material replay: six exact policies, 24 snapshots, "
-        "126 trace rows, overwrite/corrupt/truncated rejection"
+        "126 instrumented trace rows, V4 guard-only contract, diagnostic and invalid-file rejection"
     )
     return 0
 
