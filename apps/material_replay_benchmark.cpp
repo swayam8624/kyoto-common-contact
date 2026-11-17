@@ -6,6 +6,7 @@
 #include "ccp/generic_online.hpp"
 #include "ccp/learned_online.hpp"
 #include "ccp/experimental_field.hpp"
+#include "ccp/unified_certified_hierarchy.hpp"
 #include "ccp/selective_guard.hpp"
 #include <algorithm>
 #include <array>
@@ -420,7 +421,7 @@ public:
 };
 
 enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,GlobalControl,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative,
- RefitBVH,AdaptiveBVH,SpatialGrid,DeltaJoin,PatchCertificate,SignalPatchCertificate
+ RefitBVH,AdaptiveBVH,SpatialGrid,DeltaJoin,PatchCertificate,SignalPatchCertificate,UnifiedCertifiedHierarchy
 #ifdef CCP_HAVE_BULLET
 ,Bullet
 #endif
@@ -446,6 +447,7 @@ const char* name(Kind kind){
  case Kind::DeltaJoin:return "delta_spatial_join_exact";
  case Kind::PatchCertificate:return "patch_certificate_fixed";
  case Kind::SignalPatchCertificate:return "patch_certificate_signal";
+ case Kind::UnifiedCertifiedHierarchy:return "unified_certified_hierarchy_v0";
 #ifdef CCP_HAVE_BULLET
  case Kind::Bullet:return "bullet_dbvt_persistent";
 #endif
@@ -473,6 +475,7 @@ class Method {
  ccp::experiment::DeltaJoin deltaJoin_;
  ccp::experiment::PatchCertificate patchFixed_{false};
  ccp::experiment::PatchCertificate patchSignal_{true};
+ ccp::experiment::UnifiedCertifiedHierarchy unified_;
  ccp::live::BroadPhaseService global_;
  ccp::live::BroadPhaseService globalAA_;
  ccp::research::SelectiveGuard selective_{0,.045};
@@ -518,6 +521,13 @@ public:
    r.pairs=ccp::live::candidates(boxes,true);
   else if(kind_==Kind::PersistentSap)
    r.pairs=persistentSap_.query(boxes);
+  else if(kind_==Kind::UnifiedCertifiedHierarchy){
+   r.pairs=unified_.query(boxes);
+   const auto st=unified_.statistics();
+   r.builds=st.builds;r.reuses=st.reuses;r.repairs=st.repairs;
+   r.aabbTests=st.aabbTests;r.fieldEvents=st.events;
+   r.selected=unified_.active()?"unified_active_bvh":"unified_certified_reuse";
+  }
   else if(kind_==Kind::RefitBVH||kind_==Kind::AdaptiveBVH||
           kind_==Kind::SpatialGrid||kind_==Kind::DeltaJoin||
           kind_==Kind::PatchCertificate||kind_==Kind::SignalPatchCertificate){
@@ -616,7 +626,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
  std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::GuardSapTrial,Kind::Global,Kind::GlobalControl,Kind::Selective,
   Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online,
   Kind::RefitBVH,Kind::AdaptiveBVH,Kind::SpatialGrid,Kind::DeltaJoin,
-  Kind::PatchCertificate,Kind::SignalPatchCertificate};
+  Kind::PatchCertificate,Kind::SignalPatchCertificate,Kind::UnifiedCertifiedHierarchy};
 #ifdef CCP_HAVE_BULLET
  methods.push_back(Kind::Bullet);
 #endif
@@ -692,13 +702,13 @@ int main(int argc,char** argv){
   // Machine-readable executable ABI check: fail fast if an older binary is
   // accidentally used after a compile failure. No snapshots or model needed.
   if(argc==2&&std::string(argv[1])=="--capabilities"){
-   std::cout<<"KYOTO_REPLAY_ABLATION_V5 sap_persistent_coherent "
+   std::cout<<"KYOTO_REPLAY_ABLATION_V6 sap_persistent_coherent "
                "ml_cost_aware_conservative guard_sap_measured_probe guard_sap_bounded_trial "
                "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched "
                "field_events randomized_method_order bvh_refit_exact "
                "bvh_adaptive_exact grid_spatial_hash_exact delta_spatial_join_exact "
                "patch_certificate_fixed patch_certificate_signal "
-               "global_guarded_aa_control\n";
+               "unified_certified_hierarchy_v0 global_guarded_aa_control\n";
    return 0;
   }
   if(argc<3||argc>6)
