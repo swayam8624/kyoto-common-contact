@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Honest 6-material x 6-regime GIF/MP4 montage and all 7 real physics policies.
+# Honest 6-material x 6-regime GIF/MP4 montage and all 8 real physics policies.
 # A short correctness gate; NO exhaustive multi-hour parameter search.
 # bash scripts/run_kyoto_visual_package.sh [OUTPUT] [OPTIONAL_ML_MODEL]
 set -euo pipefail
@@ -59,13 +59,13 @@ python3 scripts/render_kyoto_visuals.py aabb \
   --run-dir "$OUTPUT" --output "$OUTPUT/videos/all-materials-six-regimes" \
   --budget "$BUDGET" --seed "$SEED" --frames-per-regime 5 --fps 6
 
-echo "[SHOWCASE] Exporting coupled cloth/sphere solver meshes for all 7 policies"
+echo "[SHOWCASE] Exporting coupled cloth/sphere solver meshes for all 8 policies"
 "$BUILD/ccp_visual_multicloth_export" "$OUTPUT/meshes" \
   "$SOLVER_FRAMES" 2 2
 python3 benchmarks/quality_report.py "$OUTPUT/meshes" --output "$OUTPUT/reports"
 python3 scripts/render_kyoto_visuals.py solver \
   --input-dir "$OUTPUT/meshes" \
-  --output "$OUTPUT/videos/all-seven-solver-policies" \
+  --output "$OUTPUT/videos/all-eight-solver-policies" \
   --stride 2 --fps 8
 python3 benchmarks/score_replay.py \
   "$OUTPUT/replays/actual-cloth-baseline-n${BUDGET}-seed${SEED}-evaluated.csv" \
@@ -100,5 +100,5 @@ manifest={
 (out/"SHOWCASE_MANIFEST.json").write_text(json.dumps(manifest,indent=2)+"\n")
 print("[SHOWCASE] Manifest:",out/"SHOWCASE_MANIFEST.json")
 PY
-echo "[SHOWCASE] DONE: all-materials-six-regimes.gif, all-seven-solver-policies.gif, reports"
+echo "[SHOWCASE] DONE: all-materials-six-regimes.gif, all-eight-solver-policies.gif, reports"
 echo "[SHOWCASE] Matching MP4 files are generated when ffmpeg is installed"
