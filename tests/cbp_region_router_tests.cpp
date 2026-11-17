@@ -1,7 +1,6 @@
-// Independent exhaustive oracle / dynamic-transition regression for CBP Phase 0.
+// Independent exhaustive oracle / dynamic-transition regression for CBP Phase 0/1.
 #include "ccp/cbp_region_router.hpp"
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -52,7 +51,7 @@ int main(){
  check(r,b,labels);
  labels[1]=7;
  check(r,b,labels);
- assert(r.telemetry().topologyResets>=2);
+ if(r.telemetry().topologyResets<2)throw std::runtime_error("Repartition not registered");
  r.setSapThreshold(2);
  check(r,b,labels);
 
@@ -81,10 +80,10 @@ int main(){
  bool rejected=false;
  try{auto bad=scene;bad[0].min.x=std::nan("");(void)r.query(bad,parts);}
  catch(const std::invalid_argument&){rejected=true;}
- assert(rejected);
+ if(!rejected)throw std::runtime_error("NaN bound accepted");
  rejected=false;
  try{auto bad=scene;bad[0].id=10;(void)r.query(bad,parts);}
  catch(const std::invalid_argument&){rejected=true;}
- assert(rejected);
- std::cout<<"PASS: CBP Phase 0 exact cross-patch coverage / local SAP, 90 dynamic frames\n";
+ if(!rejected)throw std::runtime_error("Changed primitive ID accepted");
+ std::cout<<"PASS: CBP exact indexed cross-patch coverage / local SAP, 90 dynamic frames\n";
 }
