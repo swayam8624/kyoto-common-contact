@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import struct
 import sys
 import tempfile
@@ -15,6 +16,7 @@ sys.path.insert(0,str(ROOT))
 from benchmarks.import_mesh_sequence import convert,HEADER
 from benchmarks.score_replay import score
 from benchmarks.quality_report import analyze
+from benchmarks.compare_reference_geometry import evaluate
 from scripts.render_kyoto_visuals import render_aabb,render_solver,MATERIALS,REGIMES,DEFAULT_METHODS
 
 class VisualDataTests(unittest.TestCase):
@@ -84,6 +86,27 @@ class VisualDataTests(unittest.TestCase):
             analyze(root)
         with self.assertRaisesRegex(ValueError,"physics differs"):
             render_solver(root,self.root/"should-not-create")
+
+
+    def test_real_pcd_surface_comparison_requires_alignment(self):
+        ref=self.root/"pcd";pred=self.root/"aligned_sim"
+        ref.mkdir();pred.mkdir()
+        for frame in range(2):
+            (ref/f"{frame:03d}.pcd").write_text(
+                "# .PCD v0.7 - Point Cloud Data file format\n"
+                "VERSION .7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\n"
+                "COUNT 1 1 1\nWIDTH 3\nHEIGHT 1\nPOINTS 3\nDATA ascii\n"
+                f"0 0 {frame*.01}\n1 0 {frame*.01}\n0 1 {frame*.01}\n",
+                encoding="utf-8")
+            (pred/f"{frame:03d}.obj").write_text(
+                f"v 0 0 {frame*.01}\nv 1 0 {frame*.01}\nv 0 1 {frame*.01}\n"
+                "f 1 2 3\n",encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"confirm-world-aligned"):
+            evaluate(ref,pred,"meters",False,limit=32)
+        report=evaluate(ref,pred,"meters",True,limit=32)
+        self.assertEqual(len(report["frames"]),2)
+        self.assertTrue(math.isfinite(report["mean_symmetric_rms"]))
+        self.assertGreaterEqual(report["mean_symmetric_rms"],0)
 
     def fixtures(self,wrong=False):
         run=self.root/"run"
