@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - research/kyoto-scale-evidence
+      - research/kyoto-exact-event-field-rumble
   pull_request:
     paths:
       - 'apps/scaling_cpu.cpp'
@@ -24,7 +25,7 @@ jobs:
             scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
             scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py \
             scripts/test_ml_recovery.py scripts/run_kyoto_controller_ablation.py \
-            scripts/test_ablation_preflight.py
+            scripts/test_ablation_preflight.py scripts/analyze_kyoto_rumble.py
           python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight -v
       - name: Compile CPU benchmark with warnings
         run: |
