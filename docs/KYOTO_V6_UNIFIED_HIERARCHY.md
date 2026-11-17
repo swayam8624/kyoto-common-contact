@@ -34,21 +34,92 @@ what spatial interactions remain possible. It may use different *work
 strategies* for that same index, without running independent Guard and SAP
 algorithms every frame.
 
-For each AABB (B_i(t)), a maintained loose envelope (E_i) is a
+For each AABB `$B_i(t)# Kyoto V6 — Unified Certified Interaction Hierarchy (experimental, exact AABB snapshots)
+
+## Why V5 changes the research problem
+
+The 864 unique material × regime × target-size × seed cells with three
+method-order repetitions each establish **multiple structural regimes**.
+The bounded Guard/SAP trial achieved 1.0912× scene-geometric and 1.3287×
+summed-scene-time speedup relative to Global Guard, winning 667/864 cells.
+Its duplicate Guard A/A control was 1.00046× overall. The original MLP
+selected Global Guard on ~89% of frames.
+
+But the standalone methods provide complementary evidence: fixed patch
+interaction certificates beat bounded trial by 2.09× geometrically for
+spring target-128 and 1.39× for spring target-512 (48/48 cells favor patches
+by over 5% in each). Large cloth favors adaptive BVH over bounded by ~1.52×
+geometrically, and large soft-ball scenes similarly favor a refit BVH by
+~1.69×. Adaptive BVH's global typical-scene ratio is only 0.590× versus
+Guard, even though its global summed-time ratio is 1.473×—it loses many
+cheap scenes and wins expensive ones. A fixed signal-padding heuristic adds
+only ~0.6% geometric advantage to fixed patch overall and is not
+automatically worth its computational complexity.
+
+These are **posthoc whole-trajectory observations** from generated workloads,
+not a deployable oracle. A merged algorithm must pay its own transition,
+maintenance and index costs on every frame. The independent V5 JSON evidence
+does not include raw replay CSVs; full source-data hashes and frame-by-frame
+pair hashes cannot be independently re-audited from the shared summaries
+alone.
+
+## Design objective
+
+A collision accelerator should maintain ONE persistent object representing
+what spatial interactions remain possible. It may use different *work
+strategies* for that same index, without running independent Guard and SAP
+algorithms every frame.
+
+, a maintained loose envelope `$E_i# Kyoto V6 — Unified Certified Interaction Hierarchy (experimental, exact AABB snapshots)
+
+## Why V5 changes the research problem
+
+The 864 unique material × regime × target-size × seed cells with three
+method-order repetitions each establish **multiple structural regimes**.
+The bounded Guard/SAP trial achieved 1.0912× scene-geometric and 1.3287×
+summed-scene-time speedup relative to Global Guard, winning 667/864 cells.
+Its duplicate Guard A/A control was 1.00046× overall. The original MLP
+selected Global Guard on ~89% of frames.
+
+But the standalone methods provide complementary evidence: fixed patch
+interaction certificates beat bounded trial by 2.09× geometrically for
+spring target-128 and 1.39× for spring target-512 (48/48 cells favor patches
+by over 5% in each). Large cloth favors adaptive BVH over bounded by ~1.52×
+geometrically, and large soft-ball scenes similarly favor a refit BVH by
+~1.69×. Adaptive BVH's global typical-scene ratio is only 0.590× versus
+Guard, even though its global summed-time ratio is 1.473×—it loses many
+cheap scenes and wins expensive ones. A fixed signal-padding heuristic adds
+only ~0.6% geometric advantage to fixed patch overall and is not
+automatically worth its computational complexity.
+
+These are **posthoc whole-trajectory observations** from generated workloads,
+not a deployable oracle. A merged algorithm must pay its own transition,
+maintenance and index costs on every frame. The independent V5 JSON evidence
+does not include raw replay CSVs; full source-data hashes and frame-by-frame
+pair hashes cannot be independently re-audited from the shared summaries
+alone.
+
+## Design objective
+
+A collision accelerator should maintain ONE persistent object representing
+what spatial interactions remain possible. It may use different *work
+strategies* for that same index, without running independent Guard and SAP
+algorithms every frame.
+
+ is a
 current-time **containment certificate**:
 
-[
-  B_i(t)\subseteq E_i(t).
-]
+$
+B_i(t) \subseteq E_i(t).
+$
 
 For every compatible pair whose envelopes intersect, store an edge in a
 potential-contact graph. Actual query results are the graph edges that
 overlap as current AABBs. Thus any current exact overlap is present because
 
-[
-  B_i\cap B_j\neq\varnothing \Longrightarrow
-  E_i\cap E_j\neq\varnothing.
-]
+$
+B_i \cap B_j \neq \varnothing \Longrightarrow E_i \cap E_j \neq \varnothing.
+$
 
 If an AABB exits its envelope, the affected potential graph edges must be
 repaired **before** filtering and returning exact candidate pairs.
