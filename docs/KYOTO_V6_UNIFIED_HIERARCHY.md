@@ -61,8 +61,11 @@ oracles. It does NOT assert safety between discretely sampled frames.
 Source: `include/ccp/unified_certified_hierarchy.hpp`.
 
 * One persistent adaptive/refit BVH indexes either cached loose envelopes
-  or exact current AABBs. This is not a wrapper that calls the existing
-  GlobalGuard or a separate SAP.
+  or exact current AABBs. This is not a wrapper that runs the existing
+  GlobalGuard or maintains a separate persistent SAP cache. The underlying
+  exact BVH implementation nevertheless has a worst-case **fresh SAP
+  fallback** when traversal work exceeds its explicit cap; that fallback
+  and the aborted BVH work are both charged to runtime.
 * In **certified reuse** mode, all primitives undergo containment and
   collision-filter-signature checks every frame. If all pass, reuse
   the complete potential-pair list and perform only current exact AABB
