@@ -415,15 +415,33 @@ public:
     patches_.push_back({begin,std::min(boxes.size(),begin+kPatchSize),{}});
    previousActivity_.assign(patches_.size(),0.);
   }
-  std::vector<double> activity(patches_.size(),0.);
+  // Causal 1D graph-signal high-pass energy on each contiguous patch:
+  // sum of differences between adjacent primitive-displacement vectors.
+  // This is a *topological-order proxy*, NOT a full cloth-mesh wavelet.
+  // It changes a padding heuristic only; current exact containment tests
+  // independently guarantee pair coverage.
+  std::vector<double> activity(patches_.size(),0.),frequency(patches_.size(),0.);
   if(!previous_.empty())
    for(size_t p=0;p<patches_.size();++p){
     const auto& patch=patches_[p];
+    double prevDx=0.,prevDy=0.,prevDz=0.,gradientEnergy=0.;
     for(size_t k=patch.begin;k<patch.end;++k){
      if(boxes[k].id!=previous_[k].id)
       throw std::runtime_error("patch certificate stable-ID mismatch");
-     activity[p]=std::max(activity[p],movement(boxes[k],previous_[k]));
+     if(!signal_)continue;
+     const double dx=center(boxes[k],0)-center(previous_[k],0);
+     const double dy=center(boxes[k],1)-center(previous_[k],1);
+     const double dz=center(boxes[k],2)-center(previous_[k],2);
+     activity[p]=std::max(activity[p],std::sqrt(dx*dx+dy*dy+dz*dz));
+     if(k>patch.begin){
+      gradientEnergy+=(dx-prevDx)*(dx-prevDx)+
+                      (dy-prevDy)*(dy-prevDy)+
+                      (dz-prevDz)*(dz-prevDz);
+     }
+     prevDx=dx;prevDy=dy;prevDz=dz;
     }
+    if(signal_&&patch.end-patch.begin>1)
+     frequency[p]=std::sqrt(gradientEnergy/double(patch.end-patch.begin-1));
    }
   std::vector<unsigned char> changed(patches_.size(),0);
   size_t count=0;
@@ -438,7 +456,8 @@ public:
      const double contrast=std::max(std::abs(activity[p]-left),
                                     std::abs(activity[p]-right));
      const double impulse=std::abs(activity[p]-previousActivity_[p]);
-     pad=std::clamp(.012+1.4*activity[p]+.6*impulse+.3*contrast,.012,.12);
+     pad=std::clamp(.012+1.2*activity[p]+.5*frequency[p]+
+                    .6*impulse+.3*contrast,.012,.12);
     }
     patches_[p].envelope=envelope(boxes,patch.begin,patch.end,pad);
     changed[p]=1;++count;
