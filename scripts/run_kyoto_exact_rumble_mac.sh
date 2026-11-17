@@ -15,8 +15,9 @@ REPEATS="${KYOTO_RUMBLE_REPEATS:-3}"
 FRAMES="${KYOTO_RUMBLE_FRAMES:-160}"
 WARMUP="${KYOTO_RUMBLE_WARMUP:-16}"
 MAX_EXPERIMENTS="${KYOTO_RUMBLE_MAX_EXPERIMENTS:-0}"
-RESUME=()
-if [[ "${KYOTO_RUMBLE_RESUME:-0}" == "1" ]]; then RESUME=(--resume); fi
+# The argument array is always non-empty; macOS Bash 3.2 + set -u
+# treats expansion of an *empty* array as an unbound variable.
+# Build a single complete argv, and append --resume only when explicitly set.
 
 # An isolated worktree protects V4 and its trained neural model.
 cmake -S . -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON
@@ -31,20 +32,24 @@ echo "[RUMBLE] Model: $MODEL"
 echo "[RUMBLE] Fresh output: $OUTPUT"
 echo "[RUMBLE] 6 materials x 6 motion regimes x 3 budgets x 8 seeds x $REPEATS repeats"
 echo "[RUMBLE] Frames per replay: $FRAMES; warmup $WARMUP; max experiments: $MAX_EXPERIMENTS (0 = all)"
-python3 scripts/run_kyoto_controller_ablation.py \
-  --model "$MODEL" \
-  --build "$BUILD" \
-  --output "$OUTPUT" \
-  --seeds 3203 3217 3251 3299 3313 3343 3371 3407 \
-  --sampling balanced \
-  --sample-seed 20261118 \
-  --order-seed 20261119 \
-  --repeats "$REPEATS" \
-  --frames "$FRAMES" \
-  --warmup "$WARMUP" \
-  --max-experiments "$MAX_EXPERIMENTS" \
-  --timeout 900 \
-  --bootstrap 2000 \
-  "${RESUME[@]}"
+ABLATION_ARGS=(
+  --model "$MODEL"
+  --build "$BUILD"
+  --output "$OUTPUT"
+  --seeds 3203 3217 3251 3299 3313 3343 3371 3407
+  --sampling balanced
+  --sample-seed 20261118
+  --order-seed 20261119
+  --repeats "$REPEATS"
+  --frames "$FRAMES"
+  --warmup "$WARMUP"
+  --max-experiments "$MAX_EXPERIMENTS"
+  --timeout 900
+  --bootstrap 2000
+)
+if [[ "${KYOTO_RUMBLE_RESUME:-0}" == "1" ]]; then
+  ABLATION_ARGS+=(--resume)
+fi
+python3 scripts/run_kyoto_controller_ablation.py "${ABLATION_ARGS[@]}"
 
 echo "[RUMBLE] Finished: $OUTPUT/RUMBLE_PATTERNS.md and RUMBLE_PATTERNS.json"
