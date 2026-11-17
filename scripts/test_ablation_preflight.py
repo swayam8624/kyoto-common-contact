@@ -37,6 +37,7 @@ class AblationPreflightTests(unittest.TestCase):
             "global_guarded_aa_control bvh_refit_exact bvh_adaptive_exact "
             "grid_spatial_hash_exact delta_spatial_join_exact "
             "patch_certificate_fixed patch_certificate_signal "
+            "unified_certified_hierarchy_v0 "
             "ml_bookkeeping_ms ml_wrapper_ms")
         verify_replayer(self.bin,self.root)
 
