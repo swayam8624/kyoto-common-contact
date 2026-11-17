@@ -28,9 +28,12 @@ SAP="sap_persistent_coherent"
 BOUNDED="guard_sap_bounded_trial"
 
 def geomean(ratios):
-    if not ratios or any(x <= 0 or not math.isfinite(x) for x in ratios):
+    # Materialize generators before validating: consuming a generator with
+    # any() otherwise leaves no values for statistics.mean().
+    values=list(ratios)
+    if not values or any(x <= 0 or not math.isfinite(x) for x in values):
         raise ValueError("Expected positive finite ratios")
-    return math.exp(mean(math.log(x) for x in ratios))
+    return math.exp(mean(math.log(x) for x in values))
 
 def nearest_percentile(xs, q):
     values=sorted(xs)
