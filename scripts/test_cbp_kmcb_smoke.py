@@ -62,8 +62,8 @@ def main() -> int:
             )
 
         summary = list(csv.DictReader(result.stdout.splitlines()))
-        if len(summary) != 6:
-            raise AssertionError(f"Expected six method rows; got {len(summary)}")
+        if len(summary) != 7:
+            raise AssertionError(f"Expected seven method rows; got {len(summary)}")
         expected_names = {
             "sap_rebuild",
             "v4_guard_sap_bounded_trial",
@@ -71,6 +71,7 @@ def main() -> int:
             "region_shared_bvh",
             "region_certified_cache",
             "causal_cbp",
+            "portfolio_v4_regional",
         }
         if {row["method"] for row in summary} != expected_names:
             raise AssertionError("Missing or duplicated benchmark method")
@@ -85,14 +86,24 @@ def main() -> int:
                 raise AssertionError("Invalid method elapsed time")
 
         trace_rows = list(csv.DictReader(trace.read_text().splitlines()))
-        if len(trace_rows) != 21 * 6:
-            raise AssertionError(f"Expected 126 trace rows, got {len(trace_rows)}")
+        if len(trace_rows) != 21 * 7:
+            raise AssertionError(f"Expected 147 trace rows, got {len(trace_rows)}")
         if not any(row["method"] == "causal_cbp" for row in trace_rows):
             raise AssertionError("Missing causal manager trace")
         for row in trace_rows:
             if row["method"] == "v4_guard_sap_bounded_trial":
                 if row["v4_action"] != "global_guarded_exact":
                     raise AssertionError("V4 cannot initiate SAP trials below 384 primitives")
+            if row["method"] == "portfolio_v4_regional":
+                if row["portfolio_mode"] not in {
+                    "frozen_v4", "region_exhaustive",
+                    "region_shared_bvh", "region_certified_cache"
+                }:
+                    raise AssertionError("Invalid portfolio selection")
+                if row["portfolio_mode"] == "frozen_v4" and (
+                    row["portfolio_v4_action"] != "global_guarded_exact"
+                ):
+                    raise AssertionError("Portfolio failed to run frozen V4")
             if row["method"] == "causal_cbp":
                 if row["manager_mode"] not in {
                     "exhaustive", "shared_bvh", "certified_cache"
@@ -136,7 +147,7 @@ def main() -> int:
 
     print(
         "PASS CBP material replay: six exact policies, 24 snapshots, "
-        "126 instrumented trace rows, V4 guard-only contract, diagnostic and invalid-file rejection"
+        "147 instrumented trace rows, V4/portfolio contracts, diagnostic and invalid-file rejection"
     )
     return 0
 
