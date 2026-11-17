@@ -29,7 +29,7 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
     if not rows:
         raise ValueError(f"{path}: empty replay")
     required = {
-        "frame", "method", "query_ms", "pairs", "oracle_equal",
+        "frame", "snapshot_hash", "method", "query_ms", "pairs", "oracle_equal",
         "sheets", "spheres", "patch_span", "triangles", "primitives",
         "regions", "portfolio_choice", "portfolio_trial",
         "portfolio_accepted", "portfolio_rejected",
@@ -51,6 +51,8 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
             raise ValueError(f"{path}: incomplete frame {frame}")
         if len({v["pairs"] for v in values.values()}) != 1:
             raise ValueError(f"{path}: mismatched candidate counts")
+        if len({v["snapshot_hash"] for v in values.values()}) != 1:
+            raise ValueError(f"{path}: method-level geometry mismatch")
     ordered = sorted(frames)
     if ordered != list(range(1, max(ordered) + 1)):
         raise ValueError(f"{path}: missing/reordered frames")
@@ -90,6 +92,9 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
         "accepted": sum(int(item["portfolio_accepted"]) for item in p),
         "rejected": sum(int(item["portfolio_rejected"]) for item in p),
         "frame_rows": [frames[f] for f in timed],
+        "fingerprints": [
+            frames[f]["fresh_sap"]["snapshot_hash"] for f in ordered
+        ],
     }
     return result, rows
 
@@ -227,6 +232,23 @@ def main() -> int:
     parser.add_argument("--html", type=Path, help="New HTML output path")
     args = parser.parse_args()
     datasets = [read_replay(path)[0] for path in args.csv]
+    cohorts = collections.defaultdict(list)
+    for data in datasets:
+        key = (
+            data["sheets"], data["spheres"], data["triangles"],
+            len(data["fingerprints"]),
+        )
+        cohorts[key].append(data)
+    for group in cohorts.values():
+        if len(group) <= 1:
+            continue
+        reference = group[0]["fingerprints"]
+        for data in group[1:]:
+            if data["fingerprints"] != reference:
+                raise ValueError(
+                    "Physics snapshots differ across patch spans: "
+                    f'{group[0]["path"]} vs {data["path"]}'
+                )
     print("# Kyoto CBP topology replay summary")
     print()
     print("| Source | Frozen V4 mean ms | Portfolio mean ms | "
@@ -240,6 +262,13 @@ def main() -> int:
               f'{item["portfolio_v4_regional"]["ratio"]:.3f}× | '
               'pair parity verified |')
     print()
+    for group in cohorts.values():
+        if len(group) > 1:
+            print(
+                f'Identical frame geometry verified across {len(group)} patch '
+                f'spans for {group[0]["sheets"]} cloth sheets / '
+                f'{group[0]["spheres"]} moving spheres.'
+            )
     print("All results are descriptive; no cross-seed significance is implied.")
     if args.html:
         if args.html.exists():
