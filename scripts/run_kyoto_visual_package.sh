@@ -3,15 +3,15 @@
 # A short correctness gate; NO exhaustive multi-hour parameter search.
 # bash scripts/run_kyoto_visual_package.sh [OUTPUT] [OPTIONAL_ML_MODEL]
 set -euo pipefail
-ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-OUTPUT="\${1:-output/kyoto-final-showcase}"
-MODEL="\${2:-}"
-BUILD="\${KYOTO_SHOWCASE_BUILD:-build/kyoto-visual-release}"
-FRAMES="\${KYOTO_SHOWCASE_FRAMES:-48}"
-SOLVER_FRAMES="\${KYOTO_SHOWCASE_SOLVER_FRAMES:-42}"
-BUDGET="\${KYOTO_SHOWCASE_BUDGET:-128}"
-SEED="\${KYOTO_SHOWCASE_SEED:-31337}"
+OUTPUT="${1:-output/kyoto-final-showcase}"
+MODEL="${2:-}"
+BUILD="${KYOTO_SHOWCASE_BUILD:-build/kyoto-visual-release}"
+FRAMES="${KYOTO_SHOWCASE_FRAMES:-48}"
+SOLVER_FRAMES="${KYOTO_SHOWCASE_SOLVER_FRAMES:-42}"
+BUDGET="${KYOTO_SHOWCASE_BUDGET:-128}"
+SEED="${KYOTO_SHOWCASE_SEED:-31337}"
 
 if [[ -e "$OUTPUT" ]]; then
   echo "Refusing to overwrite existing showcase: $OUTPUT" >&2
@@ -43,7 +43,7 @@ mkdir -p "$OUTPUT/snapshots" "$OUTPUT/replays" \
 echo "[SHOWCASE] Exporting 36 real material/regime sequences, budget $BUDGET"
 for material in cloth sponge cushion soft_ball spring mixed; do
   for regime in baseline compression shear impact rapid relax; do
-    stem="actual-\${material}-\${regime}-n\${BUDGET}-seed\${SEED}"
+    stem="actual-${material}-${regime}-n${BUDGET}-seed${SEED}"
     snapshot="$OUTPUT/snapshots/$stem.kmcb"
     csv="$OUTPUT/replays/$stem-evaluated.csv"
     "$BUILD/ccp_material_export" "$snapshot" "$material" "$BUDGET" \
@@ -68,7 +68,7 @@ python3 scripts/render_kyoto_visuals.py solver \
   --output "$OUTPUT/videos/all-seven-solver-policies" \
   --stride 2 --fps 8
 python3 benchmarks/score_replay.py \
-  "$OUTPUT/replays/actual-cloth-baseline-n\${BUDGET}-seed\${SEED}-evaluated.csv" \
+  "$OUTPUT/replays/actual-cloth-baseline-n${BUDGET}-seed${SEED}-evaluated.csv" \
   --warmup 8 --output "$OUTPUT/reports"
 
 KYOTO_OUT="$OUTPUT" KYOTO_SEED="$SEED" KYOTO_BUDGET="$BUDGET" \
