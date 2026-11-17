@@ -93,6 +93,8 @@ jobs:
           ctest --test-dir /tmp/kyoto-material-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
           python3 scripts/test_rumble_adversarial.py /tmp/kyoto-material-build/ccp_material_replay
           python3 scripts/test_rumble_endtoend.py /tmp/kyoto-material-build
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Iinclude tests/kinetic_certificates_tests.cpp -o /tmp/kyoto-kinetic-certificates
+          /tmp/kyoto-kinetic-certificates
       - name: Verify all six deformable-material families and selective cache repairs
         run: |
           mkdir -p /tmp/kyoto-material-evidence
