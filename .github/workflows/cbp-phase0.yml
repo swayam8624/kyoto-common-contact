@@ -12,6 +12,8 @@ on:
       - 'include/ccp/cbp_certified_cache.hpp'
       - 'include/ccp/cbp_cost_manager.hpp'
       - 'tests/cbp_cost_manager_tests.cpp'
+      - 'apps/cbp_kmcb_replay.cpp'
+      - 'scripts/test_cbp_kmcb_smoke.py'
       - 'apps/cbp_manager_microbench.cpp'
       - 'include/ccp/cbp_spatial_index.hpp'
       - 'include/ccp/cbp_region_router.hpp'
@@ -67,6 +69,11 @@ jobs:
           /tmp/cbp-manager-bench 256 24 > /tmp/cbp-manager-256.csv
           test "$(wc -l < /tmp/cbp-manager-256.csv)" -eq 25
           cat /tmp/cbp-manager-256.csv
+      - name: KYOTOM01 material replay six-method exactness and trace contract
+        timeout-minutes: 3
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic             -Iinclude apps/cbp_kmcb_replay.cpp src/live_cloth.cpp -o /tmp/cbp-kmcb-replay
+          python3 scripts/test_cbp_kmcb_smoke.py /tmp/cbp-kmcb-replay
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
