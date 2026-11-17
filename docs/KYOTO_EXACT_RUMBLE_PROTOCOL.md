@@ -6,7 +6,7 @@ We need to distinguish an algorithm that wins because it does less exact
 AABB pair work from an algorithm that appears faster because of fixed method
 order, lucky seeds, or silently missing candidates. This branch preserves
 the completed V4 balanced-trial evidence on
-\`research/kyoto-scale-evidence\` and adds separately tested competing
+`research/kyoto-scale-evidence` and adds separately tested competing
 architectures.
 
 This is a **CPU broad-phase candidate-set** comparison, not an end-to-end
@@ -22,17 +22,17 @@ sorted set of overlapping and category-compatible AABB pairs.
 3. Exact selective Guard and fixed/adaptive/hierarchical region methods.
 4. Measured/probed Guard–SAP and bounded-trial causal controllers.
 5. The original and conservative 12-feature trained MLP selectors.
-6. \`bvh_refit_exact\`: median-built BVH with static topology and exact refits.
-7. \`bvh_adaptive_exact\`: same BVH, causally rebuilding topology after
+6. `bvh_refit_exact`: median-built BVH with static topology and exact refits.
+7. `bvh_adaptive_exact`: same BVH, causally rebuilding topology after
    excessive observed traversal work. The cost is charged to subsequent calls.
-8. \`grid_spatial_hash_exact\`: cell-indexed exact spatial join, explicit
+8. `grid_spatial_hash_exact`: cell-indexed exact spatial join, explicit
    handling of oversized AABBs. Excessive spills use fresh exact SAP.
-9. \`delta_spatial_join_exact\`: incremental pair join when very few
+9. `delta_spatial_join_exact`: incremental pair join when very few
    primitives move, exact BVH rebuild of pairs otherwise.
-10. \`patch_certificate_fixed\`: group-enclosure certificates maintain
+10. `patch_certificate_fixed`: group-enclosure certificates maintain
     conservative possible patch neighbors. Only changed patches have their
     adjacency relation repaired.
-11. \`patch_certificate_signal\`: same *exact* certificates, but the extent
+11. `patch_certificate_signal`: same *exact* certificates, but the extent
     of their margins responds to causal patch displacement, acceleration-like
     changes, and neighboring activity contrast.
 12. Bullet's published persistent DBVT where the optional Bullet SDK is
@@ -100,7 +100,7 @@ after the benchmark identifies useful causally observable decision features.
 
 From the original repository (keeps the trained model and V4 files intact):
 
-\`\`\`bash
+```bash
 cd ~/Desktop/Programming/kyoto-common-contact
 git fetch origin
 git worktree add -b kyoto-rumble ../kyoto-exact-rumble \
@@ -118,19 +118,19 @@ KYOTO_RUMBLE_MAX_EXPERIMENTS=12 KYOTO_RUMBLE_REPEATS=1 \
 # Full fresh-seed deathmatch; 864 unique scenes, 2592 replays:
 bash scripts/run_kyoto_exact_rumble_mac.sh "$MODEL" \
   output/kyoto-rumble-v5-full
-\`\`\`
+```
 
 For an interrupted run with **the same binary hashes and parameters**:
 
-\`\`\`bash
+```bash
 KYOTO_RUMBLE_RESUME=1 \
   bash scripts/run_kyoto_exact_rumble_mac.sh "$MODEL" \
   output/kyoto-rumble-v5-full
-\`\`\`
+```
 
-Output includes \`ABLATION_CONTRACT.json\`, every snapshot, every replay CSV,
-per-scene \`FRESH_SEED_RESULTS.json\`, timing JSON, and the automatically
-computed \`RUMBLE_PATTERNS.md\`/\`RUMBLE_PATTERNS.json\` rankings and per-workload
+Output includes `ABLATION_CONTRACT.json`, every snapshot, every replay CSV,
+per-scene `FRESH_SEED_RESULTS.json`, timing JSON, and the automatically
+computed `RUMBLE_PATTERNS.md`/`RUMBLE_PATTERNS.json` rankings and per-workload
 patterns. Do not archive the huge snapshots and CSVs blindly when only a
 summary upload is needed; preserve the full raw evidence locally.
 
