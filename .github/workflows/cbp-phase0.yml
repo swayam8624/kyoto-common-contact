@@ -16,6 +16,8 @@ on:
       - 'scripts/analyze_cbp_pilot.py'
       - 'tests/cbp_cost_manager_tests.cpp'
       - 'apps/cbp_kmcb_replay.cpp'
+      - 'apps/cbp_topology_replay.cpp'
+      - 'scripts/test_cbp_topology_replay.py'
       - 'scripts/test_cbp_kmcb_smoke.py'
       - 'apps/cbp_manager_microbench.cpp'
       - 'include/ccp/cbp_spatial_index.hpp'
@@ -86,8 +88,8 @@ jobs:
         timeout-minutes: 3
         run: |
           cmake --preset kyoto-final-cpu
-          cmake --build build/kyoto-final-cpu --target ccp_cbp_cost_manager_tests ccp_cbp_portfolio_tests ccp_cbp_kmcb_replay --parallel 2
-          ctest --test-dir build/kyoto-final-cpu -R 'cbp_(causal_manager_oracle|portfolio_fallback_oracle|kmcb_snapshot_contract)' --output-on-failure
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_cost_manager_tests ccp_cbp_portfolio_tests ccp_cbp_kmcb_replay ccp_cbp_topology_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu -R 'cbp_(causal_manager_oracle|portfolio_fallback_oracle|kmcb_snapshot_contract|mesh_topology_replay_contract)' --output-on-failure
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
