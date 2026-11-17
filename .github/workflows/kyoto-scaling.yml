@@ -25,8 +25,9 @@ jobs:
             scripts/test_learned_cxx.py scripts/evaluate_learned_replay.py \
             scripts/run_kyoto_ml_mac.py scripts/run_kyoto_stress.py \
             scripts/test_ml_recovery.py scripts/run_kyoto_controller_ablation.py \
-            scripts/test_ablation_preflight.py scripts/analyze_kyoto_rumble.py
-          python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight -v
+            scripts/test_ablation_preflight.py scripts/analyze_kyoto_rumble.py \
+            scripts/test_rumble_analysis.py scripts/test_rumble_adversarial.py
+          python3 -m unittest scripts.test_ml_recovery scripts.test_ablation_preflight scripts.test_rumble_analysis -v
       - name: Compile CPU benchmark with warnings
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -pthread \
@@ -88,6 +89,7 @@ jobs:
           cmake -S . -B /tmp/kyoto-material-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
           cmake --build /tmp/kyoto-material-build --target ccp_material_benchmark ccp_material_export ccp_material_replay ccp_selective_guard_tests --parallel 4
           ctest --test-dir /tmp/kyoto-material-build --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
+          python3 scripts/test_rumble_adversarial.py /tmp/kyoto-material-build/ccp_material_replay
       - name: Verify all six deformable-material families and selective cache repairs
         run: |
           mkdir -p /tmp/kyoto-material-evidence
