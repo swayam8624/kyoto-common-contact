@@ -419,7 +419,7 @@ public:
  }
 };
 
-enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative,
+enum class Kind {Sap,PersistentSap,GuardSapProbe,GuardSapTrial,Global,GlobalControl,Selective,Fixed,Adaptive,Hierarchy,Online,Learned,LearnedConservative,
  RefitBVH,AdaptiveBVH,SpatialGrid,DeltaJoin,PatchCertificate,SignalPatchCertificate
 #ifdef CCP_HAVE_BULLET
 ,Bullet
@@ -432,6 +432,7 @@ const char* name(Kind kind){
  case Kind::GuardSapProbe:return "guard_sap_measured_probe";
  case Kind::GuardSapTrial:return "guard_sap_bounded_trial";
  case Kind::Global:return "global_guarded_exact";
+ case Kind::GlobalControl:return "global_guarded_aa_control";
  case Kind::Selective:return "selective_guard_exact";
  case Kind::Fixed:return "region_fixed";
  case Kind::Adaptive:return "region_adaptive";
@@ -473,6 +474,7 @@ class Method {
  ccp::experiment::PatchCertificate patchFixed_{false};
  ccp::experiment::PatchCertificate patchSignal_{true};
  ccp::live::BroadPhaseService global_;
+ ccp::live::BroadPhaseService globalAA_;
  ccp::research::SelectiveGuard selective_{0,.045};
  RegionalCandidates regional_;
  ccp::bench::GenericOnline online_{0};
@@ -556,9 +558,10 @@ public:
 #ifdef CCP_HAVE_BULLET
   else if(kind_==Kind::Bullet)r.pairs=bullet_.query(boxes);
 #endif
-  else if(kind_==Kind::Global){
+  else if(kind_==Kind::Global||kind_==Kind::GlobalControl){
    ccp::live::QueryMetrics m;
-   const auto& cached=global_.query(boxes,{0,.045,ccp::live::UpdatePolicy::GuardedReuse},true,m);
+   auto& service=kind_==Kind::Global?global_:globalAA_;
+   const auto& cached=service.query(boxes,{0,.045,ccp::live::UpdatePolicy::GuardedReuse},true,m);
    r.pairs=exactGuard(cached,boxes);
    r.builds=m.builds;r.reuses=m.reuses;r.aabbTests=m.pairTests;
   }else if(kind_==Kind::Selective){
@@ -610,7 +613,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
- std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::GuardSapTrial,Kind::Global,Kind::Selective,
+ std::vector<Kind> methods={Kind::Sap,Kind::PersistentSap,Kind::GuardSapProbe,Kind::GuardSapTrial,Kind::Global,Kind::GlobalControl,Kind::Selective,
   Kind::Fixed,Kind::Adaptive,Kind::Hierarchy,Kind::Online,
   Kind::RefitBVH,Kind::AdaptiveBVH,Kind::SpatialGrid,Kind::DeltaJoin,
   Kind::PatchCertificate,Kind::SignalPatchCertificate};
@@ -694,7 +697,8 @@ int main(int argc,char** argv){
                "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched "
                "field_events randomized_method_order bvh_refit_exact "
                "bvh_adaptive_exact grid_spatial_hash_exact delta_spatial_join_exact "
-               "patch_certificate_fixed patch_certificate_signal\n";
+               "patch_certificate_fixed patch_certificate_signal "
+               "global_guarded_aa_control\n";
    return 0;
   }
   if(argc<3||argc>6)
