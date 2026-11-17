@@ -1,6 +1,6 @@
 // Honest visual evidence: exports ACTUAL solver meshes and per-frame diagnostics.
-// Identical initial conditions and physics across seven certified broad phases.
-// If exact candidate pairs match, all seven meshes SHOULD match; an apparent
+// Identical initial conditions and physics across eight certified broad phases.
+// If exact candidate pairs match, all eight meshes SHOULD match; an apparent
 // geometry improvement from the broad phase alone would be a red flag.
 // This is a correctness/qualitative artifact export, not a timed performance
 // benchmark: disk I/O, auditing, and serialization are outside the solver.
@@ -22,7 +22,8 @@ using ccp::research::MultiCloth;
 using ccp::research::Policy;
 const char* names[]={
  "sap_rebuild","global_guarded","region_fixed","region_adaptive",
- "region_sweep_fixed","region_sweep_adaptive","online_contact_work"
+ "region_sweep_fixed","region_sweep_adaptive","online_contact_work",
+ "guard_sap_bounded_trial"
 };
 void vertices(std::ostream& out,const std::vector<Vec3>& p) {
  out<<"[";
@@ -81,7 +82,8 @@ struct Quality {
 MultiCloth configure(int method,int sheets,int balls){
  MultiCloth sim(sheets,balls,method==0?Policy::RebuildSAP:
                 method==1?Policy::GlobalGuard:
-                method==6?Policy::OnlineContactAware:Policy::RegionalCertified);
+                method==6?Policy::OnlineContactAware:
+                method==7?Policy::FinalBounded:Policy::RegionalCertified);
  sim.setAdaptive(method==3||method==5||method==6);
  if(method!=6)sim.setHierarchicalRegions(method>=4);
  sim.setAuditing(true);
@@ -155,7 +157,7 @@ int main(int argc,char** argv){
   std::vector<std::vector<Vec3>> states;
   states.reserve(frames);
   for(int f=0;f<frames;++f){reference.step();states.push_back(reference.positions());}
-  for(int method=0;method<7;++method){
+  for(int method=0;method<8;++method){
    auto sim=configure(method,sheets,balls);
    Quality quality(sim);
    const auto path=dir/(std::string(names[method])+".jsonl");
@@ -178,7 +180,7 @@ int main(int argc,char** argv){
    if(!out)throw std::runtime_error("failed to flush "+path.string());
    std::cout<<"VISUAL_EVIDENCE "<<names[method]<<" "<<path<<"\n";
   }
-  std::cout<<"PASS: seven independently stepped coupled-solver policies; "
+  std::cout<<"PASS: eight independently stepped coupled-solver policies; "
               "all geometry agreed with SAP reference to <1e-7.\n";
   return 0;
  }catch(const std::exception& e){
