@@ -37,14 +37,14 @@ def main():
     # Explicitly reject an obsolete replay ABI before any oracle fixtures.
     signature=subprocess.run([str(args.replayer),"--capabilities"],
                              capture_output=True,text=True,timeout=10,check=False)
-    required={"KYOTO_REPLAY_ABLATION_V5","sap_persistent_coherent",
+    required={"KYOTO_REPLAY_ABLATION_V6","sap_persistent_coherent",
               "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
               "guard_sap_measured_probe","guard_sap_bounded_trial",
               "hybrid_probed","hybrid_switched","field_events",
               "randomized_method_order","global_guarded_aa_control",
               "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
               "delta_spatial_join_exact","patch_certificate_fixed",
-              "patch_certificate_signal"}
+              "patch_certificate_signal","unified_certified_hierarchy_v0"}
     if signature.returncode!=0 or not required.issubset(set(signature.stdout.split())):
         raise RuntimeError("Replay executable is stale; rebuild it with the current learned_online.hpp")
     with tempfile.TemporaryDirectory(prefix="kyoto-learned-smoke-") as tmp:
@@ -67,7 +67,8 @@ def main():
         new_exact=(
             "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
             "delta_spatial_join_exact","patch_certificate_fixed",
-            "patch_certificate_signal","global_guarded_aa_control")
+            "patch_certificate_signal","unified_certified_hierarchy_v0",
+            "global_guarded_aa_control")
         reference={r["frame"]:r for r in rows if r["backend"]=="sap_rebuild"}
         for label in new_exact:
             matching=[r for r in rows if r["backend"]==label]
