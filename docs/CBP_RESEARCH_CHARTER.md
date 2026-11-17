@@ -18,6 +18,12 @@ An **offline per-scene best method** is not an online algorithm: deciding which 
 4. **Solver:** Does the contribution improve full CPU deformable timestep and contact correctness, not just standalone AABB replay timing? What happens under dense self-contact and worst-case adversarial motion?
 5. **Generality:** Can the benefit survive independent external deformable sequences, new seeds and machines, and a fair comparison with contemporary IPC Toolkit LBVH and solver-integrated BVH methods?
 
+## An uncomfortable upper-bound observation
+
+The V5 post-hoc per-WHOLE-scene 4-policy oracle (Guard, V4, adaptive BVH, fixed patch) reported 1.3034x geometric speedup vs Guard; V4 was 1.0912x. Thus choosing the best of those four methods with perfect hindsight would offer only roughly 1.19x *additional geometric speedup over V4*, **before** paying prediction, cache migration or selection overhead. Its summed-scene-time speedup was 1.9408x vs Guard, so costly scenes offer larger time-weighted opportunity. These are not hard bounds on a NEW local-index mechanism: a system that exploits spatially heterogeneous subregions might exceed the global per-scene oracle, but that must be measured, not assumed.
+
+A manager that merely recognizes material names or predicts the best entire method from held-out full-scene labels is NOT a sufficient novelty hypothesis. Material labels represent procedural synthetic AABB generators; we must show the causal geometric/maintenance signal generalizes to physical mesh trajectories and genuine external datasets.
+
 ## Existing contributions versus proposed contributions
 
 | Stage | What is actually implemented | Scientific claim |
@@ -61,7 +67,7 @@ Failure to reach these thresholds means the hypothesis needs revision, not more 
 
 ## Strong prior art to beat or differentiate
 
-- Weller and Zachmann (2006), Kinetic Separation Lists for CCD of Deformable Objects — event-based hierarchical temporal coherence. https://doi.org/10.2312/pe/vriphys/vriphys06/033-042
+- Avril, Gouranton and Arnaldi (2011), Dynamic Adaptation of Broad Phase Collision Detection Algorithms — direct adaptive-manager prior art; distinguish this explicitly before claiming a novel selector.\n- Weller and Zachmann (2006), Kinetic Separation Lists for CCD of Deformable Objects — event-based hierarchical temporal coherence. https://doi.org/10.2312/pe/vriphys/vriphys06/033-042
 - Adaptive Collision Culling for Massive Simulations by a Parallel and Context-Aware Sweep and Prune Algorithm — adaptive partitioning is known. https://pubmed.ncbi.nlm.nih.gov/28574360/
 - Flexible Use of Temporal and Spatial Reasoning for Fast and Scalable CPU Broad-Phase Collision Detection Using KD-Trees — hybrid spatial approaches are known. https://onlinelibrary.wiley.com/doi/10.1111/cgf.13529
 - IPC Toolkit official LBVH — published, optimized production-style external baseline. https://github.com/ipc-sim/ipc-toolkit/releases
