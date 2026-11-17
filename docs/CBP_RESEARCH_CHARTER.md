@@ -33,7 +33,7 @@ A manager that merely recognizes material names or predicts the best entire meth
 | V6, archived | single-index certified hierarchy | Negative result; diagnose maintenance bottleneck |
 | CBP Phase 0, THIS BRANCH | exact regional router with independent cross-region exhaustive oracle, local exhaustive or coherent-SAP kernels, telemetry, dynamic repartition tests | **No speed or novelty claim**; foundation to falsify local delegation |
 | CBP Phase 1, IMPLEMENTED (experimental) | one shared refittable BVH over current primitive bounds; cross-region dual-tree traversal, local SAP/exhaustive region kernels and changed-leaf/ancestor refits | Exactness CI passed; no overall performance or generality claim |
-| CBP Phase 2, NOT IMPLEMENTED | conservative per-object/patch containment certificates and indexed dirty-ID incident-edge repair using the Phase-1 BVH | Remove V6's O(dirty × N) scan, establish exactness and measure maintenance costs |
+| CBP Phase 2, IMPLEMENTED (experimental) | conservative per-object envelopes, sorted potential-contact adjacency, indexed dirty-ID incident-edge repair and exact current-AABB filtering; selectable alternative to Phase-1 traversal | Oracle and sanitizer tests passed; runtime crossover, memory and solver integration not yet validated |
 | CBP Phase 3, NOT IMPLEMENTED | measured-cost, switching-penalized local maintenance decisions; cheap escape to direct traversal | Show a real *deployed* advantage over fixed best; no hindsight leakage |
 | CBP Phase 4, NOT IMPLEMENTED | solver-integrated dirty propagation and validated continuous swept-bounds support | End-to-end demonstration and CCD-appropriate contract |
 
@@ -92,3 +92,24 @@ A synchronized, looping grid shows high-N cloth compression and rapid motion, sp
 **Limitations:** The BVH still scans input bounds each frame, rebuilds on any region reassignment, and traverses cross-region pairs each query. It does not cache per-patch certified potential-contact edges, implement an adaptive runtime cost manager, or guarantee continuous collision safety. Region-union calculation and final pair sorting remain additional overhead. The tree can deteriorate spatially under sustained large deformation.
 
 **Phase 1 acceptance gate:** Optimized `-Werror`, sanitizer tests, and exact C++ oracles must pass. After that, measure the new path against Phase 0 and against V4 on identical replay inputs, including all maintenance and normalization costs; report regressions as regressions.
+
+## Phase 2 implementation ledger (experimental, 17 Nov 2026)
+
+- `include/ccp/cbp_certified_cache.hpp` maintains current certified per-object envelopes E_i containing B_i, plus a persistent sorted potential cross-region interaction graph P. It filters the **current** exact overlapping primitive pairs from P each query.
+- If no envelope or signature changes, the graph is reused. A changed object's old incident graph edges are removed using a **per-object sorted adjacency list** (without scanning N other primitives); its new envelope is installed, affected shared-BVH leaves and ancestors refitted, and a **BVH one-to-many overlap traversal** discovers replacement incident edges.
+- Region ownership reassignment, object-count changes, and padding changes trigger a complete graph rebuild. Primitive metadata changes force local edge invalidation; exact compatible leaf checks remain compulsory.
+- `RegionRouter::setCrossMode(CrossMode::CertifiedCache)` selects this experimental mode; `SharedBVH` remains the default and `Exhaustive` remains the correctness/performance control. No cost-aware manager yet.
+- `tests/cbp_certified_cache_tests.cpp` exercises exact oracle parity under 160 changing frames, discrete touching, degenerate extents, mask changes, cached quiet motion, forced envelope escapes, new contact edges, stale-edge deletion and ownership reassignment. CI builds with `-Werror` and ASan/UBSan.
+- `apps/cbp_cross_microbench.cpp` compares all three policies on the same synthetic, stateful snapshots with every query's full wall time charged. It is a diagnostic for selecting Phase 3 experiments and should not be mistaken for an empirical paper result.
+
+### Known limits and failure regimes
+
+1. The sorted `std::set<Pair>` potential graph and per-object adjacency use memory proportional to the number of conservative cross-region potential pairs; in dense scenes this can approach O(N^2). Filtering all P edges each query can lose to direct traversal even with zero dirty objects.
+2. Dirty updates still pay O(N) to test containment and O(sum dirty adjacency degrees + BVH query work) to repair graph edges. They **do not** perform the former V6 O(dirty*N) scan, but dense neighborhoods can have inherently quadratic output size; the method has no subquadratic worst-case guarantee.
+3. The global hierarchy is rebuilt whenever any ownership label changes. Dynamic topology changes therefore can be expensive; the yet-unbuilt manager must charge migration work and choose a direct exact method when appropriate.
+4. These are exact current-frame AABB *candidate* methods. No demonstrated improvement in cloth fidelity, physical penetration, continuous detection, or complete solver timestep should be attributed to the cache.
+5. A true contribution must demonstrate outperforming strong publishable baselines on independent deformable geometry, not merely executing these known maintenance ideas correctly.
+
+### Next gate — Phase 3 measured-cost management
+
+Use causal observed per-region/whole-index work to decide among certified reuse, direct BVH and an exact fallback, without evaluating all kernels every frame. Require cooldown/hysteresis, charged cold-start/migration, randomized A/A benchmarking, and a guarantee that policy heuristics cannot change candidate correctness. Negative results must remain visible.
