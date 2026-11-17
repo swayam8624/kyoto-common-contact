@@ -65,7 +65,8 @@ def verify_replayer(replayer: Path, root: Path) -> None:
     # Track every directly related interface, not only the leaf controller.
     # In particular, Result::mlBookkeepingMs is declared in generic_online.hpp;
     # updating learned_online.hpp without it caused a real macOS build failure.
-    sources=[root/"apps/material_replay_benchmark.cpp",
+    sources=[root/"include/ccp/experimental_field.hpp",
+             root/"apps/material_replay_benchmark.cpp",
              root/"include/ccp/learned_online.hpp",
              root/"include/ccp/generic_online.hpp",
              root/"include/ccp/learned_policy.hpp",
