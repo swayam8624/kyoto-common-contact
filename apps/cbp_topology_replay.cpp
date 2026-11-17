@@ -105,10 +105,10 @@ void validateTopology(const ccp::research::MultiCloth& physics,
 int main(int argc,char** argv){
  try{
   if(argc!=6)
-   throw std::invalid_argument("Usage: ccp_cbp_topology_replay OUTPUT.csv SHEETS(1..3) SPHERES(0..3) FRAMES(12..120) PATCH_SPAN(1,2,3,4,6,12)");
+   throw std::invalid_argument("Usage: ccp_cbp_topology_replay OUTPUT.csv SHEETS(1..3) SPHERES(1..3) FRAMES(12..120) PATCH_SPAN(1,2,3,4,6,12)");
   const std::filesystem::path destination(argv[1]);
   const int sheets=boundedInt(argv[2],1,3);
-  const int spheres=boundedInt(argv[3],0,3);
+  const int spheres=boundedInt(argv[3],1,3);
   const int frames=boundedInt(argv[4],12,120);
   const int span=boundedInt(argv[5],1,12);
   if(12%span!=0)
