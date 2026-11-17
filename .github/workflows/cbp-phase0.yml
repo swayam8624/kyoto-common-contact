@@ -41,7 +41,7 @@ jobs:
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
             -Iinclude apps/cbp_cross_microbench.cpp -o /tmp/cbp-bench
           /tmp/cbp-bench 64 24 > /tmp/cbp-bench-smoke.csv
-          test "$(wc -l < /tmp/cbp-bench-smoke.csv)" -eq 7
+          test "$(wc -l < /tmp/cbp-bench-smoke.csv)" -eq 10
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
