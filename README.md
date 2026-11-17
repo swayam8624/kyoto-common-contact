@@ -1,5 +1,16 @@
 # Request-aware collision broad phase
 
+> **Final validated CPU broad-phase release (17 November 2026):** The
+> champion is the **single-backend Guard–SAP Bounded Trial V4**,
+> exported as a reusable API in
+> [`include/ccp/final_broadphase.hpp`](include/ccp/final_broadphase.hpp).
+> See [`FINAL_RELEASE.md`](FINAL_RELEASE.md) for the measured V5/V6
+> confirmation, exactness contract, short CI gate, honest limitations and
+> minimal integration. **No further multi-hour benchmarks are required.**
+> V5/V6 alternative engines remain preserved on separate research branches;
+> the unsuccessful V6 hierarchy is **not** promoted into this release.
+
+
 A native C++23 research prototype for conservative candidate generation in deformable contact simulation. The main experiment runs **one to three interacting cloth sheets and two moving spheres** with XPBD-style constraints, discrete self-contact, and an online region controller. The physics, broad phase, precise contact response and GLFW/OpenGL viewer run in one process.
 
 ```sh
