@@ -1,5 +1,5 @@
-// Small, honest Phase-1 A/B comparison. NO cross-scene claims.
-// Two independently stateful routers process IDENTICAL snapshots.
+// Small, honest Phase-1/2 three-way comparison. NO cross-scene claims.
+// Three independently stateful routers process IDENTICAL snapshots.
 // Alternating query order reduces fixed-order confounding; both pay all
 // region routing, BVH maintenance, pair generation and normalization costs.
 #include "ccp/cbp_region_router.hpp"
@@ -44,12 +44,15 @@ void runCase(const std::string& name,int n,int frames){
                    i%17==0?2u:1u,3u,true});
   labels.push_back(i%8);
  }
- RegionRouter brute,indexed;
+ RegionRouter brute,indexed,certified;
  brute.setCrossMode(CrossMode::Exhaustive);
  indexed.setCrossMode(CrossMode::SharedBVH);
+ certified.setCrossMode(CrossMode::CertifiedCache);
+ certified.setCachePadding(.045);
  brute.setSapThreshold(48);
  indexed.setSapThreshold(48);
- Stats data[2];
+ certified.setSapThreshold(48);
+ Stats data[3];
  const int warmup=std::max(8,frames/10);
  for(int frame=0;frame<frames;++frame){
   // Dynamic deformation with a repeatable abrupt regime change.
@@ -60,9 +63,9 @@ void runCase(const std::string& name,int n,int frames){
     a.min.x+=dx;a.max.x+=dx;
    }
   }
-  ccp::cbp::Pairs result[2];
+  ccp::cbp::Pairs result[3];
   auto measure=[&](int method){
-   RegionRouter& router=method?indexed:brute;
+   RegionRouter& router=method==0?brute:(method==1?indexed:certified);
    const auto start=Clock::now();
    result[method]=router.query(boxes,labels);
    const double elapsed=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
@@ -75,22 +78,23 @@ void runCase(const std::string& name,int n,int frames){
     data[method].pairs=result[method].size();
    }
   };
-  // Both algorithms have independent persistent state across ALL frames.
-  if(frame%2==0){measure(0);measure(1);}
-  else{measure(1);measure(0);}
-  if(result[0]!=result[1])
-   throw std::runtime_error("A/B parity failure: "+name+" frame "+std::to_string(frame));
+  // All three methods have independent persistent state across ALL frames.
+  // Cycle execution order to reduce method-order bias.
+  for(int k=0;k<3;++k)measure((k+frame%3)%3);
+  if(result[0]!=result[1]||result[0]!=result[2])
+   throw std::runtime_error("Three-way exact candidate mismatch: "+name+" frame "+std::to_string(frame));
  }
- for(int mode=0;mode<2;++mode){
+ for(int mode=0;mode<3;++mode){
   const auto& s=data[mode];
-  std::cout<<name<<','<<(mode?"shared_bvh":"exhaustive")<<','<<n<<','
+  std::cout<<name<<','<<(mode==0?"exhaustive":mode==1?"shared_bvh":"certified_cache")<<','<<n<<','
            <<(frames-warmup)<<','<<std::fixed<<std::setprecision(6)
            <<avg(s.times)<<','<<p95(s.times)<<','<<s.crossTests<<','
            <<s.changedLeaves<<','<<s.refits<<','<<s.pairs<<'\n';
  }
- std::cerr<<"[CBP exploratory] "<<name<<" exhaustive/shared_BVH mean ratio = "
-          <<(avg(data[0].times)/avg(data[1].times))
-          <<"x; single-process synthetic test, NOT publication evidence\n";
+ std::cerr<<"[CBP exploratory] "<<name
+          <<" brute/shared_BVH="<<(avg(data[0].times)/avg(data[1].times))
+          <<"x; brute/certified="<<(avg(data[0].times)/avg(data[2].times))
+          <<"x; synthetic CI smoke, NOT publication evidence\n";
 }
 }
 int main(int argc,char** argv){
