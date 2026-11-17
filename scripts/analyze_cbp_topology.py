@@ -269,6 +269,29 @@ def main() -> int:
                 f'spans for {group[0]["sheets"]} cloth sheets / '
                 f'{group[0]["spheres"]} moving spheres.'
             )
+
+    for dataset in datasets:
+        print()
+        print(
+            f'## All methods — {dataset["path"].name}: '
+            f'{dataset["regions"]} regions, {dataset["frames"]} timed frames'
+        )
+        print()
+        print("| Method | Mean query ms | P95 ms | V4 / method |")
+        print("|---|---:|---:|---:|")
+        for item in dataset["summary"]:
+            print(
+                f'| {item["method"]} | {item["mean"]:.6f} | '
+                f'{item["p95"]:.6f} | {item["ratio"]:.3f}× |'
+            )
+        modes = ", ".join(
+            f"{name}={count}" for name, count in sorted(dataset["choices"].items())
+        )
+        print(
+            f'Portfolio: {modes}; accepted={dataset["accepted"]}; '
+            f'rejected={dataset["rejected"]}.'
+        )
+
     print("All results are descriptive; no cross-seed significance is implied.")
     if args.html:
         if args.html.exists():
