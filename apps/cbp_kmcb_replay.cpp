@@ -12,6 +12,7 @@
 // partition control, NOT a topology-correct cloth patch assignment.
 // These are material-generator trajectories, not end-to-end solver timings.
 #include "ccp/cbp_cost_manager.hpp"
+#include "ccp/cbp_portfolio.hpp"
 #include "ccp/final_broadphase.hpp"
 #include <algorithm>
 #include <array>
@@ -34,12 +35,15 @@ using ccp::cbp::Pairs;
 using ccp::cbp::RegionRouter;
 using ccp::cbp::CrossMode;
 using ccp::cbp::CausalCostRouter;
+using ccp::cbp::CbpPortfolio;
+using ccp::cbp::PortfolioMode;
 using Clock=std::chrono::steady_clock;
 static_assert(std::endian::native==std::endian::little,
               "KYOTOM01 material ABI requires little endian");
-constexpr std::array<const char*,6> kMethods{
+constexpr std::array<const char*,7> kMethods{
  "sap_rebuild","v4_guard_sap_bounded_trial","region_exhaustive",
- "region_shared_bvh","region_certified_cache","causal_cbp"};
+ "region_shared_bvh","region_certified_cache","causal_cbp",
+ "portfolio_v4_regional"};
 
 int integer(const char* s,int lo,int hi){
  std::size_t end=0;
@@ -88,7 +92,7 @@ struct Reader{
 };
 struct Summary{
  std::vector<double> sampleMs;
- std::size_t lastPairs{},switches{},cacheFrames{},bvhFrames{},exhaustiveFrames{};
+ std::size_t lastPairs{},switches{},cacheFrames{},bvhFrames{},exhaustiveFrames{},v4Frames{};
  double selectorTotalMs{},migrationTotalMs{};
 };
 double avg(const std::vector<double>& x){
@@ -122,7 +126,9 @@ int main(int argc,char** argv){
            "v4_action,v4_trial,v4_switched,manager_sample_density,manager_sample_motion,"
            "manager_sample_count,manager_backend_ms,local_primitive_tests,cross_primitive_tests,"
            "regions,index_builds,index_changed_leaves,index_ancestor_refits,"
-           "cache_graph_builds,cache_quiet_reuses,cache_dirty,cache_potential_pairs\n";
+           "cache_graph_builds,cache_quiet_reuses,cache_dirty,cache_potential_pairs,"
+           "portfolio_mode,portfolio_trial,portfolio_accepted,portfolio_rejected,"
+           "portfolio_v4_action,portfolio_switch_ms\n";
   }
 
   ccp::final_broadphase::GuardSAPBoundedTrial frozenV4;
@@ -131,22 +137,25 @@ int main(int argc,char** argv){
   fixed[1].setCrossMode(CrossMode::SharedBVH);
   fixed[2].setCrossMode(CrossMode::CertifiedCache);
   CausalCostRouter manager;
+  CbpPortfolio portfolio; // V4 fallback with charged on-policy regional trials.
+  portfolio.setTrialKernel(CrossMode::Exhaustive); // explicit diagnostic arm
   for(auto& r:fixed)r.setSapThreshold(48);
   manager.setSapThreshold(48);
-  std::array<Summary,6> stats{};
+  portfolio.setSapThreshold(48);
+  std::array<Summary,7> stats{};
   const auto n=static_cast<int>(source.n);
   std::vector<int> labels(source.n);
   for(int i=0;i<n;++i)labels[static_cast<std::size_t>(i)]=i/span;
 
   for(int frame=0;frame<frames;++frame){
    const auto boxes=source.next();
-   std::array<Pairs,6> outcomes{};
-   std::array<double,6> times{};
-   std::array<ccp::cbp::Telemetry,6> perMethodWork{};
+   std::array<Pairs,7> outcomes{};
+   std::array<double,7> times{};
+   std::array<ccp::cbp::Telemetry,7> perMethodWork{};
    std::string v4Action="unknown";
    bool v4Trial=false,v4Switched=false;
-   for(int k=0;k<6;++k){
-    const int method=(frame+k)%6;
+   for(int k=0;k<7;++k){
+    const int method=(frame+k)%7;
     const auto start=Clock::now();
     switch(method){
      case 0:
@@ -170,12 +179,16 @@ int main(int argc,char** argv){
       outcomes[5]=manager.query(boxes,labels);
       perMethodWork[5]=manager.backendWork();
       break;
+     case 6:
+      outcomes[6]=portfolio.query(boxes,labels);
+      perMethodWork[6]=portfolio.regionalWork();
+      break;
      default:throw std::logic_error("Invalid method");
     }
     times[static_cast<std::size_t>(method)]=
       std::chrono::duration<double,std::milli>(Clock::now()-start).count();
    }
-   for(int method=1;method<6;++method)
+   for(int method=1;method<7;++method)
     if(outcomes[static_cast<std::size_t>(method)]!=outcomes[0])
      throw std::runtime_error("Exact pair mismatch method="+
                               std::string(kMethods[static_cast<std::size_t>(method)])+
@@ -187,7 +200,8 @@ int main(int argc,char** argv){
    if(frame<warmup)continue;
 
    const auto& d=manager.decision();
-   for(int method=0;method<6;++method){
+   const auto& pd=portfolio.decision();
+   for(int method=0;method<7;++method){
     auto& s=stats[static_cast<std::size_t>(method)];
     s.sampleMs.push_back(times[static_cast<std::size_t>(method)]);
     s.lastPairs=outcomes[static_cast<std::size_t>(method)].size();
@@ -198,6 +212,14 @@ int main(int argc,char** argv){
      s.cacheFrames+=static_cast<std::size_t>(d.chosen==CrossMode::CertifiedCache);
      s.bvhFrames+=static_cast<std::size_t>(d.chosen==CrossMode::SharedBVH);
      s.exhaustiveFrames+=static_cast<std::size_t>(d.chosen==CrossMode::Exhaustive);
+    }else if(method==6){
+     s.switches+=static_cast<std::size_t>(pd.switched);
+     s.selectorTotalMs+=pd.decisionMs;
+     s.migrationTotalMs+=pd.coldSwitchMs;
+     s.v4Frames+=static_cast<std::size_t>(pd.mode==PortfolioMode::FrozenV4);
+     s.cacheFrames+=static_cast<std::size_t>(pd.mode==PortfolioMode::RegionalCertifiedCache);
+     s.bvhFrames+=static_cast<std::size_t>(pd.mode==PortfolioMode::RegionalSharedBVH);
+     s.exhaustiveFrames+=static_cast<std::size_t>(pd.mode==PortfolioMode::RegionalExhaustive);
     }
     if(trace){
      trace<<frame<<','<<kMethods[static_cast<std::size_t>(method)]<<','
@@ -224,7 +246,13 @@ int main(int argc,char** argv){
           <<perMethodWork[static_cast<std::size_t>(method)].cacheGraphBuilds<<','
           <<perMethodWork[static_cast<std::size_t>(method)].cacheQuietReuses<<','
           <<perMethodWork[static_cast<std::size_t>(method)].cacheDirtyPrimitives<<','
-          <<perMethodWork[static_cast<std::size_t>(method)].cachePotentialPairs<<'\n';
+          <<perMethodWork[static_cast<std::size_t>(method)].cachePotentialPairs<<','
+          <<(method==6?CbpPortfolio::name(pd.mode):"none")<<','
+          <<(method==6&&pd.trialFrame?1:0)<<','
+          <<(method==6&&pd.trialAccepted?1:0)<<','
+          <<(method==6&&pd.trialRejected?1:0)<<','
+          <<(method==6?pd.v4Action:"none")<<','
+          <<(method==6?pd.coldSwitchMs:0.)<<'\n';
     }
    }
   }
@@ -232,7 +260,7 @@ int main(int argc,char** argv){
   std::cout<<"snapshot,N,frames,timed,seed,material_code,id_span,method,"
               "mean_ms,p95_ms,sum_ms,v4_over_method,"
               "last_pairs,switches,selector_sum_ms,migration_sum_ms,"
-              "cache_frames,bvh_frames,exhaustive_frames,exact_parity\n";
+              "cache_frames,bvh_frames,exhaustive_frames,portfolio_v4_frames,exact_parity\n";
   for(std::size_t method=0;method<kMethods.size();++method){
    const auto& s=stats[method];
    const auto a=avg(s.sampleMs);
@@ -245,11 +273,11 @@ int main(int argc,char** argv){
             <<','<<baselineMs/a<<','<<s.lastPairs<<','<<s.switches<<','
             <<s.selectorTotalMs<<','<<s.migrationTotalMs<<','
             <<s.cacheFrames<<','<<s.bvhFrames<<','<<s.exhaustiveFrames
-            <<",verified\n";
+            <<','<<s.v4Frames<<",verified\n";
   }
   if(trace.is_open()&&!trace.good())
    throw std::runtime_error("Trace CSV failed");
-  std::cerr<<"[CBP MATERIAL] exact current-AABB pair parity for all 6 methods;"
+  std::cerr<<"[CBP MATERIAL] exact current-AABB pair parity for all 7 methods;"
            <<" ID-block regions are a surrogate, not real mesh topology\n";
  }catch(const std::exception& e){
   std::cerr<<"CBP material replay failure: "<<e.what()<<'\n';
