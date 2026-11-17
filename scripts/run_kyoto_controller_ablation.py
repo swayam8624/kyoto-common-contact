@@ -35,17 +35,24 @@ BUDGETS=(128,512,2048)
 DEFAULT_SEEDS=(1201,1301,1409,1511)
 TIMES=("ml_feature_ms","ml_inference_ms","ml_decision_ms","ml_backend_ms",
        "ml_bookkeeping_ms","ml_wrapper_ms")
-REPLAY_ABI="KYOTO_REPLAY_ABLATION_V4"
+REPLAY_ABI="KYOTO_REPLAY_ABLATION_V5"
 REQUIRED_POLICIES=frozenset(("sap_rebuild","sap_persistent_coherent",
     "global_guarded_exact","ml_cost_aware","ml_cost_aware_conservative",
-    "guard_sap_measured_probe","guard_sap_bounded_trial"))
+    "guard_sap_measured_probe","guard_sap_bounded_trial",
+    "global_guarded_aa_control","bvh_refit_exact","bvh_adaptive_exact",
+    "grid_spatial_hash_exact","delta_spatial_join_exact",
+    "patch_certificate_fixed","patch_certificate_signal"))
 REQUIRED_COLUMNS=frozenset(("backend","frame","ms","pairs","pair_hash","misses",
     "chosen_backend","ml_switched","ml_bypassed",
-    "hybrid_probed","hybrid_switched",*TIMES))
+    "hybrid_probed","hybrid_switched","field_events",*TIMES))
 REQUIRED_CAPABILITIES=frozenset((REPLAY_ABI,"sap_persistent_coherent",
     "ml_cost_aware_conservative","ml_bookkeeping_ms","ml_wrapper_ms",
     "guard_sap_measured_probe","guard_sap_bounded_trial",
-    "hybrid_probed","hybrid_switched"))
+    "hybrid_probed","hybrid_switched","field_events",
+    "randomized_method_order","global_guarded_aa_control",
+    "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
+    "delta_spatial_join_exact","patch_certificate_fixed",
+    "patch_certificate_signal"))
 
 
 def verify_replayer(replayer: Path, root: Path) -> None:
@@ -204,7 +211,11 @@ def main() -> None:
     parser.add_argument("--sampling",choices=("random","balanced"),default="random",
                         help="balanced covers all material/regime/size cells before any repeat")
     parser.add_argument("--bootstrap",type=int,default=2000)
-    parser.add_argument("--timeout",type=int,default=300)
+    parser.add_argument("--timeout",type=int,default=600)
+    parser.add_argument("--repeats",type=int,default=1,
+                        help="Repeat each *identical* snapshot under a new independently randomized backend order")
+    parser.add_argument("--order-seed",type=int,default=20261118,
+                        help="Predeclared RNG seed for deterministic reproducible policy ordering")
     parser.add_argument("--resume",action="store_true",
                         help="Resume identical partial ablation, preserving finished CSVs")
     args=parser.parse_args()
@@ -229,7 +240,7 @@ def main() -> None:
         parser.error("Seeds 101 and 1009 were already inspected as test: choose fresh seeds")
     if any(b<1 or b>50000 for b in args.budgets):
         parser.error("Primitive budgets must be in 1..50000 (exporter may impose tighter limits)")
-    if args.max_experiments<0 or args.timeout<10:
+    if args.repeats<1 or args.order_seed<0 or args.max_experiments<0 or args.timeout<10:
         parser.error("Invalid max experiments or timeout")
     combos=choose_combos(args.seeds,args.materials,args.regimes,args.budgets,
                         args.sample_seed,args.max_experiments,args.sampling)
@@ -243,6 +254,7 @@ def main() -> None:
               "budgets":sorted(set(args.budgets)),"frames":args.frames,
               "warmup":args.warmup,"max_experiments":args.max_experiments,
               "sample_seed":args.sample_seed,"sampling":args.sampling,
+              "repeats":args.repeats,"order_seed":args.order_seed,
               "combos":[list(x) for x in combos],
               "evidence":"New deterministic material snapshot experiments; no model tuning",
               "source_exhaustive_run_unchanged":True}
@@ -259,11 +271,13 @@ def main() -> None:
     for folder in ("snapshots","replays","logs"):
         (output/folder).mkdir(exist_ok=True)
     paths=[]
+    # Every repeat uses the EXACT same exported binary snapshot and a new
+    # independently randomized algorithm order. The stable digest is part of
+    # the protocol, never dependent on Python's randomized hash() function.
     for i,(seed,material,regime,budget) in enumerate(combos,1):
         stem=f"actual-{material}-{regime}-n{budget}-seed{seed}"
         snapshot=output/"snapshots"/f"{stem}.kmcb"
-        report=output/"replays"/f"{stem}-evaluated.csv"
-        print(f"[ABLATION] {i}/{len(combos)}: {stem}",flush=True)
+        print(f"[ABLATION] {i}/{len(combos)}: {stem}, repeats {args.repeats}",flush=True)
         if not snapshot.exists():
             tmp=snapshot.with_name(snapshot.name+".partial")
             try:
@@ -272,19 +286,23 @@ def main() -> None:
                 os.replace(tmp,snapshot)
             finally:
                 tmp.unlink(missing_ok=True)
-        if report.exists():
-            verify_replay_csv(report)
-        if not report.exists():
-            tmp=report.with_name(report.name+".partial")
-            try:
-                checked([replayer,snapshot,tmp,0,model],
-                        output/"logs"/f"{stem}-replay.log",args.timeout)
-                # Reject stale/wrong ABI results BEFORE making them permanent.
-                verify_replay_csv(tmp)
-                os.replace(tmp,report)
-            finally:
-                tmp.unlink(missing_ok=True)
-        paths.append(report)
+        for repeat in range(args.repeats):
+            suffix=f"-rep{repeat+1}" if args.repeats>1 else ""
+            report=output/"replays"/f"{stem}{suffix}-evaluated.csv"
+            key=f"{args.order_seed}|{stem}|{repeat}".encode("utf-8")
+            order_seed=int.from_bytes(hashlib.sha256(key).digest()[:8],"little") or 1
+            if report.exists():
+                verify_replay_csv(report)
+            else:
+                tmp=report.with_name(report.name+".partial")
+                try:
+                    checked([replayer,snapshot,tmp,0,model,order_seed],
+                            output/"logs"/f"{stem}{suffix}-replay.log",args.timeout)
+                    verify_replay_csv(tmp)
+                    os.replace(tmp,report)
+                finally:
+                    tmp.unlink(missing_ok=True)
+            paths.append(report)
     scenes,summary=evaluate(paths,args.warmup,args.bootstrap,args.sample_seed)
     # These are existing-implementation relative runtimes, not predicted policy labels.
     ratio_total=sum(s["measured_mean_ms"]["global_guarded_exact"] for s in scenes)/sum(
@@ -402,7 +420,8 @@ def main() -> None:
     summary["model_sha256"]=contract["model_sha256"]
     summary["fresh_seeds"]=sorted({x[0] for x in combos})
     summary["interpretation"]=("Exploratory fresh-seed pilot, no retuning on these scenes; "
-        "scene-bootstrap interval does not give seed-independent uncertainty.")
+        "scene-bootstrap interval does not give seed-independent uncertainty; "
+        "use RUMBLE_PATTERNS.json seed-blocked intervals for independent seeds.")
     # Finish all validation and timing before publishing either final report.
     # A failed run must not leave a plausible-looking completed-results file.
     timing=metrics(paths,args.warmup)
@@ -413,6 +432,14 @@ def main() -> None:
         encoding="utf-8")
     (output/"COMPONENT_TIMING.json").write_text(
         json.dumps(timing,indent=2)+"\n",encoding="utf-8")
+    try:
+        from .analyze_kyoto_rumble import analyze, write_report
+    except ImportError:
+        from analyze_kyoto_rumble import analyze, write_report
+    rumble=analyze(paths,args.warmup,args.bootstrap,args.sample_seed)
+    write_report(rumble,output)
+    print("[RUMBLE] overall ranking, seed-blocked intervals, exact-pair audit, "
+          "A/A control, and material/regime/size patterns saved",flush=True)
     print("[ABLATION] COMPLETED: new output, original exhaustive data untouched",flush=True)
     print("[ABLATION] scenes:",len(scenes),"fresh seeds:",sorted(args.seeds),flush=True)
     print("[ABLATION] per-trajectory geo Guard/ML:",
