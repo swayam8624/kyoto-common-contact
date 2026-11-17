@@ -41,6 +41,8 @@ def run(executable: str, path: pathlib.Path, sheets: int,
     by_frame: dict[int, list[dict[str, str]]] = collections.defaultdict(list)
     for row in rows:
         by_frame[int(row["frame"])].append(row)
+        if not row.get("snapshot_hash"):
+            raise AssertionError("Missing full geometry fingerprint")
         if row["method"] not in METHODS or row["oracle_equal"] != "1":
             raise AssertionError("Unknown method or pair disagreement")
         if int(row["primitives"]) != int(row["triangles"]) + spheres:
@@ -59,6 +61,8 @@ def run(executable: str, path: pathlib.Path, sheets: int,
             raise AssertionError("Duplicate or missing backend")
         if len({entry["pairs"] for entry in group}) != 1:
             raise AssertionError("Method pair-count inconsistency")
+        if len({entry["snapshot_hash"] for entry in group}) != 1:
+            raise AssertionError("Same frame used different geometry per method")
 
     # No benchmark evidence is overwritten without an explicit new filename.
     overwrite = subprocess.run(
@@ -77,14 +81,17 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="cbp-topology-") as temp:
         root = pathlib.Path(temp)
         run(executable, root / "one-sheet-span3.csv", 1, 1, 12, 3)
-        run(executable, root / "two-sheet-span6.csv", 2, 1, 12, 6)
+        for span in (1, 3, 6, 12):
+            run(executable, root / f"two-sheet-span{span}.csv", 2, 1, 12, span)
         report = root / "topology-report.html"
         analysis = subprocess.run(
             [
                 sys.executable,
                 str(pathlib.Path(__file__).with_name("analyze_cbp_topology.py")),
-                str(root / "one-sheet-span3.csv"),
+                str(root / "two-sheet-span1.csv"),
+                str(root / "two-sheet-span3.csv"),
                 str(root / "two-sheet-span6.csv"),
+                str(root / "two-sheet-span12.csv"),
                 "--html", str(report),
             ],
             capture_output=True, text=True, check=False, timeout=20,
@@ -97,8 +104,8 @@ def main() -> int:
         if "Portfolio decisions" not in text or "V4 / method" not in text:
             raise AssertionError("Offline research report omitted measured evidence")
     print(
-        "PASS CBP topology replay: exact 7-method parity over 24 coupled "
-        "cloth frames; real sheet/cell patch identities and immutable CSV"
+        "PASS CBP topology replay: exact 7-method parity over 60 coupled "
+        "cloth frames; identical geometry across 4 patch spans, real sheet/cell identities and immutable CSV"
     )
     return 0
 
