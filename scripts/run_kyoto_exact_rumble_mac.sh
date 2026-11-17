@@ -19,7 +19,7 @@ RESUME=()
 if [[ "${KYOTO_RUMBLE_RESUME:-0}" == "1" ]]; then RESUME=(--resume); fi
 
 # An isolated worktree protects V4 and its trained neural model.
-cmake -S . -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake -S . -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON
 cmake --build "$BUILD" --target ccp_material_export ccp_material_replay --parallel 4
 ctest --test-dir "$BUILD" --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
 python3 -m unittest scripts.test_ablation_preflight scripts.test_rumble_analysis -v
