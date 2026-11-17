@@ -5,6 +5,7 @@ on:
     branches:
       - research/kyoto-scale-evidence
       - research/kyoto-exact-event-field-rumble
+      - research/kyoto-v6-certified-interaction-hierarchy
   pull_request:
     paths:
       - 'apps/scaling_cpu.cpp'
