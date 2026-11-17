@@ -1,0 +1,28 @@
+name: CBP Phase 0 exact regional oracle
+on:
+  push:
+    branches: [research/common-broadphase-orchestrator]
+  pull_request:
+    paths:
+      - 'include/ccp/cbp_region_router.hpp'
+      - 'tests/cbp_region_router_tests.cpp'
+      - '.github/workflows/cbp-phase0.yml'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+
+jobs:
+  exact-regional-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact regional router regression (C++23, no solver dependencies)
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-tests
+          /tmp/cbp-region-tests
+      - name: ASan and UBSan adversarial regression
+        run: |
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-sanitizers
+          /tmp/cbp-region-sanitizers
