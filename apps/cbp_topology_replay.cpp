@@ -70,7 +70,7 @@ std::uint64_t snapshotHash(const std::vector<Bounds>& boxes){
  // mesh grouping. Compare across span sweeps to detect altered trajectories.
  // Not a cryptographic hash; exact pair-list oracle remains independent.
  std::uint64_t value=14695981039346656037ULL;
- const auto mix=[&](std::uint64_t word)mutable{
+ const auto mix=[&](std::uint64_t word){
   value^=word;
   value*=1099511628211ULL;
  };
