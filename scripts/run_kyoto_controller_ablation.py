@@ -36,13 +36,14 @@ BUDGETS=(128,512,2048)
 DEFAULT_SEEDS=(1201,1301,1409,1511)
 TIMES=("ml_feature_ms","ml_inference_ms","ml_decision_ms","ml_backend_ms",
        "ml_bookkeeping_ms","ml_wrapper_ms")
-REPLAY_ABI="KYOTO_REPLAY_ABLATION_V5"
+REPLAY_ABI="KYOTO_REPLAY_ABLATION_V6"
 REQUIRED_POLICIES=frozenset(("sap_rebuild","sap_persistent_coherent",
     "global_guarded_exact","ml_cost_aware","ml_cost_aware_conservative",
     "guard_sap_measured_probe","guard_sap_bounded_trial",
     "global_guarded_aa_control","bvh_refit_exact","bvh_adaptive_exact",
     "grid_spatial_hash_exact","delta_spatial_join_exact",
-    "patch_certificate_fixed","patch_certificate_signal"))
+    "patch_certificate_fixed","patch_certificate_signal",
+    "unified_certified_hierarchy_v0"))
 REQUIRED_COLUMNS=frozenset(("backend","frame","ms","pairs","pair_hash","misses",
     "chosen_backend","ml_switched","ml_bypassed",
     "hybrid_probed","hybrid_switched","field_events",*TIMES))
@@ -53,7 +54,8 @@ REQUIRED_CAPABILITIES=frozenset((REPLAY_ABI,"sap_persistent_coherent",
     "randomized_method_order","global_guarded_aa_control",
     "bvh_refit_exact","bvh_adaptive_exact","grid_spatial_hash_exact",
     "delta_spatial_join_exact","patch_certificate_fixed",
-    "patch_certificate_signal"))
+    "patch_certificate_signal",
+    "unified_certified_hierarchy_v0"))
 
 
 def verify_replayer(replayer: Path, root: Path) -> None:
@@ -65,7 +67,8 @@ def verify_replayer(replayer: Path, root: Path) -> None:
     # Track every directly related interface, not only the leaf controller.
     # In particular, Result::mlBookkeepingMs is declared in generic_online.hpp;
     # updating learned_online.hpp without it caused a real macOS build failure.
-    sources=[root/"include/ccp/experimental_field.hpp",
+    sources=[root/"include/ccp/unified_certified_hierarchy.hpp",
+             root/"include/ccp/experimental_field.hpp",
              root/"apps/material_replay_benchmark.cpp",
              root/"include/ccp/learned_online.hpp",
              root/"include/ccp/generic_online.hpp",
