@@ -24,6 +24,8 @@ cmake --build "$BUILD" --target ccp_material_export ccp_material_replay --parall
 ctest --test-dir "$BUILD" --output-on-failure -R learned_cpp_model_and_exact_pair_oracle
 python3 -m unittest scripts.test_ablation_preflight scripts.test_rumble_analysis -v
 python3 scripts/test_rumble_adversarial.py "$BUILD/ccp_material_replay"
+c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Iinclude tests/kinetic_certificates_tests.cpp -o "$BUILD/ccp_kinetic_certificates_tests"
+"$BUILD/ccp_kinetic_certificates_tests"
 
 echo "[RUMBLE] Model: $MODEL"
 echo "[RUMBLE] Fresh output: $OUTPUT"
