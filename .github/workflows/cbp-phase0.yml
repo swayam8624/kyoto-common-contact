@@ -42,6 +42,11 @@ jobs:
             -Iinclude apps/cbp_cross_microbench.cpp -o /tmp/cbp-bench
           /tmp/cbp-bench 64 24 > /tmp/cbp-bench-smoke.csv
           test "$(wc -l < /tmp/cbp-bench-smoke.csv)" -eq 10
+      - name: Bounded 256-primitive diagnostic (not a performance gate)
+        timeout-minutes: 2
+        run: |
+          /tmp/cbp-bench 256 64 > /tmp/cbp-bench-256.csv
+          cat /tmp/cbp-bench-256.csv
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
