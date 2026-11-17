@@ -77,7 +77,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="cbp-topology-") as temp:
         root = pathlib.Path(temp)
         run(executable, root / "one-sheet-span3.csv", 1, 1, 12, 3)
-        run(executable, root / "two-sheet-span6.csv", 2, 0, 12, 6)
+        run(executable, root / "two-sheet-span6.csv", 2, 1, 12, 6)
     print(
         "PASS CBP topology replay: exact 7-method parity over 24 coupled "
         "cloth frames; real sheet/cell patch identities and immutable CSV"
