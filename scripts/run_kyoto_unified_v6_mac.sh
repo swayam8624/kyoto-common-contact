@@ -15,6 +15,11 @@ REPEATS="${KYOTO_V6_REPEATS:-2}"
 FRAMES="${KYOTO_V6_FRAMES:-160}"
 WARMUP="${KYOTO_V6_WARMUP:-16}"
 MAX_EXPERIMENTS="${KYOTO_V6_MAX_EXPERIMENTS:-36}"
+# Change KYOTO_V6_SEEDS for a genuinely independent confirmation run.
+# A pilot and final confirmation must never share evaluated scene/seed cells.
+SEED_TEXT="${KYOTO_V6_SEEDS:-4103 4111 4127 4153 4177 4201 4217 4231}"
+read -r -a SEEDS <<< "$SEED_TEXT"
+if [[ "${#SEEDS[@]}" -eq 0 ]]; then echo "No V6 seeds supplied" >&2; exit 2; fi
 # The argument array is always non-empty; macOS Bash 3.2 + set -u
 # treats expansion of an *empty* array as an unbound variable.
 # Build a single complete argv, and append --resume only when explicitly set.
@@ -31,13 +36,13 @@ c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Iinclude tests/kinetic_certificates
 
 echo "[RUMBLE] Model: $MODEL"
 echo "[RUMBLE] Fresh output: $OUTPUT"
-echo "[RUMBLE] 6 materials x 6 motion regimes x 3 budgets x 8 NEW seeds x $REPEATS repeats"
+echo "[RUMBLE] 6 materials x 6 motion regimes x 3 budgets x ${#SEEDS[@]} supplied seeds x $REPEATS repeats"
 echo "[RUMBLE] Frames per replay: $FRAMES; warmup $WARMUP; max experiments: $MAX_EXPERIMENTS (0 = all)"
 ABLATION_ARGS=(
   --model "$MODEL"
   --build "$BUILD"
   --output "$OUTPUT"
-  --seeds 4103 4111 4127 4153 4177 4201 4217 4231
+  --seeds "${SEEDS[@]}"
   --sampling balanced
   --sample-seed 20261120
   --order-seed 20261121
