@@ -173,6 +173,33 @@ private:
    visit(a,y.right,boxes,labels,out);
   }
  }
+ // Indexed incident-edge discovery used by the certified cross-region cache.
+ // This is a one-to-many current-ENVELOPE query, not an O(dirty*N) scan.
+ void visitIncident(int primitive,int nodeId,const std::vector<Bounds>& covers,
+                    const std::vector<int>& labels,Pairs& out){
+  const Node& n=nodes_[static_cast<std::size_t>(nodeId)];
+  const Bounds& source=covers[static_cast<std::size_t>(primitive)];
+  ++work_.nodePairVisits;
+  if(n.uniform && n.region==labels[static_cast<std::size_t>(primitive)]){
+   ++work_.sameRegionPruned;return;
+  }
+  if(!touches(source,n.box)){++work_.boundsPruned;return;}
+  if(n.leaf()){
+   const int other=n.primitive;
+   if(other==primitive || labels[static_cast<std::size_t>(other)]==
+                          labels[static_cast<std::size_t>(primitive)])return;
+   ++work_.primitiveTests;
+   const Bounds& target=covers[static_cast<std::size_t>(other)];
+   if((source.mask&target.category)!=0 &&
+      (target.mask&source.category)!=0 && touches(source,target)){
+    out.push_back({std::min(primitive,other),std::max(primitive,other)});
+    ++work_.emittedPairs;
+   }
+   return;
+  }
+  visitIncident(primitive,n.left,covers,labels,out);
+  visitIncident(primitive,n.right,covers,labels,out);
+ }
 public:
  void clear(){nodes_.clear();leaves_.clear();labels_.clear();root_=-1;work_={};}
  const Work& work()const{return work_;}
@@ -182,6 +209,20 @@ public:
    throw std::invalid_argument("CBP BVH requires one label per primitive");
   sync(boxes,labels);
   if(root_>=0)visit(root_,root_,boxes,labels,out);
+ }
+ // Refit ONCE, then perform independent BVH-culled queries for every dirty
+ // primitive. Callers must deduplicate results when both endpoints are dirty.
+ void appendIncidentCrossPairs(const std::vector<Bounds>& covers,
+                               const std::vector<int>& labels,
+                               const std::vector<int>& dirty,Pairs& out){
+  if(covers.size()!=labels.size())
+   throw std::invalid_argument("CBP incident query needs one label per primitive");
+  sync(covers,labels);
+  for(const int primitive:dirty){
+   if(primitive<0 || static_cast<std::size_t>(primitive)>=covers.size())
+    throw std::out_of_range("CBP dirty primitive ID out of range");
+   if(root_>=0)visitIncident(primitive,root_,covers,labels,out);
+  }
  }
 };
 } // namespace ccp::cbp
