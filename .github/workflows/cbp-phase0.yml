@@ -74,6 +74,28 @@ jobs:
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic             -Iinclude apps/cbp_kmcb_replay.cpp src/live_cloth.cpp -o /tmp/cbp-kmcb-replay
           python3 scripts/test_cbp_kmcb_smoke.py /tmp/cbp-kmcb-replay
+      - name: CMake target integration for the CBP manager and material replay
+        timeout-minutes: 3
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu             --target ccp_cbp_cost_manager_tests ccp_cbp_kmcb_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu             -R '^cbp_(causal_manager_oracle|kmcb_snapshot_contract)
+        run: |
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-sanitizers
+          /tmp/cbp-region-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-sanitizers
+          /tmp/cbp-bvh-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_certified_cache_tests.cpp -o /tmp/cbp-cert-sanitizers
+          /tmp/cbp-cert-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude             tests/cbp_cost_manager_tests.cpp -o /tmp/cbp-manager-sanitizers
+          /tmp/cbp-manager-sanitizers
+             --output-on-failure
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
