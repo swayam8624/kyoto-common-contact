@@ -292,13 +292,20 @@ public:
    out_=ccp::live::candidates(boxes,true);
    ++stat_.builds;return out_;
   }
+  // Hash-grid enumeration can explode when many boxes share many cells.
+  // Abort the redundant work after a predeclared cap, and charge the
+  // eventual exact sweep and all preceding grid operations to this method.
+  const size_t comparisonCap=std::max(size_t{25000},boxes.size()*size_t{128});
   for(const auto& entry:grid){
    const auto& occupants=entry.second;
    for(size_t i=0;i<occupants.size();++i)
     for(size_t j=i+1;j<occupants.size();++j){
      const auto& a=boxes[size_t(occupants[i])];
      const auto& b=boxes[size_t(occupants[j])];
-     ++stat_.aabbTests;
+     if(++stat_.aabbTests>comparisonCap){
+      out_=ccp::live::candidates(boxes,true);
+      ++stat_.repairs;return out_;
+     }
      if(compatible(a,b)&&hits(a,b))out_.push_back(canonical(a,b));
     }
   }
@@ -306,7 +313,10 @@ public:
    for(size_t j=0;j<boxes.size();++j){
     if(size_t(i)==j)continue;
     const auto& a=boxes[size_t(i)],&b=boxes[j];
-    ++stat_.aabbTests;
+    if(++stat_.aabbTests>comparisonCap){
+     out_=ccp::live::candidates(boxes,true);
+     ++stat_.repairs;return out_;
+    }
     if(compatible(a,b)&&hits(a,b))out_.push_back(canonical(a,b));
    }
   normalize(out_);++stat_.builds;
@@ -453,13 +463,21 @@ public:
    if(previous_.empty())++stat_.builds;
   }else ++stat_.reuses;
   out_.clear();
+  const size_t comparisonCap=std::max(size_t{25000},boxes.size()*size_t{128});
   for(const auto& edge:edges_){
    const auto& a=patches_[size_t(edge.first)];
    const auto& b=patches_[size_t(edge.second)];
    for(size_t i=a.begin;i<a.end;++i){
     const size_t start=edge.first==edge.second?i+1:b.begin;
     for(size_t j=start;j<b.end;++j){
-     ++stat_.aabbTests;
+     if(++stat_.aabbTests>comparisonCap){
+      out_=ccp::live::candidates(boxes,true);
+      previous_=boxes;
+      previousActivity_=std::move(activity);
+      stat_.events=count;
+      ++stat_.repairs;
+      return out_;
+     }
      if(compatible(boxes[i],boxes[j])&&hits(boxes[i],boxes[j]))
       out_.push_back(canonical(boxes[i],boxes[j]));
     }
