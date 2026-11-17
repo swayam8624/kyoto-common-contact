@@ -11,6 +11,9 @@ on:
       - 'apps/cbp_cross_microbench.cpp'
       - 'include/ccp/cbp_certified_cache.hpp'
       - 'include/ccp/cbp_cost_manager.hpp'
+      - 'include/ccp/cbp_portfolio.hpp'
+      - 'tests/cbp_portfolio_tests.cpp'
+      - 'scripts/analyze_cbp_pilot.py'
       - 'tests/cbp_cost_manager_tests.cpp'
       - 'apps/cbp_kmcb_replay.cpp'
       - 'scripts/test_cbp_kmcb_smoke.py'
@@ -69,7 +72,12 @@ jobs:
           /tmp/cbp-manager-bench 256 24 > /tmp/cbp-manager-256.csv
           test "$(wc -l < /tmp/cbp-manager-256.csv)" -eq 25
           cat /tmp/cbp-manager-256.csv
-      - name: KYOTOM01 material replay six-method exactness and trace contract
+      - name: Frozen V4 fallback portfolio exact regression
+        timeout-minutes: 2
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror             -Iinclude tests/cbp_portfolio_tests.cpp src/live_cloth.cpp             -o /tmp/cbp-portfolio-tests
+          /tmp/cbp-portfolio-tests
+      - name: KYOTOM01 material replay seven-method exactness and trace contract
         timeout-minutes: 3
         run: |
           c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic             -Iinclude apps/cbp_kmcb_replay.cpp src/live_cloth.cpp -o /tmp/cbp-kmcb-replay
@@ -78,8 +86,8 @@ jobs:
         timeout-minutes: 3
         run: |
           cmake --preset kyoto-final-cpu
-          cmake --build build/kyoto-final-cpu --target ccp_cbp_cost_manager_tests ccp_cbp_kmcb_replay --parallel 2
-          ctest --test-dir build/kyoto-final-cpu -R 'cbp_(causal_manager_oracle|kmcb_snapshot_contract)' --output-on-failure
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_cost_manager_tests ccp_cbp_portfolio_tests ccp_cbp_kmcb_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu -R 'cbp_(causal_manager_oracle|portfolio_fallback_oracle|kmcb_snapshot_contract)' --output-on-failure
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
@@ -96,3 +104,5 @@ jobs:
           /tmp/cbp-cert-sanitizers
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude             tests/cbp_cost_manager_tests.cpp -o /tmp/cbp-manager-sanitizers
           /tmp/cbp-manager-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude tests/cbp_portfolio_tests.cpp             src/live_cloth.cpp -o /tmp/cbp-portfolio-sanitizers
+          /tmp/cbp-portfolio-sanitizers
