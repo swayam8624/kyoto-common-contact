@@ -69,7 +69,7 @@ class CausalCostRouter {
   double sampledDensity{},sampledMotion{},decisionMs{},
          migrationMs{},backendMs{},totalMs{};
   std::size_t densitySamples{},switchedTotal{},potentialPairs{},dirty{};
-  bool switched{},coldStart{};
+  bool switched{},coldStart{},forcedEscape{};
  };
  private:
  Decision last_{};
@@ -134,6 +134,12 @@ class CausalCostRouter {
   // trained optimal boundaries or a claimed research novelty.
   CrossMode preferred=CrossMode::CertifiedCache;
   const bool saturated=boxes.size()<=24||density>=.55;
+  // Local observation of LAST frame's paid certificate maintenance + this
+  // frame's already-known geometry. No alternative backend is executed.
+  const bool dirtyOverload=initialized_ &&
+    selected_==CrossMode::CertifiedCache && boxes.size()>=64 &&
+    previousWork_.cacheDirtyPrimitives>boxes.size()/3 &&
+    motion>=.35;
   if(saturated)preferred=CrossMode::Exhaustive;
   else if(density>=.18 || motion>=.35 ||
           (initialized_ && selected_==CrossMode::CertifiedCache &&
@@ -155,7 +161,8 @@ class CausalCostRouter {
    // escape overrides hysteresis, but still pays full cold-start cost.
    if(preferred==pending_)++pendingFrames_;
    else{pending_=preferred;pendingFrames_=1;}
-   const bool immediate=saturated&&preferred==CrossMode::Exhaustive;
+   const bool immediate=(saturated&&preferred==CrossMode::Exhaustive)||
+     (dirtyOverload&&preferred==CrossMode::SharedBVH);
    if(immediate||(pendingFrames_>=3&&cooldown_==0)){
     bool allow=true;
     const auto& target=records_[modeIndex(preferred)][static_cast<std::size_t>(cell)];
@@ -209,7 +216,8 @@ class CausalCostRouter {
   previousWork_=work;
   last_={selected_,density,motion,ms(start,decided),migration,
          ms(backendStart,end),total,eligiblePairs,switches_,
-         work.cachePotentialPairs,work.cacheDirtyPrimitives,switchNow,cold};
+         work.cachePotentialPairs,work.cacheDirtyPrimitives,switchNow,cold,
+         switchNow&&dirtyOverload};
   return pairs;
  }
 };
