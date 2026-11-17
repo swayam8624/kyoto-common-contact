@@ -6,6 +6,7 @@ on:
       - main
       - fix/kyoto-meeting-validated-demo
       - research/kyoto-exact-event-field-rumble
+      - research/kyoto-v6-certified-interaction-hierarchy
 jobs:
   headless:
     runs-on: ubuntu-latest
