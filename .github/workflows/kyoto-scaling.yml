@@ -19,6 +19,7 @@ jobs:
       - name: Syntax-check macOS run script and Python evidence tools
         run: |
           bash -n scripts/run_kyoto_materials_mac.sh
+          bash -n scripts/run_kyoto_exact_rumble_mac.sh
           python3 -m py_compile \
             scripts/summarize_material_suite.py scripts/verify_material_cpu_gpu.py \
             scripts/package_kyoto_results.py scripts/train_online_controller.py \
