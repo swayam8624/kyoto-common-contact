@@ -27,6 +27,11 @@ python3 -m pip install Pillow
 bash scripts/run_kyoto_visual_package.sh output/kyoto-final-showcase
 ```
 
+The final V4 controller is also selectable as `Policy::FinalBounded` in
+`MultiCloth`. The coupled solver's exported geometry is checked against
+SAP on every frame; a timing or fidelity advantage in the complete solver
+is **not** assumed.
+
 The runner performs a **short** correctness gate (not another massive
 tournament), captures six materials in six motion regimes and all seven
 original coupled-cloth broad-phase policies, and exports two true-data
@@ -35,7 +40,7 @@ looping GIFs with MP4 variants when FFmpeg is available:
 - `output/kyoto-final-showcase/videos/all-materials-six-regimes.gif`:
   **six materials × four methods**, cycling across six motion regimes;
   each method shows the same actual 3D AABB geometry but its own CPU time.
-- `output/kyoto-final-showcase/videos/all-seven-solver-policies.gif`:
+- `output/kyoto-final-showcase/videos/all-eight-solver-policies.gif`:
   actual coupled cloth/sphere mesh sequences with verified SAP state parity.
 - `output/kyoto-final-showcase/reports/SOLVER_QUALITY.md`:
   edge strain, nearly collapsed triangles, contact-response diagnostics and
