@@ -145,6 +145,11 @@ target_compile_options(ccp_cbp_cost_manager_tests PRIVATE -Wall -Wextra -Wpedant
 add_executable(ccp_cbp_manager_bench apps/cbp_manager_microbench.cpp)
 target_include_directories(ccp_cbp_manager_bench PRIVATE include)
 target_compile_options(ccp_cbp_manager_bench PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Phase 4: exact frozen-V4 fallback with bounded on-policy regional trials.
+add_executable(ccp_cbp_portfolio_tests tests/cbp_portfolio_tests.cpp)
+target_link_libraries(ccp_cbp_portfolio_tests PRIVATE ccp_live)
+target_include_directories(ccp_cbp_portfolio_tests PRIVATE include)
+target_compile_options(ccp_cbp_portfolio_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Identical immutable KYOTOM01 material replays against frozen V4.
 add_executable(ccp_cbp_kmcb_replay apps/cbp_kmcb_replay.cpp)
 target_link_libraries(ccp_cbp_kmcb_replay PRIVATE ccp_live)
@@ -157,6 +162,7 @@ if(BUILD_TESTING)
   add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
   add_test(NAME cbp_causal_manager_oracle COMMAND ccp_cbp_cost_manager_tests)
+  add_test(NAME cbp_portfolio_fallback_oracle COMMAND ccp_cbp_portfolio_tests)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
