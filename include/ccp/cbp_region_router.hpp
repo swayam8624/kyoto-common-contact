@@ -1,5 +1,5 @@
 #pragma once
-// Kyoto Common Broad-Phase (CBP): Phase-0 exact regional routing baseline.
+// Kyoto Common Broad-Phase (CBP): Phase-1 exact regional routing prototype.
 // EXPERIMENTAL, NOT A NOVELTY OR PERFORMANCE CLAIM.
 //
 // The input arrays are stable ID-indexed AABBs and persistent topology-aligned
@@ -7,10 +7,12 @@
 // Cross-region interactions use conservative region-union AABBs and exact
 // primitive checks. Region boundaries NEVER suppress actual overlaps.
 //
-// This intentionally O(sum overlapping region size products) cross-region
-// baseline is a correctness control, NOT the proposed indexed local repair.
+// Default cross-region kernel is now one shared exact refittable primitive BVH.
+// The original exhaustive cross-region join remains selectable as a control.
+// This is NOT yet a cached certified-contact graph or cost-aware manager.
 // Routing and all tests are exposed as telemetry. Keep V4 frozen.
 #include "ccp/live_cloth.hpp"
+#include "ccp/cbp_spatial_index.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -46,10 +48,14 @@ inline void emit(const Bounds& a,const Bounds& b,Pairs& out){
 }
 
 enum class Kernel { Exhaustive, PersistentSAP };
+// Exhaustive preserves Phase-0 as a direct A/B diagnostic control.
+enum class CrossMode { Exhaustive, SharedBVH };
 struct Telemetry {
  std::size_t regions{},localTests{},crossTests{},regionPairTests{},
              regionPairsPruned{},localExhaustiveRegions{},localSapRegions{},
-             topologyResets{},coldSapInitializations{};
+             topologyResets{},coldSapInitializations{},
+             indexBuilds{},indexChangedLeaves{},indexAncestorRefits{},
+             indexNodePairVisits{},indexBoundsPruned{},indexSameRegionPruned{};
 };
 
 class RegionRouter {
@@ -62,6 +68,8 @@ class RegionRouter {
  std::map<int,Region> regions_;
  std::vector<int> ids_,labels_;
  std::map<int,Kernel> overrides_;
+ SharedCrossBVH sharedIndex_;
+ CrossMode crossMode_{CrossMode::SharedBVH};
  Telemetry last_{};
  std::size_t resets_{};
  std::size_t sapThreshold_{48};
@@ -128,9 +136,11 @@ class RegionRouter {
  }
 public:
  void setKernel(int regionId,Kernel kernel){overrides_[regionId]=kernel;}
+ void setCrossMode(CrossMode mode){crossMode_=mode;}
+ CrossMode crossMode() const{return crossMode_;}
  void clearOverrides(){overrides_.clear();}
  void setSapThreshold(std::size_t count){sapThreshold_=count;}
- void reset(){regions_.clear();ids_.clear();labels_.clear();resets_=0;last_={};}
+ void reset(){regions_.clear();ids_.clear();labels_.clear();sharedIndex_.clear();resets_=0;last_={};}
  Telemetry telemetry() const{return last_;}
 
  Pairs query(const std::vector<Bounds>& boxes,const std::vector<int>& regionLabels){
@@ -161,18 +171,36 @@ public:
        (r.ids.size()>=sapThreshold_?Kernel::PersistentSAP:Kernel::Exhaustive);
    local(boxes,r,mode,out);
   }
-  for(auto a=regions_.begin();a!=regions_.end();++a)
-   for(auto b=std::next(a);b!=regions_.end();++b){
-    ++last_.regionPairTests;
-    if(!overlap(a->second.unionBounds,b->second.unionBounds)){
-     ++last_.regionPairsPruned;
-     continue;
+  if(crossMode_==CrossMode::SharedBVH){
+   // The single spatial index contains ALL primitives but emits ONLY pairs
+   // whose current region owners differ. Same-region pairs are handled above.
+   // Dirty leaves and ancestors are refitted before every traversal; no
+   // delayed certificate repair or future-geometry assumption is involved.
+   sharedIndex_.appendCrossPairs(boxes,regionLabels,out);
+   const auto& w=sharedIndex_.work();
+   last_.crossTests=w.primitiveTests;
+   last_.indexBuilds=w.builds;
+   last_.indexChangedLeaves=w.changedLeaves;
+   last_.indexAncestorRefits=w.ancestorRefits;
+   last_.indexNodePairVisits=w.nodePairVisits;
+   last_.indexBoundsPruned=w.boundsPruned;
+   last_.indexSameRegionPruned=w.sameRegionPruned;
+  }else{
+   // Phase-0 reference: exact but potentially O(sum |R_a|*|R_b|).
+   // Keep this for same-input correctness and measured A/B comparisons.
+   for(auto a=regions_.begin();a!=regions_.end();++a)
+    for(auto b=std::next(a);b!=regions_.end();++b){
+     ++last_.regionPairTests;
+     if(!overlap(a->second.unionBounds,b->second.unionBounds)){
+      ++last_.regionPairsPruned;
+      continue;
+     }
+     for(int ai:a->second.ids)for(int bi:b->second.ids){
+      ++last_.crossTests;
+      emit(boxes[std::size_t(ai)],boxes[std::size_t(bi)],out);
+     }
     }
-    for(int ai:a->second.ids)for(int bi:b->second.ids){
-     ++last_.crossTests;
-     emit(boxes[std::size_t(ai)],boxes[std::size_t(bi)],out);
-    }
-   }
+  }
   last_.regions=regions_.size();
   normalize(out);
   return out;
