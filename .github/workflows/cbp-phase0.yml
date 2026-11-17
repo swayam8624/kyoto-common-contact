@@ -90,14 +90,19 @@ jobs:
           cmake --preset kyoto-final-cpu
           cmake --build build/kyoto-final-cpu --target ccp_cbp_cost_manager_tests ccp_cbp_portfolio_tests ccp_cbp_kmcb_replay ccp_cbp_topology_replay --parallel 2
           ctest --test-dir build/kyoto-final-cpu -R 'cbp_(causal_manager_oracle|portfolio_fallback_oracle|kmcb_snapshot_contract|mesh_topology_replay_contract)' --output-on-failure
-      - name: Topology-authentic coupled cloth diagnostic (not a performance gate)
+      - name: Topology-authentic four-span same-geometry ablation (diagnostic only)
         timeout-minutes: 4
         run: |
           mkdir -p build/kyoto-final-cpu/cbp-evidence
-          build/kyoto-final-cpu/ccp_cbp_topology_replay \
-            build/kyoto-final-cpu/cbp-evidence/two-cloth-span3.csv 2 1 24 3
+          for span in 1 3 6 12; do
+            build/kyoto-final-cpu/ccp_cbp_topology_replay \
+              build/kyoto-final-cpu/cbp-evidence/two-cloth-span${span}.csv 2 1 24 ${span}
+          done
           python3 scripts/analyze_cbp_topology.py \
+            build/kyoto-final-cpu/cbp-evidence/two-cloth-span1.csv \
             build/kyoto-final-cpu/cbp-evidence/two-cloth-span3.csv \
+            build/kyoto-final-cpu/cbp-evidence/two-cloth-span6.csv \
+            build/kyoto-final-cpu/cbp-evidence/two-cloth-span12.csv \
             --html build/kyoto-final-cpu/cbp-evidence/report.html
       - name: ASan and UBSan adversarial regression
         run: |
