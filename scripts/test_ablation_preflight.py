@@ -33,7 +33,10 @@ class AblationPreflightTests(unittest.TestCase):
         self.write_binary(
             f"{REPLAY_ABI} sap_persistent_coherent ml_cost_aware_conservative "
             "guard_sap_measured_probe guard_sap_bounded_trial "
-            "hybrid_probed hybrid_switched "
+            "hybrid_probed hybrid_switched field_events randomized_method_order "
+            "global_guarded_aa_control bvh_refit_exact bvh_adaptive_exact "
+            "grid_spatial_hash_exact delta_spatial_join_exact "
+            "patch_certificate_fixed patch_certificate_signal "
             "ml_bookkeeping_ms ml_wrapper_ms")
         verify_replayer(self.bin,self.root)
 
@@ -78,6 +81,15 @@ class AblationPreflightTests(unittest.TestCase):
                     self.assertEqual(len(set(actual)),2)
         self.assertEqual(len(choose_combos(seeds,materials,regimes,budgets,
                                           20261117,0,"balanced")),72)
+
+    def test_repeat_schedule_has_distinct_stable_orders(self):
+        import hashlib
+        # The same snapshot is benchmarked repeatedly with separate,
+        # deterministic shuffled-method order seeds.
+        stem="actual-cloth-impact-n512-seed3001"
+        keys=[int.from_bytes(hashlib.sha256(
+            f"20261118|{stem}|{r}".encode()).digest()[:8],"little") for r in range(3)]
+        self.assertEqual(len(set(keys)),3)
 
     def test_accepts_complete_replay_schema(self):
         report=self.root/"complete.csv"
