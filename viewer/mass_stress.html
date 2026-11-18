@@ -95,8 +95,8 @@ byId("instances").textContent=data.instances.toLocaleString();
 byId("elements").textContent=data.primitives.toLocaleString();
 byId("gpu").textContent=data.gpu_checks.toLocaleString();
 byId("conditions").textContent="Layout: "+data.layout+" · Seed: "+data.seed+" · "+data.frames.length+" frames · "+data.warmup+" warmup excluded";
-byId("machine").textContent=data.gpu_checks?"CPU + GPU EVIDENCE":"CPU EVIDENCE";
-byId("verified").textContent=data.gpu_checks?"CPU/Metal full pair counts and hashes match":"Every CPU backend matches SAP · Metal data not supplied";
+byId("machine").textContent=data.preview_only?"GEOMETRY PREVIEW":data.gpu_checks?"CPU + GPU EVIDENCE":"CPU EVIDENCE";
+byId("verified").textContent=data.preview_only?"BENCHMARK EXECUTING · TIMINGS NOT AVAILABLE":data.gpu_checks?"CPU/Metal full pair counts and hashes match":"Every CPU backend matches SAP · Metal data not supplied";
 for(let i=0;i<5;i++){const el=document.createElement("span");el.innerHTML="<i class='swatch' style='background:"+colors[i]+"'></i>"+names[i];byId("legend").append(el)}
 for(const m of data.stats){const tr=document.createElement("tr");
 for(const text of [m.mode+(m.gpu?" · GPU":""),
@@ -154,6 +154,7 @@ function drawTimes(){
  const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(100,canvas.clientWidth),h=200;
  canvas.width=Math.floor(w*dpr);canvas.height=Math.floor(h*dpr);ctx.scale(dpr,dpr);
  ctx.clearRect(0,0,w,h);const rows=Object.values(data.runs[current]).sort((a,b)=>a.host_ms-b.host_ms);
+ if(!rows.length){ctx.fillStyle="#9cb1c5";ctx.font="14px system-ui";ctx.fillText("Geometry replay available; benchmark measurements not completed",18,44);return}
  const max=Math.max(.001,...rows.map(r=>r.host_ms)),rowH=Math.min(23,190/rows.length);
  for(let i=0;i<rows.length;i++){const r=rows[i],y=i*rowH+5;
  ctx.fillStyle=r.gpu?"#8e9df2":"#4bc9b5";ctx.fillRect(156,y+3,Math.max(1,(w-235)*r.host_ms/max),rowH-5);
@@ -162,7 +163,7 @@ function drawTimes(){
 }
 function redraw(){byId("seek").max=data.frames.length-1;byId("seek").value=current;
  byId("frame-label").textContent=(current+1)+" / "+data.frames.length;
- byId("pairs").textContent=data.runs[current].sap_rebuild.pairs.toLocaleString();drawWorld();drawTimes()}
+ byId("pairs").textContent=data.preview_only?"pending":data.runs[current].sap_rebuild.pairs.toLocaleString();drawWorld();drawTimes()}
 function animate(timestamp){if(playing&&timestamp-last>1000/Number(byId("fps").value)){
  last=timestamp;current=(current+1)%data.frames.length;redraw()}requestAnimationFrame(animate)}
 byId("play").onclick=()=>{playing=!playing;byId("play").textContent=playing?"Pause":"Play"};
