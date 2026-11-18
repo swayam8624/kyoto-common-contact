@@ -102,6 +102,12 @@ def main():
         data = json.loads((scene / "asset-meshes.json").read_text())
         assert len(data["objects"]) == 12
         assert all(x["source_triangles"] == 4 for x in data["objects"])
+        assert all(x["display_triangles"] == 4 and
+                   len(x["visual_triangles"]) == 4
+                   for x in data["objects"])
+        assert all(x["selected_triangles"] == 4 and
+                   len(x["triangles"]) == 4
+                   for x in data["objects"])
         assert len(data["frames"]) == 12
         call([replay, str(scene / "snapshots.kmcb"),
               str(scene / "instances.csv"), str(scene / "cpu-core.csv"), "core"])
@@ -109,7 +115,9 @@ def main():
         call([sys.executable, str(renderer), str(scene), "--html", str(html)])
         page = html.read_text()
         for token in ("Real 3D Scene", "gl.drawArrays(gl.TRIANGLES",
-                      "CPU / broad-phase evidence", "synthetic-ci-only"):
+                      "CPU / broad-phase evidence", "synthetic-ci-only",
+                      "Higher-detail GLB display", "Measured collision triangles",
+                      "Collision-query triangles"):
             if token.lower() not in page.lower():
                 raise AssertionError("Actual mesh viewer contract missing " + token)
         node = shutil.which("node")
@@ -120,6 +128,12 @@ def main():
             client = base / "browser.js"
             client.write_text(chunks[0])
             call([node, "--check", str(client)])
+        # Display-mesh corruption must fail closed before browser output.
+        broken = json.loads((scene / "asset-meshes.json").read_text())
+        broken["objects"][0]["visual_triangles"][0][0] = "fake"
+        (scene / "asset-meshes.json").write_text(json.dumps(broken))
+        call([sys.executable, str(renderer), str(scene),
+              "--html", str(scene / "forged-visual.html")], ok=False)
         # Copy one source and tamper with it, ensuring provenance closes.
         filename = catalog / downloaded[0]["file"]
         filename.write_bytes(filename.read_bytes()[:-3] + b"xxx")
