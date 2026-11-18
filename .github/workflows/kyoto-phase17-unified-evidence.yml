@@ -9,6 +9,10 @@ on:
       - 'scripts/kyoto_research_dashboard.py'
       - 'scripts/test_kyoto_phase17.py'
       - 'scripts/run_kyoto_phase17.sh'
+      - 'apps/cbp_pressure_incremental_flat_emit.cpp'
+      - 'include/ccp/cbp_pressure_incremental_flat.hpp'
+      - 'tests/cbp_pressure_incremental_flat_tests.cpp'
+      - 'CMakeLists.txt'
   workflow_dispatch:
 permissions:
   contents: read
