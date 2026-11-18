@@ -206,6 +206,10 @@ if(BUILD_TESTING)
     add_test(NAME cbp_many_material_worlds_contract
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_mass_stress.py
         $<TARGET_FILE:ccp_cbp_mass_export> $<TARGET_FILE:ccp_cbp_mass_replay>)
+    add_test(NAME cbp_spatial_hotspots_contract
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_contact_hotspots.py
+        $<TARGET_FILE:ccp_cbp_mass_export> $<TARGET_FILE:ccp_cbp_mass_replay>
+        $<TARGET_FILE:ccp_cbp_contact_hotspots>)
     add_test(NAME cbp_mesh_topology_replay_contract
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_topology_replay.py
         $<TARGET_FILE:ccp_cbp_topology_replay>)
