@@ -61,11 +61,12 @@ void check(){
   require(actual==direct(bounds),"Four-arm portfolio lost an exact candidate");
   const auto& d=p.decision();
   require(d.totalMs>=d.backendMs,"Controller undercharged its actual backend");
-  require(d.trials>=probes&&d.switches>=switches,
-          "Four-arm trajectory counters regressed without topology reset");
   if(frame==106){
    require(d.frame==1,"Topology ownership changes must reset policy statistics");
    probes=0;switches=0;
+  }else{
+   require(d.trials>=probes&&d.switches>=switches,
+           "Four-arm trajectory counters regressed without topology reset");
   }
   probes=d.trials;switches=d.switches;
   if(d.probe){
