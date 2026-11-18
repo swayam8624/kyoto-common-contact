@@ -172,20 +172,40 @@ def triangles(document: dict, binary: bytes) -> list[tuple]:
     return result
 
 
-def compact(source: list[tuple], limit: int) -> tuple[list[list[float]], int]:
+def compact(source: list[tuple], collision_limit: int,
+            display_limit: int) -> tuple[list[list[float]], list[list[float]], int]:
+    """Two immutable LODs of the SAME source GLB, with ONE shared transform.
+
+    Render sampling can be denser for visual comprehensibility; physics/query
+    measurement only uses collision_limit source triangles. These MUST remain
+    separately labelled in the research dashboard.
+    """
     count = len(source)
-    picks = [source[min(count - 1, math.floor(k * count / min(count, limit)))]
-             for k in range(min(count, limit))]
-    coords = [value for tri in picks for value in tri]
-    lo = [min(coords[k::3]) for k in range(3)]
-    hi = [max(coords[k::3]) for k in range(3)]
-    extent = max(hi[k] - lo[k] for k in range(3))
-    if extent < 1e-10:
-        raise ValueError("Degenerate sampled geometry")
-    center = [(lo[k] + hi[k]) / 2 for k in range(3)]
+    minimum = [float("inf")] * 3
+    maximum = [-float("inf")] * 3
+    # Normalize from the FULL decoded source, not a sparse collider subset.
+    # Otherwise a higher display LOD could appear shifted or rescaled.
+    for tri in source:
+        for vertex in (0, 3, 6):
+            for axis in range(3):
+                x = tri[vertex + axis]
+                minimum[axis] = min(minimum[axis], x)
+                maximum[axis] = max(maximum[axis], x)
+    extent = max(maximum[k] - minimum[k] for k in range(3))
+    if not math.isfinite(extent) or extent < 1e-10:
+        raise ValueError("Degenerate/nonfinite original GLB mesh")
+    center = [(minimum[k] + maximum[k]) / 2 for k in range(3)]
     scale = 1.55 / extent
-    return [[round((tri[i] - center[i % 3]) * scale, 6)
-             for i in range(9)] for tri in picks], count
+
+    def sample(max_count: int) -> list[list[float]]:
+        chosen = min(count, max_count)
+        return [
+            [round((source[min(count - 1, math.floor(i * count / chosen))][j]
+                    - center[j % 3]) * scale, 6)
+             for j in range(9)]
+            for i in range(chosen)
+        ]
+    return sample(collision_limit), sample(display_limit), count
 
 
 def placement(i: int, frame: int, frames: int, count: int, layout: str):
@@ -216,7 +236,7 @@ def move(v: list[float], pose: tuple[float, float, float, float]):
 
 
 def generate(catalog: Path, output: Path, frames: int, max_tris: int,
-             seed: int, layout: str):
+             max_visual_tris: int, seed: int, layout: str):
     if output.exists():
         raise FileExistsError("Never overwrite prior asset-triangle replay evidence")
     raw_catalog = json.loads((catalog / "ASSET_CATALOG.json").read_text())
@@ -229,15 +249,19 @@ def generate(catalog: Path, output: Path, frames: int, max_tris: int,
             raise ValueError(f"Source GLB digest changed: {model['name']}")
         try:
             document, buffer = glb(path)
-            tris, original_count = compact(triangles(document, buffer), max_tris)
+            tris, visual, original_count = compact(
+                triangles(document, buffer), max_tris, max_visual_tris
+            )
             assets.append({
                 "name": model["name"], "source": model["source"],
                 "license_source": model["license_source"],
                 "sha256": model["sha256"], "source_triangles": original_count,
                 "selected_triangles": len(tris), "triangles": tris,
+                "display_triangles": len(visual), "visual_triangles": visual,
             })
-            print(f"[GLB SCENE] {model['name']} {len(tris)}/{original_count} "
-                  f"real triangles", flush=True)
+            print(f"[GLB SCENE] {model['name']} "
+                  f"collision={len(tris)}, display={len(visual)}, "
+                  f"source={original_count} triangles", flush=True)
         except (KeyError, IndexError, ValueError, TypeError,
                 struct.error) as e:
             print(f"[GLB SKIPPED] {model['name']} {e}", flush=True)
@@ -322,15 +346,20 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--frames", type=int, default=60)
     p.add_argument("--max-triangles-per-asset", type=int, default=512)
+    p.add_argument("--max-visual-triangles-per-asset", type=int, default=2048,
+                   help="Only WebGL detail; these triangles are NOT in the collision benchmark")
     p.add_argument("--layout", choices=("crowded", "wave"), default="wave")
     p.add_argument("--seed", type=int, default=66217)
     a = p.parse_args()
-    if not 12 <= a.frames <= 240 or not 1 <= a.max_triangles_per_asset <= 2000:
+    if (not 12 <= a.frames <= 240 or
+        not 1 <= a.max_triangles_per_asset <= 2000 or
+        not 1 <= a.max_visual_triangles_per_asset <= 6000):
         raise ValueError("Unsafe workload dimensions")
     if not 1 <= a.seed <= 2147483647:
         raise ValueError("Seed outside binary uint32 limit")
     generate(a.catalog, a.output, a.frames,
-             a.max_triangles_per_asset, a.seed, a.layout)
+             a.max_triangles_per_asset, a.max_visual_triangles_per_asset,
+             a.seed, a.layout)
     return 0
 
 
