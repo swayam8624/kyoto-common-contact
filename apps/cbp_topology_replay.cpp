@@ -37,9 +37,10 @@ using ccp::cbp::PortfolioMode;
 using ccp::cbp::CrossMode;
 using ccp::cbp::RegionRouter;
 using Clock=std::chrono::steady_clock;
-constexpr std::array<const char*,7> methods{
+constexpr std::array<const char*,8> methods{
  "fresh_sap","frozen_v4","topology_exhaustive","topology_shared_bvh",
- "topology_certified_cache","causal_cbp","portfolio_v4_regional"};
+ "topology_certified_cache","causal_cbp","portfolio_v4_regional",
+ "topology_xsweep"};
 constexpr double kQueryHalfMargin=.0375; // Corresponds to multicloth.cpp kMargin/2.
 int boundedInt(const char* value,int minValue,int maxValue){
  const std::string text=value;
@@ -148,6 +149,10 @@ int main(int argc,char** argv){
   regional[0].setCrossMode(CrossMode::Exhaustive);
   regional[1].setCrossMode(CrossMode::SharedBVH);
   regional[2].setCrossMode(CrossMode::CertifiedCache);
+  RegionRouter swept;
+  swept.setCrossMode(CrossMode::Exhaustive);
+  swept.setRegionSweep(true);
+  swept.setSapThreshold(48);
   CausalCostRouter manager;
   CbpPortfolio portfolio;
   portfolio.setTrialKernel(CrossMode::Exhaustive);
@@ -162,7 +167,7 @@ int main(int argc,char** argv){
         "causal_choice,causal_density,causal_motion,"
         "portfolio_choice,portfolio_trial,portfolio_accepted,"
         "portfolio_rejected,portfolio_switch,portfolio_v4_action,"
-        "local_tests,cross_tests,cache_dirty,cache_potential,"
+        "local_tests,cross_tests,region_pair_tests,region_pairs_pruned,cache_dirty,cache_potential,"
         "physics_source_step_ms\n";
   out<<std::fixed<<std::setprecision(9);
 
@@ -185,12 +190,12 @@ int main(int argc,char** argv){
    std::map<int,int> regionOccupancy;
    for(int label:labels)++regionOccupancy[label];
    const auto geometryFingerprint=snapshotHash(boxes);
-   std::array<Pairs,7> results;
-   std::array<double,7> times{};
-   std::array<ccp::cbp::Telemetry,7> work{};
+   std::array<Pairs,8> results;
+   std::array<double,8> times{};
+   std::array<ccp::cbp::Telemetry,8> work{};
    const char* v4Action="none";
-   for(int offset=0;offset<7;++offset){
-    const int method=(frame+offset)%7; // varied external evaluation order
+   for(int offset=0;offset<8;++offset){
+    const int method=(frame+offset)%8; // varied external evaluation order
     const auto start=Clock::now();
     switch(method){
      case 0:results[0]=ccp::live::candidates(boxes,true);break;
@@ -214,11 +219,15 @@ int main(int argc,char** argv){
       results[6]=portfolio.query(boxes,labels);
       work[6]=portfolio.regionalWork();
       break;
+     case 7:
+      results[7]=swept.query(boxes,labels);
+      work[7]=swept.telemetry();
+      break;
      default:throw std::logic_error("invalid method index");
     }
     times[static_cast<std::size_t>(method)]=ms(start,Clock::now());
    }
-   for(int method=1;method<7;++method){
+   for(int method=1;method<8;++method){
     if(results[static_cast<std::size_t>(method)]!=results[0])
      throw std::runtime_error("candidate parity failure at frame "+
        std::to_string(frame+1)+" method "+methods[static_cast<std::size_t>(method)]);
@@ -231,7 +240,7 @@ int main(int argc,char** argv){
    totalPairs+=results[0].size();
    const auto d=manager.decision();
    const auto p=portfolio.decision();
-   for(int method=0;method<7;++method){
+   for(int method=0;method<8;++method){
     const auto index=static_cast<std::size_t>(method);
     const auto w=work[index];
     out<<(frame+1)<<','<<std::hex<<geometryFingerprint<<std::dec
@@ -249,6 +258,7 @@ int main(int argc,char** argv){
        <<','<<(method==6&&p.switched?1:0)
        <<','<<(method==6?p.v4Action:"none")
        <<','<<w.localTests<<','<<w.crossTests
+       <<','<<w.regionPairTests<<','<<w.regionPairsPruned
        <<','<<w.cacheDirtyPrimitives<<','<<w.cachePotentialPairs
        <<','<<source.metrics().stepMs<<'\n';
    }
@@ -262,7 +272,7 @@ int main(int argc,char** argv){
   std::cerr<<"[CBP topology PASS] sheets="<<sheets<<" spheres="<<spheres
            <<" span="<<span<<" frames="<<frames
            <<" total candidate-pair occurrences="<<totalPairs
-           <<" exact parity among all 7 methods; topology IDs verified\n";
+           <<" exact parity among all 8 methods; topology IDs verified\n";
  }catch(const std::exception& e){
   std::cerr<<"CBP TOPOLOGY REPLAY FAILED: "<<e.what()<<'\n';
   return 1;
