@@ -154,6 +154,11 @@ add_executable(ccp_cbp_mass_replay apps/cbp_mass_replay.cpp)
 target_link_libraries(ccp_cbp_mass_replay PRIVATE ccp_live)
 target_include_directories(ccp_cbp_mass_replay PRIVATE include)
 target_compile_options(ccp_cbp_mass_replay PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Exact sampled cross-instance AABB intersection locations for research viewers.
+add_executable(ccp_cbp_contact_hotspots apps/cbp_contact_hotspots.cpp)
+target_link_libraries(ccp_cbp_contact_hotspots PRIVATE ccp_live)
+target_include_directories(ccp_cbp_contact_hotspots PRIVATE include)
+target_compile_options(ccp_cbp_contact_hotspots PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Phase 6 separate opt-in X-swept region-pair join.
 add_executable(ccp_cbp_region_sweep_tests tests/cbp_region_sweep_tests.cpp)
 target_include_directories(ccp_cbp_region_sweep_tests PRIVATE include)
