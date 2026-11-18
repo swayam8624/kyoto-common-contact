@@ -126,8 +126,8 @@ int main(int argc,char** argv){
   out<<std::fixed<<std::setprecision(5);
   if(onlyEstimate){
    // This is intentionally NOT a measured benchmark.
-   const long double perFrame=long double(objects)*24.;
-   const long double allFrames=perFrame*long double(frames);
+   const long double perFrame=static_cast<long double>(objects)*24.;
+   const long double allFrames=perFrame*static_cast<long double>(frames);
    out<<"status,logical_AABBs,frames,bytes_one_AABB_frame,bytes_all_frames,verified\n";
    out<<"ANALYTICAL_ONLY,"<<objects<<','<<frames<<','
       <<static_cast<double>(perFrame)<<','
