@@ -167,6 +167,10 @@ add_executable(ccp_cbp_million_scale apps/cbp_million_scale.cpp)
 target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Phase 11: ACTUAL adversarial global 3D searches. No proven-separated islands.
 # Count-only storage prevents all-overlap N^2 output allocation catastrophes.
+# Phase 13: independent geometry-cost portfolio for the same global stress geometry.
+add_executable(ccp_cbp_pressure_hybrid_cpu apps/cbp_pressure_hybrid_cpu.cpp)
+target_include_directories(ccp_cbp_pressure_hybrid_cpu PRIVATE include)
+target_compile_options(ccp_cbp_pressure_hybrid_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_cbp_pressure_cpu apps/cbp_pressure_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_cpu PRIVATE include)
 target_compile_options(ccp_cbp_pressure_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -262,6 +266,11 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME cbp_geometric_router_exact_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_hybrid.py
+        $<TARGET_FILE:ccp_cbp_pressure_cpu>
+        $<TARGET_FILE:ccp_cbp_pressure_hybrid_cpu>)
     add_test(NAME cbp_adversarial_pressure_oracle
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_cpu.py
