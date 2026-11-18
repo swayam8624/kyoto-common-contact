@@ -94,7 +94,7 @@ def main():
         f"- Incomplete/budget-capped frames: **{incomplete}**",
         f"- Full spatial rebuilds: **{rebuilds}**",
         f"- Objects whose occupied cell ranges required maintenance: **{totalDirty:,}**",
-        f"- Actually executed persistent grid queries: **{methods['persistent_3d_grid']}**",
+        f"- Actually executed persistent grid queries: **{methods['persistent_flat_3d_grid']}**",
         f"- Actually executed dense X-sweeps: **{methods['projected_x_sweep']}**",
         f"- Frozen grid exact completed frames: **{len(valid_grid)}/{len(latest)}**",
         f"- Frozen sweep exact completed frames: **{len(valid_sweep)}/{len(latest)}**",
