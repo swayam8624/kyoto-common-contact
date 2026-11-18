@@ -9,6 +9,8 @@ on:
       - 'apps/cbp_portfolio_v2_replay.cpp'
       - 'tests/cbp_portfolio_v2_tests.cpp'
       - 'scripts/analyze_cbp_portfolio_v2.py'
+      - 'scripts/render_cbp_gltf_scenes.py'
+      - 'viewer/gltf_scene_observatory.html'
       - 'CMakeLists.txt'
   workflow_dispatch:
 permissions:
@@ -74,6 +76,24 @@ jobs:
             build/phase10-real-scene/portfolio-v2.csv \
             build/phase10-real-scene/cpu-core.csv \
             --report build/phase10-real-scene/FOUR-ARM-RESULTS.md
+      - name: Render authentic real-mesh scene with exact per-frame four-arm decisions
+        timeout-minutes: 2
+        run: |
+          python3 scripts/render_cbp_gltf_scenes.py \
+            build/phase10-real-scene \
+            --html build/phase10-real-scene/PHASE10-ROUTING-OBSERVATORY.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          page=Path('build/phase10-real-scene/PHASE10-ROUTING-OBSERVATORY.html').read_text()
+          assert 'route-plot' in page
+          assert '"routing":[{' in page
+          assert 'shared_bvh' in page
+          scripts=re.findall(r'<script>(.*?)</script>',page,flags=re.S)
+          assert len(scripts)==1
+          Path('build/phase10-real-scene/rendered-browser.js').write_text(scripts[0])
+          PY
+          node --check build/phase10-real-scene/rendered-browser.js
       - name: Keep full independent method traces and exact audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -85,6 +105,7 @@ jobs:
             build/phase10-real-scene/portfolio-v2.csv
             build/phase10-real-scene/cpu-core.csv
             build/phase10-real-scene/FOUR-ARM-RESULTS.md
+            build/phase10-real-scene/PHASE10-ROUTING-OBSERVATORY.html
             build/phase10-real-scene/frames.csv
             build/phase10-real-scene/instances.csv
           retention-days: 14
