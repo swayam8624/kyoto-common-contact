@@ -88,8 +88,6 @@ inline std::vector<Box> generate(std::size_t n,std::uint32_t frame,
   const auto h=mix(i+std::uint64_t(seed)*UINT64_C(0x11791d291c13));
   const auto h2=mix(h);
   const auto group=i/64,member=i%64;
-  const double gx=double(group%side),gy=double((group/side)%side),
-               gz=double(group/(side*side));
   double x=0,y=0,z=0,half=.12;
   if(scene=="slabs"){
    // Pathological 1D projection: all boxes overlap in X, almost none in
