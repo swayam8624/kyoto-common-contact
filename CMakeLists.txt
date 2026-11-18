@@ -158,6 +158,11 @@ target_compile_options(ccp_cbp_mesh_truth_export PRIVATE -Wall -Wextra -Wpedanti
 # Independent bounded large-scale AABB family; NOT a coupled million-mesh sim.
 add_executable(ccp_cbp_million_scale apps/cbp_million_scale.cpp)
 target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Phase 11: ACTUAL adversarial global 3D searches. No proven-separated islands.
+# Count-only storage prevents all-overlap N^2 output allocation catastrophes.
+add_executable(ccp_cbp_pressure_cpu apps/cbp_pressure_cpu.cpp)
+target_include_directories(ccp_cbp_pressure_cpu PRIVATE include)
+target_compile_options(ccp_cbp_pressure_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_cbp_mass_replay apps/cbp_mass_replay.cpp)
 target_link_libraries(ccp_cbp_mass_replay PRIVATE ccp_live)
 target_include_directories(ccp_cbp_mass_replay PRIVATE include)
@@ -205,6 +210,7 @@ if(BUILD_TESTING)
   add_test(NAME cbp_causal_manager_oracle COMMAND ccp_cbp_cost_manager_tests)
   add_test(NAME cbp_portfolio_fallback_oracle COMMAND ccp_cbp_portfolio_tests)
   add_test(NAME cbp_four_arm_portfolio_oracle COMMAND ccp_cbp_portfolio_v2_tests)
+
   add_test(NAME cbp_region_sweep_oracle COMMAND ccp_cbp_region_sweep_tests)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
@@ -214,6 +220,10 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME cbp_adversarial_pressure_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_cpu.py
+        $<TARGET_FILE:ccp_cbp_pressure_cpu>)
     add_test(NAME learned_cpp_model_and_exact_pair_oracle
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_learned_cxx.py
