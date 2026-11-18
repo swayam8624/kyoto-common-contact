@@ -146,8 +146,8 @@ int main(int argc,char** argv){
   const fs::path temp=destination.string()+".part";
   std::ofstream csv(temp);
   if(!csv)throw std::runtime_error("Cannot create benchmark CSV");
-  csv<<"frame,mode,instances,primitives,ms,pairs,pair_hash,"
-        "exact_sap_equal,oracle_checked,region_pair_tests,regions,"
+  csv<<"frame,mode,instances,primitives,ms,pairs,intra_pairs,inter_instance_pairs,"
+        "pair_hash,exact_sap_equal,oracle_checked,region_pair_tests,regions,"
         "cross_tests,cache_dirty,cache_potential,portfolio_mode,"
         "portfolio_trial,portfolio_accepted,portfolio_rejected,"
         "v4_action\n";
@@ -203,6 +203,12 @@ int main(int argc,char** argv){
     elapsed[static_cast<std::size_t>(mode)]=ms(start,Clock::now());
    }
    const auto& oracle=output[0];
+   std::size_t intraPairs=0;
+   for(const auto& candidate:oracle)
+    if(labels[static_cast<std::size_t>(candidate.a)]==
+       labels[static_cast<std::size_t>(candidate.b)])
+     ++intraPairs;
+   const auto interPairs=oracle.size()-intraPairs;
    if(oracle.size()>16000000)
     throw std::runtime_error("Refusing >16-million candidate pairs in stress case");
    const bool audit=input.n<=512 && frame%7==0;
@@ -217,6 +223,7 @@ int main(int argc,char** argv){
     csv<<frame<<','<<modes[static_cast<std::size_t>(mode)]<<','
        <<instances<<','<<input.n<<','
        <<elapsed[static_cast<std::size_t>(mode)]<<','<<oracle.size()
+       <<','<<intraPairs<<','<<interPairs
        <<','<<pairHash(oracle)<<",1,"<<(audit?1:0)<<','
        <<w.regionPairTests<<','<<w.regions<<','<<w.crossTests<<','
        <<w.cacheDirtyPrimitives<<','<<w.cachePotentialPairs<<','
@@ -229,7 +236,9 @@ int main(int argc,char** argv){
    if((frame+1)%std::max(1U,input.frames/12)==0)
     std::cerr<<"[CBP MASS CPU] "<<frame+1<<"/"<<input.frames
              <<" materials "<<instances<<" AABBs "<<input.n
-             <<" exact candidate pairs "<<oracle.size()<<"\n";
+             <<" candidates "<<oracle.size()
+             <<" CROSS-MATERIAL "<<interPairs
+             <<" within-instance "<<intraPairs<<"\n";
   }
   csv.flush();
   if(!csv)throw std::runtime_error("Incomplete CPU stress CSV");
