@@ -1,0 +1,59 @@
+name: CBP Phase 11 — reproducible bounded stress driver and report contract
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - 'scripts/run_cbp_pressure_ladder.py'
+      - 'apps/cbp_pressure_cpu.cpp'
+      - 'include/ccp/cbp_pressure.hpp'
+      - '.github/workflows/cbp-phase11-runner.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile exact global CPU research backends
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_pressure_cpu --parallel 2
+          python3 -m py_compile scripts/run_cbp_pressure_ladder.py
+      - name: Execute real calibration tier and validate immutable research report
+        run: |
+          python3 scripts/run_cbp_pressure_ladder.py \
+            --tier calibration \
+            --output build/phase11-calibration \
+            --build build/kyoto-final-cpu \
+            --max-tests 30000000 \
+            --max-grid-entries 2000000 \
+            --stage-timeout 180 --suite-timeout 600
+          python3 - <<'PY'
+          import csv,json
+          from pathlib import Path
+          r=Path('build/phase11-calibration')
+          data=json.loads((r/'EXPERIMENT.json').read_text())
+          assert data['tier']=='calibration'
+          assert data['metal_requested'] is False
+          assert len(data['runs'])==4
+          assert all(x['outcome']=='completed' for x in data['runs'])
+          assert len(data['summaries'])==8
+          assert (r/'RESULTS.md').is_file()
+          assert (r/'index.html').is_file()
+          assert 'not a fully coupled deformable-material benchmark' in data['algorithmic_scope']
+          print('PASS honest bounded global CPU stress orchestrator, 4 scenes, 8 method summaries')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbp-phase11-safe-calibrated-global-stress-suite
+          path: |
+            build/phase11-calibration/RESULTS.md
+            build/phase11-calibration/EXPERIMENT.json
+            build/phase11-calibration/index.html
+            build/phase11-calibration/*.csv
+          retention-days: 14
+          if-no-files-found: warn
