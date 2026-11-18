@@ -114,6 +114,8 @@ def main() -> int:
     p.add_argument("--build", type=Path, default=Path("build/kyoto-final-cpu"))
     p.add_argument("--frames", type=int, default=60)
     p.add_argument("--max-triangles-per-asset", type=int, default=512)
+    p.add_argument("--max-visual-triangles-per-asset", type=int, default=2048,
+                   help="Real GLB triangles rendered, NOT added to the benchmark")
     p.add_argument("--layout", choices=["wave", "crowded"], default="wave")
     p.add_argument("--seed", type=int, default=66217)
     p.add_argument("--gpu", action="store_true",
@@ -124,7 +126,9 @@ def main() -> int:
                    help="On macOS, open the completed self-contained 3D report")
     p.add_argument("--timeout", type=int, default=1500)
     args = p.parse_args()
-    if not 12 <= args.frames <= 240 or not 1 <= args.max_triangles_per_asset <= 2000:
+    if (not 12 <= args.frames <= 240 or
+        not 1 <= args.max_triangles_per_asset <= 2000 or
+        not 1 <= args.max_visual_triangles_per_asset <= 6000):
         raise ValueError("Frame or triangle count beyond safe research cap")
     if not 30 <= args.timeout <= 3600:
         raise ValueError("Per-stage timeout must be 30..3600 seconds")
@@ -161,6 +165,8 @@ def main() -> int:
         "--output", str(args.output),
         "--frames", str(args.frames),
         "--max-triangles-per-asset", str(args.max_triangles_per_asset),
+        "--max-visual-triangles-per-asset",
+        str(args.max_visual_triangles_per_asset),
         "--layout", args.layout,
         "--seed", str(args.seed)
     ], args.timeout)
@@ -221,6 +227,9 @@ def main() -> int:
         "models_imported": len(models),
         "source_triangles": sum(x["source_triangles"] for x in models),
         "triangle_aabbs_recorded": sum(x["selected_triangles"] for x in models),
+        "visual_glb_triangles_rendered": sum(
+            x.get("display_triangles",x["selected_triangles"]) for x in models
+        ),
         "frames": args.frames,
         "layout": args.layout,
         "seed": args.seed,
@@ -241,8 +250,10 @@ def main() -> int:
     )
     print("\n[REAL GLTF EVIDENCE COMPLETE]")
     print(f"{len(models)} actual Khronos GLB models, "
-          f"{manifest['triangle_aabbs_recorded']:,} source triangle AABBs "
-          f"from {manifest['source_triangles']:,} total original triangles")
+          f"{manifest['triangle_aabbs_recorded']:,} measured triangle AABBs, "
+          f"{manifest['visual_glb_triangles_rendered']:,} true source triangles displayed "
+          f"(distinct visualization LOD), from {manifest['source_triangles']:,} "
+          f"original model triangles")
     print(f"Exact {args.frames}-frame CPU candidate-parity verification; "
           f"Metal actually executed: {'YES' if args.gpu else 'NO'}")
     for item in summaries:
