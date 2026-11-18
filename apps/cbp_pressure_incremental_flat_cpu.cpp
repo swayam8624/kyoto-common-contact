@@ -95,9 +95,9 @@ Result queryPreparedSweep(const std::vector<Box>& boxes,
 }
 int main(int argc,char** argv){
  try{
-  if(argc!=9)throw std::invalid_argument(
-    "Usage: ccp_cbp_pressure_incremental_cpu OUTPUT.csv SCENE N FRAMES SEED "
-    "MAX_TESTS MAX_FRAME_MS MAX_GRID_ENTRIES");
+  if(argc!=9&&argc!=11)throw std::invalid_argument(
+    "Usage: ccp_cbp_pressure_incremental_flat_cpu OUTPUT.csv SCENE N FRAMES "
+    "SEED MAX_TESTS MAX_FRAME_MS MAX_GRID_ENTRIES [--threads 1..32]");
   const fs::path destination=argv[1];
   const std::string scene=argv[2];
   if(!known(scene))throw std::invalid_argument("Unknown stress scene");
@@ -107,6 +107,10 @@ int main(int argc,char** argv){
              maxTests=number(argv[6],1000,600000000),
              maxMs=number(argv[7],20,120000),
              maxEntries=number(argv[8],10000,20000000);
+  if(argc==11&&std::string(argv[9])!="--threads")
+   throw std::invalid_argument("Additional argument must be --threads");
+  const std::size_t requestedThreads=argc==11?
+    std::size_t(number(argv[10],1,32)):1u;
   if(fs::exists(destination)||fs::exists(destination.string()+".part"))
    throw std::runtime_error("Refusing to overwrite immutable experiment CSV");
   if(!destination.parent_path().empty())
@@ -120,7 +124,8 @@ int main(int argc,char** argv){
         "membership_insertions,membership_removals,active_cells,grid_entries,"
         "grid_work_upper_bound,projected_sweep_pairs,selected_pair_tests,"
         "exact_pairs,hash64_sum,hash64_xor,hash32_sum,hash32_xor,"
-        "analytical_construct_verified,brute_oracle_checked,peak_rss_mib\n";
+        "analytical_construct_verified,brute_oracle_checked,peak_rss_mib,"
+        "thread_limit,workers_used\n";
   FlatPersistentGrid index(maxEntries);
   std::uint64_t rebuilds=0,gridSelected=0,sweepSelected=0,incomplete=0;
   std::uint64_t totalRepairs=0;
@@ -145,9 +150,11 @@ int main(int argc,char** argv){
    }
    const double decisionMs=since(decideStart);
    const auto selected=Clock::now();
+   std::size_t actualWorkers=1;
    const auto result=sweep?
        queryPreparedSweep(index.currentBoxes(),plan,maxTests,double(maxMs)):
-       index.enumerate(maxTests,double(maxMs));
+       index.enumerateParallel(maxTests,double(maxMs),requestedThreads,
+                               &actualWorkers);
    const double queried=since(selected);
    const double fullMs=since(totalStart);
    if(sweep)++sweepSelected;else ++gridSelected;
@@ -167,7 +174,9 @@ int main(int argc,char** argv){
    }
    csv<<scene<<",persistent_flat_geometry_router,"<<n<<','<<f<<','<<seed<<','
       <<(result.complete?"complete":"budget_stop")<<','
-      <<(sweep?"projected_x_sweep":"persistent_flat_3d_grid")<<','
+      <<(sweep?"projected_x_sweep":
+          actualWorkers>1?"persistent_flat_parallel_3d_grid":
+          "persistent_flat_3d_grid")<<','
       <<genMs<<','<<change.preflightMs<<','<<change.maintenanceMs<<','
       <<decisionMs<<','<<queried<<','<<fullMs<<','
       <<int(change.rebuilt)<<','<<change.changedRanges<<','
@@ -179,7 +188,7 @@ int main(int argc,char** argv){
       <<result.digest.sum<<','<<result.digest.xors<<','
       <<result.digest.sum32<<','<<result.digest.xor32<<','
       <<int(analyticVerified)<<','<<int(bruteVerified)<<','
-      <<rssMiB()<<'\n';
+      <<rssMiB()<<','<<requestedThreads<<','<<actualWorkers<<'\n';
    if((f+1)%std::max<std::uint64_t>(1,frames/10)==0)
     std::cerr<<"[FLAT PERSISTENT CBP] "<<scene<<" "<<f+1<<"/"<<frames
              <<" mode="<<(sweep?"x-sweep":"3D-grid")
@@ -188,6 +197,7 @@ int main(int argc,char** argv){
              <<" query="<<queried
              <<" changed_memberships="<<change.changedRanges
              <<" rebuilt="<<int(change.rebuilt)
+             <<" workers="<<actualWorkers
              <<" exact_pairs="<<result.digest.count
              <<" complete="<<int(result.complete)<<"\n";
   }
@@ -196,6 +206,7 @@ int main(int argc,char** argv){
   csv.close();
   fs::rename(destination.string()+".part",destination);
   std::cout<<"PASS bounded FLAT persistent spatial occupancy: frames="<<frames
+           <<" requested_threads="<<requestedThreads
            <<" rebuilds="<<rebuilds<<" changed_cell_ranges="<<totalRepairs
            <<" grid_queries="<<gridSelected<<" swept_queries="<<sweepSelected
            <<" incomplete="<<incomplete
