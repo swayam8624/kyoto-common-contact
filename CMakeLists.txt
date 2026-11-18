@@ -192,7 +192,10 @@ if(Vulkan_FOUND AND CCP_GLSLANG_VALIDATOR)
   target_include_directories(ccp_cbp_pressure_vulkan PRIVATE include)
   target_compile_definitions(ccp_cbp_pressure_vulkan PRIVATE
     CCP_PRESSURE_SPIRV="${CCP_PRESSURE_SPIRV}")
-  target_compile_options(ccp_cbp_pressure_vulkan PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  # Vk* structs use Vulkan-mandated sType-first aggregate initialization;
+  # unspecified trailing fields are intentionally zero-initialized.
+  target_compile_options(ccp_cbp_pressure_vulkan PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-missing-field-initializers -Werror)
   message(STATUS "CBP Phase 11 native Vulkan pressure: compiled target available")
 else()
   message(STATUS "CBP Phase 11 Vulkan benchmark unavailable: install Vulkan SDK + glslangValidator (no GPU result inferred)")
