@@ -143,6 +143,22 @@ def main() -> int:
                 raise AssertionError(
                     "Python independent float32 AABB oracle or FNV hash mismatch"
                 )
+        dashboard = directory / "interactive.html"
+        cmd([
+            sys.executable,
+            str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
+            str(directory), "--html", str(dashboard),
+        ])
+        html = dashboard.read_text(encoding="utf-8")
+        if ("gl.drawArraysInstanced" not in html or
+            "CPU/Metal full pair counts" not in html or
+            "mass-material" not in html.lower()):
+            raise AssertionError("Offline WebGL dashboard missing evidence or graphics")
+        cmd([
+            sys.executable,
+            str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
+            str(directory), "--html", str(dashboard),
+        ], success=False)
     print(
         "PASS CBP 12 independently stepped material worlds, 5 actual "
         "material families, exact binary CPU/Metal contract, 8 methods, "
