@@ -132,7 +132,7 @@ void value(std::ostream& o,double x){
 }
 int main(int argc,char** argv){
  try{
-  if(argc<4||argc>5)
+  if(argc<3||argc>4)
    throw std::invalid_argument(
     "Usage: ccp_cbp_mesh_truth_export ORIGINAL_CASE_DIR OUT.json [max_worlds=48]");
   const fs::path folder(argv[1]),output(argv[2]);
