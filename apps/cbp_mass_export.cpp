@@ -52,10 +52,27 @@ void write32(std::ostream& stream,std::uint32_t value){
 void writeBox(std::ostream& stream,const Six& box){
  stream.write(reinterpret_cast<const char*>(box.v.data()),24);
 }
-double origin(int component,int side,int layout,int frame,int frames,int id){
+double origin(int component,int side,int layout,int frame,int frames,int id,
+              int totalInstances){
+ const double t=double(frame)/double(std::max(1,frames-1));
+ if(layout==3||layout==4){
+  // Independent mixed-material ensembles of eight real Worlds per cluster.
+  // At full scale 125 groups * 8 materials = 1000 deforming instances.
+  // The wave moves from separated octants to intensive cross-material
+  // contacts, without claiming any inter-world physics response.
+  const int group=id/8, member=id%8;
+  const int groups=(totalInstances+7)/8;
+  const int width=static_cast<int>(std::ceil(std::cbrt(double(groups))));
+  const int x=group%width,y=(group/width)%width,z=group/(width*width);
+  const int bit=(member>>component)&1;
+  const double local=layout==3?.20:
+    (2.6-2.4*std::clamp((t-.20)/.62,0.,1.));
+  const double index=component==0?x:component==1?y:z;
+  return (index-width*.5)*6.7+(bit?local:-local)+
+    .025*std::sin((id%19)*.45+.09*frame);
+ }
  const int x=id%side,y=(id/side)%side,z=id/(side*side);
  const double spacing=layout==0?3.8:layout==1?2.3:3.3;
- double t=double(frame)/double(std::max(1,frames-1));
  const double front=layout==2?(.95*std::clamp((t-.30)/.6,0.,1.)):0.;
  if(component==0)
   return (x-side*.5)*(spacing-front)+.13*std::sin(.075*frame+id*.31);
@@ -69,7 +86,7 @@ int main(int argc,char** argv){
   if(argc!=6)
    throw std::invalid_argument(
     "Usage: ccp_cbp_mass_export OUTPUT_DIRECTORY INSTANCES[12..1000] "
-    "FRAMES[12..240] SEED[1..INT_MAX] LAYOUT[grid|clusters|contact_front]");
+    "FRAMES[12..240] SEED[1..INT_MAX] LAYOUT[grid|clusters|contact_front|crowded|collision_wave]");
   static_assert(std::endian::native==std::endian::little,
                 "KYOTOM01 requires little-endian host");
   const fs::path dir(argv[1]);
@@ -81,7 +98,8 @@ int main(int argc,char** argv){
       parse(argv[4],1,std::numeric_limits<int>::max()));
   const std::string layout=argv[5];
   const int layoutCode=layout=="grid"?0:layout=="clusters"?1:
-       layout=="contact_front"?2:-1;
+       layout=="contact_front"?2:layout=="crowded"?3:
+       layout=="collision_wave"?4:-1;
   if(layoutCode<0)throw std::invalid_argument("Invalid 3D layout");
   const int side=static_cast<int>(std::ceil(std::cbrt(double(number))));
   std::vector<Instance> instances;
@@ -132,9 +150,9 @@ int main(int argc,char** argv){
    preview<<"{\"frame\":"<<frame<<",\"instances\":[";
    for(int i=0;i<number;++i){
     auto& item=instances[static_cast<std::size_t>(i)];
-    item.x=origin(0,side,layoutCode,frame,frames,i);
-    item.y=origin(1,side,layoutCode,frame,frames,i);
-    item.z=origin(2,side,layoutCode,frame,frames,i);
+    item.x=origin(0,side,layoutCode,frame,frames,i,number);
+    item.y=origin(1,side,layoutCode,frame,frames,i,number);
+    item.z=origin(2,side,layoutCode,frame,frames,i,number);
     const auto current=item.world->snapshot(16);
     if(static_cast<int>(current.size())!=item.count)
      throw std::runtime_error("Material instance changed topology mid-run");
