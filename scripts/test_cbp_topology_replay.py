@@ -17,7 +17,7 @@ import tempfile
 METHODS = {
     "fresh_sap", "frozen_v4", "topology_exhaustive",
     "topology_shared_bvh", "topology_certified_cache",
-    "causal_cbp", "portfolio_v4_regional",
+    "causal_cbp", "portfolio_v4_regional", "topology_xsweep",
 }
 
 
@@ -53,6 +53,11 @@ def run(executable: str, path: pathlib.Path, sheets: int,
             raise AssertionError("Invalid elapsed time")
         if int(row["regions"]) < sheets:
             raise AssertionError("No meaningful regional mesh partition")
+        if row["method"] == "topology_xsweep" and (
+            int(row["region_pair_tests"]) < 0 or
+            int(row["region_pairs_pruned"]) < 0
+        ):
+            raise AssertionError("Missing X-sweep region-work counters")
     for frame in range(1, frames + 1):
         group = by_frame[frame]
         if len(group) != len(METHODS):
@@ -104,7 +109,7 @@ def main() -> int:
         if "Portfolio decisions" not in text or "V4 / method" not in text:
             raise AssertionError("Offline research report omitted measured evidence")
     print(
-        "PASS CBP topology replay: exact 7-method parity over 60 coupled "
+        "PASS CBP topology replay: exact 8-method parity over 60 coupled "
         "cloth frames; identical geometry across 4 patch spans, real sheet/cell identities and immutable CSV"
     )
     return 0
