@@ -121,3 +121,25 @@ an inspectable tracked-file/compilation-reference report, and see
 The original project demo instructions are preserved in
 [docs/HISTORICAL_README.md](docs/HISTORICAL_README.md), and the existing
 interactive viewer remains available via `open_multicloth_demo.sh`.
+
+
+## Research track navigator — Online/Guard/ML and Phase 17
+
+The historical **Online, Global Guard, Selective Guard, persistent SAP,
+learned ML, regional methods, Bullet and frozen V4** have **not** been
+superseded by the Phase 11–16 synthetic pressure-index experiments. Those
+experiments answer a different scaling question.
+
+Start with [the complete research map](docs/KYOTO_RESEARCH_UNIFIED_MAP.md)
+to understand both tracks, what was measured, and what was not. On the
+Phase 17 branch, a single additive comparison command is available:
+
+    bash scripts/run_kyoto_phase17.sh output/kyoto-phase17-mac-01
+
+This runs the historical full-output material algorithms and a separate,
+bounded set of synthetic persistent-grid CPU comparisons. It emits actual
+pair ID files from *both* persistent and independently rebuilt grids, then
+checks every pair, duplicate and complete sorted pair set. Historical models
+are only scored if the original native trained weights are supplied. The
+new report does not rank unlike-for-unlike timing boundaries, nor claim
+solver/CCD or end-to-end performance superiority.
