@@ -145,6 +145,10 @@ target_compile_options(ccp_cbp_cost_manager_tests PRIVATE -Wall -Wextra -Wpedant
 add_executable(ccp_cbp_manager_bench apps/cbp_manager_microbench.cpp)
 target_include_directories(ccp_cbp_manager_bench PRIVATE include)
 target_compile_options(ccp_cbp_manager_bench PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Phase 6 separate opt-in X-swept region-pair join.
+add_executable(ccp_cbp_region_sweep_tests tests/cbp_region_sweep_tests.cpp)
+target_include_directories(ccp_cbp_region_sweep_tests PRIVATE include)
+target_compile_options(ccp_cbp_region_sweep_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Phase 4: exact frozen-V4 fallback with bounded on-policy regional trials.
 add_executable(ccp_cbp_portfolio_tests tests/cbp_portfolio_tests.cpp)
 target_link_libraries(ccp_cbp_portfolio_tests PRIVATE ccp_live)
@@ -169,6 +173,7 @@ if(BUILD_TESTING)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
   add_test(NAME cbp_causal_manager_oracle COMMAND ccp_cbp_cost_manager_tests)
   add_test(NAME cbp_portfolio_fallback_oracle COMMAND ccp_cbp_portfolio_tests)
+  add_test(NAME cbp_region_sweep_oracle COMMAND ccp_cbp_region_sweep_tests)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
