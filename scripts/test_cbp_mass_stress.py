@@ -10,6 +10,8 @@ against silently overwriting an existing experiment.
 from __future__ import annotations
 import csv
 import pathlib
+import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -122,8 +124,22 @@ def main() -> int:
             str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
             str(directory), "--preview-only", "--html", str(live),
         ])
-        if "BENCHMARK EXECUTING" not in live.read_text(encoding="utf-8"):
+        live_html = live.read_text(encoding="utf-8")
+        if "BENCHMARK EXECUTING" not in live_html:
             raise AssertionError("Live view falsely asserted measured benchmark results")
+        if "scene-controls" not in live_html or "Instance inspector" not in live_html:
+            raise AssertionError("New live preview omitted intuitive scene controls")
+        if "GPU-only" not in live_html or "physically" not in live_html:
+            raise AssertionError("Research interpretation boundary missing")
+        # Validate the actual inline script, not just visible HTML strings.
+        node = shutil.which("node")
+        scripts = re.findall(r"<script>(.*?)</script>", live_html, flags=re.S)
+        if len(scripts) != 1:
+            raise AssertionError("Expected one self-contained browser JS script")
+        if node:
+            client = pathlib.Path(temp) / "mass-observatory-client.js"
+            client.write_text(scripts[0], encoding="utf-8")
+            cmd([node, "--check", str(client)])
 
         report = directory / "cpu-full.csv"
         cmd([replay, str(directory / "snapshots.kmcb"),
@@ -173,6 +189,29 @@ def main() -> int:
             "CPU/Metal full pair counts" not in html or
             "mass-material" not in html.lower()):
             raise AssertionError("Offline WebGL dashboard missing evidence or graphics")
+        for required_ui in (
+            "Scene replay", "Instance inspector", "gpu-rows",
+            "Top-down", "evidence", "Separate", "portfolio",
+        ):
+            # Portfolio must appear as a measured CPU method, not a claimed win.
+            if required_ui.lower() not in html.lower():
+                raise AssertionError(f"Observatory missing {required_ui}")
+        if node:
+            scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
+            if len(scripts) != 1:
+                raise AssertionError("Expected only one V2 UI script")
+            client = pathlib.Path(temp) / "mass-observatory-full.js"
+            client.write_text(scripts[0], encoding="utf-8")
+            cmd([node, "--check", str(client)])
+        # The frozen original dashboard remains selectable for A/B comparison.
+        legacy = directory / "interactive-legacy.html"
+        cmd([
+            sys.executable,
+            str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
+            str(directory), "--legacy-view", "--html", str(legacy),
+        ])
+        if "3D material-instance envelopes" not in legacy.read_text(encoding="utf-8"):
+            raise AssertionError("Original mass viewer is no longer reproducible")
         cmd([
             sys.executable,
             str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
