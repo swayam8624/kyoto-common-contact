@@ -302,6 +302,13 @@ struct Vulkan {
     pipelineLayout,0,1,&descriptorSet,0,nullptr);
   vkCmdPushConstants(cmd,pipelineLayout,VK_SHADER_STAGE_COMPUTE_BIT,0,4,&maxN);
   vkCmdDispatch(cmd,(maxN+127)/128,1,1);
+  // Shader writes become visible to the host read AFTER the fence. Do not
+  // rely on a driver-specific implicit memory visibility transition.
+  VkMemoryBarrier visible{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  visible.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;
+  visible.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
+  vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+       VK_PIPELINE_STAGE_HOST_BIT,0,1,&visible,0,nullptr,0,nullptr);
   if(timestampSupported)
    vkCmdWriteTimestamp(cmd,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,timestamps,1);
   check(vkEndCommandBuffer(cmd),"end command buffer");
