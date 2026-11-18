@@ -27,8 +27,18 @@ struct alignas(16) Box { float lo[4]{},hi[4]{}; };
 static_assert(sizeof(Box)==32);
 struct Digest {
  std::uint64_t count{},sum{},xors{};
+ // The native Metal pressure kernels also compute these independent
+ // 32-bit modular fingerprints, avoiding unsupported 64-bit atomics.
+ std::uint32_t sum32{},xor32{};
  bool operator==(const Digest&) const = default;
 };
+inline std::uint32_t mix32(std::uint32_t a,std::uint32_t b){
+ std::uint32_t x=a*UINT32_C(0x9e3779b9)+b*UINT32_C(0x85ebca6b)+
+                 UINT32_C(0x165667b1);
+ x^=x>>16;x*=UINT32_C(0x7feb352d);
+ x^=x>>15;x*=UINT32_C(0x846ca68b);
+ return x^(x>>16);
+}
 inline std::uint64_t mix(std::uint64_t x){
  x+=UINT64_C(0x9e3779b97f4a7c15);
  x=(x^(x>>30))*UINT64_C(0xbf58476d1ce4e5b9);
@@ -38,10 +48,13 @@ inline std::uint64_t mix(std::uint64_t x){
 inline void add(Digest& d,std::uint32_t a,std::uint32_t b){
  if(a>b)std::swap(a,b);
  const auto h=mix((std::uint64_t(a)<<32)|b);
+ const auto h32=mix32(a,b);
  ++d.count;d.sum+=h;d.xors^=h;
+ d.sum32+=h32;d.xor32^=h32;
 }
 inline void combine(Digest& a,const Digest& b){
  a.count+=b.count;a.sum+=b.sum;a.xors^=b.xors;
+ a.sum32+=b.sum32;a.xor32^=b.xor32;
 }
 inline bool overlap(const Box& a,const Box& b){
  return a.lo[0]<=b.hi[0]&&b.lo[0]<=a.hi[0]&&
