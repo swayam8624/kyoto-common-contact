@@ -1,0 +1,66 @@
+name: CBP Phase 11 — ACTUAL global million-object collision pressure
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-phase11-million-global.yml'
+      - 'apps/cbp_pressure_cpu.cpp'
+      - 'include/ccp/cbp_pressure.hpp'
+      - 'scripts/run_cbp_pressure_ladder.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  million-global:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile real general CPU collision search algorithms
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_pressure_cpu --parallel 2
+          python3 -m py_compile scripts/run_cbp_pressure_ladder.py
+      - name: Actually perform 1M BODY moving global 3D stress with no island assumptions
+        timeout-minutes: 15
+        run: |
+          mkdir -p build/phase11-million-global
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase11-million-global/burst-million-12frames.csv \
+            burst 1000000 12 61749 300000000 40000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase11-million-global/slabs-million-6frames.csv \
+            slabs 1000000 6 61749 300000000 40000 12000000
+      - name: Require large verified global 3D candidate sets and truthful sweep stops
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root=Path('build/phase11-million-global')
+          for name in ('burst-million-12frames.csv','slabs-million-6frames.csv'):
+              rows=list(csv.DictReader((root/name).open()))
+              assert rows and all(int(r['n'])==1000000 for r in rows)
+              grids=[r for r in rows if r['method']=='global_3d_hash_grid']
+              sweeps=[r for r in rows if r['method']=='global_x_sweep']
+              assert len(grids)==len(sweeps)
+              assert any(r['status']=='complete' for r in grids)
+              assert all(r['status'] in ('complete','budget_stop') for r in rows)
+              print(name,'frames',len(grids),
+                    'complete exact grid frames',sum(x['status']=='complete' for x in grids),
+                    'capped or stopped X-sweep frames',sum(x['status']=='budget_stop' for x in sweeps),
+                    'peak exact frame candidates',
+                    max(int(r['exact_pairs']) for r in grids if r['status']=='complete'),
+                    'max visited tests',
+                    max(int(r['tested_pairs']) for r in rows))
+              if 'slabs' in name:
+                  assert any(x['status']=='budget_stop' for x in sweeps)
+          PY
+      - name: Preserve true global million-object pressure CSVs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-phase11-global-million-aabb-genuine-search-pressure
+          path: build/phase11-million-global/*.csv
+          retention-days: 14
+          if-no-files-found: warn
