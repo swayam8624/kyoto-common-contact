@@ -59,6 +59,35 @@ jobs:
                      for x in csv.DictReader(
                          (base/'1000000-burst-4frames.csv').open()))>=250000000
           PY
+      - name: Actually persist 250MB+ real binary pair buffers to disk and verify size
+        timeout-minutes: 5
+        run: |
+          mkdir -p build/phase11-stream/disk
+          build/kyoto-final-cpu/ccp_cbp_pressure_emit \
+            build/phase11-stream/1000000-burst-disk-4frames.csv \
+            burst 1000000 4 61749 300000000 40000 384 \
+            build/phase11-stream/disk/real-pairs
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root=Path('build/phase11-stream')
+          rows=list(csv.DictReader((root/'1000000-burst-disk-4frames.csv').open()))
+          assert len(rows)==4
+          size=0
+          for x in rows:
+              assert x['status']=='VERIFIED_WRITTEN'
+              assert x['sink']=='file'
+              assert x['first_count_digest_matches']=='1'
+              path=Path(x['output_file'])
+              assert path.is_file() and path.stat().st_size==int(x['real_pair_bytes'])
+              size+=path.stat().st_size
+          assert size>500000000
+          print('PASS real persisted OS file output',size,
+                'bytes, pair receipts matched independently computed exact counts')
+          PY
+          # 505 MB of validated binary pairs are not useful as a CI artifact:
+          # retain the CSV receipts, discard only this temporary local CI copy.
+          rm -rf build/phase11-stream/disk
       - name: Upload verified pair output receipts (not huge binary bodies)
         if: always()
         uses: actions/upload-artifact@v4
