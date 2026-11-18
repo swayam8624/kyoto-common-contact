@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 import heapq
+from itertools import zip_longest
 import json
 import struct
 import tempfile
@@ -73,6 +74,36 @@ def check_unique(files: list[Path]) -> None:
         prev = key
 
 
+def sorted_binary_keys(path: Path, chunk_pairs: int = 262144):
+    """Yield all pair ID keys in sorted order, using bounded-memory disk runs."""
+    with tempfile.TemporaryDirectory(prefix="kyoto-pair-compare-") as temp:
+        folder = Path(temp)
+        files = []
+        keys = []
+        with path.open("rb") as source:
+            while block := source.read(PAIR.size * 32768):
+                if len(block) % PAIR.size:
+                    raise ValueError("Truncated record while sorting full pair file")
+                for a, b in struct.iter_unpack("<II", block):
+                    keys.append((a << 32) | b)
+                    if len(keys) == chunk_pairs:
+                        files.append(sorted_chunk_file(keys, folder, len(files)))
+                        keys.clear()
+        if keys:
+            files.append(sorted_chunk_file(keys, folder, len(files)))
+        yield from heapq.merge(*(keys_from_file(item) for item in files))
+
+
+def compare_exact_pair_files(first: Path, second: Path) -> None:
+    if first.resolve() == second.resolve():
+        raise ValueError("Independent pair-file reference must be a different file")
+    sentinel = -1
+    for a, b in zip_longest(sorted_binary_keys(first),
+                            sorted_binary_keys(second), fillvalue=sentinel):
+        if a != b:
+            raise ValueError("Full materialized pair sets are NOT identical")
+
+
 def audit_binary(path: Path, n: int, unique: bool = True,
                  chunk_pairs: int = 262144) -> tuple[int, ...]:
     size = path.stat().st_size
@@ -111,8 +142,12 @@ def audit_binary(path: Path, n: int, unique: bool = True,
     return count, sum64, xor64, sum32, xor32
 
 
-def verify(flat_csv: Path, emitted_csv: Path, unique: bool = True) -> dict:
+def verify(flat_csv: Path, emitted_csv: Path, unique: bool = True,
+           independent_csv: Path | None = None) -> dict:
     flat, emitted = rows(flat_csv), rows(emitted_csv)
+    independent = rows(independent_csv) if independent_csv else None
+    if independent is not None and len(independent) != len(flat):
+        raise ValueError("Independent pair emitter frame count mismatch")
     if len(flat) != len(emitted):
         raise ValueError("Both methods must contain the same frame count")
     records = []
@@ -136,6 +171,17 @@ def verify(flat_csv: Path, emitted_csv: Path, unique: bool = True) -> dict:
         if observed != expected:
             raise ValueError(f"Frame {idx}: streamed pairs disagree with persistent digest\n"
                              f"expected={expected}\nobserved={observed}")
+        if independent is not None:
+            other = independent[idx]
+            for key in ("scene", "n", "frame", "seed"):
+                if other[key] != f[key]:
+                    raise ValueError("Independent producer changed frame geometry")
+            if other["status"] != "VERIFIED_WRITTEN":
+                raise ValueError("Independent producer did not finish real pair output")
+            other_file = Path(other["output_file"])
+            if not other_file.is_file():
+                raise FileNotFoundError(other_file)
+            compare_exact_pair_files(name, other_file)
         if observed[0] != int(e["exact_candidate_pairs"]):
             raise ValueError("Producer count does not match file")
         if observed[0] * PAIR.size != int(e["real_pair_bytes"]):
@@ -156,6 +202,7 @@ def verify(flat_csv: Path, emitted_csv: Path, unique: bool = True) -> dict:
         "total_pair_bytes": sum(item["bytes"] for item in records),
         "all_pair_ids_valid": True, "all_pair_digests_equal": True,
         "all_pairs_uniquely_checked": unique,
+        "full_pair_list_equal_to_independent_stream": independent is not None,
         "limitations": [
             "AABB candidate list, not narrow phase, CCD or solver contacts",
             "Results from different independent processes; times are not a paired speedup",
@@ -171,13 +218,16 @@ def main() -> None:
     parser.add_argument("flat_csv", type=Path)
     parser.add_argument("stream_csv", type=Path)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--independent-stream-csv", type=Path,
+                        help="Compare actual sorted pair IDs against a separate emitter")
     parser.add_argument("--skip-unique-audit", action="store_true",
                         help="Only for gigantic exploratory runs; reported as unverified uniqueness")
     args = parser.parse_args()
     if args.report.exists():
         parser.error(f"Refusing to overwrite existing proof: {args.report}")
     result = verify(args.flat_csv, args.stream_csv,
-                    unique=not args.skip_unique_audit)
+                    unique=not args.skip_unique_audit,
+                    independent_csv=args.independent_stream_csv)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(f"PASS {result['scene']}: {result['frames']} full pair-file frames, "
