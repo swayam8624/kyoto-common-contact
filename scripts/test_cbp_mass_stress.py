@@ -75,6 +75,11 @@ def check_binary(path: pathlib.Path, n: int, frames: int) -> None:
             yield frame, len(pairs), h
 
 
+def records_of(path: pathlib.Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         raise SystemExit(
@@ -135,6 +140,12 @@ def main() -> int:
             frame_rows[int(row["frame"])].append(row)
             if row["exact_sap_equal"] != "1":
                 raise AssertionError("One algorithm failed complete pair equality")
+            intra, inter, count = (
+                int(row["intra_pairs"]), int(row["inter_instance_pairs"]),
+                int(row["pairs"]),
+            )
+            if intra < 0 or inter < 0 or intra + inter != count:
+                raise AssertionError("Within-/between-material pair ledger is inconsistent")
         for frame in range(12):
             selected = frame_rows[frame]
             if {x["mode"] for x in selected} != EXPECTED:
@@ -167,6 +178,26 @@ def main() -> int:
             str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
             str(directory), "--html", str(dashboard),
         ], success=False)
+        for layout in ("crowded", "collision_wave"):
+            region_dir = pathlib.Path(temp) / ("many-materials-" + layout)
+            cmd([export, str(region_dir), "12", "18", "541", layout])
+            scene_csv = region_dir / "cpu-core.csv"
+            cmd([replay, str(region_dir / "snapshots.kmcb"),
+                 str(region_dir / "instances.csv"), str(scene_csv), "core"])
+            scene_rows = [
+                row for row in records_of(scene_csv)
+                if row["mode"] == "sap_rebuild"
+            ]
+            if len(scene_rows) != 18:
+                raise AssertionError("Contact stress fixture missing frames")
+            inter = [int(row["inter_instance_pairs"]) for row in scene_rows]
+            if max(inter) <= 0:
+                raise AssertionError("Crowded material fixture never produced cross-material AABB pairs")
+            print(
+                "CROSS-MATERIAL " + layout + " early=" + str(inter[0])
+                + " late=" + str(inter[-1])
+                + " max=" + str(max(inter)), flush=True
+            )
     print(
         "PASS CBP 12 independently stepped material worlds, 5 actual "
         "material families, exact binary CPU/Metal contract, 8 methods, "
