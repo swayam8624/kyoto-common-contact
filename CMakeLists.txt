@@ -175,10 +175,13 @@ target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -W
 # map-only update lookup, so pair enumeration is cache-local.
 add_executable(ccp_cbp_pressure_incremental_flat_cpu apps/cbp_pressure_incremental_flat_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_incremental_flat_cpu PRIVATE include)
+find_package(Threads REQUIRED)
 target_compile_options(ccp_cbp_pressure_incremental_flat_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_link_libraries(ccp_cbp_pressure_incremental_flat_cpu PRIVATE Threads::Threads)
 add_executable(ccp_cbp_pressure_incremental_flat_tests tests/cbp_pressure_incremental_flat_tests.cpp)
 target_include_directories(ccp_cbp_pressure_incremental_flat_tests PRIVATE include)
 target_compile_options(ccp_cbp_pressure_incremental_flat_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_link_libraries(ccp_cbp_pressure_incremental_flat_tests PRIVATE Threads::Threads)
 add_executable(ccp_cbp_pressure_incremental_cpu apps/cbp_pressure_incremental_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_incremental_cpu PRIVATE include)
 target_compile_options(ccp_cbp_pressure_incremental_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -283,6 +286,11 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME cbp_flat_persistent_parallel_independent_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_parallel.py
+        $<TARGET_FILE:ccp_cbp_pressure_incremental_flat_cpu>
+        $<TARGET_FILE:ccp_cbp_pressure_cpu>)
     add_test(NAME cbp_flat_persistent_cell_direct_oracle
       COMMAND ccp_cbp_pressure_incremental_flat_tests)
     add_test(NAME cbp_flat_persistent_cell_independent_oracle
