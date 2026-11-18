@@ -143,9 +143,55 @@ def main() -> int:
                 or entry["pairs"]!=ref["pairs"] or
                 entry["inter_pairs"]!=ref["inter"]):
                 raise ValueError("Spatial hotspot locations failed exact SAP receipt")
+
+    # Optional Phase-10 on-policy routing sidecar. Never invent decisions for
+    # older Phase-9 recordings. Every decision's complete pair hash must agree
+    # with the original exact SAP oracle for its identical immutable frame.
+    # This is a separate run of the same geometry, not an offline winner.
+    routing = []
+    route_path = scene / "portfolio-v2.csv"
+    if route_path.exists() and not args.preview_only:
+        route_rows = rows(route_path)
+        if len(route_rows) != len(frames):
+            raise ValueError("Incomplete causal four-arm routing trajectory")
+        allowed = {"frozen_v4", "shared_bvh", "region_sweep",
+                   "region_exhaustive"}
+        for i, row in enumerate(route_rows):
+            ref = by_frame[i]["sap_rebuild"]
+            if (
+                int(row["frame"]) != i or
+                row["exact_parity"] != "verified" or
+                row["mode"] not in allowed or row["champion"] not in allowed or
+                row["pair_hash"] != row["oracle_pair_hash"] or
+                row["pair_hash"] != ref["hash"] or
+                int(row["pairs"]) != ref["pairs"] or
+                int(row["inter_instance_pairs"]) != ref["inter"]
+            ):
+                raise ValueError(f"Four-arm route/full SAP pair receipt mismatch frame {i}")
+            finite = ("query_ms", "backend_ms", "internal_total_ms",
+                      "migration_ms", "decision_ms")
+            if not all(
+                math.isfinite(float(row[k])) and float(row[k]) >= 0.
+                for k in finite
+            ):
+                raise ValueError("Invalid causal four-arm measured frame time")
+            if float(row["query_ms"]) + 0.01 < float(row["backend_ms"]):
+                raise ValueError("Causal route reports less than executed backend cost")
+            routing.append({
+                "mode": row["mode"], "champion": row["champion"],
+                "cost": float(row["query_ms"]),
+                "backend": float(row["backend_ms"]),
+                "migration": float(row["migration_ms"]),
+                "switched": int(row["switched"]),
+                "probe": int(row["probe"]),
+                "promoted": int(row["promoted"]),
+                "rejected": int(row["rejected"]),
+                "returning": int(row["returning"]),
+            })
+
     payload={
         "models":models,"poses":frames,"runs":by_frame,"stats":methods,
-        "previews":previews,"spatial":spatial,
+        "previews":previews,"spatial":spatial,"routing":routing,
         "limits":[lower,upper],
         "preview_only":args.preview_only,
         "layout":receipt[0]["layout"],"seed":int(receipt[0]["seed"]),
