@@ -382,3 +382,48 @@ Report P95, per-material/regime/budget performance, exact oracle parity, probes/
 **Paper-ready next gate:** Freeze V4 and its thresholds; stop reusing the now-inspected seed set for model selection. Run A/A equivalent Guard through two wrapper paths, **randomize or reverse algorithm execution order**, repeat each exact scene multiple times on a controlled/recorded Apple Silicon CPU environment, and cross each material×regime×budget cell with multiple new independent seeds. Record pair correctness, mean, P95, RSS, exact action transitions and clean-cache/warm-cache timing. Only after timing-order artifacts are bounded should one claim reproducible 9.7% typical-scene or 26.7% total-time advantages. The CPU replay does not yet establish gains in the coupled solver, narrow-phase contacts or Metal GPU. Publishable novelty remains to be developed and situated against prior art.
 
 **Local research artifacts produced in the audit:** `Kyoto_Bounded_108_Full_Research_Audit.md` and `Kyoto_Bounded_108_Per_Scene.csv` are supplied separately in the conversation, not committed to this repository. **No controller algorithm source or original measurements were modified in this pass.**
+
+
+## Phase 17 — restore research comparisons and materially verify persistent pair output (19 Nov 2026)
+
+**Branch:** research/kyoto-phase17-unified-proof, kept separate from the
+frozen V4 release and the Phase 16 research branch.
+
+The project navigation diverged after V4: the full-output original Online,
+Global Guard, Selective Guard, SAP, learned selector, measured probe and
+bounded V4 comparisons still exist in material_replay_benchmark.cpp, whereas
+Phases 11–16 mostly benchmarked synthetic count+fingerprint global spatial
+indexing at 1M objects. These methods are not direct substitutes and their
+unlike timing numbers cannot be entered in one rank table.
+
+**New additive deliverables:**
+
+- A reproducible Phase 17 runner that runs original material candidates and
+  a separate synthetic pressure cohort without overwriting old outputs.
+- A strict dashboard retaining original policy names, independently checked
+  SAP candidate hashes, trajectory-level Guard-referenced summaries and
+  separate Phase 16 scaling metrics.
+- A bounded canonical-pair streaming callback on FlatPersistentGrid; real
+  8-byte little-endian ID writes with a finite output cap, transactional
+  .part files and explicit incomplete status.
+- A new persistent-grid native pair-output executable, alongside the
+  independent rebuilt-grid streamer. Both consume the *same* synthetic
+  geometry/seed/frame cohort.
+- A Python binary-file verifier which independently recomputes 64/32-bit
+  pair digests, checks all emitted IDs, pair bytes and duplicates using
+  bounded-memory external sorting, then checks complete sorted pair-list
+  equality between the two algorithms.
+- New native and Python regressions that reject duplicates, bad pair
+  IDs, truncated binary streams, mismatched hash fields, missing original
+  historical baselines and complete/incomplete confusion.
+- A Linux CI workflow preserving raw evidence. Passing its small integration
+  cohort is not a robust Mac speedup estimate. The runner also checks the
+  original learned C++ ABI and original coupled multicloth regression.
+
+**Explicitly not completed by these changes:** physical solver integration
+of the persistent-grid output, self-collision/CCD guarantees, realistic
+deformable external benchmarks, native Metal full end-to-end timings,
+unbiased broad external library tournament or a proved new contact-graph
+algorithm. Preserve both original frozen V4 and negative V5/V6 evidence.
+
+Study/navigation reference: docs/KYOTO_RESEARCH_UNIFIED_MAP.md.
