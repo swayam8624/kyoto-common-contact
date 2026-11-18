@@ -17,6 +17,12 @@ button:hover,select:hover{border-color:#76c7ce}
 input[type=range]{accent-color:var(--mint);flex:1;min-width:140px}
 .story{background:#102b32;border:1px solid #34676b;border-radius:9px;padding:12px 15px;margin:0 0 13px}
 .story b{font-size:17px;display:block}.story p{margin:5px 0}
+.route-panel{background:#102030;border:1px solid #3c5166;border-radius:10px;padding:14px;margin:15px 0}
+#route-plot{display:block;width:100%;height:110px;background:#0a1623;border-radius:8px;cursor:crosshair}
+#route-caption{color:#c1d8e7;line-height:1.5;margin-top:6px}
+.route-legend{color:#aebfd0;font-size:12px;margin:8px 0}
+.route-key{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 5px 0 12px}
+
 .note{background:#2b2c35;border-left:3px solid #eeb977;padding:11px 13px;color:#e8d8c3;margin:12px 0}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
 .metric{background:#0d1b2c;border:1px solid var(--edge);border-radius:8px;padding:12px}
@@ -63,6 +69,17 @@ tbody tr:first-child td{color:#72e4c9}
 <div class="metric"><small>Total candidate pairs</small><b id="total">—</b><small>Exact broad-phase reference</small></div>
 <div class="metric"><small>Between separate assets</small><b id="inter">—</b><small>Not solved physical contacts</small></div>
 <div class="metric"><small>Fastest measured CPU</small><b id="fastest">—</b><small id="winner">Per current frame</small></div>
+</div>
+<div class="route-panel">
+<h2>Which broad-phase algorithm did the live controller actually execute?</h2>
+<p id="route-caption">Routing evidence will appear here only when a verified Phase 10 per-frame trace is available.</p>
+<canvas id="route-plot" aria-label="Per-frame actually executed on-policy broad-phase method and its measured cost"></canvas>
+<p class="route-legend">Each colored bar represents the actual on-policy backend executed for that frame, not a retrospective winner.
+<span class="route-key" style="background:#54dbc5"></span>Shared BVH
+<span class="route-key" style="background:#e7a95d"></span>Regional sweep
+<span class="route-key" style="background:#a6a0f2"></span>Regional exhaustive
+<span class="route-key" style="background:#8798ae"></span>Frozen V4. 
+White top marks indicate exploration; red ticks indicate rejected trials. Bar height is an illustrative log-scaled recorded query time; the numeric inspector is authoritative.</p>
 </div>
 <h2>When did object-to-object search work begin?</h2>
 <canvas id="timeline"></canvas>
@@ -231,6 +248,46 @@ function drawing(id,height){
 const reference=data.preview_only?[]:data.runs.map(f=>f.sap_rebuild);
 const maxAll=Math.max(1,...reference.map(x=>x.pairs));
 const maxCross=Math.max(1,...reference.map(x=>x.inter));
+
+const routing=data.routing||[];
+const routeColor={
+ frozen_v4:"#8798ae", shared_bvh:"#54dbc5",
+ region_sweep:"#e7a95d", region_exhaustive:"#a6a0f2"
+};
+function drawRoute(){
+ const {ctx,w,h}=drawing("route-plot",110);
+ ctx.fillStyle="#0a1623";ctx.fillRect(0,0,w,h);
+ if(!routing.length){
+  ctx.fillStyle="#aabbd0";ctx.font="12px system-ui";
+  ctx.fillText("No verified on-policy four-arm trace in this recording.",13,28);
+  return;
+ }
+ const left=16,right=w-15,top=14,bottom=h-22;
+ const max=Math.max(.01,...routing.map(x=>x.cost));
+ const width=(right-left)/routing.length;
+ for(let i=0;i<routing.length;i++){
+  const r=routing[i],x=left+i*width;
+  const amplitude=Math.log1p(r.cost)/Math.log1p(max);
+  const height=Math.max(5,(bottom-top)*amplitude);
+  ctx.fillStyle=routeColor[r.mode]||"#fff";
+  ctx.fillRect(x,bottom-height,Math.max(.6,width),height);
+  if(r.probe){
+   ctx.fillStyle="#fafaf5";
+   ctx.fillRect(x,top,Math.max(.6,width),3);
+  }
+  if(r.rejected){
+   ctx.fillStyle="#ff7979";
+   ctx.fillRect(x,top,Math.max(2,width),9);
+  }
+ }
+ ctx.strokeStyle="#f3f7ff";ctx.lineWidth=1.5;
+ const cursor=left+(frame+.5)*width;
+ ctx.beginPath();ctx.moveTo(cursor,top);ctx.lineTo(cursor,bottom+3);ctx.stroke();
+ ctx.textAlign="left";ctx.fillStyle="#bdd3e1";ctx.font="11px system-ui";
+ ctx.fillText("Frame 1",left,h-4);
+ ctx.textAlign="right";ctx.fillText("Frame "+totalFrames,right,h-4);
+}
+
 function drawTimeline(){
  const {ctx,w,h}=drawing("timeline",196),L=50,R=w-62,T=25,B=h-32;
  ctx.fillStyle="#0b1927";ctx.fillRect(0,0,w,h);
@@ -284,6 +341,17 @@ function drawMap(){
  ctx.fillText("Imported mesh XY envelopes",8,14);
 }
 function updateInfo(){
+ const route=routing[frame];
+ byId("route-caption").textContent=route?
+  ("Frame "+(frame+1)+": "+route.mode+" actually executed · "+
+   route.cost.toFixed(4)+" ms query · active champion "+
+   route.champion+" · "+(route.probe?"EXPLORATION FRAME":
+        route.returning?"RETURN FROM REJECTED TRIAL":"NORMAL EXECUTION")+
+   (route.promoted?" · PROMOTED":route.rejected?" · REJECTED":"")+
+   (route.switched?" · backend cold migration charged":"")+
+   ". No unchosen alternative ran in the controller."):
+  "This real 3D replay has no verified on-policy controller trace. "+
+  "The leaderboard is a separate comparison of complete fixed CPU algorithms.";
  const ref=reference[frame];
  byId("frame").textContent=(frame+1)+" / "+totalFrames;
  byId("seek").max=totalFrames-1;byId("seek").value=frame;
@@ -319,7 +387,7 @@ function updateInfo(){
    "Motion: fixed triangle mesh, deterministic rigid translation/rotation.";
  }
 }
-function redraw(){draw3d();drawTimeline();drawMap();updateInfo()}
+function redraw(){draw3d();drawTimeline();drawRoute();drawMap();updateInfo()}
 function tick(time){
  if(playing&&time-last>1000/Number(byId("speed").value)){
   last=time;frame=(frame+1)%totalFrames;redraw();
@@ -334,6 +402,13 @@ byId("isolate").onchange=()=>draw3d();
 byId("reset").onclick=()=>{yaw=.6;pitch=.5;zoom=1;selected=-1;byId("object").value=-1;redraw()};
 byId("top").onclick=()=>{yaw=0;pitch=1.5;draw3d()};
 byId("front").onclick=()=>{yaw=0;pitch=0;draw3d()};
+byId("route-plot").onclick=e=>{
+ if(!routing.length)return;
+ const rect=e.currentTarget.getBoundingClientRect();
+ const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left-16)/(rect.width-31)));
+ frame=Math.min(totalFrames-1,Math.floor(ratio*totalFrames));
+ playing=false;byId("play").textContent="Play";redraw();
+};
 byId("timeline").onclick=e=>{
  if(!reference.length)return;
  const rect=e.currentTarget.getBoundingClientRect();
