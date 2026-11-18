@@ -30,7 +30,7 @@ def main():
         output=folder/"real-mesh-dashboard.html"
         command([sys.executable,str(script),str(folder),"--html",str(output)])
         markup=output.read_text(encoding="utf-8")
-        checks=["CCP_MESH_TRUTH_V1","Real meshes + context","drawMeshGeometry",
+        checks=["source_verification","Real meshes + context","drawMeshGeometry",
                 "mesh-vertex","gl.TRIANGLES","gl.LINES"]
         if not all(text in markup for text in checks):
             raise AssertionError("Actual mesh draw program or topology missing")
