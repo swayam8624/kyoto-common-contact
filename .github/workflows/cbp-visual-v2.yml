@@ -9,6 +9,9 @@ on:
       - 'scripts/test_cbp_mass_stress.py'
       - 'viewer/mass_stress_v2.html'
       - 'viewer/mass_stress.html'
+      - 'apps/cbp_contact_hotspots.cpp'
+      - 'scripts/test_cbp_contact_hotspots.py'
+      - 'CMakeLists.txt'
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,13 +25,42 @@ jobs:
         run: |
           cmake --preset kyoto-final-cpu
           cmake --build build/kyoto-final-cpu \
-            --target ccp_cbp_mass_export ccp_cbp_mass_replay --parallel 2
+            --target ccp_cbp_mass_export ccp_cbp_mass_replay ccp_cbp_contact_hotspots --parallel 2
       - name: Independent candidate oracle and V1/V2 research viewer contract
         timeout-minutes: 4
         run: |
           python3 scripts/test_cbp_mass_stress.py \
             build/kyoto-final-cpu/ccp_cbp_mass_export \
             build/kyoto-final-cpu/ccp_cbp_mass_replay
+      - name: Exact AABB intersection hotspot proof and tamper rejection
+        timeout-minutes: 3
+        run: |
+          ctest --test-dir build/kyoto-final-cpu             -R '^cbp_spatial_hotspots_contract
+        timeout-minutes: 3
+        run: |
+          python3 scripts/run_cbp_mass_scale.py \
+            --build build/kyoto-final-cpu \
+            --output build/cbp-observatory-ci \
+            --instances 100 --frames 24 --seed 66217 --layout crowded \
+            --case-timeout 120
+          test -f build/cbp-observatory-ci/MANIFEST.json
+          find build/cbp-observatory-ci -name 'dashboard.html' -size +20k -print
+      - name: Preserve standalone verified observatory and raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-visual-v2-crowded-research-example
+          path: |
+            build/cbp-observatory-ci/MANIFEST.json
+            build/cbp-observatory-ci/**/CASE_REPORT.json
+            build/cbp-observatory-ci/**/dashboard.html
+            build/cbp-observatory-ci/**/cpu-core.csv
+            build/cbp-observatory-ci/**/instances.csv
+            build/cbp-observatory-ci/**/preview.jsonl
+            build/cbp-observatory-ci/**/frames.csv
+          retention-days: 7
+          if-no-files-found: warn
+             --output-on-failure
       - name: Generate actual 100-world crowded benchmark and embedded V2 dashboard
         timeout-minutes: 3
         run: |
