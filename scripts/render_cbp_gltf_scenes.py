@@ -117,11 +117,6 @@ def main() -> int:
                 "p95":times[max(0,math.ceil(len(times)*.95)-1)],
                 "kernel":statistics.fmean(kernel) if kernel else None
             })
-    all_bounds=[
-        [min(float(box[1+k]) for f in
-             (json.loads(line) for line in (scene/"preview.jsonl").open())
-             for box in f["instances"]) for k in range(3)]
-    ] if False else None
     # Parse one bounded preview file and keep original room-scale framing.
     previews=[json.loads(x) for x in
               (scene/"preview.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
