@@ -1,0 +1,107 @@
+name: CBP Phase 14 — persistent exact canonical-cell membership and million-body validation
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-phase14-persistent.yml'
+      - 'include/ccp/cbp_pressure_incremental.hpp'
+      - 'apps/cbp_pressure_incremental_cpu.cpp'
+      - 'tests/cbp_pressure_incremental_tests.cpp'
+      - 'scripts/test_cbp_pressure_incremental.py'
+      - 'scripts/analyze_cbp_pressure_incremental.py'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  persistent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frozen and persistent CPU index with warnings as errors
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_pressure_cpu \
+                     ccp_cbp_pressure_incremental_cpu \
+                     ccp_cbp_pressure_incremental_tests \
+            --parallel 2
+          python3 -m py_compile scripts/test_cbp_pressure_incremental.py scripts/analyze_cbp_pressure_incremental.py
+      - name: Brute-force exact 160-frame persistent index oracle and eight independent scene cohorts
+        run: |
+          ctest --test-dir build/kyoto-final-cpu \
+            -R '^cbp_persistent_cell_(direct|independent)_oracle$' \
+            --output-on-failure
+      - name: 1M slabs — exact quiet-frame reuse benchmark
+        timeout-minutes: 3
+        run: |
+          mkdir -p build/phase14-measurements
+          build/kyoto-final-cpu/ccp_cbp_pressure_incremental_cpu \
+            build/phase14-measurements/slabs1M-persistent.csv \
+            slabs 1000000 6 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase14-measurements/slabs1M-frozen.csv \
+            slabs 1000000 6 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_incremental.py \
+            build/phase14-measurements/slabs1M-persistent.csv \
+            build/phase14-measurements/slabs1M-frozen.csv \
+            --report build/phase14-measurements/slabs1M-results.md
+      - name: 1M burst — exact dirty migration, bounded rebuilding and dense candidate growth
+        timeout-minutes: 4
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_pressure_incremental_cpu \
+            build/phase14-measurements/burst1M-persistent.csv \
+            burst 1000000 20 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase14-measurements/burst1M-frozen.csv \
+            burst 1000000 20 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_incremental.py \
+            build/phase14-measurements/burst1M-persistent.csv \
+            build/phase14-measurements/burst1M-frozen.csv \
+            --report build/phase14-measurements/burst1M-results.md
+      - name: Fully overlapping 8K — exact dense X-switch with 33.55 million candidates
+        timeout-minutes: 2
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_pressure_incremental_cpu \
+            build/phase14-measurements/dense8192-persistent.csv \
+            all_overlap 8192 6 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase14-measurements/dense8192-frozen.csv \
+            all_overlap 8192 6 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_incremental.py \
+            build/phase14-measurements/dense8192-persistent.csv \
+            build/phase14-measurements/dense8192-frozen.csv \
+            --report build/phase14-measurements/dense8192-results.md
+      - name: Prove real frame-to-frame reuse, charged initial build and exact pair cardinality
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          p=Path("build/phase14-measurements")
+          def read(x):
+              with (p/x).open(newline="") as f:
+                  return list(csv.DictReader(f))
+          slabs=read("slabs1M-persistent.csv")
+          burst=read("burst1M-persistent.csv")
+          dense=read("dense8192-persistent.csv")
+          assert all(x["status"]=="complete" for x in slabs+burst+dense)
+          assert slabs[0]["rebuilt"]=="1"
+          assert all(x["rebuilt"]=="0" and x["changed_cell_ranges"]=="0" for x in slabs[1:])
+          assert all(x["selected_backend"]=="persistent_3d_grid" for x in slabs)
+          assert any(x["rebuilt"]=="1" and int(x["changed_cell_ranges"])>100000 for x in burst[1:])
+          assert any(int(x["exact_pairs"])==31500000 for x in burst)
+          assert all(int(x["exact_pairs"])==33550336 for x in dense)
+          assert all(x["selected_backend"]=="projected_x_sweep" for x in dense)
+          assert all(float(x["complete_query_ms"])>=float(x["query_ms"]) for x in slabs+burst+dense)
+          print("PASS exact persistent-work receipts and meaningful rebuild/reuse ablations")
+          PY
+      - name: Upload real measured/capped per-frame evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-phase14-exact-persistent-grid-1m-dirty-repair
+          path: build/phase14-measurements
+          retention-days: 14
+          if-no-files-found: warn
