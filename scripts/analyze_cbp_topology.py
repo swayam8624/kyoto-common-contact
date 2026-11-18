@@ -17,10 +17,12 @@ from pathlib import Path
 import statistics
 
 METHODS = [
-    "frozen_v4", "topology_exhaustive", "topology_shared_bvh",
-    "topology_certified_cache", "causal_cbp", "portfolio_v4_regional",
-    "fresh_sap",
+    "frozen_v4", "topology_exhaustive", "topology_xsweep",
+    "topology_shared_bvh", "topology_certified_cache", "causal_cbp",
+    "portfolio_v4_regional", "fresh_sap",
 ]
+# Preserve the original seven-policy files as immutable evidence.
+OLD_METHODS = set(METHODS) - {"topology_xsweep"}
 
 
 def read_replay(path: Path) -> tuple[dict, list[dict]]:
@@ -46,8 +48,11 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
         if not math.isfinite(t) or t < 0 or row["oracle_equal"] != "1":
             raise ValueError(f"{path}: invalid timing or candidate parity")
         frames[f][method] = row
+    policies = set(frames[1]) if 1 in frames else set()
+    if policies not in (set(METHODS), OLD_METHODS):
+        raise ValueError(f"{path}: unrecognized policy set")
     for frame, values in frames.items():
-        if set(values) != set(METHODS):
+        if set(values) != policies:
             raise ValueError(f"{path}: incomplete frame {frame}")
         if len({v["pairs"] for v in values.values()}) != 1:
             raise ValueError(f"{path}: mismatched candidate counts")
@@ -60,16 +65,17 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
     # pilots. Preserve all transitions after warmup, including paid trials.
     warmup = min(6, max(1, len(ordered) // 8))
     timed = [frame for frame in ordered if frame > warmup]
+    active_methods = [method for method in METHODS if method in policies]
     sums = {
         method: sum(float(frames[frame][method]["query_ms"]) for frame in timed)
-        for method in METHODS
+        for method in active_methods
     }
-    means = {method: sums[method] / len(timed) for method in METHODS}
+    means = {method: sums[method] / len(timed) for method in active_methods}
     v4 = means["frozen_v4"]
     if v4 <= 0 or any(v <= 0 for v in means.values()):
         raise ValueError(f"{path}: zero-duration method cannot form speedup")
     rows_out = []
-    for method in METHODS:
+    for method in active_methods:
         values = [float(frames[f][method]["query_ms"]) for f in timed]
         sorted_values = sorted(values)
         p95 = sorted_values[math.ceil(.95 * len(values)) - 1]
