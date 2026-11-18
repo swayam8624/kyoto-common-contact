@@ -43,6 +43,8 @@ h3{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:#b5cadd;ma
 #explain{color:#e2edf5}
 #focus-details{color:#c5d6e5;white-space:pre-line;line-height:1.5}
 .inset-title{margin:0 0 5px;font-size:13px;color:#dceaf5}
+#hotspot-legend{color:#fbd49a;font-size:12px;margin:5px 0}
+.hotspot-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f3bd67;margin-right:6px;box-shadow:0 0 9px #e8a74a}
 table .good{color:#77e4ce}table .bad{color:#f1b5a3}
 .panel-note{font-size:12px;color:#b4c8d7;line-height:1.55}
 #gpu-rows tr td{font-variant-numeric:tabular-nums}
@@ -69,7 +71,8 @@ table .good{color:#77e4ce}table .bad{color:#f1b5a3}
 <div class="scene-layout">
 <div class="subpanel"><div class="inset-title">XY overview · click a box to inspect a material instance</div>
 <canvas id="mini" aria-label="Interactive top-down XY material envelope map"></canvas>
-<p class="panel-note tight">Plan view of conservative 3D envelopes. White outlines indicate nearby *envelope overlaps* when an instance is selected; these are not verified element-level collision pairs.</p></div>
+<div id="hotspot-legend"><span class="hotspot-dot"></span> Amber dots: verified sampled element-AABB overlap locations (when available)</div>
+<p class="panel-note tight">White outlines indicate nearby conservative *instance-envelope* overlaps. Amber dots, if present, represent a bounded deterministic sample from the actual cross-instance AABB candidate list. Neither means a narrow-phase or physical collision.</p></div>
 <div class="subpanel"><div class="inset-title">Instance inspector</div>
 <div id="focus-details">Select an instance in the XY map to see its family, forcing regime, approximate neighborhood and number of underlying primitive AABBs.</div>
 <div class="inset-title" style="margin-top:17px">What the colors actually mean</div>
@@ -319,6 +322,14 @@ function drawMini(){
   miniRects.push({x,y,w:rw,h:rh,i,cx:x+rw/2,cy:y+rh/2});
  }
  ctx.globalAlpha=1;
+ const exactPoints=data.hotspots?.[current]?.hotspots||[];
+ for(const mark of exactPoints){
+  const adjacent=focusInstance<0||mark[0]===focusInstance||mark[1]===focusInstance;
+  if(!adjacent)continue;
+  const x=px(mark[2]),y=py(mark[3]);
+  ctx.fillStyle="#ffd185";ctx.beginPath();ctx.arc(x,y,focusInstance<0?2.8:4,0,2*Math.PI);ctx.fill();
+  ctx.strokeStyle="#45311b";ctx.lineWidth=.8;ctx.stroke();
+ }
  ctx.font="11px system-ui";ctx.fillStyle="#b4cbe2";ctx.fillText("XY map · instance envelopes",8,16);
  ctx.textAlign="right";ctx.fillText(boxes.length+" worlds",w-10,16);ctx.textAlign="left";
 }
@@ -331,6 +342,8 @@ function inspectInstance(){
   "Applied regime: "+entry.regime.replaceAll("_"," ")+"\n"+
   "Element AABBs: "+fmt(entry.primitives)+"\n"+
   "Envelope-overlapping neighbor instances: "+fmt(currentNeighbors.length)+"\n"+
+  "Verified sampled element-AABB hotspots involving this instance: "+
+  fmt((data.hotspots?.[current]?.hotspots||[]).filter(m=>m[0]===focusInstance||m[1]===focusInstance).length)+"\n"+
   (currentNeighbors.length?
    "First nearby IDs: "+currentNeighbors.slice(0,8).join(", ")+(currentNeighbors.length>8?", …":"")+"\n":"")+
   "\nThe nearby count is from conservative outer envelopes only; it is NOT the exact element-level candidate count for this instance.";
@@ -393,9 +406,14 @@ function updateStory(){
  }
  byId("story-head").textContent=headline;
  byId("story").textContent=explanation;
+ const marked=data.hotspots?.[current]?.hotspots;
  byId("moment").textContent=data.preview_only?
   "Preview mode: only recorded geometry is available. No candidate counts, speedup or GPU validation is claimed yet.":
-  "All verified algorithms consumed the same saved Float32 element AABBs. Scene layout is fixed independently of the algorithm selected.";
+  (marked?
+   "Amber XY dots: "+fmt(marked.length)+" sampled exact cross-instance element-AABB overlap midpoints. "+
+   "All candidate counts and positions are verified against the saved SAP pair hash; dots are NOT physical contact points.":
+   "No location markers extracted for this recording. Exact candidate counts still come from the measured CPU SAP replay. "+
+   "You can generate contact-hotspots.jsonl from the existing binary without rerunning physics or Metal.");
  byId("total-inline").textContent=ref?fmt(ref.pairs):"Pending";
  byId("cross-inline").textContent=ref?fmt(ref.inter_pairs):"Pending";
  byId("cross-percent").textContent=ref?
