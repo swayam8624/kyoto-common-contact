@@ -34,7 +34,7 @@ if (( FRAMES < 9 || FRAMES > 240 || BUDGET < 16 || BUDGET > 2048 ||
 fi
 
 cmake -S . -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-cmake --build "$BUILD" --parallel 4 --target ccp_material_export ccp_material_replay ccp_cbp_pressure_incremental_flat_cpu ccp_cbp_pressure_emit ccp_cbp_pressure_incremental_flat_tests ccp_final_broadphase_api_tests
+cmake --build "$BUILD" --parallel 4 --target ccp_material_export ccp_material_replay ccp_cbp_pressure_incremental_flat_cpu ccp_cbp_pressure_incremental_flat_emit ccp_cbp_pressure_emit ccp_cbp_pressure_incremental_flat_tests ccp_final_broadphase_api_tests
 ctest --test-dir "$BUILD" --output-on-failure -R '^(final_broadphase_public_api_exact_pair_oracle|cbp_flat_persistent_cell_direct_oracle)$'
 
 mkdir -p "$OUT/replays" "$OUT/snapshots" "$OUT/phase16" "$OUT/pair-files" "$OUT/pair-proofs"
@@ -68,7 +68,9 @@ for scene in $SCENES; do
     "$BUILD/ccp_cbp_pressure_incremental_flat_cpu" "$OUT/phase16/${stem}-threads${threads}.csv" "$scene" "$size" "$PFRAMES" "$SEED" 50000000 25000 12000000 --threads "$threads"
   done
   "$BUILD/ccp_cbp_pressure_emit" "$OUT/phase16/${stem}-emitted.csv" "$scene" "$size" "$PFRAMES" "$SEED" 50000000 25000 64 "$OUT/pair-files/${stem}"
+  "$BUILD/ccp_cbp_pressure_incremental_flat_emit" "$OUT/phase16/${stem}-persistent-emitted.csv" "$scene" "$size" "$PFRAMES" "$SEED" 50000000 25000 12000000 64 "$OUT/pair-files/${stem}-persistent"
   python3 scripts/verify_cbp_materialized_pairs.py "$OUT/phase16/${stem}-threads1.csv" "$OUT/phase16/${stem}-emitted.csv" --report "$OUT/pair-proofs/${stem}-PAIR-PROOF.json"
+  python3 scripts/verify_cbp_materialized_pairs.py "$OUT/phase16/${stem}-threads1.csv" "$OUT/phase16/${stem}-persistent-emitted.csv" --independent-stream-csv "$OUT/phase16/${stem}-emitted.csv" --report "$OUT/pair-proofs/${stem}-PERSISTENT-PAIR-PROOF.json"
 done
 
 python3 scripts/kyoto_research_dashboard.py --materials "$OUT" --phase16 "$OUT/phase16" --warmup 4 --output "$OUT/reports"
