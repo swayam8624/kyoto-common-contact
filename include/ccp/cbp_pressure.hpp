@@ -91,7 +91,7 @@ inline std::optional<std::uint64_t> analyticCandidates(
    // 3*.04 + 2*.045 < .31 = box diameter. Distinct groups
    // remain >=3.5-.52 apart along some grid axis.
    const std::uint64_t whole=n/64,last=n%64;
-   return whole*(64*63/2)+last*(last-1)/2;
+   return whole*(64*63/2)+(last>1?last*(last-1)/2:0);
   }
  }
  return std::nullopt;
