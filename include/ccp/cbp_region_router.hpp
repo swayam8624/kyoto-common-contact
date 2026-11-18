@@ -237,7 +237,8 @@ public:
     std::sort(sorted.begin(),sorted.end(),[](const Region* a,const Region* b){
      if(a->unionBounds.min.x!=b->unionBounds.min.x)
       return a->unionBounds.min.x<b->unionBounds.min.x;
-     return a->id<b->id;
+     // Every constructed region owns at least one unique primitive ID.
+     return a->ids.front()<b->ids.front();
     });
     for(std::size_t i=0;i<sorted.size();++i){
      const Region& a=*sorted[i];
