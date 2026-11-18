@@ -1,0 +1,93 @@
+name: CBP Phase 9 — verified real Khronos glTF scenes and exact CPU comparison
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-gltf-real.yml'
+      - 'scripts/download_cbp_gltf_scenes.py'
+      - 'scripts/import_cbp_gltf_scenes.py'
+      - 'scripts/render_cbp_gltf_scenes.py'
+      - 'viewer/gltf_scene_observatory.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-glb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native exact broad-phase CPU benchmark and hotspot extractor
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_mass_replay ccp_cbp_contact_hotspots --parallel 2
+      - name: Download pinned, separately licensed REAL Khronos glTF assets
+        timeout-minutes: 8
+        run: |
+          python3 scripts/download_cbp_gltf_scenes.py \
+            --output build/cbp-real-assets --limit 26 \
+            --per-asset-mb 24 --total-mb 280
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("build/cbp-real-assets/ASSET_CATALOG.json")
+          j=json.loads(p.read_text())
+          print("REAL downloaded models:",len(j["downloaded"]))
+          print("LICENSE-AUDITED:",[x["name"] for x in j["downloaded"]])
+          print("SKIPPED:",j["skipped"])
+          assert len(j["downloaded"])>=20, "Fewer than 20 real upstream GLB models; update the curated audited set"
+          PY
+      - name: Import real triangles, 48-frame rigid scene motion and immutable Float32 AABBs
+        timeout-minutes: 5
+        run: |
+          python3 scripts/import_cbp_gltf_scenes.py \
+            --catalog build/cbp-real-assets \
+            --output build/cbp-real-scenes \
+            --frames 48 --layout wave --seed 66217 \
+            --max-triangles-per-asset 256
+      - name: Measure exact six-mode CPU broad phase on identical REAL triangles
+        timeout-minutes: 5
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_mass_replay \
+            build/cbp-real-scenes/snapshots.kmcb \
+            build/cbp-real-scenes/instances.csv \
+            build/cbp-real-scenes/cpu-core.csv core
+      - name: Extract independently checked spatial AABB overlap markers and render REAL meshes
+        timeout-minutes: 3
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_contact_hotspots \
+            build/cbp-real-scenes/snapshots.kmcb \
+            build/cbp-real-scenes/instances.csv \
+            build/cbp-real-scenes/contact-hotspots.jsonl 160
+          python3 scripts/render_cbp_gltf_scenes.py \
+            build/cbp-real-scenes --html build/cbp-real-scenes/REAL-3D-OBSERVATORY.html
+          python3 - <<'PY'
+          import csv,json
+          from pathlib import Path
+          r=Path("build/cbp-real-scenes")
+          j=json.loads((r/"asset-meshes.json").read_text())
+          v=list(csv.DictReader((r/"cpu-core.csv").open()))
+          n=len(j["objects"])
+          assert n>=20
+          assert len(v)==48*6
+          assert all(x["exact_sap_equal"]=="1" for x in v)
+          assert (r/"REAL-3D-OBSERVATORY.html").stat().st_size>20000
+          print("REAL GLB SCENES VERIFIED:",n,"triangle AABBs:",sum(a["selected_triangles"] for a in j["objects"]))
+          PY
+      - name: Preserve real asset provenance and measured evidence for download
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-real-licensed-gltf-3d-48frame-cpu-evidence
+          path: |
+            build/cbp-real-assets/ASSET_CATALOG.json
+            build/cbp-real-scenes/asset-meshes.json
+            build/cbp-real-scenes/instances.csv
+            build/cbp-real-scenes/frames.csv
+            build/cbp-real-scenes/cpu-core.csv
+            build/cbp-real-scenes/contact-hotspots.jsonl
+            build/cbp-real-scenes/REAL-3D-OBSERVATORY.html
+          retention-days: 14
+          if-no-files-found: warn
