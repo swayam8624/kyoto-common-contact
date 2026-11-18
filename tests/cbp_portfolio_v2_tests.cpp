@@ -33,7 +33,7 @@ void construct(std::vector<Bounds>& boxes,std::vector<int>& owners,int frame){
   const double motion=.08*std::sin(.13*frame+double(i%11));
   const double local=frame<45?2.5:frame<95?.11:.5;
   const double x=double(int(group)%7)*5.+
-                  (double(int(i)%8)%2)*local+motion;
+                  double(int(i)%2)*local+motion;
   const double y=double(int(group)%7)*3.+
                   ((i/2)%2)*local+.04*std::cos(.08*frame+i);
   const double z=double(int(group)/7)*4.+((i/4)%2)*local;
@@ -53,7 +53,7 @@ void check(){
  bool sawReturn=false;
  for(int frame=0;frame<150;++frame){
   construct(bounds,labels,frame);
-  if(frame==106){
+  if(frame>=106){
    // Exactness of local ownership migration: noncontiguous labels remain legal.
    for(std::size_t i=0;i<labels.size();++i)labels[i]=int(i%17);
   }
