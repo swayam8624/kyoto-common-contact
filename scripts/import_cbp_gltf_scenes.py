@@ -208,9 +208,12 @@ def compact(source: list[tuple], collision_limit: int,
     return sample(collision_limit), sample(display_limit), count
 
 
-def placement(i: int, frame: int, frames: int, count: int, layout: str):
-    # 8 assets per cluster; gradual rigid convergence is a workload trajectory
-    # only, NOT collision response or glTF skeleton/animation evaluation.
+def placement(i: int, frame: int, frames: int, count: int,
+              layout: str, seed: int):
+    # Eight independently moving real GLB models per spatial cluster.
+    # Seed affects actual object trajectory, not merely a CSV header. This
+    # makes different seeds valid independent workload cohorts.
+    # Still kinematic rigid motion, NOT contact response/glTF animation.
     group, member = divmod(i, 8)
     groups = math.ceil(count / 8)
     side = math.ceil(groups ** (1 / 3))
@@ -220,10 +223,14 @@ def placement(i: int, frame: int, frames: int, count: int, layout: str):
     t = frame / max(1, frames - 1)
     local = .27 if layout == "crowded" else (
         2.1 - 1.83 * max(0., min(1., (t - .10) / .70)))
-    return (6.5 * (gx - side / 2) + (local if member & 1 else -local),
-            6.5 * (gy - side / 2) + (local if member & 2 else -local),
-            6.5 * gz + (local if member & 4 else -local),
-            .17 * math.sin(frame * .04 + i * .13))
+    phase = ((seed * 2654435761 + i * 2246822519) & 0xffffffff) / 4294967296 * (2 * math.pi)
+    drift = .07 * math.sin(.09 * frame + phase)
+    sway = .06 * math.cos(.07 * frame + phase * 1.13)
+    flutter = .045 * math.sin(.11 * frame + phase * .79)
+    return (6.5 * (gx - side / 2) + (local if member & 1 else -local) + drift,
+            6.5 * (gy - side / 2) + (local if member & 2 else -local) + sway,
+            6.5 * gz + (local if member & 4 else -local) + flutter,
+            .17 * math.sin(frame * .04 + i * .13 + phase * .41))
 
 
 def move(v: list[float], pose: tuple[float, float, float, float]):
@@ -293,7 +300,7 @@ def generate(catalog: Path, output: Path, frames: int, max_tris: int,
             poses = []
             h = 14695981039346656037
             for i, asset in enumerate(assets):
-                pose = placement(i, f, frames, len(assets), layout)
+                pose = placement(i, f, frames, len(assets), layout, seed)
                 poses.append([round(v, 6) for v in pose])
                 lo = [float("inf")] * 3
                 hi = [-float("inf")] * 3
