@@ -35,7 +35,7 @@ def sha256(path: Path) -> str:
     return hash_value.hexdigest()
 
 
-def load(directory: Path, metal_files: list[Path]) -> dict:
+def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -> dict:
     instances = records(directory / "instances.csv")
     receipt = records(directory / "frames.csv")
     with (directory / "preview.jsonl").open(encoding="utf-8") as file:
@@ -60,10 +60,10 @@ def load(directory: Path, metal_files: list[Path]) -> dict:
     cpu = directory / "cpu-core.csv"
     if (directory / "cpu-full.csv").is_file():
         cpu = directory / "cpu-full.csv"
-    if not cpu.is_file():
+    if not preview_only and not cpu.is_file():
         raise ValueError("Run ccp_cbp_mass_replay to produce cpu-core.csv first")
     samples = []
-    for row in records(cpu):
+    for row in ([] if preview_only else records(cpu)):
         samples.append({
             "frame": int(row["frame"]),
             "mode": row["mode"],
@@ -75,7 +75,7 @@ def load(directory: Path, metal_files: list[Path]) -> dict:
         })
         if row["exact_sap_equal"] != "1":
             raise ValueError("CPU broad-phase parity was not verified")
-    for path in metal_files:
+    for path in ([] if preview_only else metal_files):
         for row in records(path):
             if int(row["misses"]) != 0:
                 raise ValueError(f"Metal reported oracle misses: {path}")
@@ -99,12 +99,12 @@ def load(directory: Path, metal_files: list[Path]) -> dict:
             raise ValueError("Invalid measured host wall time")
         by_frame[index][row["mode"]] = row
     method_names = set(by_frame[0])
-    if "sap_rebuild" not in method_names:
+    if not preview_only and "sap_rebuild" not in method_names:
         raise ValueError("SAP exact reference missing from CPU benchmark")
     for index, group in enumerate(by_frame):
         if set(group) != method_names:
             raise ValueError("Incomplete CPU/GPU frame " + str(index))
-        reference = group["sap_rebuild"]
+        reference = group.get("sap_rebuild")
         for method, result in group.items():
             if (result["pairs"], result["hash"]) != (
                 reference["pairs"], reference["hash"]
@@ -141,6 +141,7 @@ def load(directory: Path, metal_files: list[Path]) -> dict:
         "layout": receipt[0]["layout"],
         "warmup": warmup,
         "gpu_checks": sum(bool(row["gpu"]) for row in samples),
+        "preview_only": preview_only,
         "limits": [lo, hi],
     }
 
@@ -219,10 +220,14 @@ def main() -> int:
     p.add_argument("--gpu", nargs="*", type=Path, default=None)
     p.add_argument("--html", type=Path)
     p.add_argument("--gif", type=Path)
+    p.add_argument("--preview-only", action="store_true",
+                   help="Show actual geometry during the benchmark without invented timings")
     args = p.parse_args()
+    if args.preview_only and args.gif:
+        raise ValueError("A timed GIF requires completed CPU evidence; use HTML for live geometry")
     directory = args.experiment
     gpu = args.gpu if args.gpu is not None else sorted(directory.glob("metal-*.csv"))
-    dataset = load(directory, gpu)
+    dataset = load(directory, gpu, preview_only=args.preview_only)
     template = Path(__file__).resolve().parent.parent / "viewer" / "mass_stress.html"
     output = args.html or directory / "dashboard.html"
     if output.exists():
@@ -241,6 +246,7 @@ def main() -> int:
         f"PASS mass-material visual: {dataset['instances']} stepped worlds, "
         f"{dataset['primitives']} element AABBs, {len(dataset['frames'])} frames, "
         f"{dataset['gpu_checks']} GPU rows verified against CPU exact-pair hashes"
+        + ("; GEOMETRY PREVIEW ONLY; NO TIMING CLAIM" if args.preview_only else "")
     )
     print("Immutable snapshot SHA-256: " + binary_sha)
     print("Interactive WebGL HTML: " + str(output))
