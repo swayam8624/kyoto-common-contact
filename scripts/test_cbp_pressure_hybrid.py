@@ -63,10 +63,10 @@ def test_scene(cpu: str, hybrid: str, root: Path,
                         record[field], base[field]
                     )
         if scenario == "all_overlap":
-            assert record["analytical_count_verified"] == "1"
+            assert record["analytic_count_verified"] == "1"
             assert record["selected_backend"] == "projected_x_sweep"
         if scenario == "slabs":
-            assert record["analytical_count_verified"] == "1"
+            assert record["analytic_count_verified"] == "1"
             assert record["selected_backend"] == "global_3d_hash_grid"
     print(f"PASS hybrid exact pair digests: {scenario}, "
           f"N={count}, frames={frames}, "
