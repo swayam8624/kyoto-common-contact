@@ -111,6 +111,14 @@ def main() -> int:
         preview = (directory / "preview.jsonl").read_text().splitlines()
         if len(preview) != 12:
             raise AssertionError("Visual frames do not match binary snapshot")
+        live = directory / "preview-geometry-only.html"
+        cmd([
+            sys.executable,
+            str(pathlib.Path(__file__).with_name("render_cbp_mass_dashboard.py")),
+            str(directory), "--preview-only", "--html", str(live),
+        ])
+        if "BENCHMARK EXECUTING" not in live.read_text(encoding="utf-8"):
+            raise AssertionError("Live view falsely asserted measured benchmark results")
 
         report = directory / "cpu-full.csv"
         cmd([replay, str(directory / "snapshots.kmcb"),
