@@ -121,6 +121,29 @@ void test(){
  auto serial=g.enumerate(10000000,5000);
  verify(serial.complete&&serial.digest==expected,
         "Dense serial canonical-cell digest mismatch");
+ // Phase 17: ACTUAL full pair output, not only count/fingerprint.
+ // In a 512-object all-overlap scene every unique unordered pair must be
+ // returned exactly once, despite repeated cell memberships.
+ std::vector<std::pair<std::uint32_t,std::uint32_t>> emitted;
+ emitted.reserve(512*511/2);
+ const auto stream=g.streamPairs(10000000,200000,5000,
+    [&](std::uint32_t a,std::uint32_t b){emitted.emplace_back(a,b);});
+ verify(stream.complete&&stream.digest==expected&&
+        emitted.size()==std::size_t(512*511/2),
+        "Persistent pair stream lost full exact candidates");
+ std::sort(emitted.begin(),emitted.end());
+ verify(std::unique(emitted.begin(),emitted.end())==emitted.end(),
+        "Canonical cell writer duplicated a pair");
+ std::size_t cursor=0;
+ for(std::uint32_t a=0;a<512;++a)
+  for(std::uint32_t b=a+1;b<512;++b)
+   verify(emitted[cursor++]==std::pair(a,b),
+          "Actual emitted ID list differs from exact brute truth");
+ emitted.clear();
+ const auto cappedStream=g.streamPairs(10000000,10,5000,
+    [&](std::uint32_t a,std::uint32_t b){emitted.emplace_back(a,b);});
+ verify(!cappedStream.complete&&emitted.size()==10,
+        "Output pair safety cap was bypassed or called falsely complete");
  for(const std::size_t nThreads:{2u,4u,8u}){
   std::size_t used=0;
   const auto parallel=g.enumerateParallel(10000000,5000,nThreads,&used);
