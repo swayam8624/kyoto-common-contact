@@ -64,7 +64,8 @@ table .good{color:#77e4ce}table .bad{color:#f1b5a3}
 </div>
 <h2>Scene replay · move through the 3D material field</h2>
 <canvas id="world" aria-label="3D geometry replay"></canvas>
-<div class="scene-controls"><button id="reset-camera">Reset camera</button><button id="view-front">Front view</button><button id="view-overhead">Top view</button>
+<div class="scene-controls"><label>Geometry <select id="geometry-mode"><option value="mesh-context">Real meshes + context</option><option value="mesh-only">Real meshes only</option><option value="bounds">Bounding volumes</option><option value="both">Mesh + AABBs</option></select></label>
+<button id="reset-camera">Reset camera</button><button id="view-front">Front view</button><button id="view-overhead">Top view</button>
 <button id="clear-focus">Show all instances</button>
 <label><input id="isolate" type="checkbox"> Isolate inspected instance</label></div>
 <div class="row legend" id="legend"></div>
@@ -82,7 +83,7 @@ table .good{color:#77e4ce}table .bad{color:#f1b5a3}
 <input id="seek" type="range" min="0" value="0" aria-label="Select recorded frame"><span id="frame-label">—</span>
 <select id="fps"><option value="6">6 fps</option><option value="12" selected>12 fps</option><option value="24">24 fps</option></select>
 <select id="filter"><option value="-1">All materials</option><option value="0">Cloth</option><option value="1">Sponge</option><option value="2">Cushion</option><option value="3">Soft ball</option><option value="4">Spring</option></select></div>
-<p class="muted">Drag to orbit · scroll to zoom. The boxes are per-instance conservative envelopes derived from genuinely stepped mass-spring elements; this visualization does not show individual vertices or solve interactions between different instances.</p>
+<p class="muted" id="geometry-note">Drag to orbit · scroll to zoom. Actual mesh geometry is available when a separately verified node/bond recording is exported; unsampled worlds remain envelope context. No between-world contact impulses are solved.</p>
 <div class="insight-row">
 <div class="insight"><small>Current candidate pairs · element AABBs</small><b id="total-inline">—</b><small>Same complete pair set from all verified algorithms</small></div>
 <div class="insight"><small>Between independent instances</small><b id="cross-inline">—</b><small id="cross-percent">Not physical inter-instance contact resolution</small></div>
@@ -157,12 +158,54 @@ in vec3 color;
 out vec4 frag;
 void main(){frag=vec4(color,1.);}
 </script>
+<script id="mesh-vertex" type="x-shader/x-vertex">#version 300 es
+precision highp float;
+layout(location=0) in vec3 vertexPosition;
+layout(location=1) in vec2 kindAndShade;
+uniform vec3 mid;
+uniform float scaleFactor;
+uniform float yaw;
+uniform float pitch;
+uniform float aspect;
+uniform float zoom;
+out vec4 shadedColor;
+void main(){
+ vec3 p=(vertexPosition-mid)*scaleFactor;
+ float c=cos(yaw),s=sin(yaw);
+ p=vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);
+ c=cos(pitch);s=sin(pitch);
+ p=vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);
+ float depth=4.0*zoom-p.z;
+ gl_Position=vec4(p.x*1.5/aspect,p.y*1.5,depth*.82,depth);
+ vec3 base=kindAndShade.x<.5?vec3(.3,.88,.78):
+   kindAndShade.x<1.5?vec3(.49,.70,1.):
+   kindAndShade.x<2.5?vec3(.97,.67,.42):
+   kindAndShade.x<3.5?vec3(.76,.59,1.):vec3(1.,.51,.68);
+ shadedColor=vec4(base*kindAndShade.y,1.0);
+}
+</script>
+<script id="mesh-fragment" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec4 shadedColor;
+out vec4 frag;
+void main(){frag=shadedColor;}
+</script>
 <script>
 "use strict";
 const data=JSON.parse(document.getElementById("benchmark-data").textContent);
 const byId=id=>document.getElementById(id);
 const colors=["#4de0c7","#7db2ff","#f7aa6b","#c29bff","#ff82ad"];
 const names=["Cloth","Sponge","Cushion","Soft ball","Spring"];
+const meshTruth=data.mesh_truth||null;
+const meshIDs=new Set(meshTruth?.selected?.map(x=>x.id)||[]);
+const geometrySelect=byId("geometry-mode");
+if(!meshTruth){
+ geometrySelect.value="bounds";geometrySelect.disabled=true;
+ byId("geometry-note").textContent="Only instance AABBs were stored for this run. Generate verified mesh-truth.json from the original solver and reopen a newly generated report to inspect actual deformable surfaces, filaments and lattice bonds.";
+}else{
+ geometrySelect.value="mesh-context";
+ byId("geometry-note").textContent="These mesh lines and shaded cloth/ball triangles are actual recorded solver nodes and connectivity, bit-matched to this run's Float32 AABB input. Selected sampled Worlds show meshes; other Worlds retain conservative envelope context. No inter-World collision response is simulated.";
+}
 byId("instances").textContent=data.instances.toLocaleString();
 byId("elements").textContent=data.primitives.toLocaleString();
 byId("gpu").textContent=data.gpu_checks.toLocaleString();
@@ -215,7 +258,7 @@ function build(){
  const middle=data.limits[0].map((v,i)=>(v+data.limits[1][i])*0.5);
  const extent=Math.max(...data.limits[0].map((v,i)=>data.limits[1][i]-v),0.001);
  const uniform=name=>gl.getUniformLocation(program,name);
- return {vao:vao,buffer:buffer,middle:middle,scaleFactor:2.2/extent,uniform:uniform};
+ return {program:program,vao:vao,buffer:buffer,middle:middle,scaleFactor:2.2/extent,uniform:uniform};
 }
 try{viewer=build()}catch(error){byId("issue").textContent="3D viewer unavailable: "+String(error)}
 function drawWorld(){
@@ -224,11 +267,14 @@ function drawWorld(){
  const w=Math.floor(rect.width*dpr),h=Math.floor(rect.height*dpr);
  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
  gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ gl.useProgram(viewer.program);
  const list=data.frames[current].instances,values=new Float32Array(list.length*8);
  for(let i=0;i<list.length;i++){const v=list[i],offset=i*8;
  values[offset]=v[1];values[offset+1]=v[2];values[offset+2]=v[3];
  values[offset+3]=v[4];values[offset+4]=v[5];values[offset+5]=v[6];
- values[offset+6]=v[0];values[offset+7]=i}
+ const mode=geometrySelect.value;
+ values[offset+6]=(mode==="mesh-only"||(mode==="mesh-context"&&meshIDs.has(i)))?-10:v[0];
+ values[offset+7]=i}
  gl.bindBuffer(gl.ARRAY_BUFFER,viewer.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,values);
  const target=focusInstance>=0?list[focusInstance]:null;
  const mid=target?[(target[1]+target[4])*.5,(target[2]+target[5])*.5,(target[3]+target[6])*.5]:viewer.middle;
@@ -239,7 +285,78 @@ function drawWorld(){
                      ["highlightedInstance",focusInstance],["isolateInstance",byId("isolate").checked?1:0]])
   gl.uniform1f(viewer.uniform(entry[0]),entry[1]);
  gl.bindVertexArray(viewer.vao);gl.drawArraysInstanced(gl.LINES,0,24,list.length);
+ if(meshGPU && geometrySelect.value!=="bounds")drawMeshGeometry(mid,factor,w/h);
 }
+
+/* Authentic per-frame geometry uses nodes/bonds/elements re-simulated from
+   the ORIGINAL material fixture and bit-exactly checked against its binary.
+   Mesh and AABB scenes share the original camera transform and frame index. */
+let meshGPU=null;
+function buildMeshGPU(){
+ if(!gl||!meshTruth)return null;
+ const prog=gl.createProgram();
+ for(const [type,source] of [[gl.VERTEX_SHADER,byId("mesh-vertex").textContent],
+                            [gl.FRAGMENT_SHADER,byId("mesh-fragment").textContent]]){
+  const shader=gl.createShader(type);gl.shaderSource(shader,source);
+  gl.compileShader(shader);
+  if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))
+   throw Error("Mesh shader: "+gl.getShaderInfoLog(shader));
+  gl.attachShader(prog,shader);
+ }
+ gl.linkProgram(prog);
+ if(!gl.getProgramParameter(prog,gl.LINK_STATUS))
+  throw Error("Mesh program: "+gl.getProgramInfoLog(prog));
+ const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+ gl.bufferData(gl.ARRAY_BUFFER,1024,gl.DYNAMIC_DRAW);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,20,0);
+ gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,20,12);
+ return {program:prog,vao,buffer,u:name=>gl.getUniformLocation(prog,name)};
+}
+function drawMeshGeometry(mid,factor,aspect){
+ const lines=[],faces=[];
+ for(let i=0;i<meshTruth.selected.length;i++){
+  const m=meshTruth.selected[i],nodes=meshTruth.positions[current][i];
+  if(focusInstance>=0&&byId("isolate").checked&&m.id!==focusInstance)continue;
+  if(selected>=0&&m.kind!==selected)continue;
+  const vertex=(id,shade)=>[nodes[id*3],nodes[id*3+1],nodes[id*3+2],m.kind,shade];
+  for(const [a,b] of m.edges){
+   lines.push(...vertex(a,1.13),...vertex(b,1.13));
+  }
+  for(const [a,b,c] of m.triangles){
+   const ax=nodes[a*3],ay=nodes[a*3+1],az=nodes[a*3+2];
+   const ux=nodes[b*3]-ax,uy=nodes[b*3+1]-ay,uz=nodes[b*3+2]-az;
+   const vx=nodes[c*3]-ax,vy=nodes[c*3+1]-ay,vz=nodes[c*3+2]-az;
+   const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+   const len=Math.hypot(nx,ny,nz)||1;
+   const shade=.33+.54*Math.abs((nx*.48+ny*.38+nz*.73)/len);
+   faces.push(...vertex(a,shade),...vertex(b,shade),...vertex(c,shade));
+  }
+ }
+ gl.useProgram(meshGPU.program);
+ gl.bindVertexArray(meshGPU.vao);
+ gl.uniform3f(meshGPU.u("mid"),...mid);
+ for(const [u,v] of [["scaleFactor",factor],["yaw",yaw],["pitch",pitch],
+                     ["aspect",aspect],["zoom",zoom]])
+  gl.uniform1f(meshGPU.u(u),v);
+ // Draw shaded actual cloth/ball surface, followed by real solver bonds.
+ if(faces.length){
+  gl.bindBuffer(gl.ARRAY_BUFFER,meshGPU.buffer);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(faces),gl.DYNAMIC_DRAW);
+  gl.drawArrays(gl.TRIANGLES,0,faces.length/5);
+ }
+ if(lines.length){
+  gl.bindBuffer(gl.ARRAY_BUFFER,meshGPU.buffer);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(lines),gl.DYNAMIC_DRAW);
+  gl.drawArrays(gl.LINES,0,lines.length/5);
+ }
+}
+try{meshGPU=buildMeshGPU();}catch(error){
+ byId("issue").textContent="Real mesh renderer error: "+String(error);
+ geometrySelect.value="bounds";
+}
+geometrySelect.onchange=()=>drawWorld();
+
 function drawTimes(){
  const canvas=byId("perf"),ctx=canvas.getContext("2d");
  const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(100,canvas.clientWidth),h=200;
