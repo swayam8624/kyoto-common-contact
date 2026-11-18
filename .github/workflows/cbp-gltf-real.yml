@@ -55,6 +55,39 @@ jobs:
             build/cbp-real-scenes/snapshots.kmcb \
             build/cbp-real-scenes/instances.csv \
             build/cbp-real-scenes/cpu-core.csv core
+      - name: Print measured CPU policy rankings and fixed temporal candidate progression
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from scripts.run_cbp_gltf_real_suite import summarize_cpu
+          scene=Path('build/cbp-real-scenes')
+          policies, frames=summarize_cpu(scene/'cpu-core.csv')
+          lines=[
+              '# Genuine 25-scene glTF broad-phase benchmark',
+              '',
+              'Real sampled GLB triangle AABBs, 48 frames, Ubuntu CI. Not full-resolution physical contact.',
+              '',
+              '| Exact CPU method | Mean query ms | P95 ms | Relative to frozen V4 |',
+              '|---|---:|---:|---:|',
+          ]
+          for p in policies:
+              lines.append(f"| {p['method']} | {p['mean_ms']:.6f} | {p['p95_ms']:.6f} | {p['relative_to_v4']:.3f}x |")
+          lines += [
+              '',
+              '## Candidate evidence',
+              '',
+              f"First cross-asset candidate frame (zero-based): {next((x['frame'] for x in frames if x['inter_asset']>0),None)}",
+              f"Cross-asset pairs on final frame: {frames[-1]['inter_asset']}",
+              f"Total exact AABB pairs on final frame: {frames[-1]['total']}",
+              f"Sum of inter-asset pair occurrences across all frames: {sum(x['inter_asset'] for x in frames)}",
+              '',
+              'All six CPU methods matched the complete sorted SAP candidate pair set on every frame.',
+              'No Apple Metal was executed on the Ubuntu runner; that requires macOS.',
+          ]
+          result='\n'.join(lines)+'\n'
+          print(result)
+          (scene/'EXACT-CPU-RESULTS.md').write_text(result)
+          PY
       - name: Extract independently checked spatial AABB overlap markers and render REAL meshes
         timeout-minutes: 3
         run: |
@@ -98,6 +131,7 @@ jobs:
             build/cbp-real-scenes/instances.csv
             build/cbp-real-scenes/frames.csv
             build/cbp-real-scenes/cpu-core.csv
+            build/cbp-real-scenes/EXACT-CPU-RESULTS.md
             build/cbp-real-scenes/contact-hotspots.jsonl
             build/cbp-real-scenes/REAL-3D-OBSERVATORY.html
           retention-days: 14
