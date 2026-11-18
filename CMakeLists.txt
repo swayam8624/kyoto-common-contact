@@ -170,6 +170,11 @@ target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -W
 add_executable(ccp_cbp_pressure_cpu apps/cbp_pressure_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_cpu PRIVATE include)
 target_compile_options(ccp_cbp_pressure_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Phase 11: genuinely write complete unique 8-byte candidate pairs under
+# explicit per-frame memory/disk caps, separately from count-only timing.
+add_executable(ccp_cbp_pressure_emit apps/cbp_pressure_emit.cpp)
+target_include_directories(ccp_cbp_pressure_emit PRIVATE include)
+target_compile_options(ccp_cbp_pressure_emit PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Vulkan/MoltenVK optional cross-API GPU reference. The SPIR-V compiler is
 # REQUIRED for this target; no fake GPU/backend selection or silent fallback.
 # On macOS: LunarG Vulkan SDK + MoltenVK and glslangValidator.
