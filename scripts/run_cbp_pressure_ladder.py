@@ -104,9 +104,10 @@ def summarize(rows, complete="complete", field="query_ms"):
         "p95_ms": round(ms[math.ceil(.95 * len(ms)) - 1], 5),
         "max_ms": round(max(ms), 5),
         "last_complete_count": int(ok[-1].get(
-            "exact_pairs", ok[-1].get("GPU_candidate_count", "0"))),
+            "exact_pairs", ok[-1].get("GPU_candidate_count",
+            ok[-1].get("GPU_candidates", "0")))),
         "max_tested": max(int(r.get(
-            "tested_pairs", r.get("GPU_tested_pairs", "0"))) for r in ok),
+            "tested_pairs", r.get("GPU_tested_pairs", r.get("GPU_tests", "0")))) for r in ok),
     }
 
 
@@ -119,6 +120,9 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=61749)
     p.add_argument("--gpu", action="store_true",
                    help="Execute REAL native Apple Metal grid and all-pairs counts")
+    p.add_argument("--vulkan", action="store_true",
+                   help="Also run actual Vulkan SPIR-V compute if built; software "
+                        "Vulkan is explicitly labeled SOFTWARE_CPU")
     p.add_argument("--max-tests", type=int, default=300_000_000)
     p.add_argument("--max-frame-ms", type=int, default=25_000)
     p.add_argument("--max-grid-entries", type=int, default=12_000_000)
@@ -147,10 +151,14 @@ def main() -> int:
 
     cpu = (a.build / "ccp_cbp_pressure_cpu").resolve()
     metal = (a.build / "ccp_cbp_pressure_metal").resolve()
+    vulkan = (a.build / "ccp_cbp_pressure_vulkan").resolve()
     if not cpu.is_file():
         raise FileNotFoundError("Build CPU pressure executable: " + str(cpu))
     if a.gpu and not metal.is_file():
         raise FileNotFoundError("Build real Metal pressure executable: " + str(metal))
+    if a.vulkan and not vulkan.is_file():
+        raise FileNotFoundError("Install Vulkan SDK+glslangValidator and build "
+                                "ccp_cbp_pressure_vulkan: " + str(vulkan))
     memory = probe_memory_gib()
     if (a.tier == "extreme" and memory is not None and memory < 16
             and not a.force_large_memory):
@@ -166,7 +174,8 @@ def main() -> int:
         "time_utc": datetime.now(timezone.utc).isoformat(),
         "host": platform.platform(), "processor": platform.processor(),
         "machine": platform.machine(), "ram_gib": memory,
-        "gpu_measured": a.gpu, "tier": a.tier, "seed": a.seed,
+        "metal_requested": a.gpu, "vulkan_requested": a.vulkan,
+        "tier": a.tier, "seed": a.seed,
         "algorithmic_scope": (
             "GENERAL global exact AABB count+fingerprint search. CPU grid and "
             "sweep and native Metal grid/exhaustive. No island-separation "
@@ -265,6 +274,41 @@ def main() -> int:
                     })
                     receipt["summaries"].append(actual)
                     print("[GPU]", stem, mode, actual, flush=True)
+
+            if a.vulkan and n <= 32768 and n*(n-1)//2 <= a.max_tests:
+                dest = a.output / (stem + "-vulkan-exhaustive.csv")
+                run = process([
+                    str(vulkan), str(dest), scene, str(n), str(frames),
+                    str(a.seed), str(a.max_tests), str(a.max_frame_ms),
+                    str(a.max_grid_entries),
+                ], a.output / "logs" / (stem + "-vulkan-exhaustive.log"),
+                    min(a.stage_timeout, max(30, int(a.suite_timeout - (
+                        time.monotonic() - started)))))
+                receipt["runs"].append(run)
+                if run["outcome"] != "completed":
+                    receipt["summaries"].append({
+                        "scene": scene, "n": n,
+                        "method": "vulkan_exhaustive",
+                        "status": run["outcome"]
+                    })
+                else:
+                    vals = read(dest)
+                    actual = summarize(vals, complete="COMPLETE",
+                                       field="gpu_timestamp_ms")
+                    actual.update({
+                        "scene": scene, "n": n,
+                        "method": "vulkan_exhaustive",
+                        "device_type": vals[0]["device_type"] if vals else "UNKNOWN",
+                        "device": vals[0]["vulkan_device"] if vals else "UNKNOWN",
+                        "verified_frames": sum(
+                            r["validation"] in {
+                                "VULKAN_CPU_BRUTE", "VULKAN_CPU_GRID_DIGEST",
+                                "ANALYTIC_ALL_OVERLAP_COUNT_ONLY"
+                            } for r in vals
+                        )
+                    })
+                    receipt["summaries"].append(actual)
+                    print("[VULKAN]", stem, actual, flush=True)
     finally:
         (a.output / "EXPERIMENT.json").write_text(
             json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
@@ -274,6 +318,8 @@ def main() -> int:
             "",
             f"Platform: {receipt['host']}, installed RAM: {memory} GiB.",
             f"Actual Metal requested: {'YES' if a.gpu else 'NO'}",
+            f"Actual Vulkan requested: {'YES' if a.vulkan else 'NO'} "
+            "(device type in Vulkan CSV; SOFTWARE_CPU is NOT hardware GPU)",
             "",
             "This is adversarial **global synthetic AABB** search—not proven "
             "isolated islands, 1M deformable worlds or physically resolved contacts.",
@@ -330,7 +376,8 @@ def main() -> int:
                 "tr:hover{background:#1f2f40}.hint{color:#acbfd0;line-height:1.6}"
                 "</style><h1>Kyoto: actual global collision-search pressure</h1>"
                 "<p class='hint'>No separated-island shortcut. Two distinct CPU "
-                "searches and optionally two real Metal kernels. Count-only "
+                "searches, optionally two real Metal kernels and one genuine Vulkan SPIR-V "
+                "compute backend (which may be software-backed). Count-only "
                 "not full contact physics. A capped row is NOT a completed solution.</p>"
                 "<table><thead><tr><th>Scene</th><th>Objects</th><th>Method</th>"
                 "<th>Completed frames</th><th>Mean ms</th><th>P95 ms</th>"
