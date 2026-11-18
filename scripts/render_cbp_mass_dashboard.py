@@ -121,6 +121,54 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
                     "CPU/GPU exact-pair mismatch at frame "
                     + str(index) + ", method " + method
                 )
+
+    # Optional measured spatial markers: exact candidate AABB intersection
+    # midpoints. An untrusted sidecar is NEVER plotted unless it matches the
+    # already verified CPU SAP FULL pair hash and candidate counts per frame.
+    # In preview-only mode the source CPU measurement is unavailable: no
+    # spatial markers or candidate counts may be represented as verified.
+    hotspots = []
+    hotspot_file = directory / "contact-hotspots.jsonl"
+    if not preview_only and hotspot_file.exists():
+        with hotspot_file.open(encoding="utf-8") as handle:
+            hotspots = [json.loads(line) for line in handle if line.strip()]
+        if len(hotspots) != len(frames):
+            raise ValueError("Exact candidate hotspot frame count mismatch")
+        starts = [int(row["first_primitive"]) for row in instances]
+        ends = [first + int(row["primitive_count"])
+                for first, row in zip(starts, instances, strict=True)]
+        for index, evidence in enumerate(hotspots):
+            sap = by_frame[index]["sap_rebuild"]
+            if (evidence.get("frame") != index or
+                str(evidence.get("pair_hash")) != str(sap["hash"]) or
+                evidence.get("pairs") != sap["pairs"] or
+                evidence.get("inter_pairs") != sap["inter_pairs"]):
+                raise ValueError(
+                    f"Spatial markers disagree with full CPU pair evidence at frame {index}"
+                )
+            samples = evidence.get("hotspots")
+            if not isinstance(samples, list) or len(samples) != evidence.get("sampled"):
+                raise ValueError("Malformed or incomplete spatial candidate samples")
+            if len(samples) > min(512, evidence["inter_pairs"]):
+                raise ValueError("More candidate samples than actual inter-instance pairs")
+            for marker in samples:
+                if not isinstance(marker, list) or len(marker) != 7:
+                    raise ValueError("Malformed candidate overlap coordinate")
+                a, b, x, y, z, prim_a, prim_b = marker
+                if not (isinstance(a, int) and isinstance(b, int)
+                        and isinstance(prim_a, int) and isinstance(prim_b, int)
+                        and 0 <= a < len(instances) and 0 <= b < len(instances)
+                        and a != b
+                        and starts[a] <= prim_a < ends[a]
+                        and starts[b] <= prim_b < ends[b]
+                        and all(math.isfinite(v) for v in (x, y, z))):
+                    raise ValueError("Spatial candidate references wrong source instances")
+                for owner in (a, b):
+                    box = frames[index]["instances"][owner]
+                    for axis, point in enumerate((x, y, z)):
+                        if not box[axis + 1] - 0.001 <= point <= box[axis + 4] + 0.001:
+                            raise ValueError("Candidate spatial marker outside its instance envelope")
+
     warmup = min(8, len(frames) // 8)
     stats = []
     for method in sorted(method_names):
@@ -153,6 +201,7 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
         "runs": by_frame,
         "stats": stats,
         "instances": len(instances),
+        "hotspots": hotspots,
         "instance_info": [{
             "id": int(row["id"]), "kind": row["kind"], "regime": row["regime"],
             "primitives": int(row["primitive_count"])
