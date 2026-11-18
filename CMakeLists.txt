@@ -218,6 +218,9 @@ if(BUILD_TESTING)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_contact_hotspots.py
         $<TARGET_FILE:ccp_cbp_mass_export> $<TARGET_FILE:ccp_cbp_mass_replay>
         $<TARGET_FILE:ccp_cbp_contact_hotspots>)
+    add_test(NAME cbp_real_mesh_truth_contract
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_mesh_truth.py
+        $<TARGET_FILE:ccp_cbp_mass_export> $<TARGET_FILE:ccp_cbp_mesh_truth_export>)
     add_test(NAME cbp_mesh_topology_replay_contract
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_topology_replay.py
         $<TARGET_FILE:ccp_cbp_topology_replay>)
