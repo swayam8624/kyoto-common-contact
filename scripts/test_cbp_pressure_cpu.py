@@ -49,14 +49,14 @@ def main():
         # The true 3D method still obtains an exact answer, while the
         # aborted sweep MUST be marked incomplete rather than "verified."
         entries = run(exe, root / "slabs-budget.csv",
-                      "slabs", 16384, 2, 25000)
+                      "slabs", 16384, 2, 5000000)
         grid = [x for x in entries if x["method"] == "global_3d_hash_grid"]
         sweep = [x for x in entries if x["method"] == "global_x_sweep"]
         assert all(x["status"] == "complete" and
                    x["cross_method_verified"] == "0" for x in grid)
         assert all(x["status"] == "budget_stop" and
                    x["cross_method_verified"] == "0" for x in sweep)
-        assert all(int(x["tested_pairs"]) == 25000 for x in sweep)
+        assert all(int(x["tested_pairs"]) == 5000000 for x in sweep)
         print("PASS truthful budgeted worst-case: complete exact global "
               "3D grid, deliberately incomplete projected sweep")
     return 0
