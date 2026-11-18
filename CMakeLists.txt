@@ -122,6 +122,13 @@ if(APPLE)
   add_executable(ccp_scaling_metal apps/scaling_metal.mm)
   target_link_libraries(ccp_scaling_metal PRIVATE "-framework Foundation" "-framework Metal")
   target_compile_options(ccp_scaling_metal PRIVATE -Wall -Wextra -Wpedantic)
+  # Phase 11: REAL Apple GPU budgeted adversarial 3D hashing vs all-pairs
+  # search, both count-only to avoid TB-scale pair materialization.
+  add_executable(ccp_cbp_pressure_metal apps/cbp_pressure_metal.mm)
+  target_include_directories(ccp_cbp_pressure_metal PRIVATE include)
+  target_link_libraries(ccp_cbp_pressure_metal PRIVATE
+    "-framework Foundation" "-framework Metal")
+  target_compile_options(ccp_cbp_pressure_metal PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Experimental CBP: Phase-0 exhaustive control and Phase-1 shared spatial BVH.
