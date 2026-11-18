@@ -136,6 +136,17 @@ Phase 17 branch, a single additive comparison command is available:
 
     bash scripts/run_kyoto_phase17.sh output/kyoto-phase17-mac-01
 
+Then open the **actual measured algorithm trace explorer**, with Global Guard,
+SAP, original Online, V4 and the regional methods shown and individually
+selectable (plus ML/Bullet if supplied and executed):
+
+    open output/kyoto-phase17-mac-01/reports/KYOTO_METHODS_OFFLINE.html
+
+The associated full-pair results and separate spatial-pressure counts are
+also written to `reports/KYOTO_UNIFIED_EVIDENCE.md` and the machine-readable
+`reports/KYOTO_UNIFIED_EVIDENCE.json`. The Phase 17 reduced Linux validation
+is archived in the [GitHub Actions run](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44422251207).
+
 This runs the historical full-output material algorithms and a separate,
 bounded set of synthetic persistent-grid CPU comparisons. It emits actual
 pair ID files from *both* persistent and independently rebuilt grids, then
