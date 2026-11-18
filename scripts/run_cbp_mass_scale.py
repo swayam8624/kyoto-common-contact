@@ -87,6 +87,8 @@ def main() -> int:
                         help="Include expensive certified-cache/causal CPU modes (max 16k AABBs)")
     parser.add_argument("--gif", action="store_true",
                         help="Also make actual-geometry looping GIF (requires Pillow)")
+    parser.add_argument("--live-visual", action="store_true",
+                        help="Open a GPU WebGL geometry-only replay before benchmarking, then final report afterwards")
     parser.add_argument("--case-timeout", type=int, default=1500,
                         help="Max seconds per export or algorithm process")
     args = parser.parse_args()
@@ -144,6 +146,16 @@ def main() -> int:
              str(args.frames), str(args.seed), args.layout],
             timeout=args.case_timeout,
         )
+        if args.live_visual:
+            live_page = case / "preview-during-benchmark.html"
+            execute(
+                [sys.executable,
+                 str(Path(__file__).with_name("render_cbp_mass_dashboard.py")),
+                 str(case), "--preview-only", "--html", str(live_page)],
+                timeout=args.case_timeout,
+            )
+            if sys.platform == "darwin":
+                subprocess.run(["open", str(live_page)], check=False)
         cpu_path = case / ("cpu-full.csv" if args.full else "cpu-core.csv")
         cpu_seconds = execute(
             [str(binaries["cpu"]), str(case / "snapshots.kmcb"),
@@ -173,6 +185,8 @@ def main() -> int:
         if args.gif:
             visual_cmd += ["--gif", str(case / "loop.gif")]
         visual_seconds = execute(visual_cmd, timeout=args.case_timeout)
+        if args.live_visual and sys.platform == "darwin":
+            subprocess.run(["open", str(dashboard)], check=False)
         with (case / "instances.csv").open(newline="", encoding="utf-8") as file:
             rows = list(csv.DictReader(file))
         with (case / "frames.csv").open(newline="", encoding="utf-8") as file:
@@ -203,7 +217,8 @@ def main() -> int:
         print(
             "[CBP CASE PASS] " + case.name + ": "
             + str(result["primitive_AABBs"]) + " primitives, "
-            + str(result["frames"]) + " frames, verified CPU/GPU hash parity",
+            + str(result["frames"]) + " frames, CPU full-pair parity verified"
+            + ("; Metal full-pair hashes verified" if args.gpu else "; Apple GPU not run"),
             flush=True
         )
         cases.append(result)
