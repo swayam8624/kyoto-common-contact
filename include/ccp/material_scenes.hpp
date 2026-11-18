@@ -175,6 +175,11 @@ public:
  size_t elements()const{return elements_.size();}
  size_t nodes()const{return nodes_.size();}
  size_t bonds()const{return bonds_.size();}
+ // Read-only positions/connectivity for scientific mesh visualizations.
+ // Exporters must not mutate the solver or substitute envelopes for meshes.
+ const std::vector<Node>& visualNodes()const noexcept{return nodes_;}
+ const std::vector<Bond>& visualBonds()const noexcept{return bonds_;}
+ const std::vector<Element>& visualElements()const noexcept{return elements_;}
  void step(){
   ++step_;
   // Lightweight damped Verlet dynamics and structural position constraints.
