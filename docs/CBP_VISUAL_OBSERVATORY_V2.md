@@ -44,3 +44,26 @@ The colored lines are per-instance *envelopes*, not triangle meshes, physical co
 ## Validation
 
 GitHub CI validates small independent AABB candidate oracles, generates preview/full V2 and original V1 dashboards, checks browser JS syntax using Node, and exports a measured 100-world crowded HTML example with raw material data.
+
+## Optional verified cross-instance AABB overlap markers
+
+The geometry-only instance envelopes are intentionally large. If the saved CPU query has cross-instance candidates, the optional `ccp_cbp_contact_hotspots` extractor computes actual element-AABB intersection midpoints for a deterministic capped sample (up to 160/frame by default) from the immutable Float32 recording. It stores full ordered pair-set FNV64 hashes and exact cross-instance counts for every frame. The V2 dashboard refuses to display these markers unless every complete hash and count matches the existing CPU SAP replay and sampled primitive IDs belong to the claimed instances. No new solver or GPU run is required.
+
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+cmake --preset kyoto-final-cpu
+cmake --build build/kyoto-final-cpu --target ccp_cbp_contact_hotspots --parallel 4
+ctest --test-dir build/kyoto-final-cpu -R '^cbp_spatial_hotspots_contract$' --output-on-failure
+for size in 100 1000; do
+  case="output/cbp-phase7-mac-gpu-120/materials${size}-frames120-seed43129-contact_front"
+  if [[ -f "$case/cpu-core.csv" && ! -e "$case/contact-hotspots.jsonl" ]]; then
+    ./build/kyoto-final-cpu/ccp_cbp_contact_hotspots "$case/snapshots.kmcb" "$case/instances.csv" "$case/contact-hotspots.jsonl" 160
+  fi
+  if [[ -f "$case/contact-hotspots.jsonl" && ! -e "$case/dashboard-with-hotspots.html" ]]; then
+    python3 scripts/render_cbp_mass_dashboard.py "$case" --html "$case/dashboard-with-hotspots.html"
+  fi
+  if [[ -f "$case/dashboard-with-hotspots.html" ]]; then open "$case/dashboard-with-hotspots.html"; fi
+done
+```
+
+Amber circles on the XY map represent *sampled broad-phase element AABB intersection locations*, not actual mesh surface intersection coordinates, confirmed physical contacts or collision forces. The sample is not an unbiased estimator of every hotspot's spatial density, and it never replaces the verified exact total counts. The source file names are immutable so all prior benchmark HTML and data remain intact.
