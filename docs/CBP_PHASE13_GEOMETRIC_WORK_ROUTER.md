@@ -34,6 +34,12 @@ Means come from separate Linux GitHub runner processes and are descriptive, not 
 
 These measurements are strong architectural guidance, but neither novel per-patch topology repair nor an optimized shared CPU/Metal GPU backend has been implemented yet. Count+fingerprint output is not pair-list writing, narrow-phase collision, CCD, contact solving or visual-quality validation.
 
+## Critical native Metal measurement caveat
+
+The Phase 11 native Metal pressure implementation **builds the 3D cell grid on the CPU and runs the complete CPU grid oracle on each frame before GPU dispatch**. It separately records `generate_ms`, `grid_build_ms`, `cpu_oracle_ms`, `gpu_prepare_ms`, `host_submit_wait_ms` and `gpu_execution_ms`. The ~12.9 ms Metal result at 1M burst is GPU kernel time only; neither that figure nor a CPU-query/GPU-kernel ratio measures whole application throughput. The 71-second simultaneous CPU+Metal experiment also includes an additional full CPU correctness oracle executing INSIDE the Metal process, so it is not a clean CPU-versus-GPU contention test yet.
+
+The next measurement-control change should run a deferred GPU-only compute path without a synchronous in-band CPU oracle; afterward, independently compare exact per-frame count and stronger full pair receipts to the saved CPU evidence. Keep validation costs in a separate evidence column, not hidden in the GPU execution metric. The displayed GPU time presently also excludes pair-list materialization, downstream contact solvers, and some post-dispatch CPU result reduction.
+
 ## Run against your existing Mac Phase 11 evidence
 
 Git pulls below preserve all existing data and use fresh output paths.
