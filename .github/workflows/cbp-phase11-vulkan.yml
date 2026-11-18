@@ -1,0 +1,64 @@
+name: CBP Phase 11 — native Vulkan SPIR-V compute and exact CPU parity
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - 'apps/cbp_pressure_vulkan.cpp'
+      - 'shaders/cbp_pressure_count.comp'
+      - 'include/ccp/cbp_pressure.hpp'
+      - '.github/workflows/cbp-phase11-vulkan.yml'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vulkan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual Vulkan loader, SPIR-V compiler and software CPU driver
+        timeout-minutes: 7
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libvulkan-dev glslang-tools mesa-vulkan-drivers vulkan-tools
+      - name: Compile portable Vulkan compute (Mesa Lavapipe is SOFTWARE)
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_pressure_vulkan ccp_cbp_pressure_cpu --parallel 2
+          vulkaninfo --summary || true
+      - name: Distinct 3D layouts: GPU/Vulkan compute API with true CPU hash oracle
+        timeout-minutes: 5
+        run: |
+          mkdir -p build/phase11-vulkan
+          for SCENE in sparse burst slabs all_overlap; do
+            build/kyoto-final-cpu/ccp_cbp_pressure_vulkan \
+              "build/phase11-vulkan/${SCENE}-n512.csv" \
+              "$SCENE" 512 3 61749 30000000 10000 1000000
+          done
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          for scene in ('sparse','burst','slabs','all_overlap'):
+              f=Path(f'build/phase11-vulkan/{scene}-n512.csv')
+              rows=list(csv.DictReader(f.open()))
+              assert len(rows)==3
+              assert all(r['status']=='COMPLETE' for r in rows)
+              assert all(r['validation']=='VULKAN_CPU_BRUTE' for r in rows)
+              assert all(int(r['GPU_tests'])==512*511//2 for r in rows)
+              assert all(r['vulkan_device'] for r in rows)
+              print('PASS Vulkan actual GPU-compute API invocation on',
+                    rows[0]['device_type'],rows[0]['vulkan_device'],
+                    'scenario',scene,
+                    'with exact brute CPU count and pair-fingerprint checks')
+          PY
+      - name: Preserve real Vulkan device/API and CPU comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-phase11-real-vulkan-api-software-vs-gpu-disclosed
+          path: build/phase11-vulkan/*.csv
+          retention-days: 14
+          if-no-files-found: warn
