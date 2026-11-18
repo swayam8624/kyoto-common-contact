@@ -30,8 +30,8 @@
 
 namespace {
 namespace fs=std::filesystem;
-using ccp::cbp::Bounds;
-using ccp::cbp::Pairs;
+using ccp::live::Bounds;
+using Pairs=std::vector<ccp::live::Pair>;
 struct Input {
  std::ifstream in;
  std::uint32_t n{},frames{},seed{},type{};
