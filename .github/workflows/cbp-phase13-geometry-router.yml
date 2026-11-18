@@ -1,0 +1,99 @@
+name: CBP Phase 13 — exact geometry-cost router on million-body adversarial scenes
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-phase13-geometry-router.yml'
+      - 'apps/cbp_pressure_hybrid_cpu.cpp'
+      - 'scripts/test_cbp_pressure_hybrid.py'
+      - 'scripts/analyze_cbp_pressure_hybrid.py'
+      - 'include/ccp/cbp_pressure.hpp'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  geometric-router:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build independent global algorithms and controller
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_pressure_cpu ccp_cbp_pressure_hybrid_cpu --parallel 2
+          python3 -m py_compile scripts/test_cbp_pressure_hybrid.py scripts/analyze_cbp_pressure_hybrid.py
+      - name: Seven-cohort independent exact pair hash and output contract
+        run: |
+          ctest --test-dir build/kyoto-final-cpu \
+            -R '^cbp_geometric_router_exact_oracle$' --output-on-failure
+      - name: Real held-out 8,192 all-overlap vs separate frozen grid and X sweep
+        run: |
+          mkdir -p build/phase13-evidence
+          build/kyoto-final-cpu/ccp_cbp_pressure_hybrid_cpu \
+            build/phase13-evidence/dense8192-hybrid.csv \
+            all_overlap 8192 6 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase13-evidence/dense8192-fixed.csv \
+            all_overlap 8192 6 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_hybrid.py \
+            build/phase13-evidence/dense8192-hybrid.csv \
+            build/phase13-evidence/dense8192-fixed.csv \
+            --report build/phase13-evidence/dense8192-RESULTS.md
+      - name: Global 1M x-aligned projection degeneracy, exact grid and budgeted sweep
+        timeout-minutes: 3
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_pressure_hybrid_cpu \
+            build/phase13-evidence/slabs1M-hybrid.csv \
+            slabs 1000000 4 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase13-evidence/slabs1M-fixed.csv \
+            slabs 1000000 4 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_hybrid.py \
+            build/phase13-evidence/slabs1M-hybrid.csv \
+            build/phase13-evidence/slabs1M-fixed.csv \
+            --report build/phase13-evidence/slabs1M-RESULTS.md
+      - name: Genuine 1M moving AABB 12-frame burst with massive changing pair cardinality
+        timeout-minutes: 4
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_pressure_hybrid_cpu \
+            build/phase13-evidence/burst1M-hybrid.csv \
+            burst 1000000 12 95377 300000000 25000 12000000
+          build/kyoto-final-cpu/ccp_cbp_pressure_cpu \
+            build/phase13-evidence/burst1M-fixed.csv \
+            burst 1000000 12 95377 300000000 25000 12000000
+          python3 scripts/analyze_cbp_pressure_hybrid.py \
+            build/phase13-evidence/burst1M-hybrid.csv \
+            build/phase13-evidence/burst1M-fixed.csv \
+            --report build/phase13-evidence/burst1M-RESULTS.md
+      - name: Audit that hybrid actually beats pathological grid by switching to X-sweep
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          p=Path('build/phase13-evidence')
+          with (p/'dense8192-hybrid.csv').open() as f:
+              dense=list(csv.DictReader(f))
+          with (p/'slabs1M-hybrid.csv').open() as f:
+              slabs=list(csv.DictReader(f))
+          with (p/'burst1M-hybrid.csv').open() as f:
+              burst=list(csv.DictReader(f))
+          assert all(r['status']=='complete' for r in dense+slabs+burst)
+          assert all(r['selected_backend']=='projected_x_sweep' for r in dense)
+          assert all(r['selected_backend']=='global_3d_hash_grid' for r in slabs)
+          assert all(int(r['exact_pairs'])==33550336 for r in dense)
+          assert all(int(r['exact_pairs'])==0 for r in slabs)
+          assert any(int(r['exact_pairs'])==31500000 for r in burst)
+          assert all(float(r['complete_query_ms'])>=float(r['query_ms']) for r in dense+slabs+burst)
+          print('PASS independent heldout exact geometric-policy routing and fully paid query timings')
+          PY
+      - name: Preserve immutable complete and capped method evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-phase13-geometric-router-verified-global-pressure
+          path: build/phase13-evidence
+          retention-days: 14
+          if-no-files-found: warn
