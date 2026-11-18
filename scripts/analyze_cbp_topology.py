@@ -105,6 +105,94 @@ def read_replay(path: Path) -> tuple[dict, list[dict]]:
     return result, rows
 
 
+
+def temporal_windows(info: dict) -> list[dict]:
+    """Diagnostic, hindsight-only local performance windows.
+
+    Fixed-length windows are established by frame count (not retrospectively
+    chosen winning frames). Reference and alternatives share the same window.
+    """
+    frames = info["frame_rows"]
+    size = max(1, math.ceil(len(frames) / 4))
+    windows = []
+    for start in range(0, len(frames), size):
+        group = frames[start:start + size]
+        def mean(method: str) -> float:
+            return statistics.fmean(float(frame[method]["query_ms"]) for frame in group)
+        v4 = mean("frozen_v4")
+        exhaustive = mean("topology_exhaustive")
+        portfolio = mean("portfolio_v4_regional")
+        sweep = mean("topology_xsweep") if "topology_xsweep" in group[0] else None
+        windows.append({
+            "begin": int(group[0]["frozen_v4"]["frame"]),
+            "end": int(group[-1]["frozen_v4"]["frame"]),
+            "v4": v4,
+            "exhaustive": exhaustive,
+            "portfolio": portfolio,
+            "exhaustive_speedup": v4 / exhaustive if exhaustive else math.nan,
+            "portfolio_speedup": v4 / portfolio if portfolio else math.nan,
+            "sweep_speedup": v4 / sweep if sweep else None,
+            "trial_frames": sum(int(x["portfolio_v4_regional"]["portfolio_trial"])
+                                for x in group),
+            "pairs": statistics.fmean(int(x["frozen_v4"]["pairs"]) for x in group),
+        })
+    return windows
+
+
+def svg_crossover(info: dict) -> str:
+    """Actual per-frame ratio, NOT a deployable hindsight selection policy."""
+    data = info["frame_rows"]
+    width, height = 750, 230
+    x0, x1, y0, y1 = 56, 724, 25, 181
+    variants = [
+        ("topology_exhaustive", "#49bbaa"),
+        ("portfolio_v4_regional", "#d6a56e"),
+    ]
+    if "topology_xsweep" in data[0]:
+        variants.insert(1, ("topology_xsweep", "#89a7ed"))
+    observed = [
+        float(frame["frozen_v4"]["query_ms"]) /
+        max(float(frame[mode]["query_ms"]), 1e-12)
+        for frame in data for mode, _ in variants
+    ]
+    max_y = max(1.3, min(5.0, max(observed) * 1.1))
+    def xpos(i: int) -> float:
+        return x0 + (x1 - x0) * i / max(1, len(data) - 1)
+    def ypos(value: float) -> float:
+        return y1 - (y1 - y0) * min(max(value, 0.), max_y) / max_y
+    shapes = [
+        f'<line x1="{x0}" y1="{ypos(1):.1f}" x2="{x1}" '
+        f'y2="{ypos(1):.1f}" stroke="#bccbd6" '
+        'stroke-width="1" stroke-dasharray="4 5"/>',
+        f'<text x="10" y="{ypos(1)+4:.1f}" font-size="12" fill="#cad2dc">1×</text>',
+        f'<text x="{x0}" y="15" font-size="12" fill="#dce7f2">'
+        'Frame-by-frame V4 speedup (above 1× = faster than V4)</text>',
+    ]
+    for mode, color in variants:
+        points = []
+        for i, frame in enumerate(data):
+            baseline = float(frame["frozen_v4"]["query_ms"])
+            candidate = float(frame[mode]["query_ms"])
+            points.append(f"{xpos(i):.1f},{ypos(baseline / max(candidate,1e-12)):.1f}")
+        shapes.append(
+            f'<polyline points="{" ".join(points)}" fill="none" '
+            f'stroke="{color}" stroke-width="2" stroke-linejoin="round"/>'
+        )
+    for i, (mode, color) in enumerate(variants):
+        shapes.append(
+            f'<rect x="{x0+220*i}" y="201" width="11" height="11" fill="{color}"/>'
+            f'<text x="{x0+15+220*i}" y="211" font-size="11" '
+            f'fill="#dce7f2">{html.escape(mode)}</text>'
+        )
+    shapes.append(
+        f'<text x="{x0}" y="195" font-size="10" fill="#9eacbb">'
+        f'Frames {data[0]["frozen_v4"]["frame"]}–'
+        f'{data[-1]["frozen_v4"]["frame"]}; ratios clipped at {max_y:.1f}×</text>'
+    )
+    return (f'<svg viewBox="0 0 {width} {height}" role="img" '
+            'aria-label="Measured per-frame speedups, not online decisions">'
+            + "".join(shapes) + '</svg>')
+
 def svg_bars(info: dict) -> str:
     # Plot ratio >1 as a faster-than-V4 result, <1 as a regression.
     data = info["summary"]
@@ -191,6 +279,20 @@ def html_report(data: list[dict]) -> str:
             f'{d["frames"]} timed frames after {d["warmup"]} warmup</p>'
             '</header><h3>Query-time ratio vs V4</h3>'
             + svg_bars(d)
+            + '<h3>How the winner changes over time — retrospective only</h3>'
+            + svg_crossover(d)
+            + '<h3>Fixed chronological windows (no cherry-picking)</h3>'
+            + '<table><thead><tr><th>Frames</th><th>Mean pairs</th>'
+            '<th>Fixed exhaustive / V4</th><th>Portfolio / V4</th>'
+            '<th>Trial frames</th></tr></thead><tbody>'
+            + "".join(
+                f'<tr><td>{w["begin"]}–{w["end"]}</td>'
+                f'<td>{w["pairs"]:.1f}</td>'
+                f'<td>{w["exhaustive_speedup"]:.3f}×</td>'
+                f'<td>{w["portfolio_speedup"]:.3f}×</td>'
+                f'<td>{w["trial_frames"]}</td></tr>'
+                for w in temporal_windows(d)
+            ) + '</tbody></table>'
             + '<h3>Portfolio decisions (not hindsight)</h3>'
             + svg_timeline(d)
             + '<p class="muted">' + modes
@@ -219,7 +321,7 @@ def html_report(data: list[dict]) -> str:
         '.note{border-left:3px solid #c69568;padding:12px 16px;'
         'background:#253344}</style></head><body>'
         '<h1>Common Broad Phase — topology-based evidence</h1>'
-        '<p class="note">Each replay runs seven exact methods on the '
+        '<p class="note">Each replay runs seven or eight exact methods on the '
         '<em>same physical trajectory</em>. Lower query time is better. '
         'All candidate pairs matched, but different methods do not generate '
         'separate physical cloth animations here. These are short developer '
@@ -297,6 +399,21 @@ def main() -> int:
             f'Portfolio: {modes}; accepted={dataset["accepted"]}; '
             f'rejected={dataset["rejected"]}.'
         )
+        print("Retrospective fixed chronological windows (V4 / alternative; >1× faster):")
+        for w in temporal_windows(dataset):
+            swept = (
+                f'{w["sweep_speedup"]:.3f}×' if w["sweep_speedup"] is not None
+                else "n/a (legacy 7-policy trace)"
+            )
+            print(
+                f'  frames {w["begin"]:>2}-{w["end"]:>2} | '
+                f'pairs/frame {w["pairs"]:.1f} | '
+                f'fixed exhaustive {w["exhaustive_speedup"]:.3f}× | '
+                f'X-sweep {swept} | '
+                f'portfolio {w["portfolio_speedup"]:.3f}× | '
+                f'paid trial frames {w["trial_frames"]}'
+            )
+
 
     print("All results are descriptive; no cross-seed significance is implied.")
     if args.html:
