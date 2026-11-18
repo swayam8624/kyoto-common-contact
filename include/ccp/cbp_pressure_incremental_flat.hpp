@@ -20,6 +20,9 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <atomic>
+#include <exception>
+#include <thread>
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
@@ -234,6 +237,109 @@ public:
           entries_,work_,inserts,removes,preflightMs,
           since(maintenance)};
  }
+ // Phase 16: parallel READ-ONLY canonical-cell enumeration. Temporal grid
+ // maintenance remains serial and must be charged in its parent query.
+ // Each cell owns all its candidate tests; any AABB pair present in several
+ // cells is accepted only in its canonical overlap-minimum cell.
+ //
+ // Count and commutative digests are reduced AFTER all workers join. For
+ // exact result semantics we only execute parallel when the complete known
+ // cell-test upper bound is within the safety budget. Otherwise we call the
+ // original serial budgeted enumerator, never a falsely "complete" prefix.
+ //
+ // Per-worker bin ranges are balanced by full cell comparison work. No
+ // background thread, shared mutable digest, offline best-method oracle
+ // or uncharged preprocessing is used.
+ Result enumerateParallel(std::uint64_t maxTests,double maxMs,
+                          std::size_t requestedThreads,
+                          std::size_t* actuallyUsed=nullptr)const {
+  if(!initialized_)
+   throw std::logic_error("No AABB scene installed in persistent grid");
+  if(requestedThreads<1||requestedThreads>32)
+   throw std::invalid_argument("Parallel broadphase needs 1..32 threads");
+  if(actuallyUsed)*actuallyUsed=1;
+  if(requestedThreads==1||work_<250000||bins_.size()<2||
+     work_>maxTests)
+   return enumerate(maxTests,maxMs);
+
+  const auto start=std::chrono::steady_clock::now();
+  const auto workers=std::min(requestedThreads,bins_.size());
+  const auto totalWeight=work_+std::uint64_t(bins_.size());
+  const auto goal=std::max<std::uint64_t>(1,(totalWeight+workers-1)/workers);
+  std::vector<std::pair<std::size_t,std::size_t>> chunks;
+  chunks.reserve(workers);
+  std::size_t begin=0;
+  std::uint64_t chunkWeight=0;
+  for(std::size_t i=0;i<bins_.size();++i){
+   const auto n=std::uint64_t(bins_[i].ids.size());
+   chunkWeight+=n*(n-1)/2+1;
+   if(chunkWeight>=goal&&chunks.size()+1<workers&&
+      i+1<bins_.size()){
+    chunks.emplace_back(begin,i+1);
+    begin=i+1;
+    chunkWeight=0;
+   }
+  }
+  chunks.emplace_back(begin,bins_.size());
+  if(actuallyUsed)*actuallyUsed=chunks.size();
+  std::vector<Result> partial(chunks.size());
+  std::vector<std::exception_ptr> failures(chunks.size());
+  std::atomic<bool> stop{false};
+  auto job=[&](std::size_t k){
+   try{
+    Result local;
+    for(auto i=chunks[k].first;i<chunks[k].second;++i){
+     if(stop.load(std::memory_order_relaxed))break;
+     const auto& bin=bins_[i];
+     const auto& ids=bin.ids;
+     for(std::size_t a=0;a<ids.size();++a)
+      for(std::size_t b=a+1;b<ids.size();++b){
+       // Same bounded wall-clock contract as the serial query. The
+       // output is marked INCOMPLETE if any worker exceeds it.
+       if((local.tests&65535u)==0&&since(start)>maxMs){
+        stop.store(true,std::memory_order_relaxed);
+        break;
+       }
+       if(stop.load(std::memory_order_relaxed))break;
+       ++local.tests;
+       const auto aa=ids[a],bb=ids[b];
+       if(overlap(current_[aa],current_[bb])&&
+          canonical(current_[aa],current_[bb])==bin.cell)
+        add(local.digest,aa,bb);
+      }
+    }
+    partial[k]=local;
+   }catch(...){
+    failures[k]=std::current_exception();
+    stop.store(true,std::memory_order_relaxed);
+   }
+  };
+  std::vector<std::thread> pool;
+  pool.reserve(chunks.size()-1);
+  try{
+   for(std::size_t k=1;k<chunks.size();++k)
+    pool.emplace_back(job,k);
+   job(0);
+  }catch(...){
+   stop.store(true,std::memory_order_relaxed);
+   for(auto& thread:pool)if(thread.joinable())thread.join();
+   throw;
+  }
+  for(auto& thread:pool)thread.join();
+  for(auto& failure:failures)
+   if(failure)std::rethrow_exception(failure);
+  Result total;
+  total.complete=!stop.load(std::memory_order_relaxed);
+  for(const auto& p:partial){
+   total.tests+=p.tests;
+   combine(total.digest,p.digest);
+  }
+  total.ms=since(start);
+  if(total.complete&&total.tests!=work_)
+   throw std::logic_error("Parallel complete digest lost spatial candidate tests");
+  return total;
+ }
+
  Result enumerate(std::uint64_t maxTests,double maxMs)const {
   if(!initialized_)
    throw std::logic_error("No AABB scene installed in persistent grid");
