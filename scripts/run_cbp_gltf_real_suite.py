@@ -19,6 +19,7 @@ import csv
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -89,7 +90,7 @@ def summarize_cpu(path: Path) -> tuple[list[dict], list[dict]]:
         mean = statistics.fmean(sampled)
         summaries.append({
             "method": mode, "mean_ms": mean,
-            "p95_ms": sampled[max(0, int((len(sampled) - 1) * .95))],
+            "p95_ms": sampled[max(0, math.ceil(.95 * len(sampled)) - 1)],
             "relative_to_v4": baseline / mean if mean > 0 else None,
         })
     summaries.sort(key=lambda x: x["mean_ms"])
