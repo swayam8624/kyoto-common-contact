@@ -43,7 +43,9 @@ public:
    throw std::runtime_error("invalid material snapshot header; expected KYOTOM01");
   for(auto* value:{&count,&frames,&seed,&material})
    stream_.read(reinterpret_cast<char*>(value),sizeof(uint32_t));
-  if(!stream_||!count||count>16384||!frames||frames>10000||material>5)
+  // Replay may contain 1000 independently stepped material assemblies.
+  // The separate 16-million output-pair cap remains an absolute safeguard.
+  if(!stream_||!count||count>65536||!frames||frames>10000||material>5)
    throw std::runtime_error("unsupported material replay header dimensions");
   const auto start=stream_.tellg();
   stream_.seekg(0,std::ios::end);
