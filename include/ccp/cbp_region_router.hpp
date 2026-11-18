@@ -74,6 +74,9 @@ class RegionRouter {
  SharedCrossBVH sharedIndex_;
  CertifiedCrossCache crossCache_;
  CrossMode crossMode_{CrossMode::SharedBVH};
+ // Optional exact coarse sweep for exhaustive cross-region joins.
+ // OFF by default: the frozen Phase-0 control is not changed.
+ bool regionSweep_{};
  Telemetry last_{};
  std::size_t resets_{};
  std::size_t sapThreshold_{48};
@@ -141,6 +144,8 @@ class RegionRouter {
 public:
  void setKernel(int regionId,Kernel kernel){overrides_[regionId]=kernel;}
  void setCrossMode(CrossMode mode){crossMode_=mode;}
+ void setRegionSweep(bool enabled){regionSweep_=enabled;}
+ bool regionSweep()const{return regionSweep_;}
  void setCachePadding(double p){crossCache_.setPadding(p);}
  CrossMode crossMode() const{return crossMode_;}
  void clearOverrides(){overrides_.clear();}
@@ -207,20 +212,47 @@ public:
    last_.cacheEdgesInserted=w.incidentEdgesInserted;
    last_.cachePotentialPairs=w.potentialPairCount;
   }else{
-   // Phase-0 reference: exact but potentially O(sum |R_a|*|R_b|).
-   // Keep this for same-input correctness and measured A/B comparisons.
-   for(auto a=regions_.begin();a!=regions_.end();++a)
-    for(auto b=std::next(a);b!=regions_.end();++b){
-     ++last_.regionPairTests;
-     if(!overlap(a->second.unionBounds,b->second.unionBounds)){
-      ++last_.regionPairsPruned;
-      continue;
-     }
-     for(int ai:a->second.ids)for(int bi:b->second.ids){
-      ++last_.crossTests;
-      emit(boxes[std::size_t(ai)],boxes[std::size_t(bi)],out);
+   // Two exact variants of the SAME exhaustive cross-patch kernel.
+   // Phase-0 reference remains unchanged unless regionSweep_ is opted in.
+   const auto join=[&](const Region& a,const Region& b){
+    ++last_.regionPairTests;
+    if(!overlap(a.unionBounds,b.unionBounds)){
+     ++last_.regionPairsPruned;
+     return;
+    }
+    for(int ai:a.ids)for(int bi:b.ids){
+     ++last_.crossTests;
+     emit(boxes[std::size_t(ai)],boxes[std::size_t(bi)],out);
+    }
+   };
+   if(regionSweep_){
+    // Sweep all conservative region union envelopes in ascending X. A
+    // region that starts beyond the end of the current interval CANNOT
+    // overlap it in 3D; skipping that pair cannot create a false negative.
+    // The cost of sorting + visiting the active patch frontier is included
+    // in the query time. No unchosen backend is executed.
+    std::vector<const Region*> sorted;
+    sorted.reserve(regions_.size());
+    for(const auto& item:regions_)sorted.push_back(&item.second);
+    std::sort(sorted.begin(),sorted.end(),[](const Region* a,const Region* b){
+     if(a->unionBounds.min.x!=b->unionBounds.min.x)
+      return a->unionBounds.min.x<b->unionBounds.min.x;
+     return a->id<b->id;
+    });
+    for(std::size_t i=0;i<sorted.size();++i){
+     const Region& a=*sorted[i];
+     for(std::size_t j=i+1;j<sorted.size();++j){
+      const Region& b=*sorted[j];
+      if(b.unionBounds.min.x>a.unionBounds.max.x)break;
+      join(a,b);
      }
     }
+   }else{
+    // Preserve historical O(R^2) region-envelope all-pairs reference.
+    for(auto a=regions_.begin();a!=regions_.end();++a)
+     for(auto b=std::next(a);b!=regions_.end();++b)
+      join(a->second,b->second);
+   }
   }
   last_.regions=regions_.size();
   normalize(out);
