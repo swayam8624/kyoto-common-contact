@@ -1,0 +1,74 @@
+name: CBP Phase 9 — held-out 120-frame higher-density real GLB stress
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-gltf-long.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-scene-long:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact CPU kernels and spatial marker extractor
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_mass_replay ccp_cbp_contact_hotspots --parallel 2
+      - name: Fetch 26 upstream pinned and separately licensed REAL glTF models
+        timeout-minutes: 7
+        run: |
+          python3 scripts/download_cbp_gltf_scenes.py \
+            --output build/real-gltf-source --limit 26 \
+            --per-asset-mb 24 --total-mb 280
+      - name: Run 120-frame independent-seed high-density REAL triangle workload
+        timeout-minutes: 17
+        run: |
+          python3 scripts/run_cbp_gltf_real_suite.py \
+            --assets build/real-gltf-source \
+            --output build/real-gltf-long-wave \
+            --build build/kyoto-final-cpu \
+            --frames 120 --seed 94681 --layout wave \
+            --max-triangles-per-asset 1024 \
+            --max-visual-triangles-per-asset 3072 \
+            --timeout 900
+      - name: Enforce nontrivial measured long-run and truthful scope
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('build/real-gltf-long-wave/REAL-SCENE-EXPERIMENT.json')
+          j=json.loads(p.read_text())
+          assert j['models_imported']>=20
+          assert j['triangle_aabbs_recorded']>10000
+          assert j['frames']==120 and j['gpu_measured'] is False
+          assert j['candidate_pairs_last_frame']>0
+          assert j['cross_asset_last_frame']>0
+          assert len(j['cpu_methods'])==6
+          assert (p.parent/'REAL-3D-OBSERVATORY.html').is_file()
+          print('PASS held-out REAL mesh stress:',j['models_imported'],'models,',
+                j['triangle_aabbs_recorded'],'measured triangles,',j['frames'],'frames')
+          for x in j['cpu_methods']:
+              print(x['method'],f"{x['mean_ms']:.5f} ms",
+                    f"{x['relative_to_v4']:.3f}x vs frozen V4")
+          print('Cross-asset candidate pairs on last frame:',j['cross_asset_last_frame'])
+          PY
+      - name: Preserve genuine long-run results, scene renderer and source provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-25-real-gltf-long-120f-1024-collider-heldout
+          path: |
+            build/real-gltf-source/ASSET_CATALOG.json
+            build/real-gltf-long-wave/REAL-SCENE-EXPERIMENT.json
+            build/real-gltf-long-wave/REAL-3D-OBSERVATORY.html
+            build/real-gltf-long-wave/cpu-core.csv
+            build/real-gltf-long-wave/frames.csv
+            build/real-gltf-long-wave/instances.csv
+            build/real-gltf-long-wave/contact-hotspots.jsonl
+          retention-days: 14
+          if-no-files-found: warn
