@@ -296,11 +296,11 @@ public:
       for(std::size_t b=a+1;b<ids.size();++b){
        // Same bounded wall-clock contract as the serial query. The
        // output is marked INCOMPLETE if any worker exceeds it.
-       if((local.tests&65535u)==0&&since(start)>maxMs){
+       if((local.tests&65535u)==0&&
+          (stop.load(std::memory_order_relaxed)||since(start)>maxMs)){
         stop.store(true,std::memory_order_relaxed);
         break;
        }
-       if(stop.load(std::memory_order_relaxed))break;
        ++local.tests;
        const auto aa=ids[a],bb=ids[b];
        if(overlap(current_[aa],current_[bb])&&
