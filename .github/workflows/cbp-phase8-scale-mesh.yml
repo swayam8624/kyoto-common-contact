@@ -1,0 +1,75 @@
+name: CBP Phase 8 — million-body scale and source-verified deforming mesh scenes
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-phase8-scale-mesh.yml'
+      - 'apps/cbp_million_scale.cpp'
+      - 'apps/cbp_mesh_truth_export.cpp'
+      - 'include/ccp/material_scenes.hpp'
+      - 'scripts/test_cbp_mesh_truth.py'
+      - 'scripts/test_cbp_mesh_observatory.py'
+      - 'scripts/render_cbp_mass_dashboard.py'
+      - 'viewer/mass_stress_v2.html'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scaled-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build million-object scale gate and real deforming mesh exporter
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu \
+            --target ccp_cbp_million_scale ccp_cbp_mesh_truth_export ccp_cbp_mass_export ccp_cbp_mass_replay \
+            --parallel 2
+      - name: Verify animated mesh positions and standalone WebGL viewer
+        run: |
+          ctest --test-dir build/kyoto-final-cpu \
+            -R '^cbp_real_mesh_(truth|observatory)_contract$' --output-on-failure
+      - name: Run independently brute-checked exact 1024-object case
+        run: |
+          mkdir -p build/cbp-phase8-evidence
+          build/kyoto-final-cpu/ccp_cbp_million_scale \
+            1024 6 541 dense build/cbp-phase8-evidence/1024-full-oracle.csv
+          python3 - <<'PY'
+          import csv
+          with open('build/cbp-phase8-evidence/1024-full-oracle.csv') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==6 and all(row['global_oracle_checked']=='1' for row in rows)
+          assert all(int(row['exact_pairs'])>0 for row in rows)
+          PY
+      - name: Actually materialize and move one million AABB bodies over 12 frames
+        timeout-minutes: 3
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_million_scale \
+            1000000 12 541 pulse build/cbp-phase8-evidence/1000000-real-aabbs.csv
+          python3 - <<'PY'
+          import csv
+          with open('build/cbp-phase8-evidence/1000000-real-aabbs.csv') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==12
+          assert all(int(row['objects'])==1000000 for row in rows)
+          assert all(int(row['bytes_resident'])==24000000 for row in rows)
+          assert all(int(row['exact_pairs'])>0 for row in rows)
+          assert all(row['global_oracle_checked']=='0' for row in rows)
+          print('PASS: 1,000,000 materialized moving AABBs. Global exactness depends on proved island-separation invariant; NOT a 1M deformable World benchmark.')
+          PY
+      - name: Report billion-AABB capacity as an analytical estimate ONLY
+        run: |
+          build/kyoto-final-cpu/ccp_cbp_million_scale \
+            1000000000 120 541 pulse build/cbp-phase8-evidence/1000000000-VIRTUAL-only.csv --virtual
+          grep ANALYTICAL_ONLY build/cbp-phase8-evidence/1000000000-VIRTUAL-only.csv
+      - name: Upload inspectable source-bound scale results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbp-phase8-bounded-scale-measured-and-analytical
+          path: build/cbp-phase8-evidence/*.csv
+          retention-days: 14
+          if-no-files-found: warn
