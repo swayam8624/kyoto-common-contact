@@ -178,6 +178,12 @@ target_include_directories(ccp_cbp_pressure_incremental_flat_cpu PRIVATE include
 find_package(Threads REQUIRED)
 target_compile_options(ccp_cbp_pressure_incremental_flat_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
 target_link_libraries(ccp_cbp_pressure_incremental_flat_cpu PRIVATE Threads::Threads)
+# Phase 17: actual full pair-output streaming from the independently retained
+# persistent flat-cell index, with bounded disk sink and exact digest checks.
+add_executable(ccp_cbp_pressure_incremental_flat_emit apps/cbp_pressure_incremental_flat_emit.cpp)
+target_include_directories(ccp_cbp_pressure_incremental_flat_emit PRIVATE include)
+target_compile_options(ccp_cbp_pressure_incremental_flat_emit PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_link_libraries(ccp_cbp_pressure_incremental_flat_emit PRIVATE Threads::Threads)
 add_executable(ccp_cbp_pressure_incremental_flat_tests tests/cbp_pressure_incremental_flat_tests.cpp)
 target_include_directories(ccp_cbp_pressure_incremental_flat_tests PRIVATE include)
 target_compile_options(ccp_cbp_pressure_incremental_flat_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
