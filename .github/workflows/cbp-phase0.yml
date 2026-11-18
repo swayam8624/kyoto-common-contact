@@ -19,6 +19,9 @@ on:
       - 'tests/cbp_cost_manager_tests.cpp'
       - 'apps/cbp_kmcb_replay.cpp'
       - 'apps/cbp_topology_replay.cpp'
+      - 'apps/cbp_mass_export.cpp'
+      - 'apps/cbp_mass_replay.cpp'
+      - 'scripts/test_cbp_mass_stress.py'
       - 'scripts/test_cbp_topology_replay.py'
       - 'scripts/test_cbp_kmcb_smoke.py'
       - 'apps/cbp_manager_microbench.cpp'
@@ -110,6 +113,33 @@ jobs:
             build/kyoto-final-cpu/cbp-evidence/two-cloth-span6.csv \
             build/kyoto-final-cpu/cbp-evidence/two-cloth-span12.csv \
             --html build/kyoto-final-cpu/cbp-evidence/report.html
+      - name: Independently stepped multi-material worlds on shared CPU/Metal binary
+        timeout-minutes: 4
+        run: |
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_mass_export ccp_cbp_mass_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu -R '^cbp_many_material_worlds_contract
+        run: |
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_region_router_tests.cpp -o /tmp/cbp-region-sanitizers
+          /tmp/cbp-region-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_region_sweep_tests.cpp -o /tmp/cbp-region-sweep-sanitizers
+          /tmp/cbp-region-sweep-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-sanitizers
+          /tmp/cbp-bvh-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_certified_cache_tests.cpp -o /tmp/cbp-cert-sanitizers
+          /tmp/cbp-cert-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude             tests/cbp_cost_manager_tests.cpp -o /tmp/cbp-manager-sanitizers
+          /tmp/cbp-manager-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined             -fno-omit-frame-pointer -Iinclude tests/cbp_portfolio_tests.cpp             src/live_cloth.cpp -o /tmp/cbp-portfolio-sanitizers
+          /tmp/cbp-portfolio-sanitizers
+ --output-on-failure
       - name: ASan and UBSan adversarial regression
         run: |
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
