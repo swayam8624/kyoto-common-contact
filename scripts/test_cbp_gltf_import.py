@@ -109,6 +109,17 @@ def main():
                    len(x["triangles"]) == 4
                    for x in data["objects"])
         assert len(data["frames"]) == 12
+        # Truly held-out seeds must change recorded 3D geometry rather than
+        # being only a cosmetic CSV label.
+        scene_other = base / "different-seed"
+        call([sys.executable, str(importer), "--catalog", str(catalog),
+              "--output", str(scene_other), "--frames", "12",
+              "--max-triangles-per-asset", "4", "--layout", "crowded",
+              "--seed", "99173"])
+        if hashlib.sha256((scene / "snapshots.kmcb").read_bytes()).digest() == (
+            hashlib.sha256((scene_other / "snapshots.kmcb").read_bytes()).digest()
+        ):
+            raise AssertionError("Different workload seeds produced identical geometry")
         call([replay, str(scene / "snapshots.kmcb"),
               str(scene / "instances.csv"), str(scene / "cpu-core.csv"), "core"])
         html = scene / "viewer.html"
