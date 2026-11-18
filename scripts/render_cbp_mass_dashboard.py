@@ -70,6 +70,7 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
             "host_ms": float(row["ms"]),
             "gpu_ms": None,
             "pairs": int(row["pairs"]),
+            "inter_pairs": int(row["inter_instance_pairs"]),
             "hash": int(row["pair_hash"]),
             "gpu": False,
         })
@@ -85,6 +86,7 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
                 "host_ms": float(row["host_ms"]),
                 "gpu_ms": float(row["gpu_ms"]),
                 "pairs": int(row["overlaps"]),
+                "inter_pairs": None,  # GPU has no instance-owner metadata.
                 "hash": int(row["pair_hash"]),
                 "gpu": True,
             })
