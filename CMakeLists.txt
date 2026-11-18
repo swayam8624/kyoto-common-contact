@@ -145,6 +145,15 @@ target_compile_options(ccp_cbp_cost_manager_tests PRIVATE -Wall -Wextra -Wpedant
 add_executable(ccp_cbp_manager_bench apps/cbp_manager_microbench.cpp)
 target_include_directories(ccp_cbp_manager_bench PRIVATE include)
 target_compile_options(ccp_cbp_manager_bench PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Phase 7: hundreds/thousands of independently stepped material assemblies
+# serialized once and replayed identically through CPU and Apple Metal.
+add_executable(ccp_cbp_mass_export apps/cbp_mass_export.cpp)
+target_link_libraries(ccp_cbp_mass_export PRIVATE ccp_multicloth)
+target_compile_options(ccp_cbp_mass_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_cbp_mass_replay apps/cbp_mass_replay.cpp)
+target_link_libraries(ccp_cbp_mass_replay PRIVATE ccp_live)
+target_include_directories(ccp_cbp_mass_replay PRIVATE include)
+target_compile_options(ccp_cbp_mass_replay PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # Phase 6 separate opt-in X-swept region-pair join.
 add_executable(ccp_cbp_region_sweep_tests tests/cbp_region_sweep_tests.cpp)
 target_include_directories(ccp_cbp_region_sweep_tests PRIVATE include)
@@ -189,6 +198,9 @@ if(BUILD_TESTING)
         $<TARGET_FILE:ccp_material_replay>)
     add_test(NAME evidence_csv_contracts
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_evidence_summarizers.py)
+    add_test(NAME cbp_many_material_worlds_contract
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_mass_stress.py
+        $<TARGET_FILE:ccp_cbp_mass_export> $<TARGET_FILE:ccp_cbp_mass_replay>)
     add_test(NAME cbp_mesh_topology_replay_contract
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_topology_replay.py
         $<TARGET_FILE:ccp_cbp_topology_replay>)
