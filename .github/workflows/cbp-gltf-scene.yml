@@ -1,0 +1,31 @@
+name: CBP Phase 8 — real glTF triangle-scene importer and offline 3D renderer
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-gltf-scene.yml'
+      - 'scripts/import_cbp_gltf_scenes.py'
+      - 'scripts/render_cbp_gltf_scenes.py'
+      - 'scripts/test_cbp_gltf_import.py'
+      - 'scripts/download_cbp_gltf_scenes.py'
+      - 'viewer/gltf_scene_observatory.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gltf-formats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native exact pair reference
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_mass_replay --parallel 2
+      - name: Validate twelve synthetic-format glTF binary fixtures, real triangle parsing and 3D UI
+        run: |
+          python3 scripts/test_cbp_gltf_import.py build/kyoto-final-cpu/ccp_cbp_mass_replay
+      - name: Python static compile gates
+        run: |
+          python3 -m py_compile scripts/download_cbp_gltf_scenes.py scripts/import_cbp_gltf_scenes.py scripts/render_cbp_gltf_scenes.py
