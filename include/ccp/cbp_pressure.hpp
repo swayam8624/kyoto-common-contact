@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -75,6 +76,27 @@ inline bool known(const std::string& scene){
  return std::find_if(scenes.begin(),scenes.end(),
   [&](const char* s){return scene==s;})!=scenes.end();
 }
+inline std::optional<std::uint64_t> analyticCandidates(
+    const std::string& scenario,std::uint64_t n,
+    std::uint32_t frame,std::uint32_t frames){
+ // Independent procedural truth is available ONLY for these narrowly
+ // specified workload geometries. NEVER extrapolate this proof to real
+ // deformable scenes, arbitrary mixed AABBs or other motion regimes.
+ if(scenario=="slabs")return 0;
+ if(scenario=="all_overlap")return n*(n-1)/2;
+ if(scenario=="burst"){
+  const double phase=double(frame)/double(std::max(1u,frames-1u));
+  if(phase>.25&&phase<.75){
+   // Each 64-body group has max within-axis center separation
+   // 3*.04 + 2*.045 < .31 = box diameter. Distinct groups
+   // remain >=3.5-.52 apart along some grid axis.
+   const std::uint64_t whole=n/64,last=n%64;
+   return whole*(64*63/2)+last*(last-1)/2;
+  }
+ }
+ return std::nullopt;
+}
+
 inline std::vector<Box> generate(std::size_t n,std::uint32_t frame,
                                  std::uint32_t totalFrames,
                                  std::uint32_t seed,const std::string& scene){
