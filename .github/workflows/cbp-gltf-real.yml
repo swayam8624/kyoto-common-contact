@@ -8,6 +8,7 @@ on:
       - 'scripts/download_cbp_gltf_scenes.py'
       - 'scripts/import_cbp_gltf_scenes.py'
       - 'scripts/render_cbp_gltf_scenes.py'
+      - 'scripts/run_cbp_gltf_real_suite.py'
       - 'viewer/gltf_scene_observatory.html'
   workflow_dispatch:
 permissions:
@@ -76,6 +77,16 @@ jobs:
           assert (r/"REAL-3D-OBSERVATORY.html").stat().st_size>20000
           print("REAL GLB SCENES VERIFIED:",n,"triangle AABBs:",sum(a["selected_triangles"] for a in j["objects"]))
           PY
+      - name: Validate repeatable one-command real-scene suite (different budget and frames)
+        timeout-minutes: 4
+        run: |
+          python3 scripts/run_cbp_gltf_real_suite.py \
+            --assets build/cbp-real-assets \
+            --output build/cbp-real-suite-smoke \
+            --build build/kyoto-final-cpu \
+            --frames 12 --max-triangles-per-asset 64 --layout crowded --seed 8113 \
+            --timeout 180
+          test -f build/cbp-real-suite-smoke/REAL-SCENE-EXPERIMENT.json
       - name: Preserve real asset provenance and measured evidence for download
         if: always()
         uses: actions/upload-artifact@v4
