@@ -330,7 +330,7 @@ byId("map").onclick=e=>{
  let best=null,score=Infinity;
  for(const a of boxes){
   const inside=x>=a.x&&x<=a.x+a.rw&&y>=a.y&&y<=a.y+a.rh;
-  const d=inside?.01+Math.min(1,a.rw*a.rh/10000):
+  const d=inside ? (.01+Math.min(1,a.rw*a.rh/10000)) :
                  Math.hypot(x-a.cx,y-a.cy);
   if(d<score){score=d;best=a.i;}
  }
