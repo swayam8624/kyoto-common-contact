@@ -340,6 +340,48 @@ public:
   return total;
  }
 
+ // Phase 17: bounded actual candidate IDs, in deterministic *cell traversal*
+ // order (NOT globally sorted). The sink may stream fixed-size chunks to a
+ // solver or disk; it must not mutate this index. Canonical ownership makes
+ // each accepted current-AABB pair unique, even across multi-cell boxes.
+ //
+ // On any cap/time stop the result is explicitly incomplete. A caller writing
+ // to disk must use a temporary file and discard it unless complete; the
+ // digest alone is NOT equivalent to a fully materialized pair buffer.
+ template<class Emit>
+ Result streamPairs(std::uint64_t maxTests,std::uint64_t maxPairs,
+                    double maxMs,Emit&& emit)const {
+  if(!initialized_)
+   throw std::logic_error("No AABB scene installed in persistent grid");
+  if(maxTests==0||maxPairs==0||!std::isfinite(maxMs)||maxMs<=0)
+   throw std::invalid_argument("Invalid bounded pair streaming budget");
+  Result out;
+  const auto began=std::chrono::steady_clock::now();
+  for(const auto& bin:bins_){
+   for(std::size_t i=0;i<bin.ids.size();++i){
+    for(std::size_t j=i+1;j<bin.ids.size();++j){
+     if(out.tests>=maxTests||
+        (out.tests%65536==0&&since(began)>maxMs)){
+      out.complete=false;out.ms=since(began);return out;
+     }
+     ++out.tests;
+     const auto a=bin.ids[i],b=bin.ids[j];
+     if(!overlap(current_[a],current_[b])||
+        !(canonical(current_[a],current_[b])==bin.cell))continue;
+     if(out.digest.count>=maxPairs){
+      out.complete=false;out.ms=since(began);return out;
+     }
+     emit(std::min(a,b),std::max(a,b));
+     add(out.digest,a,b);
+    }
+   }
+  }
+  out.ms=since(began);
+  if(out.tests!=work_)
+   throw std::logic_error("Full pair stream did not enumerate all cell tests");
+  return out;
+ }
+
  Result enumerate(std::uint64_t maxTests,double maxMs)const {
   if(!initialized_)
    throw std::logic_error("No AABB scene installed in persistent grid");
