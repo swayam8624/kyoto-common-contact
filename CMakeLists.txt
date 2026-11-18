@@ -170,6 +170,15 @@ target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -W
 # Phase 13: independent geometry-cost portfolio for the same global stress geometry.
 # Phase 14: retain actual spatial cell ownership across changing frame geometry
 # rather than rebuilding an unordered_map for every full-frame query.
+# Phase 15 preserves Phase 14's pointer-heavy version as a negative control.
+# The flat version uses a contiguous vector of spatial cells and separate
+# map-only update lookup, so pair enumeration is cache-local.
+add_executable(ccp_cbp_pressure_incremental_flat_cpu apps/cbp_pressure_incremental_flat_cpu.cpp)
+target_include_directories(ccp_cbp_pressure_incremental_flat_cpu PRIVATE include)
+target_compile_options(ccp_cbp_pressure_incremental_flat_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_cbp_pressure_incremental_flat_tests tests/cbp_pressure_incremental_flat_tests.cpp)
+target_include_directories(ccp_cbp_pressure_incremental_flat_tests PRIVATE include)
+target_compile_options(ccp_cbp_pressure_incremental_flat_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_cbp_pressure_incremental_cpu apps/cbp_pressure_incremental_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_incremental_cpu PRIVATE include)
 target_compile_options(ccp_cbp_pressure_incremental_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -274,6 +283,13 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME cbp_flat_persistent_cell_direct_oracle
+      COMMAND ccp_cbp_pressure_incremental_flat_tests)
+    add_test(NAME cbp_flat_persistent_cell_independent_oracle
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_incremental_flat.py
+        $<TARGET_FILE:ccp_cbp_pressure_cpu>
+        $<TARGET_FILE:ccp_cbp_pressure_incremental_flat_cpu>)
     add_test(NAME cbp_persistent_cell_direct_oracle
       COMMAND ccp_cbp_pressure_incremental_tests)
     add_test(NAME cbp_persistent_cell_independent_oracle
