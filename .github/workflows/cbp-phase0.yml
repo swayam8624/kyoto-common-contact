@@ -118,6 +118,10 @@ jobs:
           /tmp/cbp-region-sanitizers
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
             -fno-omit-frame-pointer -Iinclude \
+            tests/cbp_region_sweep_tests.cpp -o /tmp/cbp-region-sweep-sanitizers
+          /tmp/cbp-region-sweep-sanitizers
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -Iinclude \
             tests/cbp_shared_bvh_tests.cpp -o /tmp/cbp-bvh-sanitizers
           /tmp/cbp-bvh-sanitizers
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined \
