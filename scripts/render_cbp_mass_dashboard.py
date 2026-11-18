@@ -38,6 +38,12 @@ def sha256(path: Path) -> str:
 def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -> dict:
     instances = records(directory / "instances.csv")
     receipt = records(directory / "frames.csv")
+    if len({int(row["id"]) for row in instances}) != len(instances):
+        raise ValueError("Duplicate material instance identities")
+    if sorted(int(row["id"]) for row in instances) != list(range(len(instances))):
+        raise ValueError("Material instance IDs must be consecutive and index aligned")
+    if sum(int(row["primitive_count"]) for row in instances) != int(receipt[0]["primitives"]):
+        raise ValueError("Instance primitive counts must cover exact recorded AABBs")
     with (directory / "preview.jsonl").open(encoding="utf-8") as file:
         frames = [json.loads(line) for line in file if line.strip()]
     if not frames or len(frames) != len(receipt):
@@ -122,12 +128,21 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
             by_frame[f][method]["host_ms"]
             for f in range(warmup, len(frames))
         )
+        measured_kernel = [
+            by_frame[f][method]["gpu_ms"]
+            for f in range(warmup, len(frames))
+            if by_frame[f][method]["gpu_ms"] is not None
+            and by_frame[f][method]["gpu_ms"] >= 0
+        ]
         stats.append({
             "mode": method,
             "mean": statistics.fmean(sorted_times),
             "median": statistics.median(sorted_times),
             "p95": sorted_times[max(0, math.ceil(.95 * len(sorted_times)) - 1)],
             "gpu": by_frame[0][method]["gpu"],
+            "gpu_kernel_mean": (
+                statistics.fmean(measured_kernel) if measured_kernel else None
+            ),
         })
     lo = [min(shape[k] for frame in frames for shape in frame["instances"])
           for k in (1, 2, 3)]
@@ -138,6 +153,10 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
         "runs": by_frame,
         "stats": stats,
         "instances": len(instances),
+        "instance_info": [{
+            "id": int(row["id"]), "kind": row["kind"], "regime": row["regime"],
+            "primitives": int(row["primitive_count"])
+        } for row in instances],
         "primitives": n,
         "seed": int(receipt[0]["seed"]),
         "layout": receipt[0]["layout"],
@@ -222,6 +241,8 @@ def main() -> int:
     p.add_argument("--gpu", nargs="*", type=Path, default=None)
     p.add_argument("--html", type=Path)
     p.add_argument("--gif", type=Path)
+    p.add_argument("--legacy-view", action="store_true",
+                   help="Use original v1 dashboard for reproducibility comparisons")
     p.add_argument("--preview-only", action="store_true",
                    help="Show actual geometry during the benchmark without invented timings")
     args = p.parse_args()
@@ -230,7 +251,9 @@ def main() -> int:
     directory = args.experiment
     gpu = args.gpu if args.gpu is not None else sorted(directory.glob("metal-*.csv"))
     dataset = load(directory, gpu, preview_only=args.preview_only)
-    template = Path(__file__).resolve().parent.parent / "viewer" / "mass_stress.html"
+    template = Path(__file__).resolve().parent.parent / "viewer" / (
+        "mass_stress.html" if args.legacy_view else "mass_stress_v2.html"
+    )
     output = args.html or directory / "dashboard.html"
     if output.exists():
         raise FileExistsError(f"Preserving prior HTML report: {output}")
