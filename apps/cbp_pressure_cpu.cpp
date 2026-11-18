@@ -39,7 +39,8 @@ std::string status(const Result& r){return r.complete?"complete":"budget_stop";}
 void emit(std::ostream& out,const std::string& scene,const char* method,
           std::uint64_t n,std::uint64_t frame,std::uint32_t seed,
           double generation,double gridBuild,const Grid& grid,
-          const Result& r,bool validated,bool oracleChecked,bool analytic){
+          const Result& r,bool validated,bool oracleChecked,
+          bool analytic,std::uint64_t analyticExpected){
  out<<scene<<','<<method<<','<<n<<','<<frame<<','<<seed<<','
     <<status(r)<<','<<generation<<','<<gridBuild<<','<<r.ms<<','
     <<r.tests<<','<<grid.entries<<','<<grid.bins.size()<<','
@@ -47,7 +48,8 @@ void emit(std::ostream& out,const std::string& scene,const char* method,
     <<r.digest.sum<<','<<r.digest.xors<<','
     <<r.digest.sum32<<','<<r.digest.xor32<<','
     <<int(validated)<<','<<int(oracleChecked)<<','
-    <<int(analytic)<<','<<grid.estimatedBytes<<','<<rssMiB()<<"\n";
+    <<int(analytic)<<','<<analyticExpected<<','
+    <<grid.estimatedBytes<<','<<rssMiB()<<"\n";
 }
 }
 int main(int argc,char** argv){
@@ -72,8 +74,8 @@ int main(int argc,char** argv){
   out<<"scene,method,n,frame,seed,status,generate_ms,grid_build_ms,query_ms,"
         "tested_pairs,grid_entries,grid_cells,grid_upper_bound,exact_pairs,"
         "hash64_sum,hash64_xor,hash32_sum,hash32_xor,"
-        "cross_method_verified,brute_oracle_checked,analytic_all_overlap,"
-        "estimated_data_bytes,peak_rss_mib\n";
+        "cross_method_verified,brute_oracle_checked,analytical_construct_verified,"
+        "analytical_expected_pairs,estimated_data_bytes,peak_rss_mib\n";
   bool incomplete=false;
   for(std::uint64_t f=0;f<frames;++f){
    const auto before=std::chrono::steady_clock::now();
@@ -94,15 +96,17 @@ int main(int argc,char** argv){
    const bool verified=gridResult.complete&&sweepResult.complete;
    if(verified&&gridResult.digest!=sweepResult.digest)
     throw std::runtime_error("Independent global-sweep and hash-grid pair DIGEST MISMATCH");
-   if(scene=="all_overlap"&&gridResult.complete){
-    if(gridResult.digest.count!=n*(n-1)/2)
-     throw std::runtime_error("Known all-overlap cardinality mismatch");
-   }
+   const auto expected=analyticCandidates(scene,n,std::uint32_t(f),
+                                          std::uint32_t(frames));
+   if(expected&&gridResult.complete&&gridResult.digest.count!=*expected)
+    throw std::runtime_error("Independent analytically known candidate count failed");
    if(!gridResult.complete||!sweepResult.complete)incomplete=true;
    emit(out,scene,"global_3d_hash_grid",n,f,std::uint32_t(seed),generateMs,
-        buildMs,grid,gridResult,verified,oracle,scene=="all_overlap");
+        buildMs,grid,gridResult,verified,oracle,
+        expected.has_value()&&gridResult.complete,expected.value_or(0));
    emit(out,scene,"global_x_sweep",n,f,std::uint32_t(seed),generateMs,
-        buildMs,grid,sweepResult,verified,oracle,scene=="all_overlap");
+        buildMs,grid,sweepResult,verified,oracle,
+        expected.has_value()&&sweepResult.complete,expected.value_or(0));
    if((f+1)%std::max<std::uint64_t>(1,frames/12)==0){
     std::cerr<<"[PRESSURE] "<<scene<<" N="<<n<<" "<<f+1<<"/"<<frames
              <<" 3D-grid "<<gridResult.ms<<" ms "
