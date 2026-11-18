@@ -248,7 +248,7 @@ def generate(catalog: Path, output: Path, frames: int, max_tris: int,
         raise ValueError("Real mesh triangles exceed shared exact replay cap")
     output.mkdir(parents=True, exist_ok=False)
     with (output / "instances.csv").open("w", newline="") as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator="\n")
         writer.writerow(["id", "kind", "regime", "first_primitive", "primitive_count"])
         start = 0
         for i, asset in enumerate(assets):
@@ -257,7 +257,7 @@ def generate(catalog: Path, output: Path, frames: int, max_tris: int,
             start += asset["selected_triangles"]
     preview = (output / "preview.jsonl").open("w", encoding="utf-8")
     receipt = (output / "frames.csv").open("w", newline="")
-    csv_out = csv.writer(receipt)
+    csv_out = csv.writer(receipt, lineterminator="\n")
     csv_out.writerow(["frame", "instances", "primitives", "layout", "seed",
                       "geometry_fnv64"])
     motion = []
