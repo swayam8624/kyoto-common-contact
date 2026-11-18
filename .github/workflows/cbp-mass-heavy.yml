@@ -1,0 +1,79 @@
+name: CBP 1000-world multi-layout extended research stress
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-mass-heavy.yml'
+  workflow_dispatch:
+
+jobs:
+  held-layout-development-probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release build and independent small material contract
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_mass_export ccp_cbp_mass_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu -R '^cbp_many_material_worlds_contract$' --output-on-failure
+      - name: 1000 materials x 120 frames, separated grid
+        timeout-minutes: 8
+        run: |
+          python3 scripts/run_cbp_mass_scale.py \
+            --build build/kyoto-final-cpu \
+            --output build/cbp-mass-grid \
+            --instances 1000 --frames 120 --seed 43129 --layout grid \
+            --case-timeout 420
+      - name: 1000 materials x 120 frames, spatial clusters
+        timeout-minutes: 8
+        run: |
+          python3 scripts/run_cbp_mass_scale.py \
+            --build build/kyoto-final-cpu \
+            --output build/cbp-mass-clusters \
+            --instances 1000 --frames 120 --seed 43130 --layout clusters \
+            --case-timeout 420
+      - name: 1000 materials x 120 frames, moving contact front
+        timeout-minutes: 8
+        run: |
+          python3 scripts/run_cbp_mass_scale.py \
+            --build build/kyoto-final-cpu \
+            --output build/cbp-mass-contact-front \
+            --instances 1000 --frames 120 --seed 43131 --layout contact_front \
+            --case-timeout 420
+      - name: Print every positive and negative full-pair-verified outcome
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for directory in ['grid', 'clusters', 'contact-front']:
+              file=Path('build/cbp-mass-'+directory+'/MANIFEST.json')
+              run=json.loads(file.read_text())
+              case=run['cases'][0]
+              means={v['mode']:v['mean_ms'] for v in case['cpu_methods']}
+              baseline=means['frozen_v4']
+              print('LAYOUT',directory,'SEED',run['seed'],
+                    'MATERIAL_INSTANCES',case['instances'],'PRIMITIVES',case['primitive_AABBs'],
+                    'FRAMES',case['frames'],'WALL_SECONDS',case['total_wall_seconds'])
+              for method,value in means.items():
+                  print('  ',method,'mean ms',round(value,6),
+                        'vs frozen V4',round(baseline/value,4),'x')
+          PY
+      - name: Save CSV, interactive visual and reproducibility receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-1000-worlds-3-layouts-extended-evidence
+          path: |
+            build/cbp-mass-*/MANIFEST.json
+            build/cbp-mass-*/**/CASE_REPORT.json
+            build/cbp-mass-*/**/cpu-core.csv
+            build/cbp-mass-*/**/preview.jsonl
+            build/cbp-mass-*/**/instances.csv
+            build/cbp-mass-*/**/frames.csv
+            build/cbp-mass-*/**/dashboard.html
+            build/cbp-mass-contact-front/**/snapshots.kmcb
+          retention-days: 7
+          if-no-files-found: warn
