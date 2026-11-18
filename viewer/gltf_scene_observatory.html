@@ -49,13 +49,17 @@ tbody tr:first-child td{color:#72e4c9}
 <input id="seek" type="range" min="0" value="0"><b id="frame">—</b>
 <select id="speed"><option value="5">5 fps</option><option value="12" selected>12 fps</option><option value="24">24 fps</option></select>
 <select id="object"><option value="-1">All imported scenes</option></select>
+<label>Visible triangles <select id="mesh-detail">
+<option value="visual" selected>Higher-detail GLB display</option>
+<option value="collision">Measured collision triangles</option>
+</select></label>
 <button id="reset">Reset view</button><button id="top">Overhead</button><button id="front">Front</button>
 <label><input type="checkbox" id="isolate"> Isolate asset</label></div>
-<p class="muted">Drag to orbit · scroll to zoom. Models use true glTF triangle vertices, simplified flat shading, and the exact saved rigid transforms. PBR textures, skinning and glTF animation are intentionally not represented.</p>
+<p class="muted">Drag to orbit · scroll to zoom. Both visible detail levels come from the same source GLB and follow the same saved rigid motion. Only the smaller **measured collision triangles** generate candidate pairs. Higher-detail display triangles do not take part in the benchmark. Original PBR textures, skinning and glTF animation are not evaluated.</p>
 <div class="metrics">
 <div class="metric"><small>Actual named GLB scenes</small><b id="count">—</b><small>Distinct source models imported</small></div>
 <div class="metric"><small>Triangle AABBs in query</small><b id="tri">—</b><small>Deterministically sampled triangles</small></div>
-<div class="metric"><small>Source mesh coverage</small><b id="coverage">—</b><small>Selected / original triangles</small></div>
+<div class="metric"><small>Collision sampling</small><b id="coverage">—</b><small>Measured triangles / original</small></div>
 <div class="metric"><small>Total candidate pairs</small><b id="total">—</b><small>Exact broad-phase reference</small></div>
 <div class="metric"><small>Between separate assets</small><b id="inter">—</b><small>Not solved physical contacts</small></div>
 <div class="metric"><small>Fastest measured CPU</small><b id="fastest">—</b><small id="winner">Per current frame</small></div>
@@ -130,7 +134,9 @@ byId("coverage").textContent=(100*data.primitives/data.triangles_original).toFix
 byId("status").textContent=data.preview_only?"GEOMETRY ONLY · RUN PENDING":"EXACT CPU"+(data.stats.some(x=>x.is_gpu)?" / METAL":"")+" QUERY PARITY";
 byId("conditions").textContent="Pinned upstream: Khronos glTF-Sample-Assets · Layout: "+data.layout+
  " · Seed: "+data.seed+" · "+totalFrames+" frames · "+data.models.length+
- " models. The selected triangle fraction is not a physically uniform surface decimation.";
+ " models. "+fmt(data.primitives)+" triangles are measured; "+
+ fmt(data.triangles_display)+" distinct sampled triangles are displayed. "+
+ "The higher-detail display does NOT change collision results or represent full-mesh accuracy.";
 for(let i=0;i<data.models.length;i++){
  const op=document.createElement("option");op.value=i;op.textContent=data.models[i].name;
  byId("object").append(op);
@@ -168,9 +174,9 @@ function init(){
  if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));
  const gpu=[];
  const min=data.limits[0],max=data.limits[1],extent=Math.max(1,...min.map((v,k)=>max[k]-v));
- for(const model of data.models){
+ function allocateGeometry(tris){
   const vertices=[];
-  for(const tri of model.triangles){
+  for(const tri of tris){
    const a=tri.slice(0,3),b=tri.slice(3,6),c=tri.slice(6,9);
    const u=b.map((v,k)=>v-a[k]),v=c.map((x,k)=>x-a[k]);
    const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
@@ -181,7 +187,13 @@ function init(){
   const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,16,0);
-  gpu.push({vao,count:vertices.length/4});
+  return {vao,count:vertices.length/4};
+ }
+ for(const model of data.models){
+  gpu.push({
+   collision:allocateGeometry(model.triangles),
+   visual:allocateGeometry(model.visual_triangles||model.triangles)
+  });
  }
  gl.enable(gl.DEPTH_TEST);gl.clearColor(.03,.07,.12,1);
  const uniform=id=>gl.getUniformLocation(prog,id);
@@ -205,8 +217,9 @@ function draw3d(){
   const bright=selected<0||selected===i?1:.35;
   gl.uniform3f(viewer.uniform("rgb"),...color.map(x=>x*bright));
   gl.uniform4f(viewer.uniform("motion"),...motion);
-  gl.bindVertexArray(viewer.gpu[i].vao);
-  gl.drawArrays(gl.TRIANGLES,0,viewer.gpu[i].count);
+  const mesh=viewer.gpu[i][byId("mesh-detail").value];
+  gl.bindVertexArray(mesh.vao);
+  gl.drawArrays(gl.TRIANGLES,0,mesh.count);
  }
 }
 function drawing(id,height){
@@ -296,8 +309,10 @@ function updateInfo(){
   const m=data.models[selected];
   byId("inspector").textContent=
    "Asset #"+selected+": "+m.name+"\n"+
-   "Triangles used: "+fmt(m.selected_triangles)+" / "+fmt(m.source_triangles)+"\n"+
-   "Coverage: "+(100*m.selected_triangles/m.source_triangles).toFixed(1)+"%\n"+
+   "Collision-query triangles: "+fmt(m.selected_triangles)+" / "+fmt(m.source_triangles)+"\n"+
+   "Higher-detail display triangles: "+fmt(m.display_triangles??m.selected_triangles)+" / "+fmt(m.source_triangles)+"\n"+
+   "Collision coverage: "+(100*m.selected_triangles/m.source_triangles).toFixed(1)+"%\n"+
+   "Display coverage: "+(100*(m.display_triangles??m.selected_triangles)/m.source_triangles).toFixed(1)+"%\n"+
    "Source GLB SHA-256: "+m.sha256.slice(0,16)+"…\n"+
    "Original file: "+m.source+"\n"+
    "Legal details: "+m.license_source+"\n"+
@@ -314,6 +329,7 @@ byId("play").onclick=()=>{playing=!playing;byId("play").textContent=playing?"Pau
 byId("next").onclick=()=>{playing=false;byId("play").textContent="Play";frame=(frame+1)%totalFrames;redraw()};
 byId("seek").oninput=e=>{frame=Number(e.target.value);playing=false;byId("play").textContent="Play";redraw()};
 byId("object").onchange=e=>{selected=Number(e.target.value);redraw()};
+byId("mesh-detail").onchange=()=>draw3d();
 byId("isolate").onchange=()=>draw3d();
 byId("reset").onclick=()=>{yaw=.6;pitch=.5;zoom=1;selected=-1;byId("object").value=-1;redraw()};
 byId("top").onclick=()=>{yaw=0;pitch=1.5;draw3d()};
