@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kyoto CBP · Research Observatory / V2</title>
+<title>Kyoto CBP · Mass-Material Research Observatory / V2</title>
 <style>
 :root{color-scheme:dark;--bg:#0a101a;--panel:#152133;--border:#34445c;--text:#e5effa;--muted:#a1b2c6;--green:#65d5be}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,sans-serif}
@@ -414,7 +414,7 @@ byId("mini").addEventListener("click",ev=>{
  // Prefer the smallest covering envelope; otherwise closest center.
  for(const item of miniRects){
   const covers=x>=item.x-2&&x<=item.x+item.w+2&&y>=item.y-2&&y<=item.y+item.h+2;
-  const d=covers?Math.min(0.1,item.w*item.h/1000):Math.hypot(item.cx-x,item.cy-y);
+  const d=covers?Math.min(.3,item.w*item.h/10000):Math.hypot(item.cx-x,item.cy-y);
   if(d<dist){dist=d;pick=item.i;}
  }
  if(pick!==null&&dist<35){
