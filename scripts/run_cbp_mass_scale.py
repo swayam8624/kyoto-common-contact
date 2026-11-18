@@ -68,6 +68,10 @@ def stats_for(path: Path) -> list[dict]:
             "mode": mode, "mean_ms": statistics.fmean(times),
             "p95_ms": times[max(0, math.ceil(.95 * len(times)) - 1)],
             "candidate_pair_count_last": int(group[-1]["pairs"]),
+            "inter_instance_pairs_last": int(group[-1]["inter_instance_pairs"]),
+            "inter_instance_pairs_mean": statistics.fmean(
+                int(row["inter_instance_pairs"]) for row in group
+            ),
         })
     return output
 
@@ -79,7 +83,8 @@ def main() -> int:
     parser.add_argument("--instances", nargs="+", type=int, default=[100, 1000])
     parser.add_argument("--frames", type=int, default=48)
     parser.add_argument("--seed", type=int, default=42017)
-    parser.add_argument("--layout", choices=["grid", "clusters", "contact_front"],
+    parser.add_argument("--layout", choices=["grid", "clusters", "contact_front",
+                                              "crowded", "collision_wave"],
                         default="contact_front")
     parser.add_argument("--gpu", action="store_true",
                         help="Run real Apple Metal SAP, regional and online replay")
