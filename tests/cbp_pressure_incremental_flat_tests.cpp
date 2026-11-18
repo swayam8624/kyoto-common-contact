@@ -106,6 +106,45 @@ void test(){
  verify(g.enumerate(10000000,5000).digest==stable,
         "Oversized bad input destroyed the previous valid spatial index");
 
+ // Phase 16 multithreaded genuine cell query. Every box overlaps every
+ // other box, giving >1,000,000 CELL comparisons while the exact pair set
+ // is only 130,816 stable ID pairs. The result must match a full brute
+ // oracle, independent of schedule and worker completion order.
+ auto dense=std::vector<Box>(512);
+ for(auto& b:dense)
+  for(int axis=0;axis<3;++axis){
+   b.lo[axis]=-.35f;
+   b.hi[axis]=.35f;
+  }
+ g.advance(dense);
+ const auto expected=brute(dense);
+ auto serial=g.enumerate(10000000,5000);
+ verify(serial.complete&&serial.digest==expected,
+        "Dense serial canonical-cell digest mismatch");
+ for(const std::size_t nThreads:{2u,4u,8u}){
+  std::size_t used=0;
+  const auto parallel=g.enumerateParallel(10000000,5000,nThreads,&used);
+  verify(used>1,"Parallel cells failed to allocate multiple workers");
+  verify(parallel.complete&&parallel.digest==expected,
+         "Parallel cell-enumeration digest mismatch");
+  verify(parallel.tests==serial.tests,
+         "Parallel candidate-test accounting does not match serial");
+ }
+ // A capped query is NEVER an exact completed result, even if the
+ // scheduler processes a favorable slice first.
+ std::size_t used=0;
+ const auto capped=g.enumerateParallel(50000,5000,8,&used);
+ verify(!capped.complete,
+        "Budget-capped parallel query incorrectly reported complete");
+ // Unchanged packed occupancy: independent temporal calls must remain
+ // bitwise deterministic for the hash+count digest, not execution order.
+ for(int i=0;i<4;++i){
+  g.advance(dense);
+  const auto next=g.enumerateParallel(10000000,5000,4,&used);
+  verify(next.complete&&next.digest==expected,
+         "Temporal parallel candidate digest drifted across frames");
+ }
+
  std::cout<<"PASS FLAT persistent exact spatial membership oracle across "
           <<"160 frames incl no-op reuse, within-cell motion, cell migration, "
           <<"global overlap, scene resize and input corruption"
