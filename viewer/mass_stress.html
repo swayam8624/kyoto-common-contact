@@ -39,6 +39,7 @@ table{border-collapse:collapse;width:100%;font-size:12px}td,th{border-bottom:1px
 <div class="metric"><small>Material instances</small><b id="instances">—</b></div>
 <div class="metric"><small>Element AABBs</small><b id="elements">—</b></div>
 <div class="metric"><small>Exact candidate pairs</small><b id="pairs">—</b></div>
+<div class="metric"><small>Between different materials</small><b id="inter">—</b></div>
 <div class="metric"><small>Verified GPU frame-modes</small><b id="gpu">—</b></div>
 </div><p id="conditions" class="muted"></p>
 <h2>Measured comparison</h2><div class="tablewrap"><table><thead>
@@ -163,7 +164,9 @@ function drawTimes(){
 }
 function redraw(){byId("seek").max=data.frames.length-1;byId("seek").value=current;
  byId("frame-label").textContent=(current+1)+" / "+data.frames.length;
- byId("pairs").textContent=data.preview_only?"pending":data.runs[current].sap_rebuild.pairs.toLocaleString();drawWorld();drawTimes()}
+ byId("pairs").textContent=data.preview_only?"pending":data.runs[current].sap_rebuild.pairs.toLocaleString();
+ byId("inter").textContent=data.preview_only?"pending":data.runs[current].sap_rebuild.inter_pairs.toLocaleString();
+ drawWorld();drawTimes()}
 function animate(timestamp){if(playing&&timestamp-last>1000/Number(byId("fps").value)){
  last=timestamp;current=(current+1)%data.frames.length;redraw()}requestAnimationFrame(animate)}
 byId("play").onclick=()=>{playing=!playing;byId("play").textContent=playing?"Pause":"Play"};
