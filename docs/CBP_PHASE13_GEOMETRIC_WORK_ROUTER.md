@@ -43,7 +43,7 @@ cd ~/Desktop/Programming/kyoto-common-contact
 git switch research/common-broadphase-orchestrator
 git pull --ff-only origin research/common-broadphase-orchestrator
 cmake --preset kyoto-final-cpu -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
-cmake --build build/kyoto-final-cpu --target ccp_cbp_pressure_hybrid_cpu --parallel 4
+cmake --build build/kyoto-final-cpu --target ccp_cbp_pressure_cpu ccp_cbp_pressure_hybrid_cpu --parallel 4
 ctest --test-dir build/kyoto-final-cpu -R '^cbp_geometric_router_exact_oracle$' --output-on-failure
 
 mkdir -p output/cbp-phase13-mac-01
