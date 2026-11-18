@@ -155,6 +155,9 @@ target_compile_options(ccp_cbp_mass_export PRIVATE -Wall -Wextra -Wpedantic -Wer
 add_executable(ccp_cbp_mesh_truth_export apps/cbp_mesh_truth_export.cpp)
 target_link_libraries(ccp_cbp_mesh_truth_export PRIVATE ccp_multicloth)
 target_compile_options(ccp_cbp_mesh_truth_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Independent bounded large-scale AABB family; NOT a coupled million-mesh sim.
+add_executable(ccp_cbp_million_scale apps/cbp_million_scale.cpp)
+target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_cbp_mass_replay apps/cbp_mass_replay.cpp)
 target_link_libraries(ccp_cbp_mass_replay PRIVATE ccp_live)
 target_include_directories(ccp_cbp_mass_replay PRIVATE include)
