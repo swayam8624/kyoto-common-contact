@@ -1,0 +1,55 @@
+name: CBP large mixed-material scaling and visual evidence
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-mass-scale.yml'
+  workflow_dispatch:
+
+jobs:
+  large-material-worlds:
+    name: 100 and 1000 actual stepped material instances
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record environment and build shared snapshot tools
+        run: |
+          uname -a
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_mass_export ccp_cbp_mass_replay --parallel 2
+          ctest --test-dir build/kyoto-final-cpu -R '^cbp_many_material_worlds_contract$' --output-on-failure
+      - name: Run real 100- and 1000-instance material worlds with exact CPU parity
+        timeout-minutes: 24
+        run: |
+          python3 scripts/run_cbp_mass_scale.py \
+            --build build/kyoto-final-cpu \
+            --output build/cbp-mass-recorded-20261118 \
+            --instances 100 1000 \
+            --frames 48 \
+            --seed 42017 \
+            --layout contact_front \
+            --case-timeout 900
+      - name: Show independently measured overall results
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          run = json.loads(Path("build/cbp-mass-recorded-20261118/MANIFEST.json").read_text())
+          print("HARDWARE:", run["hardware"])
+          for case in run["cases"]:
+              print("REAL STEPPED WORLDS:", case["instances"], "ELEMENT AABBS:", case["primitive_AABBs"])
+              print("WALL SECONDS:", case["total_wall_seconds"])
+              for method in case["cpu_methods"]:
+                  print(method["mode"], method["mean_ms"], method["p95_ms"])
+          PY
+      - name: Preserve raw binary, CPU metrics and self-contained visual dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbp-many-material-worlds-cpu-and-visual
+          path: build/cbp-mass-recorded-20261118/
+          retention-days: 7
+          if-no-files-found: warn
