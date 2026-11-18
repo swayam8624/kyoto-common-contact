@@ -1,0 +1,52 @@
+name: CBP Phase 12 — simultaneous bounded CPU and native Metal hardware pressure
+on:
+  push:
+    branches:
+      - research/common-broadphase-orchestrator
+    paths:
+      - '.github/workflows/cbp-phase12-dual.yml'
+      - 'scripts/run_cbp_dual_pressure.py'
+      - 'apps/cbp_pressure_cpu.cpp'
+      - 'include/ccp/cbp_pressure.hpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dual-cpu-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build real global hash grid and sweep
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_cbp_pressure_cpu --parallel 2
+          python3 -m py_compile scripts/run_cbp_dual_pressure.py
+      - name: Validate bounded process monitoring, frame parity and immutable report
+        run: |
+          python3 scripts/run_cbp_dual_pressure.py \
+            --cpu-only \
+            --n 1024 --frames 8 --scene burst \
+            --max-tests 10000000 \
+            --timeout 90 \
+            --output build/cbp-dual-cpu-ci
+          python3 - <<'PY'
+          import json,csv
+          from pathlib import Path
+          p=Path('build/cbp-dual-cpu-ci')
+          j=json.loads((p/'EXPERIMENT.json').read_text())
+          assert j['status']=='complete' and not j['gpu_actually_executed']
+          assert j['frames']==8 and j['n']==1024
+          r=list(csv.DictReader((p/'cpu-global.csv').open()))
+          assert len(r)==16
+          assert len(list(csv.DictReader((p/'host-contention.csv').open())))>0
+          print('PASS bounded concurrent experiment receipt and exact global CPU calibration')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbp-phase12-cpu-only-orchestrator-test
+          path: |
+            build/cbp-dual-cpu-ci
+          retention-days: 14
+          if-no-files-found: warn
