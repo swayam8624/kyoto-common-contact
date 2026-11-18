@@ -169,6 +169,64 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
                         if not box[axis + 1] - 0.001 <= point <= box[axis + 4] + 0.001:
                             raise ValueError("Candidate spatial marker outside its instance envelope")
 
+
+    # Optional 3D animation of ACTUAL World nodes/bonds/triangles. The native
+    # exporter has to prove every selected primitive's Float32 AABB exactly
+    # matches the immutable source before it writes this JSON.
+    mesh_truth = None
+    mesh_path = directory / "mesh-truth.json"
+    if mesh_path.is_file():
+        if mesh_path.stat().st_size > 160 * 1024 * 1024:
+            raise ValueError("Real mesh visual sidecar exceeds 160 MiB UI budget")
+        mesh_truth = json.loads(mesh_path.read_text(encoding="utf-8"))
+        if (mesh_truth.get("schema") != "CCP_MESH_TRUTH_V1" or
+            mesh_truth.get("source") != "KYOTOM01" or
+            mesh_truth.get("framesTotal") != len(frames) or
+            mesh_truth.get("instancesTotal") != len(instances) or
+            "bit-match immutable source" not in mesh_truth.get("validation", "")):
+            raise ValueError("Missing or unverified source-matched mesh metadata")
+        selected = mesh_truth.get("selected")
+        positions = mesh_truth.get("positions")
+        if (not isinstance(selected, list) or not 1 <= len(selected) <= 256
+            or not isinstance(positions, list)
+            or len(positions) != len(frames)):
+            raise ValueError("Invalid authentic mesh sample dimensions")
+        id_to_kind = {int(row["id"]): MATERIALS.index(row["kind"])
+                      for row in instances}
+        used_ids = set()
+        for item in selected:
+            mid, node_count = item["id"], item["nodeCount"]
+            if (mid in used_ids or mid not in id_to_kind or
+                item["kind"] != id_to_kind[mid] or
+                not isinstance(node_count, int) or not 2 <= node_count <= 50000):
+                raise ValueError("Wrong real mesh identity or topology")
+            used_ids.add(mid)
+            for pair in item["edges"]:
+                if len(pair) != 2 or not all(
+                    isinstance(idx, int) and 0 <= idx < node_count
+                    for idx in pair
+                ):
+                    raise ValueError("Real mesh bond uses invalid vertex ID")
+            for tri in item["triangles"]:
+                if len(tri) != 3 or not all(
+                    isinstance(idx, int) and 0 <= idx < node_count
+                    for idx in tri
+                ):
+                    raise ValueError("Real mesh face uses invalid vertex ID")
+        for frame_index, world_positions in enumerate(positions):
+            if len(world_positions) != len(selected):
+                raise ValueError("Incomplete 3D World geometry frame")
+            for item, coords in zip(selected, world_positions, strict=True):
+                if (len(coords) != 3 * item["nodeCount"] or
+                    not all(isinstance(x, (float, int)) and math.isfinite(x)
+                            for x in coords)):
+                    raise ValueError(f"Invalid or nonfinite mesh nodes in frame {frame_index}")
+        mesh_truth = {
+            "selected": selected,
+            "positions": positions,
+            "source_verification": mesh_truth["validation"],
+        }
+
     warmup = min(8, len(frames) // 8)
     stats = []
     for method in sorted(method_names):
@@ -202,6 +260,7 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
         "stats": stats,
         "instances": len(instances),
         "hotspots": hotspots,
+        "mesh_truth": mesh_truth,
         "instance_info": [{
             "id": int(row["id"]), "kind": row["kind"], "regime": row["regime"],
             "primitives": int(row["primitive_count"])
