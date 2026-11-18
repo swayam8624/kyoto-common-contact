@@ -47,14 +47,18 @@ def main() -> int:
         raise ValueError("Triangle scene replay frame/instance metadata mismatch")
     for i,m in enumerate(models):
         count=m["selected_triangles"]
+        display_count=m.get("display_triangles", count)
+        visual=m.get("visual_triangles",m["triangles"])
         if (m["name"] != instance_rows[i]["kind"] or
             len(m["triangles"])!=count or not 1<=count<=2000 or
-            m["source_triangles"]<count or
+            not 1<=display_count<=6000 or len(visual)!=display_count or
+            m["source_triangles"]<max(count,display_count) or
             not isinstance(m["sha256"],str) or len(m["sha256"])!=64):
-            raise ValueError("Imported mesh sampling/provenance mismatch")
-        if not all(len(t)==9 and all(math.isfinite(v) for v in t)
-                   for t in m["triangles"]):
-            raise ValueError("Invalid source GLB triangle vertex positions")
+            raise ValueError("Imported collision/display mesh provenance mismatch")
+        for source_mesh in (m["triangles"],visual):
+            if not all(len(t)==9 and all(math.isfinite(v) for v in t)
+                       for t in source_mesh):
+                raise ValueError("Invalid source GLB triangle vertex positions")
     for index, frame in enumerate(frames):
         if len(frame)!=len(models) or any(
             len(pose)!=4 or not all(math.isfinite(v) for v in pose)
@@ -146,6 +150,7 @@ def main() -> int:
         "preview_only":args.preview_only,
         "layout":receipt[0]["layout"],"seed":int(receipt[0]["seed"]),
         "primitives":sum(m["selected_triangles"] for m in models),
+        "triangles_display":sum(m.get("display_triangles",m["selected_triangles"]) for m in models),
         "triangles_original":sum(m["source_triangles"] for m in models),
         "boundary":("Static source mesh sampled triangles with rigid trajectory; "
                     "not full source mesh, glTF animation, deformable mesh or coupled contact solver."),
@@ -159,8 +164,10 @@ def main() -> int:
     args.html.parent.mkdir(parents=True,exist_ok=True)
     args.html.write_text(html.replace("__PAYLOAD__",text),encoding="utf-8")
     print(f"PASS real glTF scene observatory: {len(models)} named models, "
-          f"{payload['primitives']}/{payload['triangles_original']} source "
-          f"triangles selected, {len(frames)} rigid-motion frames, "
+          f"{payload['primitives']} collision triangles, "
+          f"{payload['triangles_display']} real visual triangles, "
+          f"{payload['triangles_original']} source triangles, "
+          f"{len(frames)} rigid-motion frames, "
           f"{len(methods)} verified CPU/Metal policies")
     print("Open offline 3D source-mesh viewer: "+str(args.html))
     return 0
