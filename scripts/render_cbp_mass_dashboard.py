@@ -146,12 +146,12 @@ def load(directory: Path, metal_files: list[Path], preview_only: bool = False) -
                 raise ValueError(
                     f"Spatial markers disagree with full CPU pair evidence at frame {index}"
                 )
-            samples = evidence.get("hotspots")
-            if not isinstance(samples, list) or len(samples) != evidence.get("sampled"):
+            markers = evidence.get("hotspots")
+            if not isinstance(markers, list) or len(markers) != evidence.get("sampled"):
                 raise ValueError("Malformed or incomplete spatial candidate samples")
-            if len(samples) > min(512, evidence["inter_pairs"]):
+            if len(markers) > min(512, evidence["inter_pairs"]):
                 raise ValueError("More candidate samples than actual inter-instance pairs")
-            for marker in samples:
+            for marker in markers:
                 if not isinstance(marker, list) or len(marker) != 7:
                     raise ValueError("Malformed candidate overlap coordinate")
                 a, b, x, y, z, prim_a, prim_b = marker
