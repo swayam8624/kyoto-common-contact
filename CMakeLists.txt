@@ -170,6 +170,33 @@ target_compile_options(ccp_cbp_million_scale PRIVATE -Wall -Wextra -Wpedantic -W
 add_executable(ccp_cbp_pressure_cpu apps/cbp_pressure_cpu.cpp)
 target_include_directories(ccp_cbp_pressure_cpu PRIVATE include)
 target_compile_options(ccp_cbp_pressure_cpu PRIVATE -Wall -Wextra -Wpedantic -Werror)
+# Vulkan/MoltenVK optional cross-API GPU reference. The SPIR-V compiler is
+# REQUIRED for this target; no fake GPU/backend selection or silent fallback.
+# On macOS: LunarG Vulkan SDK + MoltenVK and glslangValidator.
+# On Linux: Vulkan SDK; Lavapipe is SOFTWARE and is labelled as such.
+find_package(Vulkan QUIET)
+find_program(CCP_GLSLANG_VALIDATOR glslangValidator)
+if(Vulkan_FOUND AND CCP_GLSLANG_VALIDATOR)
+  set(CCP_PRESSURE_SPIRV "${CMAKE_CURRENT_BINARY_DIR}/cbp_pressure_count.comp.spv")
+  add_custom_command(OUTPUT "${CCP_PRESSURE_SPIRV}"
+    COMMAND "${CCP_GLSLANG_VALIDATOR}" -V
+      "${CMAKE_CURRENT_SOURCE_DIR}/shaders/cbp_pressure_count.comp"
+      -o "${CCP_PRESSURE_SPIRV}"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/cbp_pressure_count.comp"
+    COMMENT "Compile true Vulkan adversarial AABB SPIR-V kernel"
+    VERBATIM)
+  add_custom_target(ccp_cbp_pressure_spirv DEPENDS "${CCP_PRESSURE_SPIRV}")
+  add_executable(ccp_cbp_pressure_vulkan apps/cbp_pressure_vulkan.cpp)
+  add_dependencies(ccp_cbp_pressure_vulkan ccp_cbp_pressure_spirv)
+  target_link_libraries(ccp_cbp_pressure_vulkan PRIVATE Vulkan::Vulkan)
+  target_include_directories(ccp_cbp_pressure_vulkan PRIVATE include)
+  target_compile_definitions(ccp_cbp_pressure_vulkan PRIVATE
+    CCP_PRESSURE_SPIRV="${CCP_PRESSURE_SPIRV}")
+  target_compile_options(ccp_cbp_pressure_vulkan PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  message(STATUS "CBP Phase 11 native Vulkan pressure: compiled target available")
+else()
+  message(STATUS "CBP Phase 11 Vulkan benchmark unavailable: install Vulkan SDK + glslangValidator (no GPU result inferred)")
+endif()
 add_executable(ccp_cbp_mass_replay apps/cbp_mass_replay.cpp)
 target_link_libraries(ccp_cbp_mass_replay PRIVATE ccp_live)
 target_include_directories(ccp_cbp_mass_replay PRIVATE include)
