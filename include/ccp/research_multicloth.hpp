@@ -100,6 +100,18 @@ public:
   // contact-rich physical solver STRESS INPUT, NOT a claim that the
   // solver spontaneously folded a flat cloth or solved full CCD.
   void prepareFoldedInitialStateForResearch();
+  // Physically distinct, smooth U-turn fixture: real first-sheet
+  // vertices form a continuously bent flap with positive clearance;
+  // other sheets translate rigidly out of the fold's path.
+  // This is an explicitly PREPARED source, not natural spontaneous
+  // folding, and no CCD guarantee is implied.
+  void prepareRoundedNonintersectingFoldForResearch();
+
+  // INDEPENDENT endpoint geometry diagnostic. Counts nonlocal same-
+  // sheet triangle pairs whose edges actually pierce the opposite
+  // triangle interior. No broad-phase policy or cached candidates
+  // participate; the cost is NOT charged to native policy timing.
+  [[nodiscard]] std::size_t countNonlocalSelfIntersections() const;
   void step();
   void setPolicy(Policy policy);
   void setAdaptive(bool adaptive);
