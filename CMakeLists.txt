@@ -313,6 +313,13 @@ target_link_libraries(ccp_rbc_material_replay PRIVATE ccp_live)
 target_include_directories(ccp_rbc_material_replay PRIVATE include)
 target_compile_options(ccp_rbc_material_replay PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+# Separate frozen protocol Run-1: includes contiguous flat RBC and Guard A/A.
+# Does not alter historical native executable or source cohort.
+add_executable(ccp_rbc_final_repeated apps/rbc_final_repeated.cpp)
+target_link_libraries(ccp_rbc_final_repeated PRIVATE ccp_live)
+target_include_directories(ccp_rbc_final_repeated PRIVATE include)
+target_compile_options(ccp_rbc_final_repeated PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_rbc_spatial_frontier_tests tests/rbc_spatial_frontier_tests.cpp)
 target_include_directories(ccp_rbc_spatial_frontier_tests PRIVATE include)
 target_compile_options(ccp_rbc_spatial_frontier_tests PRIVATE
