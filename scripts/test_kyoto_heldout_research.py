@@ -110,6 +110,20 @@ def inspect(root: Path):
                 for r in rows if r["policy"]=="sap_rebuild")>0):
             actual_contact_variants.add((scenario["geometry_seed"],scenario["topology_seed"]))
         for r in rows:
+            ensure(int(r["pinned_vertices"]) in (4,6),
+                   "unexpected held-out physical cloth anchor count")
+            if r["policy"]=="guard_sap_bounded_trial":
+                ensure(int(r["frozen_guard_queries"])+
+                       int(r["frozen_sap_queries"])==5,
+                       "original frozen V4 selection missing solver iterations")
+                ensure(r["last_broadphase_action"] in (
+                       "global_guarded_exact","sap_persistent_coherent"),
+                       "invalid measured physical V4 backend choice")
+            else:
+                ensure(all(int(r[k])==0 for k in (
+                       "frozen_guard_queries","frozen_sap_queries",
+                       "frozen_trial_queries","frozen_switches")),
+                       "non-V4 policy contains synthetic V4 decision telemetry")
             ensure(int(r["geometry_seed"]) == scenario["geometry_seed"] and
                    int(r["topology_seed"]) == scenario["topology_seed"],
                    "coupled physical geometry/topology seed provenance missing")
@@ -141,6 +155,8 @@ def inspect(root: Path):
         ensure(truth[0]["geometry_seed"] == scenario["geometry_seed"] and
                truth[0]["topology_seed"] == scenario["topology_seed"],
                "mesh source header lacks independent topology provenance")
+        ensure(truth[0]["pinned_vertices"] in (4,6),
+               "mesh source does not serialize valid actual anchor count")
         canonical = lambda obj: json.dumps(
             obj, separators=(",", ":")).encode("utf-8")
         initial = hashlib.sha256(canonical(truth[0]["rest_positions"])).hexdigest()
@@ -165,6 +181,16 @@ def inspect(root: Path):
         total_coupled += n_frames
     ensure(total_coupled>0,"no coupled-contact simulations")
     n_variants = len(data["independent_geometry_topology_seeds_used"])
+    assert all(len(x["pinned_vertices"]) == 1
+               for x in data["coupled_solver_runs"]), (
+                   "same seeded policy cohort unexpectedly changes pin counts"
+               )
+    pinned_by_topo = {}
+    for x in data["coupled_solver_runs"]:
+        pinned_by_topo.setdefault(x["topology_seed"], x["pinned_vertices"][0])
+    if n_variants>=2:
+        ensure(len(set(pinned_by_topo.values()))>=2,
+               "independent topological pin-constraint variant was not tested")
     ensure(data.get("actual_physical_contact_coverage_enforced") is True,
            "actual physical contact gate not recorded")
     ensure(len(actual_contact_variants)==n_variants,
