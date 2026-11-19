@@ -12,6 +12,7 @@ on:
       - 'apps/material_snapshot_export.cpp'
       - 'apps/kyoto_heldout_coupled_audit.cpp'
       - 'tests/kyoto_heldout_fixture_tests.cpp'
+      - 'tests/kyoto_coupled_variation_tests.cpp'
       - 'scripts/run_kyoto_heldout_research.py'
       - 'scripts/test_kyoto_heldout_research.py'
   workflow_dispatch:
@@ -31,11 +32,12 @@ jobs:
         run: |
           cmake --preset kyoto-final-cpu
           cmake --build build/kyoto-final-cpu --parallel 3 --target \
-            ccp_kyoto_heldout_fixture_tests ccp_material_export \
-            ccp_material_replay ccp_kyoto_heldout_coupled
+            ccp_kyoto_heldout_fixture_tests ccp_kyoto_coupled_variation_tests \
+            ccp_material_export ccp_material_replay ccp_kyoto_heldout_coupled
       - name: Prove topology/geometry independence and candidate exactness
         run: |
           build/kyoto-final-cpu/ccp_kyoto_heldout_fixture_tests
+          build/kyoto-final-cpu/ccp_kyoto_coupled_variation_tests
       - name: Exercise distinct physical fixtures and original frozen methods
         run: |
           python3 scripts/run_kyoto_heldout_research.py \
