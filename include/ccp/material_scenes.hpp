@@ -117,10 +117,15 @@ class World {
    if(y<cells)bond(a,ids[size_t(y+1)*side+x],s.strength);
    if(x<cells&&y<cells){
     const int b=ids[size_t(y)*side+x+1],c=ids[size_t(y+1)*side+x],d=ids[size_t(y+1)*side+x+1];
-    if(alternateDiagonal(x,y)){
-     // Exactly two non-overlapping triangles, using the opposing b-c
-     // diagonal rather than always sharing a-d. Stable primitive IDs
-     // remain intact; this is genuine triangle adjacency variation.
+    if(variation_.topologySeed==0){
+     // Historical reference fixture had BOTH diagonal springs although
+     // only a-d was the actual triangulation diagonal. Preserve this
+     // exactly: existing exported snapshots MUST remain unchanged.
+     bond(a,d,s.strength*.45);bond(b,c,s.strength*.45);
+     element({a,b,d},0);element({a,d,c},0);
+    }else if(alternateDiagonal(x,y)){
+     // True alternative triangulation: shared b-c diagonal, a different
+     // structural bond graph, same count and stable primitive IDs.
      bond(b,c,s.strength*.45);
      element({a,b,c},0);element({b,d,c},0);
     }else{
