@@ -97,13 +97,73 @@ ratios by seed: 2.6433x, 2.6554x, 2.6713x. Aggregate geometric mean
 is 2.656665x. This tests the mechanism's cache-invalidation response
 and is NOT physical cloth or general solver speedup.
 
+## Completed original 11-algorithm ranking (new Mac SHA-verified scorer)
+
+The author then ran `scripts/analyze_kyoto_decision_coverage.py` on the
+**same 39 already-completed** Mac replay CSVs. Its stdout reported:
+`PASS: 11 methods verified without rerunning the experiment`.
+The original decision manifest SHA-256 stayed
+`5cd6965a73e2fe3417df01ffa46a56fe641b6b33d4b2e5c937f584afe4e9da8e`.
+The independent report text was supplied in conversation. These are
+user-side Mac measurements, not GitHub-hosted timings.
+
+Natural fixtures: 36 phase-varied trajectories, eight warmup frames
+excluded. Higher Guard/method is better. The **first-place** V4 algorithm
+is a *small* 1.0306x geometric-mean improvement; each other tested
+method, including original Online, was slower than standalone Guard on
+the geometric mean of the chosen trajectory cohort.
+
+| Executed method | Guard/method geomean | Wins vs Guard | Sum-of-scene-means speedup | Median of scene p95 ms |
+|---|---:|---:|---:|---:|
+| Frozen V4 Guard/SAP bounded trial | 1.0306x | 21/36 | 1.0316x | 1.14752 |
+| Global Guard | 1.0000x | reference | 1.0000x | 1.18700 |
+| Selective Guard | 0.8450x | 10/36 | 0.9248x | 0.98077 |
+| Original Online | 0.7493x | 2/36 | 0.8143x | 0.95015 |
+| Regional fixed | 0.7145x | 3/36 | 0.7916x | 0.61935 |
+| Regional adaptive | 0.7018x | 3/36 | 0.7823x | 0.66538 |
+| Regional hierarchical | 0.6974x | 3/36 | 0.7694x | 0.61623 |
+| Guard/SAP measured probe | 0.6874x | 6/36 | 0.5624x | 0.93750 |
+| Persistent SAP | 0.4728x | 4/36 | 0.5132x | 0.60177 |
+| Fresh SAP | 0.4513x | 2/36 | 0.4947x | 0.63467 |
+| External Bullet persistent DBVT | 0.2474x | 0/36 | 0.2923x | 1.26675 |
+
+**Do not conflate metrics:** the sum-of-scene-means ratio weights
+high-cost scenes more heavily; it is NOT end-to-end wall-clock speedup.
+The median of each scene's P95 is NOT a pooled P95 nor a paired tail
+speedup. Results include every candidate pair materialized and exact
+pair fingerprints checked, but no solver/contact/CCD time.
+
+**Artificial rigid translation, separated from natural fixtures:**
+
+| Executed method | Guard/method geomean | Wins vs Guard |
+|---|---:|---:|
+| Persistent SAP | 2.7190x | 3/3 |
+| Frozen V4 | 2.6567x | 3/3 |
+| Fresh SAP | 2.5306x | 3/3 |
+| Measured Guard/SAP probe | 2.4676x | 3/3 |
+| Regional hierarchical | 1.4332x | 3/3 |
+| Regional fixed | 1.4209x | 3/3 |
+| Regional adaptive | 1.3642x | 3/3 |
+| Original Online | 1.2864x | 3/3 |
+| External Bullet DBVT | 1.0410x | 3/3 |
+| Global Guard | 1.0000x | reference |
+| Selective Guard | 0.9759x | 0/3 |
+
+The artificial case strongly favors SAP because repeatedly invalidated
+Guard envelopes create avoidable rebuilds. This does **not** change the
+natural ordering and should not be marketed as a physical solver result.
+
+The observed difference between V4 and Guard (roughly 3% on the natural
+cohort) is too small to defend without replicated same-snapshot
+measurements, A/A controls and policy-order balancing. The **next
+experimental priority** is to measure that noise floor rather than to
+invent a new algorithm, change frozen thresholds or re-export geometry.
+
 ## What the report DOES NOT establish
 
-* It does not give reliable cross-method speedup rankings for all
-  11 executed policies; the original manifest omitted their timing
-  summaries. A new additive no-rerun all-policy scorer is provided
-  in scripts/analyze_kyoto_decision_coverage.py and MUST read the original
-  Mac replay CSVs and verify their SHA-256 receipts before ranking.
+* The complete 11-policy ranking is now available from the separately
+  verified local Mac CSV reanalysis above; it remains a one-run-per-method
+  descriptive ranking, not replicated evidence of general superiority.
 * It does not demonstrate that the on-policy V4 switch consistently wins
   across sponge or mixed material regimes.
 * It does not establish any trained ML policy behavior; weights absent.
