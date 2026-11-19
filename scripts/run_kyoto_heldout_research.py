@@ -61,7 +61,8 @@ def run(cmd: list[str], logfile: Path, timeout: int) -> None:
         raise RuntimeError("Nonzero subprocess exit: " + str(logfile))
 
 
-def parse_coupled(path: Path, expected_frames: int, expected_scenario: str):
+def parse_coupled(path: Path, expected_frames: int, expected_scenario: str,
+                  geometry_seed: int, topology_seed: int):
     import csv
     with path.open(newline="", encoding="utf-8") as source:
         rows = list(csv.DictReader(source))
@@ -74,7 +75,9 @@ def parse_coupled(path: Path, expected_frames: int, expected_scenario: str):
         if [int(r["frame"]) for r in entries] != list(range(expected_frames)):
             raise ValueError("Missing/duplicate coupled policy frame")
     for r in rows:
-        if r["scenario"] != expected_scenario or int(r["oracle_misses"]):
+        if (r["scenario"] != expected_scenario or int(r["oracle_misses"]) or
+            int(r["geometry_seed"]) != geometry_seed or
+            int(r["topology_seed"]) != topology_seed):
             raise ValueError("Coupled physical source failed equality audit")
         if not all(math.isfinite(float(r[field])) and float(r[field]) >= 0
                    for field in (
@@ -87,6 +90,7 @@ def parse_coupled(path: Path, expected_frames: int, expected_scenario: str):
             raise ValueError("Coupled solver states differ from SAP")
     return {
         "scenario": expected_scenario, "frames": expected_frames,
+        "geometry_seed": geometry_seed, "topology_seed": topology_seed,
         "methods": sorted(methods),
         "source": str(path), "sha256": sha256(path),
         "full_geometry_agreement": True,
@@ -218,21 +222,48 @@ def main():
                           flush=True)
 
     coupled = []
+    # The coupled contact solver NOW receives the exact same independently
+    # assigned geometry/topology seed pairs as the new material fixtures.
+    # Its actual triangles, constraints, positions and anchors are varied,
+    # not merely the broad-phase AABB stream.
+    for variation in HELDOUT[:a.heldout_count]:
+        for scenario in a.coupled_scenarios:
+            label = (scenario+"-geom"+str(variation["geometry"])+
+                     "-topo"+str(variation["topology"]))
+            directory = a.output / "coupled" / label
+            log = a.output / "logs" / ("coupled-" + label + ".log")
+            run([str(binaries["coupled"]), str(directory),
+                 str(a.coupled_frames), "2", "2", scenario,
+                 str(variation["geometry"]), str(variation["topology"])],
+                log, a.timeout)
+            data = parse_coupled(
+                directory / "COUPLED_SOLVER.csv", a.coupled_frames, scenario,
+                variation["geometry"], variation["topology"])
+            data["mesh_stream_sha256"] = {
+                label: sha256(directory / (label + ".jsonl"))
+                for label in data["methods"]
+            }
+            # Archive the independently generated actual mesh geometry and
+            # triangle connectivity, not just its flat AABB envelopes.
+            import json as _json
+            header = _json.loads(
+                (directory / "sap_rebuild.jsonl").open(encoding="utf-8").readline())
+            data["source_rest_positions_sha256"] = hashlib.sha256(
+                _json.dumps(header["rest_positions"],separators=(",",":")).encode()
+            ).hexdigest()
+            data["source_triangle_topology_sha256"] = hashlib.sha256(
+                _json.dumps(header["triangles"],separators=(",",":")).encode()
+            ).hexdigest()
+            coupled.append(data)
+            print("PASS COUPLED", label, "frames", a.coupled_frames,
+                  "independent physical solver mesh/contacts agree with SAP",
+                  flush=True)
     for scenario in a.coupled_scenarios:
-        directory = a.output / "coupled" / scenario
-        log = a.output / "logs" / ("coupled-" + scenario + ".log")
-        run([str(binaries["coupled"]), str(directory),
-             str(a.coupled_frames), "2", "2", scenario], log, a.timeout)
-        data = parse_coupled(directory / "COUPLED_SOLVER.csv",
-                             a.coupled_frames, scenario)
-        data["mesh_stream_sha256"] = {
-            label: sha256(directory / (label + ".jsonl"))
-            for label in data["methods"]
-        }
-        coupled.append(data)
-        print("PASS COUPLED", scenario, "frames", a.coupled_frames,
-              "geometry agrees with independent SAP-driven solver",
-              flush=True)
+        tested = [x for x in coupled if x["scenario"] == scenario]
+        if len({x["source_rest_positions_sha256"] for x in tested}) != len(tested):
+            raise ValueError("Coupled independent geometry seeds repeated original mesh")
+        if len({x["source_triangle_topology_sha256"] for x in tested}) != len(tested):
+            raise ValueError("Coupled independent topology seeds repeated original triangulation")
     summary = {
         "experiment": "Kyoto independent geometry and topology plus coupled solver audit",
         "frozen_v4_unchanged": True,
@@ -243,10 +274,10 @@ def main():
         "material_replays": natural,
         "coupled_solver_runs": coupled,
         "important_limits": [
-            "Independent geometry and connectivity are in the mass-spring fixture stream, not yet within the MultiCloth coupled physical solver",
+            "Independent geometry and triangle connectivity are now varied in BOTH the mass-spring fixture and coupled MultiCloth solver under explicitly different independent seeds",
             "Mass-spring fixture uses damped Verlet plus constrained spherical/floor projection; it is not a calibrated contact solver",
             "New full candidate-pair replay times do not include narrow-phase or solve time",
-            "The separate MultiCloth audit measures real contacts and physical mesh parity under three policies but keeps its original triangle topology",
+            "MultiCloth still has a fixed 13x13 grid connectivity family (no remeshing or tearing), but independent diagonal choices, vertex jitter, pin constraints and structural connections now vary",
             "MultiCloth policy runs are executed in separate consecutive sessions; their end-to-end time is descriptive, not randomized ABBA speedup",
             "No CCD, continuous contact detection, externally validated material constitutive model or penetration-depth reference is claimed",
             "Different seeds guarantee geometry and selected connectivity changes through native fixture tests; forcing phase alone is insufficient",
@@ -270,11 +301,13 @@ def main():
                      str(x["topology"]) + " | " +
                      format(x["guard_over_frozen_v4"], ".4f") + "x |")
     lines += ["", "## Existing coupled-contact solver correctness and physical metrics", "",
-              "| Scenario | Frames | Three original policies | SAP geometry equal? | SAP contact events | Mean full step ms (SAP / Guard / V4) |",
-              "|---|---:|---|---|---:|---|"]
+              "| Scenario | Geometry seed | Topology seed | Frames | Three original policies | SAP geometry equal? | SAP contact events | Mean full step ms (SAP / Guard / V4) |",
+              "|---|---:|---:|---:|---|---|---:|---|"]
     for x in coupled:
         times = x["step_time_mean_ms_by_method"]
-        lines.append("| " + x["scenario"] + " | " + str(x["frames"]) +
+        lines.append("| " + x["scenario"] + " | " + str(x["geometry_seed"]) +
+                     " | " + str(x["topology_seed"]) +
+                     " | " + str(x["frames"]) +
                      " | SAP, Guard, frozen V4 | yes | " +
                      str(x["contacts_by_method"]["sap_rebuild"]) + " | " +
                      " / ".join(format(times[k], ".4f") for k in (
