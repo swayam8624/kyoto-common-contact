@@ -90,6 +90,19 @@ class DecisionCoverageRegressions(unittest.TestCase):
                         for a, b in zip(box, moved):
                             self.assertAlmostEqual(
                                 b - a, displacement, delta=0.00002)
+            source_csv = root / "original-evaluated.csv"
+            shifted_csv = root / "translated-evaluated.csv"
+            execute(self.replayer, original, source_csv, 0, "--order-seed", 19)
+            execute(self.replayer, transformed, shifted_csv, 0, "--order-seed", 29)
+            def signatures(path):
+                with path.open(newline="", encoding="utf-8") as data:
+                    return {
+                        int(row["frame"]): (int(row["pairs"]), row["pair_hash"])
+                        for row in csv.DictReader(data)
+                        if row["backend"] == "sap_rebuild"
+                    }
+            self.assertEqual(signatures(source_csv), signatures(shifted_csv),
+                             "Rigid translation changed current-AABB candidate truth")
 
 
 def main() -> None:
