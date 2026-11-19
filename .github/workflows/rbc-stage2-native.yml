@@ -34,8 +34,9 @@ jobs:
           cmake --build build/rbc-stage2-ci --parallel 3 \
             --target ccp_material_export ccp_rbc_material_tournament \
                      ccp_rbc_coupled_tournament ccp_rbc_spatial_frontier_tests
-          ctest --test-dir build/rbc-stage2-ci -R rbc_indexed --output-on-failure
-      - name: Execute 54 independent seeded native AABB streams and nine REAL physically coupled scenes
+                     ccp_rbc_flat_frontier_tests
+          ctest --test-dir build/rbc-stage2-ci -R 'rbc_(indexed|flat)' --output-on-failure
+      - name: Execute 54 independent seeded SIX-METHOD full-pair AABB streams and nine FIVE-POLICY coupled physics scenes
         run: |
           set -euo pipefail
           python3 scripts/run_rbc_research_gate.py \
@@ -72,9 +73,10 @@ jobs:
           strict=validate_physics(Path('output/rbc-stage2-strict-fold-16.csv'),
                                   16,'fold',73013,86011,True)
           assert strict['rbc_strict_oracle_queries']==16*5
+          assert strict['rbc_flat_strict_oracle_queries']==16*5
           assert strict['all_sap_reference_particle_states_equal']
-          print("PASS: 54x60 full-pair native and 9x60 real physics source/solver parity")
-          print("PASS: 80 independent exact RBC solver-query oracle checks on strict fold")
+          print("PASS: 54x60 six-method native FULL PAIRS and 9x60 five-policy real physics parity")
+          print("PASS: 160 independent exact RBC indexed+flat solver-query oracle checks")
           PY
       - name: Preserve fully inspectable original binary inputs and native outputs even on failure
         if: always()
