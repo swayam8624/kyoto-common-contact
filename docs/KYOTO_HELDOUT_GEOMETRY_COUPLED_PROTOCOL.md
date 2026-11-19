@@ -265,3 +265,49 @@ all six-family AABB replay cells use the same rapid motion class.
 The original physical mesh solver still uses 13x13 grid-family
 connectivity, albeit varied triangle diagonals, vertex perturbations,
 spring connections and pin layouts.
+
+
+## Cross-platform source identity and exact V4 per-frame decision proof
+
+The completed matched Mac and Linux SIX-family RAPID 60-frame
+runs have near-identical Guard/V4 geometric means (Mac=1.0577x,
+Linux=1.0552x) and, most notably, exactly identical aggregate
+Guard/SAP/trial/switch counts in ALL 18 matched source conditions.
+This is documented in
+KYOTO_MAC_LINUX_MATCHED_60F_2026-11-19.md.
+
+The remaining test is whether each exact source frame was
+bit-identical and every actual V4 action occurred on the same
+frame. The derived Mac text table alone cannot establish that.
+Do not rerun native benchmarks just to inspect their CSVs.
+
+Run on the Mac from the repository root to create the NEW,
+small, source-verified gzip without changing any original
+large native evidence files:
+
+    git pull --ff-only origin research/kyoto-decision-coverage
+    python3 scripts/export_kyoto_heldout_trace.py --results output/kyoto-mac-matched-60f --output output/kyoto-mac-matched-60f-source-trace.json.gz
+
+The exporter verifies original KYOTOM01 and CSV SHA-256 receipts,
+the full set of methods and exact SAP pair count/hash parity on
+each frame. It exports actual action, trial, switch, original
+per-frame Guard/V4 time and execution slot along with original
+source hashes. It refuses to overwrite an existing trace.
+
+Linux original compact reference: the
+kyoto-heldout-independent-ci-compact-trace.json.gz artifact from
+[CI 44476062782](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44476062782).
+The matched Linux source trace can be used for offline
+source-vs-source comparison:
+
+    python3 scripts/compare_kyoto_heldout_traces.py --a output/kyoto-mac-matched-60f-source-trace.json.gz --b LINUX_SOURCE_TRACE.json.gz --output output/kyoto-source-platform-proof-new --warmup 8
+
+Original same-specification *procedural seeds* are not enough to
+establish byte-identical source snapshots across Apple Silicon
+and Ubuntu. A matching snapshot SHA256 plus exact SAP pair hash
+and per-frame V4 action sequence would be stronger evidence,
+although it would NOT remove distinct CPU thermal/clock,
+compiler or method cohort scheduling biases. Mac has eleven
+methods including native Bullet, Linux ten without Bullet.
+No full physics solver adaptive runtime claim follows from
+this discrete source trace comparison.
