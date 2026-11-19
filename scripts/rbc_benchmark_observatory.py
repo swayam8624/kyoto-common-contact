@@ -116,6 +116,14 @@ def read_research(path: Path) -> dict:
             raise ValueError("Native scene is missing a compared method")
         if any(methods[m] != methods[BASELINE] for m in MATERIAL_METHODS):
             raise ValueError("Different native timing frames across methods")
+        # The manifest flag alone is not an oracle. Cross-check full
+        # candidate counts and pair fingerprints on EVERY original frame.
+        pair_receipts = defaultdict(set)
+        for row in actual_rows:
+            pair_receipts[int(row["frame"])].add(
+                (int(row["pairs"]), int(row["pair_fnv64"])))
+        if any(len(values) != 1 for values in pair_receipts.values()):
+            raise ValueError(f"Native pair identity differs across methods: {csv_path}")
         if not result["all_five_pair_streams_equal_fresh_sap_on_every_frame"]:
             raise ValueError("Native exact-pair parity did not pass")
         means = result["per_method_mean_ms"]
@@ -171,6 +179,15 @@ def read_research(path: Path) -> dict:
         means = result["solver_mean_full_step_ms_by_policy"]
         if set(means) != set(PHYSICAL_METHODS):
             raise ValueError("Incomplete coupled full-step summary")
+        # Verify measured whole-step averages with the actual warmup rule.
+        after = min(8, max(0, len(methods["sap_rebuild"]) // 8))
+        for policy in PHYSICAL_METHODS:
+            samples = [number(row["step_ms"], "full_solver_step_ms")
+                       for row in rows
+                       if row["policy"] == policy and int(row["frame"]) >= after]
+            if not math.isclose(statistics.mean(samples), float(means[policy]),
+                                rel_tol=1e-7, abs_tol=1e-8):
+                raise ValueError(f"Coupled CSV/summary timing mismatch: {policy}")
         physical.append({
             "scenario": item["scenario"],
             "means": {m: number(means[m], "whole_solver_ms", positive=True)
