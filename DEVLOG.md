@@ -850,3 +850,90 @@ cloth positive, not universal superiority or a physical
 solver performance win. Original six-family Linux ball/spring
 positives still deserve Mac testing under exactly matched
 workloads and a balanced A/A order protocol.
+
+
+## 2026-11-19 — CRITICAL 36-frame Mac horizon correction; 11 methods and V4 trial censoring
+
+The user supplied the full contents of
+output/kyoto-heldout-mac-first/full-method-scores/HELDOUT_ALL_METHODS.md.
+Earlier Mac terminal logs showed all 54 scenes completed and the
+original native source hashes passed. The full report now confirms
+ELEVEN actually executed Mac CPU broad-phase policies, including
+Bullet DBVT and excluding any trained ML model.
+
+Geometric Guard/method ranking:
+Global Guard 1.0000x (reference), frozen V4 0.9992x
+(27/54 scene wins, sum-of-scene-means 0.9903x),
+selective Guard 0.8856x (22/54, sum-of-scene-means 1.0789x),
+measured probe 0.8166x, online cost-aware 0.7977x,
+region fixed 0.7429x, region adaptive 0.7233x,
+region hierarchical 0.7224x, persistent SAP 0.4284x,
+rebuilt SAP 0.4116x, Bullet DBVT 0.2274x
+(0/54 scene wins). The differing geomean and sum-means
+rank of selective Guard is a weighting dependence, not
+a solver throughput claim.
+
+**IMPORTANT SOURCE HORIZON DISCOVERY:** the runner's earlier
+material --frames DEFAULT was 36, not 60. The Mac command
+left this flag unspecified; 54 * 36 = 1944 original
+V4 source query frames, first eight per trajectory warmup:
+54 * 28 = 1512 measured frames per original policy.
+There are 11 * 54 * 36 = 21384 native policy/frame rows.
+The 540 coupled scenario frames reported by the other
+validation are 9 * 60 and must remain a SEPARATE
+physical solver measurement. In contrast, the Linux
+6-family CI used explicit --frames 60.
+
+The actual on-policy Mac V4 record proves:
+Guard 1895 frames, SAP 49 frames, trial frames 42,
+other (NON-TRIAL) SAP frames only SEVEN, and ten
+backend action switches. All seven nontrial SAP frames
+occurred in the sponge RAPID N1331 cell. Cloth RAPID
+N1058 recorded 12 SAP frames and 12 trials, NO
+committed/non-trial SAP frames, over three meshes.
+
+Why the comparison is censored: the frozen selector
+needs eight SAP trial frames before it can promote
+its mode to sustained SAP, and large rapid cloth
+activated trials near frame 32 on the longer
+Linux stream. The 36-frame Mac source ends after
+frame 35, leaving only FOUR remaining SAP trial
+frames. The absence of sustained Mac SAP in
+rapid cloth does NOT prove Mac's selector would
+reject SAP; it means this trajectory never observed
+the entire acceptance window. The observed
+Mac rapid-cloth Guard/V4 1.1146x single-run
+condition is not evidence of sustained adaptive
+SAP-driven speedup.
+
+Also V4's seven sustained/nontrial SAP frames in sponge
+rapid N1331 accompany 0.9002x Guard/V4 cell average,
+but the cell aggregate alone cannot prove which of
+the three seeds held those frames or that the
+0.7388x bad ratio was caused by them. Need the
+individual original Mac CSV/JSON files for causality.
+
+**REPAIR WITHOUT DESTROYING EVIDENCE:** changed only NEW
+heldout runner's FUTURE --frames default from 36 to
+60, emitted explicit source vs coupled frame horizon
+and warnings on short runs. The existing saved 36-frame
+Mac files and original V4 source remain untouched.
+No new native timing was executed as part of this
+fix. Augmented the no-rerun scorer to report actual
+source frames/trajectory, warmup-measured frames,
+total method/frame records and nontrial SAP frames,
+with fail-closed checks of trial semantics.
+CI now asserts full 60-frame and 52 measured
+frames with nontrial SAP accounting. The old
+Mac output can be re-scored, without native reruns,
+into a NEW no-overwrite output folder.
+
+The full derived report and corrected validity
+constraints are archived in
+docs/KYOTO_HELDOUT_54_SCENE_MAC_FIRST_2026-11-19.md.
+Original Mac source files/receipts were not
+uploaded to GitHub. Pending stronger replication:
+identical new six-family rapid fixture matrix,
+matched 60 material frames, identical original
+policy cohort where capabilities allow, controlled
+A/A repetitions, and real solver SAP activation.
