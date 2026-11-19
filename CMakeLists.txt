@@ -302,6 +302,15 @@ add_executable(ccp_rbc_swept_reach_tests tests/rbc_swept_reach_tests.cpp)
 target_include_directories(ccp_rbc_swept_reach_tests PRIVATE include)
 target_compile_options(ccp_rbc_swept_reach_tests PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_rbc_spatial_frontier_tests tests/rbc_spatial_frontier_tests.cpp)
+target_include_directories(ccp_rbc_spatial_frontier_tests PRIVATE include)
+target_compile_options(ccp_rbc_spatial_frontier_tests PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_rbc_material_tournament apps/rbc_material_tournament.cpp)
+target_link_libraries(ccp_rbc_material_tournament PRIVATE ccp_live)
+target_include_directories(ccp_rbc_material_tournament PRIVATE include)
+target_compile_options(ccp_rbc_material_tournament PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -311,6 +320,8 @@ if(BUILD_TESTING)
     COMMAND ccp_rbc_margin_model_tests)
   add_test(NAME rbc_linear_swept_reach_conservative_candidate_contract
     COMMAND ccp_rbc_swept_reach_tests)
+  add_test(NAME rbc_indexed_spatial_frontier_exact_pair_and_local_repair
+    COMMAND ccp_rbc_spatial_frontier_tests)
   add_test(NAME cbp_exact_region_oracle COMMAND ccp_cbp_router_tests)
   add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
