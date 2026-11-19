@@ -150,9 +150,23 @@ public:
     void initialize(const std::vector<Bounds>& boxes,
                     const std::vector<Reach>& reach) {
         build(boxes,reach);
+        translation_anchor_={};
     }
 
-    [[nodiscard]] QueryResult query(const std::vector<Bounds>& current) {
+    // Optional solver-SUPPLIED CUMULATIVE common translation of the
+    // reference frame. This avoids invalidating intra-cluster potential
+    // pairs merely because every primitive translates together. It is
+    // safe even if the hint is wrong: actual face residuals are CHECKED
+    // against the motion-compensated reference before any reuse.
+    //
+    // This is a single globally co-translating group only; per-cluster
+    // inter-group certificates are a separate, unsolved research stage.
+    [[nodiscard]] QueryResult query_translated(const std::vector<Bounds>& current,
+                                              ccp::live::Vec3 translation) {
+        if (!std::isfinite(translation.x) ||
+            !std::isfinite(translation.y) ||
+            !std::isfinite(translation.z))
+            throw std::invalid_argument("RBC translation must be finite");
         if (!ready_)
             throw std::logic_error("RBC initialize() must precede query()");
         validate(current,reach_);
@@ -161,10 +175,23 @@ public:
                 throw std::invalid_argument(
                     "RBC primitive identity or ordering changed; explicit reinitialize required");
         bool rebuilt=false;
+        const ccp::live::Vec3 relative={
+            translation.x-translation_anchor_.x,
+            translation.y-translation_anchor_.y,
+            translation.z-translation_anchor_.z
+        };
         for (std::size_t i=0;i<current.size();++i) {
-            // Reaching the boundary is valid: touching AABBs are inclusive.
-            if (face_motion(reference_[i],current[i])>reach_[i].skin) {
+            Bounds shifted=reference_[i];
+            shifted.min.x+=relative.x; shifted.max.x+=relative.x;
+            shifted.min.y+=relative.y; shifted.max.y+=relative.y;
+            shifted.min.z+=relative.z; shifted.max.z+=relative.z;
+            // If an untrustworthy translation hint underestimates
+            // residual motion, THIS direct check prevents stale reuse.
+            // The reference's pairwise gap remains invariant under
+            // any common translation.
+            if (face_motion(shifted,current[i])>reach_[i].skin) {
                 build(current,reach_); // exact, total fallback
+                translation_anchor_=translation;
                 rebuilt=true;
                 break;
             }
@@ -182,6 +209,10 @@ public:
         std::sort(result.begin(),result.end());
         return {std::move(result),rebuilt,potential_.size(),rebuild_count_};
     }
+    // Original fixed-world query is still available without translation.
+    [[nodiscard]] QueryResult query(const std::vector<Bounds>& current) {
+        return query_translated(current,{});
+    }
     [[nodiscard]] std::size_t rebuilds() const noexcept {return rebuild_count_;}
     [[nodiscard]] std::size_t potential_pairs() const noexcept {return potential_.size();}
 private:
@@ -190,6 +221,7 @@ private:
     std::vector<Reach> reach_;
     std::vector<IndexPair> potential_;
     std::size_t rebuild_count_{};
+    ccp::live::Vec3 translation_anchor_{};
     bool ready_{};
 
     void build(const std::vector<Bounds>& boxes,
