@@ -380,6 +380,11 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_rbc_material_replay.py
         $<TARGET_FILE:ccp_material_export>
         $<TARGET_FILE:ccp_rbc_material_replay>)
+    add_test(NAME rbc_ten_policy_AA_replay_receipt_and_source_integrity
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_rbc_controlled_study.py
+        $<TARGET_FILE:ccp_material_export>
+        $<TARGET_FILE:ccp_rbc_material_replay>)
     add_test(NAME cbp_flat_persistent_parallel_independent_oracle
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_parallel.py
