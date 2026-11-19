@@ -518,10 +518,89 @@ function buildLeaderboard(){if(!data.research){$("material-section").style.displ
  regimes.forEach(m=>{const x=text("option",m);x.value=m;$("regime").append(x);});
  data.summary.forEach(x=>{const e=text("option",x.method);e.value=x.method;$("method").append(e);});
  $("method").value="rbc_flat_repair";$("regime").addEventListener("change",drawHeat);$("method").addEventListener("change",drawHeat);drawHeat();
- const phys=$("physical");let h=document.createElement("tr");["Scenario",...data.physical_methods.map(s=>s+" (ms)")].forEach(s=>h.append(text("th",s)));phys.append(h);
- data.research.physical.forEach(s=>{const tr=document.createElement("tr");tr.append(text("td",s.scenario));data.physical_methods.forEach(m=>tr.append(text("td",fmt(s.means[m]))));phys.append(tr);});
+ const phys=$("physical");let h=document.createElement("tr");["Scenario",...data.physical_methods.map(s=>s+" (ms)"),"V4/Flat step speedup"].forEach(s=>h.append(text("th",s)));phys.append(h);
+ data.research.physical.forEach(s=>{const tr=document.createElement("tr");tr.append(text("td",s.scenario));data.physical_methods.forEach(m=>tr.append(text("td",fmt(s.means[m]))));tr.append(text("td",fmt(s.means.frozen_v4/s.means.rbc_flat,3)+"×"));phys.append(tr);});
  if(!data.research.physical.length)$("physical-section").style.display="none";
 }
+function setupCoupled(){
+ if(!data.research||!data.research.physical.length){
+  $("coupled-traces-section").style.display="none";return;
+ }
+ data.research.physical.forEach(s=>{
+  const opt=text("option",s.scenario);opt.value=s.scenario;
+  $("coupled-scenario").append(opt);
+ });
+ const draw=()=>{drawCoupledLines();drawCoupledHeat();};
+ $("coupled-scenario").addEventListener("change",draw);
+ $("coupled-metric").addEventListener("change",draw);
+ draw();
+}
+const solverColors=["#8db2f8","#edbd84","#e4d892","#6fe5c3","#d99bc9"];
+function solverData(){
+ const scenario=$("coupled-scenario").value;
+ return data.research.physical.find(s=>s.scenario===scenario);
+}
+function drawCoupledLines(){
+ const d=solverData();if(!d)return;
+ const {c,w,h}=setupCanvas("coupled-lines"),m=$("coupled-metric").value;
+ const names=data.physical_methods, left=52,right=20,top=26,bottom=78;
+ const flat=names.flatMap(n=>d.series[n].map(s=>s[m])),max=Math.max(.00001,...flat)*1.1;
+ c.fillStyle="#111b28";c.fillRect(0,0,w,h);
+ c.font="12px system-ui";c.fillStyle="#b4ccda";
+ for(let tick=0;tick<=4;tick++){
+   const y=top+(h-top-bottom)*tick/4;
+   c.strokeStyle="#34485e";c.beginPath();c.moveTo(left,y);c.lineTo(w-right,y);c.stroke();
+   c.fillText(fmt(max*(1-tick/4),2),4,y+4);
+ }
+ names.forEach((name,i)=>{
+   const arr=d.series[name],len=arr.length;
+   c.strokeStyle=solverColors[i];c.lineWidth=1.8;c.beginPath();
+   arr.forEach((row,j)=>{
+     const x=left+j*(w-left-right)/Math.max(1,len-1);
+     const y=top+(1-row[m]/max)*(h-top-bottom);
+     j?c.lineTo(x,y):c.moveTo(x,y);
+   });
+   c.stroke();
+   const lx=left+(i%3)*Math.min(190,(w-left-right)/3),
+         ly=h-49+Math.floor(i/3)*19;
+   c.fillStyle=solverColors[i];c.fillRect(lx,ly-8,11,9);
+   c.fillStyle="#d4e0e9";c.font="11px system-ui";c.fillText(name,lx+15,ly);
+ });
+ const first=d.series[names[0]].length,after=Math.min(8,Math.max(0,Math.floor(first/8)));
+ const splitX=left+after*(w-left-right)/Math.max(1,first-1);
+ c.beginPath();c.setLineDash([5,4]);c.strokeStyle="#edbd84";c.lineWidth=1;
+ c.moveTo(splitX,top);c.lineTo(splitX,h-bottom);c.stroke();c.setLineDash([]);
+ c.fillStyle="#d7c08c";c.fillText("warmup",Math.max(left,splitX-24),top-9);
+ c.fillStyle="#c5d4df";c.fillText("Frame 0",left,h-57);c.fillText("Frame "+(first-1),w-105,h-57);
+}
+function drawCoupledHeat(){
+ const d=solverData();if(!d)return;
+ const {c,w,h}=setupCanvas("coupled-heat"),names=data.physical_methods,
+       metric=$("coupled-metric").value,pad=113,top=18;
+ const all=names.flatMap(n=>d.series[n].map(s=>s[metric]));
+ const vmax=Math.max(.00001,...all),lower=Math.min(...all),range=Math.max(1e-9,vmax-lower);
+ c.fillStyle="#111b28";c.fillRect(0,0,w,h);
+ names.forEach((name,row)=>{
+  const arr=d.series[name],rowHeight=(h-43)/names.length;
+  c.font="11px system-ui";c.fillStyle="#c4d4e1";
+  c.fillText(name,8,top+(row+.58)*rowHeight);
+  arr.forEach((obs,j)=>{
+   const level=(obs[metric]-lower)/range;
+   const hue=Math.round(210-190*level);
+   c.fillStyle="hsl("+hue+",73%,"+Math.round(26+33*level)+"%)";
+   c.fillRect(pad+j*(w-pad-13)/arr.length,
+              top+row*rowHeight,
+              (w-pad-13)/arr.length+.3,rowHeight-2);
+  });
+ });
+ const length=d.series[names[0]].length,after=Math.min(8,Math.max(0,Math.floor(length/8)));
+ c.fillStyle="#c6d7e3";c.font="11px system-ui";
+ c.fillText("Frame 0",pad,h-7);c.fillText("Frame "+(length-1),w-85,h-7);
+ c.beginPath();c.strokeStyle="#f5cd81";c.setLineDash([3,3]);
+ let x=pad+after*(w-pad-13)/length;
+ c.moveTo(x,top);c.lineTo(x,h-24);c.stroke();c.setLineDash([]);
+}
+
 function linePlot(){if(!data.proof)return;const {c,w,h}=setupCanvas("lines"),p=data.proof,metric=$("metric").value,pad=48;
  c.clearRect(0,0,w,h);const colors=["#7ea9fa","#f5b879","#f2d78d","#73dbbd","#dc97cb"];
  const vals=p.policies.flatMap(x=>x.frames.map(f=>f[metric]));const top=Math.max(.001,...vals)*1.08;
@@ -539,8 +618,10 @@ function timingHeat(){if(!data.proof)return;const {c,w,h}=setupCanvas("frameheat
 function init(){card("Material scenes",data.research?data.research.scenes.length:"Not supplied");
  card("Native compared methods",data.research?data.summary.length:"—");
  card("Solver scenes",data.research?data.research.physical.length:"Not supplied");
- card("Real cloth frames",data.proof?data.proof.frames:"Not supplied");
+ card("Coupled solver frames",data.research?data.research.physical.reduce((sum,s)=>sum+s.frames,0):"—");
+ if(data.proof)card("Geometry-proof frames",data.proof.frames);
  buildLeaderboard();
+ setupCoupled();
  if(!data.research){$("stats").insertAdjacentElement("afterend",text("p","No Stage-2 research manifest supplied: algorithm heatmap and performance surface require a full native research run."));}
  if(!data.proof){$("proof-section").style.display="none";}else{
    $("metric").addEventListener("change",()=>{linePlot();timingHeat();});linePlot();timingHeat();
@@ -552,7 +633,7 @@ function init(){card("Material scenes",data.research?data.research.scenes.length
  }
  let warnings=(data.research?data.research.warnings:[]).concat(["No confidence interval is computed from a single timing session.","Never infer a full-solver speedup from AABB query timings."]);
  $("limits").textContent=warnings.join("  •  ");
- window.addEventListener("resize",()=>{if(data.research)drawSurface();if(data.proof){linePlot();timingHeat();}});
+ window.addEventListener("resize",()=>{if(data.research){drawSurface();drawCoupledLines();drawCoupledHeat();}if(data.proof){linePlot();timingHeat();}});
 }
 init();
 </script></body></html>'''
