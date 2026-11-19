@@ -321,6 +321,11 @@ add_executable(ccp_rbc_flat_frontier_tests tests/rbc_flat_frontier_tests.cpp)
 target_include_directories(ccp_rbc_flat_frontier_tests PRIVATE include)
 target_compile_options(ccp_rbc_flat_frontier_tests PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_rbc_physical_geometry_tests tests/rbc_physical_geometry_tests.cpp)
+target_link_libraries(ccp_rbc_physical_geometry_tests PRIVATE ccp_multicloth)
+target_include_directories(ccp_rbc_physical_geometry_tests PRIVATE include)
+target_compile_options(ccp_rbc_physical_geometry_tests PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_rbc_material_tournament apps/rbc_material_tournament.cpp)
 target_link_libraries(ccp_rbc_material_tournament PRIVATE ccp_live)
 target_include_directories(ccp_rbc_material_tournament PRIVATE include)
@@ -348,6 +353,8 @@ if(BUILD_TESTING)
     COMMAND ccp_rbc_spatial_frontier_tests)
   add_test(NAME rbc_flat_frontier_independent_exact_pair_and_batch_repair
     COMMAND ccp_rbc_flat_frontier_tests)
+  add_test(NAME rbc_nonpenetrating_rounded_fold_vs_historical_invalid_geometry
+    COMMAND ccp_rbc_physical_geometry_tests)
   # Full real coupled experiment and immutable KYOTOM01 replay run in
   # GitHub Actions with NEW no-overwrite evidence directories; not in
   # normal CTest to avoid polluting existing source or repeat failures.
