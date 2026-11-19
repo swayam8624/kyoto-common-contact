@@ -188,11 +188,27 @@ def read_research(path: Path) -> dict:
             if not math.isclose(statistics.mean(samples), float(means[policy]),
                                 rel_tol=1e-7, abs_tol=1e-8):
                 raise ValueError(f"Coupled CSV/summary timing mismatch: {policy}")
+        # Reuse the SAME verified native coupled CSV to drive frame plots.
+        # These samples are measured solver states, not a second simulation.
+        series = {policy: [] for policy in PHYSICAL_METHODS}
+        for row in rows:
+            record = {"frame": int(row["frame"])}
+            for field in ("step_ms", "broad_ms", "narrow_ms",
+                          "self_contacts", "sphere_contacts",
+                          "self_crossings", "max_stretch"):
+                record[field] = number(row[field], field)
+            series[row["policy"]].append(record)
+        for policy in PHYSICAL_METHODS:
+            series[policy].sort(key=lambda frame: frame["frame"])
+            if [f["frame"] for f in series[policy]] != list(range(len(series[policy]))):
+                raise ValueError("Native coupled frame sequence incomplete")
         physical.append({
             "scenario": item["scenario"],
             "means": {m: number(means[m], "whole_solver_ms", positive=True)
                       for m in PHYSICAL_METHODS},
             "frames": len(methods["sap_rebuild"]),
+            "series": series,
+            "source": str(csv_path),
         })
     return {"scenes": material, "physical": physical,
             "manifest": str(path.resolve()), "sha256": sha256(path),
