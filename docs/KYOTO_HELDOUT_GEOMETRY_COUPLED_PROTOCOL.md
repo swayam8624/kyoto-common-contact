@@ -95,8 +95,9 @@ From the repository root on research/kyoto-decision-coverage:
 
 Run the full **new-geometry** matrix with a NEW directory; this
 creates three independently topologized/perturbed fixtures for
-each of cloth, sponge, mixed at both 128 and 512 budgets and both
-baseline and rapid conditions. It does NOT reuse original Mac
+each of cloth, sponge, mixed at requested budgets 128, 512 and
+1024, with both baseline and rapid regimes (54 material trajectories
+in total). It does NOT reuse original Mac
 Phase 18 snapshots. The coupled audit separately runs free,
 pull and fold with two cloth sheets and two spheres:
 
@@ -105,6 +106,22 @@ pull and fold with two cloth sheets and two spheres:
     python3 scripts/test_kyoto_heldout_research.py output/kyoto-heldout-original-01
 
     open output/kyoto-heldout-original-01/HELDOUT_RESULTS.md
+
+    python3 scripts/analyze_kyoto_heldout_evidence.py --results output/kyoto-heldout-original-01 --output output/kyoto-heldout-original-01/full-method-scores --warmup 8
+    open output/kyoto-heldout-original-01/full-method-scores/HELDOUT_ALL_METHODS.md
+
+For the separately verified six-family rapid-motion matrix already
+run under Linux Actions, explicitly request six families:
+
+    python3 scripts/run_kyoto_heldout_research.py --exporter build/kyoto-final-cpu/ccp_material_export --replayer build/kyoto-final-cpu/ccp_material_replay --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled --output output/kyoto-six-family-mac-first --materials cloth sponge cushion soft_ball spring mixed --regimes rapid --budgets 128 512 1024 --heldout-count 3 --frames 60 --warmup 8 --coupled-frames 60 --coupled-scenarios free pull fold
+
+The all-algorithm analysis is POSTPROCESSING only, reads existing
+original source SHA-256 receipts, verifies strict SAP candidate count
+and pair-hash equality and exposes the actual Guard/SAP/trial/switch
+trajectory counts. The ten native CPU policies in the Linux suite
+must never be advertised as eleven: trained ML weights and external
+Bullet DBVT were not executed there. Native query timing takes place
+in the research runner, not the postprocessor.
 
 All source files are immutable by policy: the runner refuses to
 overwrite an existing output directory, raw source snapshot and
@@ -197,3 +214,33 @@ preserved, not reinterpreted as speed improvements.
 The full Mac experiment remains a new execution, not a rerun of the
 old immutable Phase 18 scene set. No new Mac results are asserted until
 the user executes it. All original threshold constants are unchanged.
+
+## Broader Linux six-family result with negative controls
+
+The independently verified
+[54-scene ten-method source report](KYOTO_HELDOUT_54_SCENE_NATIVE_RESULT_2026-11-19.md)
+is an ADDITIVE result from a single Linux CI execution
+[run 44468375567](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44468375567),
+not an already run Mac result. Across 54 truly seeded rapid-motion
+source scenes, each with 60 frames and ten policies, all 32,400
+frame/method candidate pairs matched the same-frame SAP count/hash
+and 144 source-file SHA-256 receipts were independently checked.
+Overall Guard/V4 geometric mean was 1.0552x with 25/54 scene
+wins; selected larger cloth, ball and spring settings were better,
+while cushion, sponge and mixed contained many ties or regressions.
+
+The original coupled solver's three distinct seeded physical
+geometries, each under free, pull and fold for 60 frames, accumulated
+actual sphere-contact responses but ZERO naturally driven
+nonlocal cloth self-contact events. Frozen V4 never selected SAP
+in the 2700 coupled solver iterations. This is discrete solver
+correctness and source-state parity evidence, not a successful
+adaptive physical solver speedup. In a SEPARATE intentionally
+overlapped patch diagnostic, self-contact correction counts were
+283, 276 and 317, with disabled-collision controls at zero.
+
+No conclusive results are claimed for independent forcing histories:
+all six-family AABB replay cells use the same rapid motion class.
+The original physical mesh solver still uses 13x13 grid-family
+connectivity, albeit varied triangle diagonals, vertex perturbations,
+spring connections and pin layouts.
