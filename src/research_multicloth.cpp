@@ -402,6 +402,46 @@ void MultiCloth::setFixtureVariation(std::uint32_t geometrySeed,
  fixtureJitter_=jitter;
  reset(sheets_,balls_); // New physical state AND invalidated policy caches.
 }
+void MultiCloth::prepareFoldedInitialStateForResearch(){
+ // Explicit prepared contact-rich *initial condition*, not a
+ // simulated trajectory. Keep original flat rest lengths/constraints.
+ // The folded flap is a real deformable mesh of the first sheet with
+ // its own original topology and per-vertex dynamical state.
+ if(frame_!=0||grab_.active)
+  throw std::logic_error(
+    "prepared fold only allowed at frame zero before grabbing");
+ if(sheets_<1)
+  throw std::logic_error("prepared fold needs at least one cloth sheet");
+ const int creaseRow=kSide/2;
+ for(int y=0;y<creaseRow;++y)
+  for(int x=0;x<kSide;++x){
+   const int id=y*kSide+x;
+   const int crease=creaseRow*kSide+x;
+   if(pinned_[std::size_t(id)])
+    throw std::logic_error(
+      "prepared fold may not overwrite kinematic anchors");
+   const auto original=positions_[std::size_t(id)];
+   const auto center=positions_[std::size_t(crease)];
+   // A half-turn about the row-6 X-axis maps the lower flap
+   // into the original upper half. A small positive vertical
+   // offset leaves the real 0.070m same-sheet contact thickness
+   // active without inventing contact events.
+   positions_[std::size_t(id)]={
+    original.x,2.0*center.y-original.y,
+    2.0*center.z-original.z+.022
+   };
+   previous_[std::size_t(id)]=positions_[std::size_t(id)];
+  }
+ // All caches remain logically reset at frame zero. Nonetheless
+ // explicitly invalidate them so future engine changes cannot
+ // accidentally reuse pre-fold AABB geometry.
+ regional_.reset();
+ global_.invalidate();
+ finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};
+ rbc_.reset();
+ rbcFlat_.reset();
+ metrics_={};
+}
 void MultiCloth::reset(int sheetCount,int sphereCount){
  if(sheetCount<1||sheetCount>3||sphereCount<1||sphereCount>8)
   throw std::invalid_argument("supported configuration: 1-3 cloths and 1-8 moving spheres");
