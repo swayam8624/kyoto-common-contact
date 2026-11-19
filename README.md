@@ -1,5 +1,21 @@
 # Kyoto Collision Broad-Phase — validated CPU core and visual evidence
 
+## Measured benchmark observatory (19 November 2026)
+
+The small five-policy cloth GIF is a **physical consistency test**, not a
+complete research presentation. Use the new
+[Research Observatory workflow](docs/research/rbc/BENCHMARK_OBSERVATORY.md)
+to run a real multi-material native benchmark, print **terminal tables**,
+and generate a standalone HTML with **speedup leaderboards, budget/material
+heatmaps, a rotatable 3D performance surface, full-step solver comparisons,
+and frame-by-frame timing visualizations**. The 3D original-geometry viewer
+also offers source-derived strain and displacement color heatmaps.
+
+A chart never substitutes for a native experiment. There are no invented
+measurements, and the new observatory does not modify the old experimental
+receipts or claim that exact pair-identical methods create better physics.
+
+
 An exact, stateful broad-phase candidate generator for deformable-contact
 research, written in **C++23**. The selected implementation is the **V4
 single-backend Guard–SAP Bounded Trial**. It has been benchmarked repeatedly
