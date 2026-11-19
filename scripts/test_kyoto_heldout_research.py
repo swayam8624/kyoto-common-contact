@@ -85,9 +85,11 @@ def inspect(root: Path):
            len(data["independent_geometry_topology_seeds_used"]),
            "duplicate geometry/topology seed pair")
     total_coupled = 0
+    distinct_coupled_geometry = defaultdict(set)
+    distinct_coupled_topology = defaultdict(set)
     for scenario in data["coupled_solver_runs"]:
-        directory = root / "coupled" / scenario["scenario"]
         csv_path = Path(scenario["source"])
+        directory = csv_path.parent
         ensure(csv_path.is_file() and sha256(csv_path) == scenario["sha256"],
                "original coupled contact CSV SHA mismatch")
         with csv_path.open(newline="", encoding="utf-8") as stream:
@@ -103,6 +105,9 @@ def inspect(root: Path):
             ensure([int(r["frame"]) for r in subset] == list(range(n_frames)),
                    "wrong coupled solver frame indices")
         for r in rows:
+            ensure(int(r["geometry_seed"]) == scenario["geometry_seed"] and
+                   int(r["topology_seed"]) == scenario["topology_seed"],
+                   "coupled physical geometry/topology seed provenance missing")
             ensure(int(r["oracle_misses"]) == 0,
                    "physical solver's broad-phase reported missing candidate")
             ensure(float(r["max_position_difference_from_sap"]) <= 1e-7,
@@ -128,6 +133,18 @@ def inspect(root: Path):
                    "wrong physical mesh chronology")
             streams[name] = lines
         truth = streams["sap_rebuild"]
+        ensure(truth[0]["geometry_seed"] == scenario["geometry_seed"] and
+               truth[0]["topology_seed"] == scenario["topology_seed"],
+               "mesh source header lacks independent topology provenance")
+        canonical = lambda obj: json.dumps(
+            obj, separators=(",", ":")).encode("utf-8")
+        initial = hashlib.sha256(canonical(truth[0]["rest_positions"])).hexdigest()
+        topology = hashlib.sha256(canonical(truth[0]["triangles"])).hexdigest()
+        ensure(initial == scenario["source_rest_positions_sha256"] and
+               topology == scenario["source_triangle_topology_sha256"],
+               "coupled source mesh vertex or adjacency fingerprint altered")
+        distinct_coupled_geometry[scenario["scenario"]].add(initial)
+        distinct_coupled_topology[scenario["scenario"]].add(topology)
         for name in names - {"sap_rebuild"}:
             other = streams[name]
             ensure(truth[0]["triangles"] == other[0]["triangles"] and
@@ -142,7 +159,13 @@ def inspect(root: Path):
                        "visual differs between exact-candidate physics policies")
         total_coupled += n_frames
     ensure(total_coupled>0,"no coupled-contact simulations")
-    print("PASS: independently varied first-frame geometry, all original")
+    n_variants = len(data["independent_geometry_topology_seeds_used"])
+    for kind in {item["scenario"] for item in data["coupled_solver_runs"]}:
+        ensure(len(distinct_coupled_geometry[kind]) == n_variants,
+               "coupled physical geometry failed to vary with independent seeds")
+        ensure(len(distinct_coupled_topology[kind]) == n_variants,
+               "coupled physical triangle topology failed to vary with independent seeds")
+    print("PASS: independently varied first-frame geometry AND coupled solver mesh adjacency, all original")
     print("      full-pair policy outputs, receipts, and coupled mesh/contact parity")
     print("      scenes:",len(trajectories),"coupled scenario-frames:",total_coupled)
     print("      not proof of continuous collision, mesh penetration, or speedup")
