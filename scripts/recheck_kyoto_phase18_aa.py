@@ -126,6 +126,7 @@ def test_aa(path, original, orderseed, frames, warmup):
     return {
         "methods": sorted(methods),
         "order": order,
+        "a_b_identities_assigned_before_shuffle": True,
         "mean_ms": time,
         "guard_aa_ratio": time[GUARD] / time[GUARD_B],
         "v4_aa_ratio": time[V4] / time[V4_B],
@@ -244,6 +245,9 @@ def save(data, output):
         " KYOTOM01 snapshot SHA-256 checks and original/current SAP candidate"
         " fingerprints were enforced; only the CPU query timings were repeated.",
         "",
+        "A/B identities were assigned BEFORE execution-order randomization," 
+        " so either copy may execute first in each repeated timing run.",
+        "",
         "Two independent instances of the SAME Global Guard and frozen V4"
         " implementations are measured on each snapshot stream. Duplicates"
         " preserve independent caches and decision state and never share"
@@ -327,7 +331,7 @@ def main():
     capabilities = subprocess.run(
         [str(replayer), "--capabilities"], capture_output=True, text=True,
         check=False, timeout=20)
-    if capabilities.returncode or "aa_guard_v4_clones" not in capabilities.stdout:
+    if capabilities.returncode or "aa_labels_shuffled_independently" not in capabilities.stdout:
         p.error("Stale CPU binary: build latest ccp_material_replay first")
     manifest = a.results / "DECISION_COVERAGE.json"
     original = json.loads(manifest.read_text(encoding="utf-8"))
@@ -362,6 +366,7 @@ def main():
     cohorts, conditions = summarize(all_rows)
     summary = {
         "experiment": "Phase 18 replicated same-snapshot native A/A",
+        "a_b_identities_assigned_before_shuffle": True,
         "source_manifest": str(manifest), "source_manifest_sha256": sha256(manifest),
         "source_trajectories": len(chosen), "repeats_per_trajectory": a.repeats,
         "warmup_excluded": int(original["warmup"]),
