@@ -224,7 +224,7 @@ void benchmark(const Source& source,const std::string& output,
   // For smaller inputs, cross-check SAP itself against independently
   // implemented exhaustive current reach-AABB (radius=0).
   if(source.n<=384) {
-   const std::vector<ccp::rbc::Reach> zero(sample.size(),{});
+   const std::vector<ccp::rbc::Reach> zero(sample.size(),ccp::rbc::Reach{});
    if(actual!=ccp::rbc::exhaustive(sample,zero))
     throw std::runtime_error("SAP and brute-force oracle mismatch");
   }
