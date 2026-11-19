@@ -127,9 +127,12 @@ void setDrive(MultiCloth& sim,const std::string& scenario,Vec3 original,int fram
   target.y+=.09*std::sin(6.283185307179586*fraction);
   target.z+=.36*std::sin(3.141592653589793*fraction);
  }else if(scenario=="fold"){
-  target.x-=.55*fraction;
-  target.y+=.21*std::sin(3.141592653589793*fraction);
-  target.z-=.24*fraction;
+  // A substantial, gradual across-sheet pull: an actual solver grab
+  // constraint, never direct particle teleportation. Some trajectories
+  // may still bend without self-contact; contact metrics decide.
+  target.x-=1.35*fraction;
+  target.y+=.46*std::sin(3.141592653589793*fraction);
+  target.z-=.55*fraction;
  }else throw std::invalid_argument("unknown coupled solver scenario");
  sim.updateGrab(target);
 }
@@ -140,6 +143,7 @@ void header(std::ostream& out,const MultiCloth& sim,const char* label,
     <<"\",\"scenario\":\""<<scenario
     <<"\",\"geometry_seed\":"<<geometrySeed
     <<",\"topology_seed\":"<<topologySeed
+    <<",\"pinned_vertices\":"<<sim.pinnedCount()
     <<",\"units\":\"simulation units\",\"triangles\":[";
  for(std::size_t i=0;i<sim.triangles().size();++i){
   if(i)out<<',';
@@ -175,6 +179,12 @@ void frame(std::ostream& out,const MultiCloth& sim,int index,
     <<",\"self_contacts\":"<<m.selfContacts
     <<",\"sphere_contacts\":"<<m.sphereContacts
     <<",\"precise_tests\":"<<m.preciseTests
+    <<",\"self_crossings\":"<<m.selfCrossings
+    <<",\"frozen_guard_queries\":"<<m.frozenGuardQueries
+    <<",\"frozen_sap_queries\":"<<m.frozenSapQueries
+    <<",\"frozen_trial_queries\":"<<m.frozenTrialQueries
+    <<",\"frozen_switches\":"<<m.frozenSwitches
+    <<",\"last_broadphase_action\":\""<<m.lastEvent<<"\""
     <<",\"rms_relative_edge_strain\":"<<quality.rmsStretch
     <<",\"maximum_edge_stretch\":"<<quality.maxStretch
     <<",\"near_degenerate_triangles\":"<<quality.collapsed
@@ -194,8 +204,9 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
  std::filesystem::create_directories(dest);
  std::ofstream csv(dest/"COUPLED_SOLVER.csv");
  if(!csv)throw std::runtime_error("cannot open coupled solver CSV");
- csv<<"scenario,geometry_seed,topology_seed,policy,frame,sheets,spheres,triangles,candidate_pairs,"
-       "precise_tests,self_contacts,sphere_contacts,velocity_clamps,"
+ csv<<"scenario,geometry_seed,topology_seed,policy,frame,sheets,spheres,triangles,pinned_vertices,candidate_pairs,"
+       "precise_tests,self_contacts,sphere_contacts,self_crossings,velocity_clamps,"
+       "frozen_guard_queries,frozen_sap_queries,frozen_trial_queries,frozen_switches,last_broadphase_action,"
        "oracle_misses,broad_ms,narrow_ms,step_ms,max_position_difference_from_sap,"
        "rms_relative_edge_strain,max_edge_stretch,near_degenerate_triangles,min_height\n";
  csv<<std::fixed<<std::setprecision(9);
@@ -236,9 +247,13 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
     ++comparisonFrames;
    }
    csv<<scenario<<','<<geometrySeed<<','<<topologySeed<<','<<policy.name<<','<<i<<','<<sheets<<','<<spheres<<','
-      <<sim.triangles().size()<<','<<m.pairs<<','<<m.preciseTests<<','
-      <<m.selfContacts<<','<<m.sphereContacts<<','<<m.velocityClamps<<','
-      <<m.oracleMisses<<','<<m.broadMs<<','<<m.narrowMs<<','<<m.stepMs
+      <<sim.triangles().size()<<','<<sim.pinnedCount()<<','
+      <<m.pairs<<','<<m.preciseTests<<','
+      <<m.selfContacts<<','<<m.sphereContacts<<','<<m.selfCrossings<<','
+      <<m.velocityClamps<<','<<m.frozenGuardQueries<<','<<m.frozenSapQueries
+      <<','<<m.frozenTrialQueries<<','<<m.frozenSwitches
+      <<','<<m.lastEvent
+      <<','<<m.oracleMisses<<','<<m.broadMs<<','<<m.narrowMs<<','<<m.stepMs
       <<','<<worst<<','<<stats.rmsStretch<<','<<stats.maxStretch
       <<','<<stats.collapsed<<','<<stats.minZ<<'\n';
    frame(visual,sim,i,worst,stats);
