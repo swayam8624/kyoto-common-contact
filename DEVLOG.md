@@ -609,3 +609,44 @@ docs/CBP_PHASE18_MAC_AA_RESULTS_2026-11-19.md.
 Next substantive research remains genuinely independent geometry/topology,
 and coupled solver/CCD performance and correctness. Do not manufacture
 ML weights or retune V4 against this already-observed benchmark.
+
+
+## 2026-11-19 — final verified post-hoc Mac A/A sensitivity
+
+The user completed the no-rerun, immutable-CSV SHA-verifying robustness
+analyzer on all 144 Mac replay timings. Conditional-on-the-observed-
+snapshots timing resampling for the 36-trajectory natural suite:
+Guard/V4 geometric mean 1.0188x, 2.5th-to-97.5th percentile repeat
+envelope 1.0117x..1.0257x. After removing the *previously seen*
+single strongest cloth rapid N=1058 condition, Guard/V4 1.0027x,
+envelope 0.9954x..1.0106x (effect near zero). Cloth rapid N=1058:
+1.2139x with fixed-scene repeat envelope 1.2042x..1.2255x.
+
+This is NOT independent geometry validation and these resampling
+numbers are NOT population CIs or p-values. The old A/B labeling
+defect was CONFIRMED directly by recording the execution slots:
+Guard A earlier 144/B earlier 0 and V4 A earlier 144/B earlier 0.
+The aggregate Guard/V4 over both copies is algebraically invariant
+to the A/B label choice; still, no unbiased A/A chronology claim
+is allowed from the old replay series.
+
+Seven exact action differences in the original Mac CSVs:
+sponge/baseline/N1331/seed3203/repeat2, frames 11..17 after warmup.
+A selected SAP in each (measured [1.755458, 1.800084, 1.744167,
+1.772917, 1.850583, 1.946417, 1.877167] ms);
+B selected Guard (measured [2.711500, 0.145291, 0.134958,
+2.908125, 0.135250, 0.112292, 0.105208] ms).
+A's seven-frame total 12.746793ms, B's 6.252624ms. An inexpensive
+Guard fast path interspersed with expensive events is suggested by
+the timings, but internal cache-rebuild metrics/EWMA were NOT
+serialized and cannot be asserted from output times alone.
+No exact-pair discrepancy. Original full receipt in
+docs/CBP_PHASE18_MAC_AA_POSTHOC_ROBUSTNESS_2026-11-19.md.
+
+Research decision: retain frozen V4 as candidate for a narrow
+sustained Guard-expense workload. Do not claim general superiority,
+population statistical significance, CCD, visual deformation quality
+or coupled solver improvement from this AABB-only phase.
+Do not continue infinite retiming of the same saved scenes to
+manufacture evidence. Priority is independently varied topology/
+geometry and physically coupled collision verification.
