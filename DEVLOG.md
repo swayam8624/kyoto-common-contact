@@ -798,3 +798,55 @@ overwrite. Follow-up scientific work requires independently
 varied forcing histories, genuine nonlocal self-contact
 under continuous natural motion, independent penetration/CCD
 truth, and balanced whole solver ABBA timings, keeping V4 frozen.
+
+
+## 2026-11-19 — user-supplied first real Apple Silicon 54-scene held-out log
+
+Completed the Mac-side independent mesh/physics research
+experiment: 54 source snapshots across cloth, sponge, mixed,
+baseline+rapid, three sizes and independent geometry/topology
+seeds, plus nine physically coupled free/pull/fold scenes
+of 60 frames each. Native build/export/replay succeeded;
+all 54 original method CSVs passed framewise exact SAP
+candidate count/hash validation and source integrity receipt
+checks. Nine solver cases passed their coupled physical
+source mesh and contact parity audits. Third-party Bullet
+headers caused eight nonfatal C99 extension warnings.
+Interactive zsh printed three nonfatal "command not found: #"
+errors from pasted comments, not from native code.
+
+The user's terminal paste included 54 Guard/V4 ratios rounded
+to 4 decimals; not the full saved original CSVs, native V4
+backend action counts or all-methods output. Mathematical
+aggregation of those printed ratios:
+- All 54: Guard/V4 0.999160x, wins 27/54.
+- Baseline 27: 1.010115x, wins 16/27.
+- Rapid 27: 0.988324x, wins 11/27.
+- Cloth 18: 1.009656x, sponge 18: 0.986505x,
+  mixed 18: 1.001458x.
+- Rapid cloth N1058: 1.0524x, 1.0472x, 1.2564x =>
+  1.114584x geomean, all 3 positive, but third dominates.
+- Rapid sponge N1331: 1.0009x, 0.9867x, 0.7388x =>
+  0.900259x geomean; strong single negative case.
+- Removing strongest positive cloth rapid N1058:
+  51-scene remaining ratio 0.992756x. Removing
+  strongest negative sponge rapid N1331: 1.005305x.
+
+The Linux 54-scene suite was six material families and RAPID-only,
+not the same matrix as this three-family baseline+rapid Mac run.
+No inference about cross-machine algorithm speed or
+native method rankings may be made from comparing those two
+different benchmark suites. Full Mac all-method report and
+native raw receipts are still stored on the Mac, not
+provided to the current GitHub source.
+
+Published accurate disclosure and all 18 three-seed per-cell
+ratios in
+docs/KYOTO_HELDOUT_54_SCENE_MAC_FIRST_2026-11-19.md.
+NO modifications to the frozen V4 code, thresholds or existing
+original immutable Phase18 or held-out results. This Mac
+experiment supports broad overall parity plus a narrow rapid-
+cloth positive, not universal superiority or a physical
+solver performance win. Original six-family Linux ball/spring
+positives still deserve Mac testing under exactly matched
+workloads and a balanced A/A order protocol.
