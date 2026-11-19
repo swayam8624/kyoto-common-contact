@@ -25,7 +25,9 @@ The follow-up implementation lives on branch
    the actual execution slot and shuffle seed for inspection.
 2. The new `scripts/run_kyoto_decision_coverage.py` exports actual original
    mass-spring material snapshots at requested budgets 512 and 1024, with
-   3 different seeds by default. It reads the actual KYOTOM01 header and
+   3 forcing-phase seed values by default. The generator's initial geometry
+   and topology remain deterministic for each material/size; seed % 101
+   shifts the driving phase rather than creating independent geometry. It reads the actual KYOTOM01 header and
    FAILS if the generated object count is below 384.
 3. It includes a separate **artificial rigid-translation diagnostic**.
    Alternating .30-world-unit whole-scene translations stress Guard's
@@ -125,7 +127,8 @@ reuses the **original CSVs** and enforces their recorded hashes:
     open output/kyoto-decision-mac-first/verified-all-methods-v1/VERIFIED_ALL_METHODS.md
 
 The analyzer never times a backend, cannot silently pool artificial with
-natural scenes, refuses evidence replacement and validates all policy
-pair lists against SAP. A complete Linux integration regression with
+natural scenes, refuses evidence replacement and checks framewise candidate
+pair counts/hashes against SAP. It does not have independently saved raw
+pair-ID lists for direct bytewise set comparison. A complete Linux integration regression with
 a deliberately falsified manifest hash passed:
 https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461
