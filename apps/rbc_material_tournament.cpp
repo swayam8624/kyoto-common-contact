@@ -9,10 +9,11 @@
 // each frame (not a balanced multi-session A/A experiment).
 //
 // Methods: fresh SAP, fixed original Guard, frozen V4 (unchanged),
-// persistent SAP, and NEW RBC indexed incremental frontier.
+// persistent SAP, slow RBC node-set negative, NEW flat RBC frontier.
 // This is genuine full pair emission, NOT count-only GPU/CPU workload.
 // This is not a contact solver experiment: see rbc_coupled_tournament.
 #include "ccp/rbc/certified_spatial_frontier.hpp"
+#include "ccp/rbc/certified_flat_frontier.hpp"
 #include "ccp/final_broadphase.hpp"
 #include <algorithm>
 #include <array>
@@ -36,9 +37,9 @@ using Pairs=std::vector<Pair>;
 using Clock=std::chrono::steady_clock;
 static_assert(std::endian::native==std::endian::little,
               "KYOTOM01 replay requires little endian");
-constexpr std::array<const char*,5> methods={
+constexpr std::array<const char*,6> methods={
     "sap_rebuild","guard_fixed_exact","v4_frozen",
-    "sap_persistent","rbc_indexed_repair"
+    "sap_persistent","rbc_indexed_repair","rbc_flat_repair"
 };
 int bounded(const char* text,int lo,int hi){
     const std::string value(text);
@@ -128,16 +129,17 @@ void replay(const char* sourcePath,const char* outputPath,
     ccp::final_broadphase::GuardSAPBoundedTrial v4;
     ccp::final_broadphase::PersistentSAP persistent;
     ccp::rbc::CertifiedSpatialFrontier rbc;
+    ccp::rbc::CertifiedFlatFrontier flat;
     std::vector<ccp::rbc::Reach> radius(
         source.n,ccp::rbc::Reach{0.,skin}); // input ALREADY padded
-    std::array<double,5> sum{};
-    std::array<std::size_t,5> count{};
+    std::array<double,6> sum{};
+    std::array<std::size_t,6> count{};
     for(std::uint32_t frame=0;frame<source.frames;++frame){
         const auto current=source.next();
-        std::array<Method,5> measurements{};
-        std::array<int,5> slots{};
-        for(int slot=0;slot<5;++slot){
-            const int id=(int(frame)+slot)%5;
+        std::array<Method,6> measurements{};
+        std::array<int,6> slots{};
+        for(int slot=0;slot<6;++slot){
+            const int id=(int(frame)+slot)%6;
             slots[std::size_t(id)]=slot;
             Method& m=measurements[std::size_t(id)];
             const auto begin=Clock::now();
@@ -157,7 +159,7 @@ void replay(const char* sourcePath,const char* outputPath,
                 m.switched=outcome.switched;
             }else if(id==3){
                 m.pairs=persistent.query(current);
-            }else{
+            }else if(id==4){
                 const auto before=rbc.global_builds();
                 if(!rbc.initialized())
                     rbc.initialize(current,radius);
@@ -168,6 +170,17 @@ void replay(const char* sourcePath,const char* outputPath,
                 m.globalBuilds=rbc.global_builds()-before;
                 m.indexComparisons=result.build_comparisons;
                 m.queryChecks=result.query_pair_checks;
+            }else{
+                const auto before=flat.global_builds();
+                if(!flat.initialized())
+                    flat.initialize(current,radius);
+                auto result=flat.query(current);
+                m.pairs=std::move(result.pairs);
+                m.potential=result.potential_pairs;
+                m.localRepairs=result.local_repairs;
+                m.globalBuilds=flat.global_builds()-before;
+                m.indexComparisons=result.build_comparisons;
+                m.queryChecks=result.query_pair_checks;
             }
             m.ms=std::chrono::duration<double,std::milli>(
                 Clock::now()-begin).count();
@@ -175,7 +188,7 @@ void replay(const char* sourcePath,const char* outputPath,
         // No counting/hash shortcuts. Full sorted pair IDs from each
         // algorithm are compared against fresh independent SAP output.
         const auto& oracle=measurements[0].pairs;
-        for(int i=0;i<5;++i){
+        for(int i=0;i<6;++i){
             const auto& m=measurements[std::size_t(i)];
             if(m.pairs!=oracle)
                 throw std::runtime_error(
@@ -198,10 +211,10 @@ void replay(const char* sourcePath,const char* outputPath,
     }
     if(!csv)throw std::runtime_error("failed flushing native RBC replay");
     std::cout<<std::fixed<<std::setprecision(5)
-             <<"PASS RBC exact 5-arm material replay source "<<sourcePath
+             <<"PASS RBC exact 6-arm material replay source "<<sourcePath
              <<" frames "<<source.frames<<" N "<<source.n
              <<" all candidate pairs equal on EVERY source frame\n";
-    for(int i=0;i<5;++i)
+    for(int i=0;i<6;++i)
         std::cout<<methods[std::size_t(i)]<<" mean_query_ms="
                  <<sum[std::size_t(i)]/double(count[std::size_t(i)])
                  <<" guard_over_method="<<
