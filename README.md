@@ -226,7 +226,9 @@ python3 scripts/analyze_kyoto_decision_coverage.py \
 open output/kyoto-decision-mac-first/verified-all-methods-v1/VERIFIED_ALL_METHODS.md
 ```
 
-The report fails if source SHA-256, execution-order receipts or actual
-full-pair sets disagree; it separates natural and intentionally artificial
-motion. Linux [CI regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461)
+The report fails if source SHA-256, execution-order receipts or framewise
+candidate **count/hash** records disagree; it does NOT independently compare
+raw candidate-ID streams. It separates natural and intentionally artificial
+motion. The three seed values vary only the forcing phase of a fixed
+material/topology fixture, not initial scene geometry. Linux [CI regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461)
 passed both valid and deliberately corrupted evidence checks.
