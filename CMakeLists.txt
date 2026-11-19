@@ -59,6 +59,9 @@ target_compile_options(ccp_material_export PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_kyoto_heldout_fixture_tests tests/kyoto_heldout_fixture_tests.cpp)
 target_link_libraries(ccp_kyoto_heldout_fixture_tests PRIVATE ccp_live)
 target_compile_options(ccp_kyoto_heldout_fixture_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_kyoto_coupled_variation_tests tests/kyoto_coupled_variation_tests.cpp)
+target_link_libraries(ccp_kyoto_coupled_variation_tests PRIVATE ccp_multicloth)
+target_compile_options(ccp_kyoto_coupled_variation_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_kyoto_heldout_coupled apps/kyoto_heldout_coupled_audit.cpp)
 target_link_libraries(ccp_kyoto_heldout_coupled PRIVATE ccp_multicloth)
 target_compile_options(ccp_kyoto_heldout_coupled PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -296,6 +299,8 @@ if(BUILD_TESTING)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
   add_test(NAME kyoto_heldout_independent_geometry_topology_oracle
     COMMAND ccp_kyoto_heldout_fixture_tests)
+  add_test(NAME kyoto_coupled_contact_independent_mesh_topology_oracle
+    COMMAND ccp_kyoto_coupled_variation_tests)
   add_test(NAME kyoto_heldout_coupled_fold_solver_parity
     COMMAND ccp_kyoto_heldout_coupled
       ${CMAKE_CURRENT_BINARY_DIR}/kyoto-heldout-coupled-ci 8 1 1 fold)
