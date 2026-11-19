@@ -167,3 +167,33 @@ and physical diagnostics across policies, and (4) reproducible
 cross-platform C++ regression evidence. Any actual speedup can
 be stated only after the new native runs complete and the actual
 numbers are reviewed. No broad Phase 18 victory is assumed.
+
+
+## Observed first Linux native run, not a claimed Mac speedup
+
+After strengthening the test beyond an eight-frame no-contact smoke
+sequence, Linux Actions run 44465880693 passed 48-frame independent
+physical solver cases with two truly different mesh triangulations,
+vertex geometries and four-versus-six pinned vertex constraints.
+
+Actual precise collision tests and sphere-contact responses occurred
+in the thousands across real solver subiterations. All three original
+candidate policies produced identical physical trajectories and
+contact-response totals relative to SAP. However: zero **nonlocal
+cloth self-contact responses** occurred, including the grab-fold
+motion; and frozen V4 selected Guard for **240/240 solver queries
+per scenario**, with zero SAP trials/switches. This is an important
+negative experimental finding, not a successful online-switching demo.
+See [the source-backed CI report](KYOTO_HELDOUT_FIRST_NATIVE_RESULT_2026-11-19.md).
+
+The held-out Python runner now defaults to 60 coupled solver frames,
+instead of the original short 24-frame exploratory setting.
+An explicit fail-closed gate requires actual narrow-phase tests and
+at least one contact response for each independent mesh seed over
+its selected scenarios. It also records chosen Guard/SAP/trial/switch
+counts from each REAL V4 solver iteration; zero activations are
+preserved, not reinterpreted as speed improvements.
+
+The full Mac experiment remains a new execution, not a rerun of the
+old immutable Phase 18 scene set. No new Mac results are asserted until
+the user executes it. All original threshold constants are unchanged.
