@@ -268,4 +268,37 @@ private:
     h.max.z=std::max(a.max.z,b.max.z);
     return h;
 }
+
+// Conservative set of pairs whose reach-inflated LINEAR swept AABB
+// envelopes intersect anywhere over a step. Each primitive must retain
+// its ID, category and mask between endpoints. A wider swept candidate
+// set is allowed (false positives); omitted potentially active pairs
+// are NOT allowed.
+//
+// IMPORTANT:
+//   - This is BROAD-PHASE only. Simultaneous contact time and the CCD
+//     time-of-impact are not computed here.
+//   - It assumes *linear vertex trajectories* or a solver-certified
+//     endpoint enclosure. It is NOT valid for unknown curved motion.
+//   - The caller's skin is irrelevant for a SINGLE swept step; only
+//     radius enters the independent envelope query.
+//   - This Stage-0 reference remains O(N^2), not an optimized service.
+[[nodiscard]] inline Pairs linear_swept_reach_candidates(
+    const std::vector<Bounds>& start,
+    const std::vector<Bounds>& end,
+    const std::vector<Reach>& reach) {
+    validate(start, reach);
+    validate(end, reach);
+    std::vector<Bounds> hulls;
+    std::vector<Reach> envelope_reach;
+    hulls.reserve(start.size());
+    envelope_reach.reserve(start.size());
+    for (std::size_t i=0; i<start.size(); ++i) {
+        // Interpolation is defined for a stable primitive ID, not
+        // whichever input happens to occupy its former array slot.
+        hulls.push_back(linear_endpoint_hull(start[i], end[i]));
+        envelope_reach.push_back({reach[i].radius, 0.0});
+    }
+    return exhaustive(hulls, envelope_reach);
+}
 } // namespace ccp::rbc
