@@ -335,10 +335,10 @@ footer{border-top:1px solid var(--edge);margin-top:32px;padding:20px 0;color:var
 </section>
 <section class="card wide" id="proof-section">
 <h2>Five-policy synchronized physics evidence</h2><p class="under">Original C++ time series. The contact/intersection plot uses SAP reference alone to avoid counting the same physical trajectory five times.</p>
-<div class="controls"><label>Metric <select id="metric"><option value="step_ms">Whole step (ms)</option><option value="broad_ms">Broad-phase (ms)</option><option value="narrow_ms">Narrow-phase (ms)</option></select></label>
+<div class="controls"><label>Metric <select id="metric"><option value="step_ms">Whole step (ms)</option><option value="broad_ms">Broad-phase (ms)</option><option value="narrow_ms">Narrow-phase (ms)</option><option value="self_contacts">Same-sheet contact corrections (count)</option><option value="sphere_contacts">Sphere contact corrections (count)</option><option value="geometric_self_intersections">Endpoint triangle intersections (count)</option></select></label>
 <a id="viewer" href="#" style="display:none">Open actual original-geometry 3D viewer</a></div>
 <canvas id="lines"></canvas>
-<h2 style="margin-top:24px">Timing heatmap • native frame × policy</h2><p class="under">Each rectangle is a measured timing sample. Darker/cooler = lower time, warmer = higher time.</p>
+<h2 style="margin-top:24px">Native frame × policy metric heatmap</h2><p class="under">Each cell is an original native timing or solver diagnostic. Darker/cooler = lower measured value, warmer = higher measured value.</p>
 <canvas id="frameheat"></canvas>
 <div id="correctness" class="notice"></div>
 </section>
