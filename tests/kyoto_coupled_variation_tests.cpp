@@ -71,8 +71,8 @@ int main(){
   MultiCloth otherGeom(2,2,Policy::RebuildSAP);
   setup(a,73013u,86011u);
   setup(again,73013u,86011u);
-  setup(changed,74017u,86017u);
-  setup(otherTopo,73013u,86017u);
+  setup(changed,74017u,86019u);
+  setup(otherTopo,73013u,86019u);
   setup(otherGeom,74017u,86011u);
   check(samePositions(a,again)&&a.triangles()==again.triangles(),
         "coupled seed experiment non-deterministic");
@@ -87,6 +87,12 @@ int main(){
         "different geometry seed did not independently vary vertices");
   check(a.triangles()==otherGeom.triangles(),
         "geometry seed inadvertently changed triangle connectivity");
+  // Topology seed 86019 is divisible by three, so the alternative
+  // fixtures also pin the upper-middle node on each sheet. This is a
+  // genuine, separately validated boundary-constraint variant.
+  check(a.pinnedCount()==4&&changed.pinnedCount()==6 &&
+        otherTopo.pinnedCount()==6&&otherGeom.pinnedCount()==4,
+        "independent topology seed did not change anchored physical nodes");
   meshValid(a);meshValid(changed);
 
   MultiCloth guard(2,2,Policy::GlobalGuard);
