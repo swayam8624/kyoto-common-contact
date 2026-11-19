@@ -300,3 +300,35 @@ actual V4 action-disagreement frame indices from the old CSVs, and
 calculates balanced-condition leave-one-out and fixed-scene resampling
 sensitivity. Resampling conditional on fixed geometry is not a
 population confidence interval and does not establish physical solver speed.
+
+
+### Phase 18 post-hoc Mac A/A robustness: source-verified condition sensitivity
+
+The original 144 repeated Mac A/A replays were reanalyzed **without any
+new native timings**. The source-verified report and seven exact
+backend-decision disagreement frames are preserved in
+[the full Mac A/A post-hoc robustness note](docs/CBP_PHASE18_MAC_AA_POSTHOC_ROBUSTNESS_2026-11-19.md).
+
+Full fixed natural suite: Guard/V4 **1.0188x**, conditional time-repeat
+resampling **1.0117x..1.0257x**. Excluding the strongest previously
+observed cloth/rapid/N=1058 condition: **1.0027x**, conditional
+resampling **0.9954x..1.0106x**. The positive rapid-cloth condition:
+**1.2139x**, conditional **1.2042x..1.2255x**. None of these conditional
+resampling envelopes should be presented as a population confidence
+interval or a claim on independently generated physical geometries.
+
+The original A/B label chronology was biased: Guard A and V4 A ran
+before their B duplicates in **all 144/144** replays. This limitation
+remains attached to the old evidence even though later *optional*
+instrumentation correctly randomizes copy identities beforehand.
+The aggregate Guard/V4 ratio over both copies does not depend
+mathematically on which identical copy was named A; it still has
+whole-trajectory method-order, thermal and fixed-fixture limitations.
+
+In sponge baseline N=1331 seed3203 repeat2, the copies differed on
+frames 11..17: A used SAP (median 1.800 ms) while B used Guard
+(median 0.135 ms), including two >2-ms Guard outliers. The saved
+CSV cannot show the controller's internal rebuild streaks/EWMAs or
+a counterfactual optimal backend. Pair correctness remained verified.
+No changes to frozen V4 were made. Further research requires actual
+independently varied geometry/topology and end-to-end solver evidence.
