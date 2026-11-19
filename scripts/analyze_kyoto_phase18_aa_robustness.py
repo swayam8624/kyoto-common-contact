@@ -12,6 +12,7 @@ envelope for this fixed suite*, NOT a population confidence interval.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import math
@@ -91,6 +92,41 @@ def validate_record(row: dict, warmup: int) -> dict:
         "va": finite_positive(row["mean_ms"][V4_A]),
         "vb": finite_positive(row["mean_ms"][V4_B]),
     }
+    # Cross-check timing-triggered V4 action instability frame-by-frame,
+    # rather than merely trusting the compact A/A JSON summary. These rows
+    # are DESCRIPTIVE evidence, not a new exact-pair oracle.
+    v4_decisions = {V4_A: {}, V4_B: {}}
+    with source.open(newline="", encoding="utf-8") as stream:
+        reader = csv.DictReader(stream)
+        for item in reader:
+            if item["backend"] in v4_decisions:
+                method_rows = v4_decisions[item["backend"]]
+                frame = int(item["frame"])
+                if frame in method_rows:
+                    raise ValueError("Repeated V4 frame row: " + str(source))
+                method_rows[frame] = {
+                    "selected": item["chosen_backend"],
+                    "trial": int(item["hybrid_probed"]),
+                    "switch": int(item["hybrid_switched"]),
+                    "measured_ms": finite_positive(item["ms"]),
+                }
+    frames_a = v4_decisions[V4_A]
+    frames_b = v4_decisions[V4_B]
+    if not frames_a or set(frames_a) != set(frames_b) or        set(frames_a) != set(range(len(frames_a))):
+        raise ValueError("V4 clones do not cover the same consecutive frames")
+    frame_divergences = [
+        {"frame": index, "before_warmup": index < warmup,
+         "v4_A": frames_a[index], "v4_B": frames_b[index]}
+        for index in sorted(frames_a)
+        if frames_a[index]["selected"] != frames_b[index]["selected"]
+    ]
+    if len(frame_divergences) != int(row["v4_action_mismatch_frames"]):
+        raise ValueError("Recorded V4 disagreement count differs from CSV")
+    for backend, expected in ((V4_A, row["v4_a"]), (V4_B, row["v4_b"])):
+        frames = v4_decisions[backend].values()
+        if (sum(x["selected"] == "sap_persistent_coherent" for x in frames)
+                != int(expected["sap"])) or            sum(x["trial"] for x in frames) != int(expected["trial"]) or            sum(x["switch"] for x in frames) != int(expected["switches"]):
+            raise ValueError("V4 action receipt differs from full replay CSV")
     ratios = {
         "guard_aa_ratio": values["ga"] / values["gb"],
         "v4_aa_ratio": values["va"] / values["vb"],
@@ -115,6 +151,7 @@ def validate_record(row: dict, warmup: int) -> dict:
         "log_guard_aa": math.log(ratios["guard_aa_ratio"]),
         "log_v4_aa": math.log(ratios["v4_aa_ratio"]),
         "actions_mismatched": int(row["v4_action_mismatch_frames"]),
+        "frame_divergences": frame_divergences,
         "v4_a_sap_frames": int(row["v4_a"]["sap"]),
         "v4_b_sap_frames": int(row["v4_b"]["sap"]),
         "v4_a_trial_frames": int(row["v4_a"]["trial"]),
@@ -296,6 +333,7 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
             "material": r["material"], "regime": r["regime"], "n": r["n"],
             "seed": r["seed"], "repeat": r["repeat"],
             "mismatch_frames": r["actions_mismatched"],
+            "frame_divergences": r["frame_divergences"],
             "v4_a_sap": r["v4_a_sap_frames"],
             "v4_b_sap": r["v4_b_sap_frames"],
             "guard_aa_ratio": math.exp(r["log_guard_aa"]),
@@ -419,6 +457,20 @@ def save(report, destination):
                          str(d["mismatch_frames"]) + " | " +
                          str(d["v4_a_sap"]) + " | " +
                          str(d["v4_b_sap"]) + " |")
+        lines += ["", "### Exact differing frame states from original native CSV", "",
+                  "| Material | Regime | N | Phase seed | Repeat | Frame | Warmup? | V4 A backend | V4 B backend | V4 A ms | V4 B ms |",
+                  "|---|---|---:|---:|---:|---:|---|---|---|---:|---:|"]
+        for d in report["backend_decision_disagreements"]:
+            for frame in d["frame_divergences"]:
+                a, b = frame["v4_A"], frame["v4_B"]
+                lines.append("| " + d["material"] + " | " + d["regime"] +
+                             " | " + str(d["n"]) + " | " + str(d["seed"]) +
+                             " | " + str(d["repeat"]) + " | " +
+                             str(frame["frame"]) + " | " +
+                             str(frame["before_warmup"]) + " | " +
+                             a["selected"] + " | " + b["selected"] +
+                             " | " + format(a["measured_ms"], ".6f") +
+                             " | " + format(b["measured_ms"], ".6f") + " |")
     lines += ["", "## Methodological boundaries", ""]
     lines += ["- " + v for v in report["limitations"]]
     (destination / "AA_ROBUSTNESS.md").write_text(
