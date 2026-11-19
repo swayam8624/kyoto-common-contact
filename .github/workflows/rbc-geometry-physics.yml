@@ -11,6 +11,8 @@ on:
       - 'apps/rbc_coupled_tournament.cpp'
       - 'CMakeLists.txt'
       - 'scripts/render_rbc_physics_studio.py'
+      - 'scripts/build_rbc_physics_viewer.py'
+      - 'web/rbc_verified_physics_viewer_template.html'
   workflow_dispatch:
 permissions:
   contents: read
@@ -110,6 +112,37 @@ jobs:
           assert movie.stat().st_size>100000
           print('PASS actual 5-policy source geometry, same camera and depth-tested GIF')
           PY
+      - name: Build real 80-frame five-policy interactive orbit and timeline browser, with embedded SOURCE RECEIPTS
+        run: |
+          python3 scripts/build_rbc_physics_viewer.py \
+            --mesh-dir output/rbc-rounded-clean-80/g73013-mesh \
+            --output output/rbc-rounded-clean-80/FIVE_POLICY_INTERACTIVE.html
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('output/rbc-rounded-clean-80')
+          document=(root/'FIVE_POLICY_INTERACTIVE.html').read_text()
+          receipt=json.loads((root/'FIVE_POLICY_INTERACTIVE.viewer-receipts.json').read_text())
+          assert receipt['original_frames']==80
+          assert receipt['original_policy_count']==5
+          assert receipt['original_total_policy_frames']==400
+          assert receipt['all_original_endpoint_intersections_zero']
+          assert receipt['all_original_policy_positions_SAP_equal']
+          assert receipt['HTML_sha256']==hashlib.sha256(document.encode()).hexdigest()
+          payload=re.search(r'<script id="native-evidence" type="application/json">(.*?)</script>',
+                            document,re.S)
+          assert payload is not None
+          data=json.loads(payload.group(1))
+          assert data['schema']=='rbc-five-policy-original-native-webgl-v1'
+          assert len(data['policies'])==5
+          assert all(len(x)==80 for x in data['policies'].values())
+          assert all(all(f['metrics']['geometric_self_intersections']==0 for f in x)
+                     for x in data['policies'].values())
+          native_js=document.split('<script type="module">',1)[1].split('</script>',1)[0]
+          Path('/tmp/kyoto-rbc-3d-viewer-syntax.mjs').write_text(native_js)
+          print('PASS original 5-policy 3D browser source data, 400 verified original physics frames and SHA-256 receipt')
+          PY
+          node --check /tmp/kyoto-rbc-3d-viewer-syntax.mjs
       - name: Preserve original failure or success source, not fake physics visual
         if: always()
         uses: actions/upload-artifact@v4
