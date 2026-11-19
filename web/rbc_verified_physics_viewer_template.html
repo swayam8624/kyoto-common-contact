@@ -22,6 +22,9 @@ button:hover{background:#344a5b}
 button.primary{background:#adf0dc;color:#122a28;border-color:#adf0dc}
 .control{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted)}
 .control input{accent-color:#90ddc6}
+.control select{background:#223447;border:1px solid #456378;color:#e7f3fa;border-radius:6px;padding:6px 9px}
+.metric-legend{color:#b6cad5;font-size:12px;margin:0 0 15px}
+.ramp{display:inline-block;width:110px;height:10px;border-radius:4px;margin:0 8px;background:linear-gradient(90deg,#3560ac,#3cc7ae,#ffc167,#ed6650)}
 #timeline{width:min(370px,40vw);min-width:130px}
 .counter{font-variant-numeric:tabular-nums;color:#e4f3f7;font-size:12px;white-space:nowrap}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
@@ -70,9 +73,15 @@ code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px}
  <label class="control"><input id="wireframe" type="checkbox">Wireframe</label>
  <label class="control"><input id="spheres" type="checkbox" checked>Moving spheres</label>
  <label class="control"><input id="sheet-b" type="checkbox" checked>Second sheet</label>
+ <label class="control">3D coloring <select id="surface-mode">
+  <option value="material">Original materials</option>
+  <option value="strain">Edge-length strain heatmap</option>
+  <option value="displacement">Displacement heatmap</option>
+ </select></label>
  <button id="reset" type="button">Reset cameras</button>
  <span class="mini">Playback is slowed for inspection; timing readouts are the original native measurements.</span>
 </div>
+<div class="metric-legend">Source-derived deformation overlay (not calibrated stress). <span class="ramp" id="heat-ramp" style="display:none"></span><span id="heat-units">Choose a metric above.</span></div>
 <div class="grid" id="grid">
  <article class="stage" data-policy="sap_rebuild"><div class="head"><strong>01 / Rebuilt SAP</strong><span class="index">REFERENCE</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
  <article class="stage" data-policy="global_guard"><div class="head"><strong>02 / Global Guard</strong><span class="index">LEGACY BASELINE</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
@@ -129,6 +138,42 @@ const sheetMaterials=[
  new THREE.MeshStandardMaterial({color:0xdc9973,metalness:0.02,roughness:0.88,side:THREE.DoubleSide})
 ];
 const obstacleMaterial=new THREE.MeshStandardMaterial({color:0x8194ad,roughness:0.41,metalness:0.12});
+// Color modes are computed only from the unchanged native vertex streams.
+const rest=data.header.initial_positions;
+const palette=[0x3560ac,0x3cc7ae,0xffc167,0xed6650].map(hex=>new THREE.Color(hex));
+let surfaceMode='material';
+function metricColor(v){
+ const s=Math.max(0,Math.min(.99999,v))*3,idx=Math.min(2,Math.floor(s));
+ return palette[idx].clone().lerp(palette[idx+1],s-idx);
+}
+function vertexHeat(positions){
+ const n=positions.length,measure=new Float32Array(n),counts=new Uint16Array(n);
+ if(surfaceMode==='displacement'){
+   const denom=Math.max(1e-7,span*.30);
+   for(let i=0;i<n;i++){
+     const a=positions[i],b=rest[i];
+     measure[i]=Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2])/denom;
+   }
+ }else if(surfaceMode==='strain'){
+   for(const tri of triangles){
+     for(const [a,b] of [[tri[0],tri[1]],[tri[1],tri[2]],[tri[2],tri[0]]]){
+       const p=positions[a],q=positions[b],po=rest[a],qo=rest[b];
+       const oldLength=Math.hypot(po[0]-qo[0],po[1]-qo[1],po[2]-qo[2]);
+       if(oldLength<1e-10)continue;
+       const current=Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
+       const change=Math.abs(current/oldLength-1);
+       measure[a]+=change;measure[b]+=change;counts[a]++;counts[b]++;
+     }
+   }
+   for(let i=0;i<n;i++)measure[i]=measure[i]/Math.max(1,counts[i])/.25;
+ }
+ const rgb=new Float32Array(n*3);
+ for(let i=0;i<n;i++){
+   const c=metricColor(measure[i]);
+   rgb[i*3]=c.r;rgb[i*3+1]=c.g;rgb[i*3+2]=c.b;
+ }
+ return rgb;
+}
 const obstacleSphere=new THREE.SphereGeometry(1,32,24);
 const rigs=[];
 let syncing=false;
@@ -217,9 +262,15 @@ function putFrame(f){
  for(const rig of rigs){
   const native=data.policies[rig.name][frame];
   const vertices=new Float32Array(native.positions.flat());
+  const overlay=surfaceMode==='material'?null:vertexHeat(native.positions);
   for(const sheet of rig.cloth){
     sheet.geometry.attributes.position.array.set(vertices);
     sheet.geometry.attributes.position.needsUpdate=true;
+    if(overlay){
+      const existing=sheet.geometry.getAttribute('color');
+      if(existing){existing.array.set(overlay);existing.needsUpdate=true;}
+      else sheet.geometry.setAttribute('color',new THREE.BufferAttribute(overlay.slice(),3));
+    }
     sheet.geometry.computeVertexNormals();
   }
   for(let i=0;i<rig.spheres.length;i++){
@@ -265,6 +316,23 @@ document.getElementById('spheres').addEventListener('change',ev=>{
 });
 document.getElementById('sheet-b').addEventListener('change',ev=>{
  for(const rig of rigs)rig.cloth[1].visible=ev.target.checked;
+});
+document.getElementById('surface-mode').addEventListener('change',ev=>{
+ surfaceMode=ev.target.value;
+ const overlay=surfaceMode!=='material';
+ for(const rig of rigs)for(let i=0;i<rig.cloth.length;i++){
+   const mesh=rig.cloth[i];
+   mesh.material.vertexColors=overlay;
+   mesh.material.color.set(overlay?0xffffff:(i===0?0x3c9db4:0xdc9973));
+   mesh.material.needsUpdate=true;
+ }
+ document.getElementById('heat-ramp').style.display=overlay?'inline-block':'none';
+ document.getElementById('heat-units').textContent=surfaceMode==='strain'
+   ?'Blue = 0%; red = 25%+ mean absolute edge-length change from rest geometry.'
+   :surfaceMode==='displacement'
+   ?'Blue = zero; red = 30%+ of full-scene span displaced from original positions.'
+   :'Original material shading.';
+ putFrame(frame);
 });
 document.getElementById('reset').addEventListener('click',()=>{
  for(const rig of rigs){rig.camera.position.copy(initialCamera);rig.control.target.copy(center);rig.control.update();}
