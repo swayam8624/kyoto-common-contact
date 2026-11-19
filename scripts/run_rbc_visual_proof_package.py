@@ -26,6 +26,7 @@ import json
 import math
 import platform
 import subprocess
+import importlib.util
 from collections import defaultdict
 from pathlib import Path
 
@@ -78,7 +79,43 @@ def require_native_csv(source:Path, frames:int, geo:int,topo:int)->dict:
     }
 
 
+def check_dependencies(args)->None:
+    # Fail BEFORE creating any immutable output directory or running
+    # native physics. In particular, broken Homebrew Node must not
+    # waste a full 80-frame run only to fail at offline packaging.
+    missing=[p for p in ("numpy","PIL") if importlib.util.find_spec(p) is None]
+    if missing:
+        raise RuntimeError(
+            "Missing Python rendering libraries: "+", ".join(missing)+
+            ". Use a clean environment; do not forcibly alter Conda base.")
+    if args.offline:
+        root=Path(__file__).resolve().parents[1]
+        esbuild=root/"node_modules"/".bin"/"esbuild"
+        three=root/"node_modules"/"three"/"package.json"
+        if not esbuild.is_file() or not three.is_file():
+            raise RuntimeError(
+                "Offline WebGL needs the local pinned Three.js and esbuild "
+                "dependencies. Your native C++ experiment does NOT need "
+                "npm: omit --offline to generate original solver evidence, "
+                "the source-verified GIF and an internet-backed HTML viewer. "
+                "Repair Homebrew Node before requesting the self-contained "
+                "HTML bundle.")
+        try:
+            version=subprocess.run([str(esbuild),"--version"],
+                capture_output=True,text=True,timeout=15,check=False)
+        except (OSError,subprocess.TimeoutExpired) as exc:
+            raise RuntimeError(
+                "Local esbuild cannot start. Omit --offline to finish "
+                "the native experiment and online viewer without npm.") from exc
+        if version.returncode!=0:
+            raise RuntimeError(
+                "Local esbuild is unusable: "+
+                (version.stderr[:300] or str(version.returncode))+
+                ". Omit --offline to generate the full native data/GIF "
+                "and internet-backed viewer.")
+
 def execute(args)->dict:
+    check_dependencies(args)
     if args.output.exists():
         raise FileExistsError(
             "Research package output already exists; never overwrite original evidence")
