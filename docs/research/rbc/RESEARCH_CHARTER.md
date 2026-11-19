@@ -150,21 +150,33 @@ alone can miss a mid-step collision.** Require independently proved
 path-envelope bounds. Even a correct swept broad phase does NOT
 solve continuous narrow-phase triangle collision detection.
 
-### E. Cluster-relative budgets — planned, not yet an engine
+### E. Translation-compensated certificates — global Stage 0 IMPLEMENTED
 
-When two primitives undergo exactly the same cluster translation,
-their mutual AABB box gap remains the same. Translation can be
-factored out for intra-cluster pairs. More generally decompose
-face motion into a cluster translation and bounded residual.
-Then intra-cluster pair gap changes are bounded by the residual
-motions, and inter-cluster motion by relative cluster translations
-plus residuals.
+Two primitives undergoing exactly the SAME common translation preserve
+their box gaps. The Stage-0 oracle now has query_translated(), accepting
+a solver-supplied *cumulative* whole-scene translation. It subtracts
+that translation from every CURRENT six-face displacement before checking
+the reference skin. A shared translation of 1000 world units may
+therefore preserve the original potential pair certificate rather than
+force a stale-cache rebuild, provided relative face residual is
+at most skin_i. False/missing hints are safe: direct measured residual
+validation forces an exact rebuild. This is accompanied by
+tests/rbc_reach_budget_tests.cpp property and negative-control cases.
+
+**NOT YET IMPLEMENTED:** multiple independently translating clusters,
+hierarchical patch fronts, inter-cluster relative-motion certificates
+and solver-predicted prospective motion bound consumption. For
+separate clusters, a single global translation cannot be cancelled
+for each pair; validity needs a checked inter-cluster relative
+translation plus two residual bounds. A mesh partition must not
+silently ignore nonlocal folded contacts or interactions between
+different sheets.
 
 A *measured* residual after motion is valid for an a posteriori
 candidate check. A *predicted* residual used to skip query work
-before motion must be a guaranteed upper bound, not an EWMA
-or visual estimate. The cluster partition must not silently
-ignore folded nonlocal contacts or different sheets.
+before motion must be a GUARANTEED bound, not an EWMA or a visual
+estimate. No performance advantage is claimed from the current
+O(N^2) reference-list implementation.
 
 ### F. Margin cost model — an idealized, falsifiable model
 
