@@ -14,7 +14,7 @@ unuploaded CSVs.
 ## Actual workload and correctness contract
 
 * 36 naturally stepped material trajectories (60 frames each) with
-  three seeds (3203, 3217, 3251) per material/regime/size condition.
+  three seed values (3203, 3217, 3251) per material/regime/size condition. The material generator uses seed % 101 as a phase offset in its forcing; geometry and topology are otherwise identical for a given material/size. These are phase-varied replicates, NOT independent initial-condition samples.
 * 3 deliberately artificial whole-scene rigid-translation diagnostics.
 * Original 11 CPU AABB candidate algorithms executed including real Bullet
   DBVT. Trained ML was NOT executed, and cannot be ranked.
@@ -111,8 +111,7 @@ and is NOT physical cloth or general solver speedup.
   solver time, cloth self-interaction correction, or improved folding.
 * It does not contain repeated A/A trials on one machine and cannot
   support a population-level confidence interval.
-* Three different seeds with a fixed fixture generator are not three
-  independently calibrated physical experiments.
+* Three different seeds here change the forcing phase but NOT the generated initial geometry or topology. They are not independent physical scene samples.
 * Earlier V5/V6 synthetic results and later Phase 16 million-AABB
   digest/count-only results are different cohorts, so they are
   neither pooled nor overwritten.
@@ -126,7 +125,7 @@ research/kyoto-decision-coverage branch:
     open output/kyoto-decision-mac-first/verified-all-methods-v1/VERIFIED_ALL_METHODS.md
 
 The analyzer intentionally refuses overwritten output or tampered source
-SHA-256, validates framewise SAP pairs and original execution order,
+SHA-256, validates framewise SAP pair counts and hashes (not saved raw pair-ID lists) and original execution order,
 and treats natural dynamics and artificial translation as separate cohorts.
 
 Research recommendation: do not retune frozen V4 from these scenes.
