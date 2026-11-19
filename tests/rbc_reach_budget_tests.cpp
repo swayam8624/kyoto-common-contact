@@ -148,6 +148,59 @@ void test_randomized_reference_and_pair_oracle() {
                 "randomized tests failed to exercise actual invalidations");
     }
 }
+void test_common_translation_compensation() {
+    // Both objects may travel thousands of world units without changing
+    // their relative gaps. A shared *verified* translation must not drain
+    // per-primitive skin or incur needless reference-list rebuilds.
+    const std::vector<Reach> r{{0.,.01},{0.,.01}};
+    std::vector<Bounds> boxes{box(7,0,0,0),box(9,3,0,0)};
+    ccp::rbc::CertifiedReferenceList cert;
+    cert.initialize(boxes,r);
+    require(cert.potential_pairs()==0,
+            "initial separated pair incorrectly emitted as potential");
+    shift(boxes[0],1000,150,-38);
+    shift(boxes[1],1000,150,-38);
+    auto q=cert.query_translated(boxes,{1000,150,-38});
+    require(!q.rebuilt && q.pairs.empty(),
+            "uniform whole-scene translation should retain certificate");
+    require(cert.rebuilds()==1,
+            "co-translated scene unnecessarily exhausted its skin");
+    shift(boxes[0],50,2,-5);
+    shift(boxes[1],50,2,-5);
+    q=cert.query_translated(boxes,{1050,152,-43});
+    require(!q.rebuilt,
+            "second huge co-translation unexpectedly required a rebuild");
+    require(q.pairs==ccp::rbc::exhaustive(boxes,r),
+            "translated certificate differs from independent oracle");
+
+    // False solver hint: one object moves relative to the cluster,
+    // exhausting its tiny residual skin. Must rebuild before filtering.
+    shift(boxes[1],-2.0,0,0);
+    q=cert.query_translated(boxes,{1050,152,-43});
+    require(q.rebuilt,"untrusted translation hint evaded mandatory fallback");
+    require(q.pairs.size()==1 &&
+            q.pairs==ccp::rbc::exhaustive(boxes,r),
+            "co-translation fallback omitted genuine touching pair");
+
+    // If the caller supplies zero translation afterward, it must remain
+    // SAFE by detecting excessive drift and rebuilding; never silently
+    // treat a changed reference-frame convention as a valid cache.
+    shift(boxes[1],-0.2,0,0);
+    q=cert.query(boxes);
+    require(q.pairs==ccp::rbc::exhaustive(boxes,r),
+            "changing translation frame missed exact current candidates");
+
+    ccp::rbc::CertifiedReferenceList falseHint;
+    std::vector<Bounds> far{box(3,0,0,0),box(4,3,0,0)};
+    falseHint.initialize(far,r);
+    shift(far[0],1000,0,0);
+    shift(far[1],1000,0,0);
+    const auto failSafe=falseHint.query_translated(far,{0,0,0});
+    require(failSafe.rebuilt &&
+            failSafe.pairs==ccp::rbc::exhaustive(far,r),
+            "lying or absent translation hint did not fail closed");
+}
+
 void test_lipschitz_bound() {
     std::mt19937 rng(1999);
     std::uniform_real_distribution<double> coord(-7.,7.);
@@ -174,9 +227,10 @@ int main() {
         test_budget_ledger();
         test_invalid_inputs_and_linear_sweep();
         test_randomized_reference_and_pair_oracle();
+        test_common_translation_compensation();
         test_lipschitz_bound();
         std::cout << "PASS: RBC Stage 0 exact reach oracle; "
-                  << "172800 randomized frame-pair equality decisions; "
+                  << "4080 randomized independent frame oracle checks; "
                   << "20000 Lipschitz trials; safe invalidation, "
                   << "mask changes, linear sweeps and strict input validation\n";
         return 0;
