@@ -8,6 +8,7 @@
 // novelty beyond existing BVH/fat-bound techniques requires literature proof.
 #include "ccp/live_cloth.hpp"
 #include "ccp/final_broadphase.hpp"
+#include "ccp/rbc/certified_spatial_frontier.hpp"
 #include "ccp/online_partitioner.hpp"
 #include <array>
 #include <cstddef>
@@ -19,7 +20,8 @@ namespace ccp::research {
 using Vec3 = live::Vec3;
 using Bounds = live::Bounds;
 using Pair = live::Pair;
-enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware, FinalBounded };
+// Keep every historical policy numeric identity; append RBC as an opt-in arm.
+enum class Policy { RebuildSAP, GlobalGuard, RegionalCertified, OnlineContactAware, FinalBounded, RBCSpatialCertified };
 struct Sphere { Vec3 center; double radius; };
 struct Primitive { Bounds box; int region{}, sheet{}; };
 // Snapshot of the last completed physical timestep. Most counters accumulate
@@ -37,7 +39,9 @@ struct Metrics {
               regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
               onlineStrategySwitches{},
               frozenGuardQueries{},frozenSapQueries{},frozenTrialQueries{},
-              frozenSwitches{};
+              frozenSwitches{},
+              rbcQueries{},rbcGlobalBuilds{},rbcDirtyRepairs{},
+              rbcPotentialPairs{},rbcIndexComparisons{},rbcCandidateChecks{};
   double grabError{}, broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
          onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{},
          maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
@@ -160,6 +164,8 @@ private:
   void assignOnlineRegionIds();
   live::BroadPhaseService global_;
   ccp::final_broadphase::GuardSAPBoundedTrial finalBounded_;
+  // Independent opt-in certified frontier, reset on fixture/solver changes.
+  ccp::rbc::CertifiedSpatialFrontier rbc_;
   Metrics metrics_;
   void updateSpheres(double t);
   std::vector<Primitive> makePrimitives() const;
