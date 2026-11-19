@@ -1,6 +1,6 @@
 // RBC / Kyoto physical contact solver tournament, opt-in new experiment.
 //
-// Four REAL policies execute the SAME seeded XPBD-style solver with
+// Five REAL policies execute the SAME seeded XPBD-style solver with
 // identical geometry, constraints, forcing and contact projection:
 // rebuilt SAP, original global Guard, frozen V4 and NEW RBC indexed frontier.
 //
@@ -34,12 +34,12 @@ namespace {
 using ccp::research::MultiCloth;
 using ccp::research::Policy;
 using Vec3=ccp::research::Vec3;
-constexpr std::array<const char*,4> names{
-    "sap_rebuild","global_guard","frozen_v4","rbc_indexed"
+constexpr std::array<const char*,5> names{
+    "sap_rebuild","global_guard","frozen_v4","rbc_indexed","rbc_flat"
 };
-constexpr std::array<Policy,4> policies{
+constexpr std::array<Policy,5> policies{
     Policy::RebuildSAP, Policy::GlobalGuard, Policy::FinalBounded,
-    Policy::RBCSpatialCertified
+    Policy::RBCSpatialCertified,Policy::RBCFlatCertified
 };
 int integer(const char* text,int min,int max){
     std::size_t pos=0;long long value=0;
@@ -121,7 +121,10 @@ void execute(const char* destination,int frames,
           "oracle_misses,oracle_checked,"
           "rbc_queries,rbc_index_builds,rbc_local_repairs,"
           "rbc_potential_pairs_sum,rbc_index_comparisons,"
-          "rbc_candidate_checks,rbc_last_event\n";
+          "rbc_candidate_checks,"
+          "rbc_flat_queries,rbc_flat_index_builds,rbc_flat_local_repairs,"
+          "rbc_flat_potential_pairs_sum,rbc_flat_index_comparisons,"
+          "rbc_flat_candidate_checks,rbc_last_event\n";
     std::vector<std::unique_ptr<MultiCloth>> sims;
     constexpr int tri=2*(5*12+5);
     for(Policy policy:policies) {
@@ -148,13 +151,14 @@ void execute(const char* destination,int frames,
     }
     const Vec3 anchor=pick(*sims[0],tri);
     RestQuality rest(*sims[0]);
-    std::array<double,4> broadTotal{},stepTotal{};
-    std::array<std::size_t,4> solverContactTotal{},candidates{};
+    std::array<double,5> broadTotal{},stepTotal{};
+    std::array<std::size_t,5> solverContactTotal{},candidates{};
     std::size_t allRbcBuilds=0,allRbcRepairs=0,allRbcIndexTests=0;
+    std::size_t allFlatBuilds=0,allFlatRepairs=0,allFlatIndexTests=0;
     for(int frame=0;frame<frames;++frame){
-        std::array<int,4> slots{};
-        for(int slot=0;slot<4;++slot) {
-            const int method=(frame+slot)%4;
+        std::array<int,5> slots{};
+        for(int slot=0;slot<5;++slot) {
+            const int method=(frame+slot)%5;
             slots[std::size_t(method)]=slot;
             drive(*sims[std::size_t(method)],scenario,anchor,frame,frames);
             sims[std::size_t(method)]->step();
@@ -198,7 +202,7 @@ void execute(const char* destination,int frames,
                     std::to_string(frame)+" policy="+names[m]+
                     " max_relative_diff="+std::to_string(worst));
             // The strict independent oracle is inside each RBC query.
-            if(strict&&m==3&&!metric.oracleChecked)
+            if(strict&&(m==3||m==4)&&!metric.oracleChecked)
                 throw std::runtime_error(
                     "strict RBC frame lacked any independent SAP oracle check");
             const double maxStretch=rest.maxStretch(sim);
@@ -211,6 +215,11 @@ void execute(const char* destination,int frames,
                 allRbcRepairs+=metric.rbcDirtyRepairs;
                 allRbcIndexTests+=metric.rbcIndexComparisons;
             }
+            if(m==4){
+                allFlatBuilds+=metric.rbcFlatGlobalBuilds;
+                allFlatRepairs+=metric.rbcFlatLocalRepairs;
+                allFlatIndexTests+=metric.rbcFlatIndexComparisons;
+            }
             out<<frame<<','<<names[m]<<','<<scenario<<','<<geo<<','<<topo
                <<','<<int(strict)<<','<<slots[m]<<','
                <<metric.stepMs<<','<<metric.broadMs<<','<<metric.narrowMs<<','
@@ -222,12 +231,19 @@ void execute(const char* destination,int frames,
                <<metric.rbcGlobalBuilds<<','<<metric.rbcDirtyRepairs<<','
                <<metric.rbcPotentialPairs<<','
                <<metric.rbcIndexComparisons<<','
-               <<metric.rbcCandidateChecks<<','<<metric.lastEvent<<'\n';
+               <<metric.rbcCandidateChecks<<','
+               <<metric.rbcFlatQueries<<','
+               <<metric.rbcFlatGlobalBuilds<<','
+               <<metric.rbcFlatLocalRepairs<<','
+               <<metric.rbcFlatPotentialPairs<<','
+               <<metric.rbcFlatIndexComparisons<<','
+               <<metric.rbcFlatCandidateChecks<<','
+               <<metric.lastEvent<<'\n';
         }
     }
     if(!out)throw std::runtime_error("coupled physical CSV write failed");
     std::cout<<std::fixed<<std::setprecision(5)
-             <<"PASS RBC 4-policy ACTUAL coupled solver "
+             <<"PASS RBC 5-policy ACTUAL coupled solver "
              <<scenario<<" frames="<<frames<<" 2 sheets 2 spheres "
              <<"geometry="<<geo<<" topology="<<topo
              <<" strict_every_rbc_solver_query="<<strict<<"\n";
@@ -240,6 +256,9 @@ void execute(const char* destination,int frames,
     std::cout<<"RBC total builds="<<allRbcBuilds
              <<" local repairs="<<allRbcRepairs
              <<" paid index comparisons="<<allRbcIndexTests<<"\n"
+             <<"RBC flat total builds="<<allFlatBuilds
+             <<" local repairs="<<allFlatRepairs
+             <<" paid index comparisons="<<allFlatIndexTests<<"\n"
              <<"One execution per policy per scene; NO A/A, no confidence"
                " interval, no calibrated physical fidelity or CCD claim.\n";
 }
