@@ -74,6 +74,17 @@ void drive(MultiCloth& sim,const std::string& scenario,
         target.x-=1.35*fraction;
         target.y+=.46*std::sin(pi*fraction);
         target.z-=.55*fraction;
+    }else if(scenario=="fold_over"){
+        // New NON-TELEPORTING over-fold challenge: attach the actual
+        // bottom-center barycentric surface and drive it toward/over
+        // the two independently pinned upper corners. Raise first,
+        // then descend through the source sheet's own height.
+        // Existing free/pull/fold forcing and all old evidence unchanged.
+        // This is NOT guaranteed to produce same-sheet contact:
+        // the native self-contact counter must decide that question.
+        target.x+=.14*std::sin(2*pi*fraction);
+        target.y+=2.34*fraction;
+        target.z+=.52*std::sin(pi*fraction)-.045*fraction;
     }else throw std::invalid_argument("unknown coupled drive");
     sim.updateGrab(target);
 }
@@ -126,7 +137,10 @@ void execute(const char* destination,int frames,
           "rbc_flat_potential_pairs_sum,rbc_flat_index_comparisons,"
           "rbc_flat_candidate_checks,rbc_last_event\n";
     std::vector<std::unique_ptr<MultiCloth>> sims;
-    constexpr int tri=2*(5*12+5);
+    // The standard scenario grabs a central triangle. Over-fold
+    // instead chooses a real bottom-center triangle, so continuous
+    // barycentric driving pulls a free flap across the same sheet.
+    const int tri=scenario=="fold_over"?2*(1*12+5):2*(5*12+5);
     for(Policy policy:policies) {
         auto s=std::make_unique<MultiCloth>(2,2,policy);
         if(geo||topo)
@@ -268,11 +282,12 @@ int main(int argc,char** argv){
         if(argc!=7)
             throw std::invalid_argument(
                 "usage: ccp_rbc_coupled_tournament NEW.csv FRAMES(8..160)"
-                " free|pull|fold GEOMETRY_SEED TOPOLOGY_SEED"
+                " free|pull|fold|fold_over GEOMETRY_SEED TOPOLOGY_SEED"
                 " STRICT_AUDIT(0|1)");
         const int frames=integer(argv[2],8,160);
         const std::string scenario(argv[3]);
-        if(scenario!="free"&&scenario!="pull"&&scenario!="fold")
+        if(scenario!="free"&&scenario!="pull"&&scenario!="fold"&&
+           scenario!="fold_over")
             throw std::invalid_argument("unsupported coupled scenario");
         const int geo=integer(argv[4],0,2000000000);
         const int topo=integer(argv[5],0,2000000000);
