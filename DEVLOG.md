@@ -563,3 +563,49 @@ See docs/CBP_PHASE18_AA_REPLICATION_PROTOCOL.md for exact commands
 and measurement boundaries. Next: evaluate actual Mac A/A distributions,
 then consider stricter balanced ABBA sweeps and genuinely independent
 topology/geometry sets. Do not retune V4 with the same evidence.
+
+## 19 November 2026 — 144-repeat Mac A/A evidence; critical labeling audit
+
+Actual Mac: 36 immutable physically stepped material AABB sequences
+replayed four times with independently instantiated Guard and V4 copies:
+144 replay sessions. Guard/V4 natural repeated geomean was 1.0188x
+(previous 1.0306x single-run). Three forcing-phase variants in the
+single rapid-cloth N=1058 geometry family achieved 1.2139x over
+Guard with ZERO selected-backend A/B disagreements. Excluding this
+one strongest condition leaves ~1.0027x across the other eleven
+equal-weighted natural conditions, i.e. no meaningful broad-suite gain.
+
+The two V4 copies disagreed in only seven frame decisions, all in
+sponge baseline N=1331 seed3203 repeat2, with 411 versus 404 SAP
+frames in aggregate. Guard A/B median |log ratio| .02152 and p95
+.16280 are empirical SAME-SNAPSHOT timing differences, NOT
+confidence intervals for true algorithm speed.
+
+Critically, source review of original optional --aa-control revealed
+that the two same-Kind policy copies were shuffled first and only
+THEN assigned A/B labels in execution order. Therefore A was
+ALWAYS earlier than B in the completed 144-run Mac A/A outputs.
+Its A/B reference ratio is confounded with within-run chronological
+position, even though the two methods and caches were genuinely
+independent. Source history and old evidence were preserved.
+
+Fixed the optional A/A scheduler by assigning unique policy identities
+BEFORE shuffling. It now supports either A-first or B-first, and
+a distinct capability marker aa_labels_shuffled_independently.
+New replays refuse stale binaries. Frozen V4 algorithm code,
+original no-A/A material benchmark output, and historic Mac
+snapshots are unchanged.
+
+Added immutable-results-only
+scripts/analyze_kyoto_phase18_aa_robustness.py:
+SHA-validates the 144 old run CSVs and strict SAP pair fingerprints,
+audits the recorded early/late A/B slots, recomputes stored timing
+ratios, reports each actual V4 action-divergent frame, and calculates
+equal-condition leave-one-out and conditional time-repeat resampling.
+NO new timing or material simulation is performed, and no true
+population CI is asserted. Documented all results in
+docs/CBP_PHASE18_MAC_AA_RESULTS_2026-11-19.md.
+
+Next substantive research remains genuinely independent geometry/topology,
+and coupled solver/CCD performance and correctness. Do not manufacture
+ML weights or retune V4 against this already-observed benchmark.
