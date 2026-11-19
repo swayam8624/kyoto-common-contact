@@ -56,7 +56,6 @@ public:
         reach_=reach;
         reference_=input;
         buildAll();
-        anchor_={};
         initialized_=true;
     }
     void reset() noexcept {
@@ -67,7 +66,6 @@ public:
         potential_count_=0;
         total_global_builds_=0;
         total_local_repairs_=0;
-        anchor_={};
         initialized_=false;
     }
     [[nodiscard]] bool initialized() const noexcept {return initialized_;}
@@ -135,7 +133,6 @@ public:
                 ++result.local_repairs;
             }
         }
-        anchor_=cumulativeShift;
         // Iterate symmetric potential neighbor lists once. Reference
         // envelopes DO NOT use compatibility filtering: current masks
         // are applied here, so masks can change while certificates live.
@@ -262,7 +259,6 @@ private:
     std::size_t potential_count_{};
     std::size_t total_global_builds_{};
     std::size_t total_local_repairs_{};
-    ccp::live::Vec3 anchor_{};
     bool initialized_{};
 };
 } // namespace ccp::rbc
