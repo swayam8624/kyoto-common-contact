@@ -157,6 +157,22 @@ int main(){
   World originalVolume("sponge",128,3301,"rapid",first);
   ensure(!connectivityEqual(differentVolume,originalVolume),
          "volumetric cross-bracing did not vary with topology seed");
+  // A change in topologySeed MUST change the physical connectivity,
+  // independently of initial coordinates, across ALL six families.
+  // Previously soft_ball and spring only varied vertex positions;
+  // that would make the phrase "independent topology" misleading.
+  for(const auto* type:{"cloth","sponge","cushion","soft_ball","spring","mixed"}){
+   World base(type,128,3301,"rapid",
+              Variation{73013u,86011u,.012});
+   World changedTopology(type,128,3301,"rapid",
+                         Variation{73013u,86019u,.012});
+   ensure(geometryEqual(base,changedTopology),
+          "independent topology seed unexpectedly changed initial node geometry");
+   ensure(!connectivityEqual(base,changedTopology),
+          "independent topology seed failed to change a material connectivity graph");
+   auditPhysicalState(base);
+   auditPhysicalState(changedTopology);
+  }
   std::cout<<"PASS independent node geometry, material triangulation,"
               " volumetric connectivity, stable IDs, exact V4 AABB pairs,"
               " backward-compatible defaults and finite mesh evolution\n";
