@@ -532,3 +532,78 @@ The comparator distinguishes exact bytewise snapshot SHA matches,
 SAP pair fingerprints, frame-by-frame action equality and policy
 execution slot differences. CI tests both code paths on original
 immutable research source inputs.
+
+
+## RBC integrated Stage 2: 54 material trajectories, 9 coupled physics scenes, and verified true self-contact
+
+The NEW Reach–Budget Calculus research branch now implements
+THREE independent reference/candidate-list strategies:
+- Original exhaustive reach-AABB and motion-certificate oracle.
+- Node-based spatial frontier with per-dirty-object repairs.
+- Contiguous flat packed edge frontier with batched dirty
+  repairs, exact current candidate filtering and per-frame
+  fail-closed motion-certificate invalidation.
+All are additive, not replacements for historical frozen V4.
+
+Source-verified real CPU full-pair native benchmarks
+[54 material scene results](docs/research/rbc/STAGE2_NATIVE_54_AND_9_VERIFIED_RESULTS.md)
+and [12 new-source 10-method 4-repeat A/A results](docs/research/rbc/STAGE2_12_SOURCE_10_METHOD_AA_PILOT_2026-11-19.md)
+are intentionally honest about NEGATIVE results:
+old node RBC Guard/method geomean 0.35631x;
+flat RBC 0.87099x over 54 queried material scenes,
+29/54 wins but severe cushion regression;
+frozen V4 1.08863x. The new 24,960
+native original timed rows (10 methods x 4 repeats
+x 12 scenes x 52 post-warmup frames) include Guard A/A
+and matched .045/.10/.20 skin comparisons. All original
+KYOTOM01 snapshots, pair hashes and source receipts were
+independently checked against original CI artifacts.
+
+**Real solver-in-the-loop source verification**:
+nine free/pull/fold (60-frame) five-policy solver scenes
+Guard/flat whole-step geomean 1.02656x, 8/9 wins,
+but ZERO naturally induced same-sheet self-contact.
+The continued 150-frame barycentric over-fold from
+an initially flat sheet also produced ZERO same-sheet
+responses (preserved NEGATIVE control).
+
+An explicit *prepared initial pre-fold*, not spontaneously
+generated cloth folding, now generates ACTUAL NONLOCAL
+same-sheet corrections in separately stepped XPBD-style
+cloth solvers, with original contact narrow phase,
+true source triangle topology and identical SAP particle
+states across all five policy arms:
+121,376 self-contact corrections and 39,245 discrete
+self-crossing detections in three independent real
+80-frame cloth stress scenes. Experimental Guard/flat
+whole-step geomean 1.08032x, each of three source
+variants faster, but there is NO population CI, CCD,
+calibrated FEM or independent penetration oracle.
+[Pre-fold source evidence and exact caveats](docs/research/rbc/PREPARED_FOLD_REAL_SELF_CONTACT_2026-11-19.md).
+
+For ACTUAL source-backed synchronous 3D cloth panels
+(same mesh, topology, real contact counts and original
+sphere trajectories in five equal-view camera panels),
+the real solver supports an optional nonoverwriting
+mesh JSONL output dir. Requires Pillow for GIF render:
+
+    cmake --preset kyoto-final-cpu
+    cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_rbc_coupled_tournament
+    build/kyoto-final-cpu/ccp_rbc_coupled_tournament output/rbc-mac-prefold-80.csv 80 prefold_relax 73013 86011 0 output/rbc-mac-prefold-mesh
+    python3 scripts/render_rbc_physics_grid.py --mesh-dir output/rbc-mac-prefold-mesh --output output/rbc-mac-prefold-five-policy.gif --stride 3 --fps 12
+
+This makes a continuously looping real-source 3D GIF,
+PNG preview and JSON per-source SHA-256 manifest.
+No generative or re-created mesh is passed off as
+the actual solver. Correct broad-phase replacements
+produce identical physical geometry, NOT visually
+smoother folds; different algorithms change timing.
+
+CI original evidence:
+- https://github.com/swayam8624/kyoto-common-contact/actions/runs/44545519873
+- https://github.com/swayam8624/kyoto-common-contact/actions/runs/44547606970
+- https://github.com/swayam8624/kyoto-common-contact/actions/runs/44549527676
+- https://github.com/swayam8624/kyoto-common-contact/actions/runs/44551401172
+
+All old source and experimental negative controls retained,
+frozen V4 unmodified, archived pre-cleanup tag unaffected.
