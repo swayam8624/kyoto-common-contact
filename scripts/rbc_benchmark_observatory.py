@@ -318,7 +318,10 @@ header{padding:26px 0 28px;border-bottom:1px solid var(--edge)}.meta{color:var(-
 .stat span{display:block;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase}.stat strong{display:block;font-size:28px;margin-top:10px;font-variant-numeric:tabular-nums}
 .dashboard{display:grid;grid-template-columns:1fr 1fr;gap:14px}.wide{grid-column:1/-1}.under{font-size:12px;color:var(--muted);margin:0 0 16px}
 canvas{width:100%;height:310px;display:block;background:#111b28;border:1px solid #243444;border-radius:9px}
-#surface{height:420px;touch-action:none;cursor:grab}#surface:active{cursor:grabbing}
+#surface{height:490px;touch-action:none;cursor:grab}#surface:active{cursor:grabbing}
+#coupled-lines{height:350px}#coupled-heat{height:220px}
+#surface-caption{font-size:12px;line-height:1.6}
+.subtle{font-size:12px;color:#aebfcd;margin-top:12px}
 select{background:#213246;color:var(--text);border:1px solid #3d5367;border-radius:7px;padding:8px}
 .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}.muted{color:var(--muted)}a{color:#a6e8dc}
 table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid #273848;text-align:right;padding:11px 9px}th:first-child,td:first-child{text-align:left}th{color:#a5bfcb;font-weight:650}
@@ -337,17 +340,33 @@ footer{border-top:1px solid var(--edge);margin-top:32px;padding:20px 0;color:var
 <div class="scroll"><table id="leaderboard"></table></div><div id="bars"></div>
 </section>
 <section class="card">
-<h2>Measured speedup heatmap</h2><p class="under">Rows = material; columns = object budget. Each cell is a geometric mean over actual source scenes in that cohort. Blank means unmeasured.</p>
+<h2>Measured speedup heatmap</h2><p class="under">Rows = material family; columns = requested object budget (actual native N may differ). Same-scene Guard / method; above 1× is faster. No cross-material interpolation.</p>
 <div class="controls"><label>Regime <select id="regime"></select></label><label>Method <select id="method"></select></label></div>
 <div id="heatmap"></div>
 </section>
 <section class="card">
-<h2>Interactive 3D performance surface</h2><p class="under">X = object budget, Y = material family, Z = same-scene Guard / selected algorithm. Drag to orbit. This is a 3D graph of real timings, not a physical simulation.</p>
+<h2>3D performance atlas · discrete measured cohorts</h2><p class="under">Independent 3D columns. X = nominal object budget, Y = material category, Z = Guard / selected method speedup. 1× means parity. Drag to orbit; hover for native N. No invented physical simulation or continuity between categories.</p>
 <canvas id="surface"></canvas><div class="muted" id="surfacecaption"></div>
 </section>
 <section class="card wide" id="physical-section">
 <h2>Real coupled-solver comparisons</h2><p class="under">Measured whole-step CPU milliseconds including simulation and broad-phase. These measurements are not interchangeable with query-only speedups.</p>
 <div class="scroll"><table id="physical"></table></div>
+</section>
+<section class="card wide" id="coupled-traces-section">
+<h2>Real coupled-physics time series</h2><p class="under">Original 60-frame native solver observations from the same SHA-verified coupled CSV files used in the table above. These are actual timings, not geometry-proof meshes or repeated sampling sessions.</p>
+<div class="controls"><label>Scenario <select id="coupled-scenario"></select></label><label>Metric <select id="coupled-metric">
+<option value="step_ms">Whole solver step (ms)</option>
+<option value="broad_ms">Broad phase (ms)</option>
+<option value="narrow_ms">Narrow phase (ms)</option>
+<option value="self_contacts">Solver self-contact corrections (count)</option>
+<option value="sphere_contacts">Sphere contact corrections (count)</option>
+<option value="max_stretch">Maximum edge stretch (ratio)</option>
+</select></label></div>
+<canvas id="coupled-lines"></canvas>
+<h2 style="margin-top:22px">Frame × broad-phase policy heatmap</h2>
+<p class="under">Each cell is an original native solver observation; warmup frames are shown, but excluded from reported means.</p>
+<canvas id="coupled-heat"></canvas>
+<div class="subtle">Important: contact correction counts are solver diagnostics, not a proof of zero nonlocal mesh penetrations or continuous collision detection.</div>
 </section>
 <section class="card wide" id="proof-section">
 <h2>Five-policy synchronized physics evidence</h2><p class="under">Original C++ time series. The contact/intersection plot uses SAP reference alone to avoid counting the same physical trajectory five times.</p>
