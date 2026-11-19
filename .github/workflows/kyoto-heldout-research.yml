@@ -50,7 +50,7 @@ jobs:
             --budgets 128 \
             --heldout-count 2 \
             --frames 12 --warmup 2 \
-            --coupled-frames 8 \
+            --coupled-frames 48 \
             --coupled-scenarios free fold
       - name: Strict source fingerprints, pair and coupled mesh audit
         run: |
