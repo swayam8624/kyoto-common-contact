@@ -410,7 +410,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
  pinned_.clear();initialPins_.clear();constraints_.clear();spheres_.clear();
  grab_={};
- regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();metrics_={};
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();rbcFlat_.reset();metrics_={};
  const double spacing=2.2/(kSide-1);
  const auto mix32=[](std::uint32_t x){
   x^=x>>16;x*=0x7feb352du;
@@ -516,7 +516,7 @@ void MultiCloth::setPolicy(Policy policy){
   patchCellSpan_=0;
   setPatchCellSpan(span);
  }
- regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();rbcFlat_.reset();
 }
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
 void MultiCloth::setHierarchicalRegions(bool enabled){
@@ -562,6 +562,7 @@ void MultiCloth::setSelfCollisions(bool enabled){
  regional_.reset();
  global_.invalidate(); // eligibility masks now include/exclude same-sheet pairs
  rbc_.reset(); // conservative reset on solver collision-mask setting changes
+ rbcFlat_.reset();
 }
 // Same-cloth triangles in the same cell or neighboring mesh cells share
 // an edge, vertex or structural one-ring neighborhood. Excluding them
@@ -1027,6 +1028,27 @@ void MultiCloth::step(){
    metrics_.rbcCandidateChecks+=outcome.query_pair_checks;
    metrics_.lastEvent=outcome.global_rebuilt?"RBC_GLOBAL_REBUILD":
      outcome.local_repairs?"RBC_LOCAL_REPAIR":"RBC_CERTIFICATE_REUSE";
+  }else if(policy_==Policy::RBCFlatCertified){
+   // Independent contiguous pair-front alternative. It shares exact
+   // reach/motion semantics with the node-set RBC policy but its
+   // flat edge storage reduces allocator pressure in contact-heavy
+   // worlds. Keep both as genuine comparison arms.
+   const auto beforeBuilds=rbcFlat_.global_builds();
+   if(!rbcFlat_.initialized()){
+    const std::vector<ccp::rbc::Reach> reach(
+      bounds.size(),ccp::rbc::Reach{kMargin*.5,.045});
+    rbcFlat_.initialize(bounds,reach);
+   }
+   auto outcome=rbcFlat_.query(bounds);
+   pairs=std::move(outcome.pairs);
+   ++metrics_.rbcFlatQueries;
+   metrics_.rbcFlatGlobalBuilds+=rbcFlat_.global_builds()-beforeBuilds;
+   metrics_.rbcFlatLocalRepairs+=outcome.local_repairs;
+   metrics_.rbcFlatPotentialPairs+=outcome.potential_pairs;
+   metrics_.rbcFlatIndexComparisons+=outcome.build_comparisons;
+   metrics_.rbcFlatCandidateChecks+=outcome.query_pair_checks;
+   metrics_.lastEvent=outcome.global_rebuilt?"RBC_FLAT_GLOBAL_BUILD":
+     outcome.local_repairs?"RBC_FLAT_LOCAL_REPAIR":"RBC_FLAT_REUSE";
   }else{
    // Pad only the query copy. The independent brute-force oracle below
    // starts from RAW geometry bounds and must not pad a second time.
@@ -1043,7 +1065,7 @@ void MultiCloth::step(){
   }
   metrics_.candidatePairs=pairs;
   if(auditing_&&(
-      policy_==Policy::RBCSpatialCertified||
+      (policy_==Policy::RBCSpatialCertified||policy_==Policy::RBCFlatCertified)||
       ((iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)))){
    std::vector<Bounds> exact;
    exact.reserve(bounds.size());
@@ -1063,7 +1085,7 @@ void MultiCloth::step(){
    }
    if(policy_==Policy::RegionalCertified&&pairs!=oracle)
     throw std::runtime_error("REGIONAL EXACT-CURRENT AABB REVALIDATION DISAGREES");
-   if(policy_==Policy::RBCSpatialCertified&&pairs!=oracle)
+   if((policy_==Policy::RBCSpatialCertified||policy_==Policy::RBCFlatCertified)&&pairs!=oracle)
     throw std::runtime_error("RBC EXACT-CURRENT AABB CANDIDATES DISAGREE WITH SAP");
    metrics_.oracleChecked=true;
   }
