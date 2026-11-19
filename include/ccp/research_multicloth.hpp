@@ -78,6 +78,12 @@ class MultiCloth {
 public:
   explicit MultiCloth(int sheetCount=3,int sphereCount=2,Policy policy=Policy::RegionalCertified);
   void reset(int sheetCount,int sphereCount);
+  // Research-only INDEPENDENT initial mesh perturbation + topology seed.
+  // Opt-in. Both zeros preserve historical MultiCloth fixtures exactly.
+  // Applies only before a simulation starts and reconstructs all particles,
+  // triangles, constraints and broad-phase controller caches.
+  void setFixtureVariation(std::uint32_t geometrySeed,
+                           std::uint32_t topologySeed,double jitter=.010);
   void step();
   void setPolicy(Policy policy);
   void setAdaptive(bool adaptive);
@@ -124,6 +130,8 @@ public:
 private:
   struct Constraint {int a{},b{};double length{},compliance{},lambda{};};
   int sheets_{3},balls_{2},frame_{},patchCellSpan_{3};
+  std::uint32_t fixtureGeometrySeed_{},fixtureTopologySeed_{};
+  double fixtureJitter_{.010};
   Policy policy_{Policy::RegionalCertified};
   bool adaptive_{true},auditing_{false},hierarchicalRegions_{false},selfCollisions_{true};
   struct Grab {
