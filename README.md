@@ -8,6 +8,87 @@ exploratory BVHs. It is **not** a continuous collision detector and the
 standalone V4 CPU algorithm has **not** been shown to improve the complete
 coupled cloth solver's time or physical fidelity.
 
+## New RBC research: fixed the REAL cloth intersection problem
+
+**19 November 2026 — physical geometry audit and visual correction.**
+The first RBC folded-cloth GIF was PHYSICALLY INVALID:
+an artificially mirrored flap started through the upper
+sheet, and the discrete solver did not remove all
+nonlocal intersections. An independent post-step
+triangle piercing audit measured 45 crossings at
+frame 0 and 31 still remaining at frame 79 on the
+source scenario. Original native contact correction
+counts and cross-policy AABB/particle parity did NOT
+establish collision-free cloth.
+
+**Do not cite the old prepared-fold 121,376 contact
+corrections as evidence of accurate resolved physics.**
+The original negative source, controller, methods,
+SHA manifests and historical V4 remain intact.
+
+A NEW separate rounded_fold_relax source constructs
+the original deformable mesh along a smooth finite-radius
+U-turn with positive clearance, retains original
+springs/topology/anchors and moves the second cloth
+sheet rigidly into a separate observation bay. It is
+still a deliberately prepared initial fold, not a
+flat-to-fold spontaneous result.
+
+The independent correctness gate NOW requires:
+- five independently stepped original C++ broad phases;
+- full exact current SAP candidate/particle-state parity;
+- strictly ZERO nonlocal same-sheet triangle-edge
+  piercings at every original recorded frame;
+- a separate source-based Python audit of seven linearly
+  interpolated subframes between every two actual steps;
+- original 3D vertex/triangle/sphere SHA-256 provenance,
+  with every previous invalid stress fixture preserved.
+
+Verified three source variations x 80 real physical frames:
+**zero** measured strict nonlocal piercings across
+240 true frame endpoints plus **1,680** linearly
+sampled intermediate states. There are still
+**644 real solver same-sheet contact corrections** in
+the three SAP-reference trajectories. These are not
+true swept CCD or coplanar-contact correctness proofs.
+
+New downloadable visual formats:
+- depth-buffered, shaded **real-source five-policy GIF**
+  with a sixth magnified original cloth-fold view;
+- offline single HTML with embedded pinned Three.js
+  and all FIVE original solver source streams: orbit
+  real 3D cloth, scrub all frames, isolate the folded
+  sheet, view original native timings, check
+  original penetration counters and inspect wireframe;
+- original solver CSVs/JSONLs and independent
+  geometry/visual receipt manifests.
+
+[Read the physical and visual failure postmortem](docs/research/rbc/GEOMETRY_VALIDITY_VISUAL_POSTMORTEM_2026-11-19.md).
+
+Run a complete new source-verified package ONCE from your
+Mac. Requires original C++23 solver build, NumPy/Pillow,
+and local Node packages Three.js 0.180.0 and esbuild
+0.25.12 for offline WebGL:
+
+~~~bash
+git switch research/reach-budget-calculus
+git pull --ff-only origin research/reach-budget-calculus
+cmake --preset kyoto-final-cpu
+cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_rbc_coupled_tournament ccp_rbc_physical_geometry_tests
+ctest --test-dir build/kyoto-final-cpu -R 'rbc_' --output-on-failure
+python3 -m pip install numpy Pillow
+npm install --no-save --no-package-lock three@0.180.0 esbuild@0.25.12
+python3 scripts/run_rbc_visual_proof_package.py --solver build/kyoto-final-cpu/ccp_rbc_coupled_tournament --output output/rbc-clean-physics-mac-01 --frames 80 --geometry-seed 73013 --topology-seed 86011 --subdivisions 8 --stride 3 --fps 12 --offline
+open output/rbc-clean-physics-mac-01/INTERACTIVE_ORIGINAL_PHYSICS.html
+open output/rbc-clean-physics-mac-01/ACTUAL_CLOTH_FIVE_POLICIES.gif
+~~~
+
+Do not rerun to an existing output directory: this
+pipeline refuses to overwrite original evidence.
+It is a genuine, single-command physical validation
+and visualization workflow, NOT an ML-rendered
+fake cloth animation.
+
 ## Final measured result — no re-tuning required
 
 Across the independent 864-scene V6 confirmation (three timing repetitions
