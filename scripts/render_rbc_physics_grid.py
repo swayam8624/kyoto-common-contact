@@ -175,13 +175,25 @@ def render(sources:dict, output:Path, stride:int, fps:int,
                    f"broad {metric['broad_ms']:.3f} ms",
                    fill=(190,208,221),font=small)
             sheet.paste(panel,(col*panel_width,row*panel_height))
+        # The sixth cell is a dedicated legend; captions NEVER overlay
+        # the real source-mesh comparison panels.
         d=ImageDraw.Draw(sheet)
-        d.text((panel_width+15,panel_height+20),
-               "EXACT SAME PHYSICAL STATE | Different charged candidate generators",
-               fill=(246,241,228),font=font)
-        d.text((panel_width+15,panel_height+45),
-               "Prepared folded input - not spontaneous flat-cloth folding or CCD",
-               fill=(192,198,212),font=small)
+        ox=panel_width*2
+        oy=panel_height
+        d.rectangle((ox+2,oy+2,ox+panel_width-2,oy+panel_height-2),
+                    fill=(29,36,48),outline=(74,81,96),width=2)
+        d.text((ox+18,oy+24),"SCIENTIFIC CONTROL",fill=(243,237,225),font=font)
+        for k,line in enumerate((
+            "Five independently run policies",
+            "Same original physical geometry",
+            "Identical real contact response",
+            "Only broad-phase work differs",
+            "Prepared pre-folded source mesh",
+            "Not spontaneous fold or CCD proof",
+            "Original source SHA256 in manifest",
+            "Timings = per-policy native step"
+        )):
+            d.text((ox+18,oy+57+k*25),line,fill=(193,204,220),font=small)
         images.append(sheet)
     output.parent.mkdir(parents=True,exist_ok=True)
     images[0].save(output,save_all=True,append_images=images[1:],
