@@ -463,3 +463,45 @@ deformation improvement or universal online-policy speedup follow from
 this activation check. The complete Mac decision matrix is reproducible
 through scripts/run_kyoto_decision_coverage.py and documented in
 docs/CBP_DECISION_COVERAGE_EXPERIMENT.md.
+
+
+## 19 November 2026 — Mac completed Phase 18 decision coverage
+
+The user actually executed the original CPU replay across 36 natural
+mass-spring material trajectories and 3 separate artificial diagnostics:
+3 unique seeds, 2 requested scene budgets, cloth/sponge/mixed,
+baseline/rapid regimes, 60 frames per trajectory. Build succeeded with
+AppleClang; external Bullet generated only third-party warnings.
+All eleven CPU methods completed and full current-AABB candidate
+pair hashes were checked against independent SAP by the runner.
+No trained ML weights were supplied.
+
+Actual natural V4 actions: 2059 Guard, 101 SAP, 40 SAP-trial frames,
+7 switches (2160 total frames). Warm Guard/V4 trajectory-geomean was
+1.030587x, with 21/36 wins. Three rapid cloth N=1058 trajectories
+actually transitioned to sustained SAP and achieved 1.3275x, 1.2763x
+and 1.1414x respectively; two sponge N=1331 trajectories returned
+to Guard after 8-frame trials and lost relative to Guard.
+
+Artificial N=1058 rigid translation controls had 9 Guard + 171 SAP
+frames, 24 trial frames and three switches; these do NOT represent
+physically solved deformation and are excluded from natural aggregation.
+
+Important distinction: this 3.1% overall improvement on the selected
+natural fixture family is not a general paper-level result without
+replicated A/A and timing/order controls, and earlier <384-object
+Phase 17 negative results remain unchanged. See the preserved
+source-derived receipt in docs/CBP_PHASE18_MAC_ACTUAL_2026-11-19.md.
+
+The first report retained Guard/V4 timing but omitted actual timing
+summaries for the ten other algorithms despite executing them. A new
+post-run source-SHA-verified analyzer
+scripts/analyze_kyoto_decision_coverage.py reuses EXISTING Mac CSVs,
+checks every replay against SAP again, reports all algorithms by
+geometric means, stratifies natural material conditions, separately
+reports rigid-translation performance, and refuses data corruption or
+overwrite. Linux CI with intentionally altered source hash PASSED:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461
+
+No changes were made to the frozen V4 controller, the trained model,
+the old scientifically frozen results, or large-scale CBP core.
