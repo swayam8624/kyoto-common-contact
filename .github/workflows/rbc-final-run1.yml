@@ -1,0 +1,69 @@
+name: RBC final Run-1 paired flat V4 A-A native smoke
+
+on:
+  push:
+    paths:
+      - "apps/rbc_final_repeated.cpp"
+      - "scripts/run_rbc_final_repeated.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/rbc-final-run1.yml"
+  pull_request:
+    paths:
+      - "apps/rbc_final_repeated.cpp"
+      - "scripts/run_rbc_final_repeated.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/rbc-final-run1.yml"
+  workflow_dispatch:
+
+jobs:
+  verify-11-policy-source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python syntax validation
+        run: python3 -m py_compile scripts/run_rbc_final_repeated.py
+      - name: Build ONLY original source exporter and NEW final repeat runner
+        run: |
+          cmake -S . -B build/rbc-final-smoke -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/rbc-final-smoke --parallel 2 --target ccp_material_export ccp_rbc_final_repeated
+      - name: Export one small real geometry source
+        run: |
+          mkdir -p build/rbc-final-smoke/source
+          build/rbc-final-smoke/ccp_material_export \
+            build/rbc-final-smoke/source/cloth.kmcb cloth 128 24 1409 shear 73013 86011
+      - name: Generate a native-source SHA256 manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          path=Path("build/rbc-final-smoke/source/cloth.kmcb")
+          sha=hashlib.sha256(path.read_bytes()).hexdigest()
+          result={"native_material_scenes":[{
+              "material":"cloth","source":str(path),"source_sha256":sha
+          }]}
+          out=Path("build/rbc-final-smoke/source/RBC_RESULTS.json")
+          out.write_text(json.dumps(result,indent=2)+"\n")
+          PY
+      - name: Run original-source 11-method exact pair oracle and A-A controls
+        run: |
+          python3 -u scripts/run_rbc_final_repeated.py \
+            --replayer build/rbc-final-smoke/ccp_rbc_final_repeated \
+            --manifest build/rbc-final-smoke/source/RBC_RESULTS.json \
+            --output build/rbc-final-smoke/result \
+            --repeats 2 --warmup 4
+      - name: Fail closed on missing Flat/V4/A-A receipts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("build/rbc-final-smoke/result/RBC_FINAL_REPEATED_RESULTS.json")
+          d=json.loads(p.read_text())
+          assert d["source_scene_count"]==1
+          assert d["all_natively_emitted_pair_sets_exact"]
+          assert set(("rbc_flat_045","guard_sap_bounded_trial_frozen",
+                      "guard_045_A","guard_045_B")).issubset(d["method_names"])
+          assert d["flat_vs_v4_paired"]["scenes"]==1
+          PY
