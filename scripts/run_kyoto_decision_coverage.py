@@ -21,7 +21,7 @@ import json
 import struct
 import subprocess
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -135,7 +135,6 @@ def build_summary(root: Path, warmup: int, cases: list[dict]) -> dict:
     decisions = audit_decisions(root, warmup)
     if len(material["files"]) != len(cases) or len(decisions["scenes"]) != len(cases):
         raise ValueError("Missing raw replay or a skipped material trajectory")
-    classifications = {case["csv"]: case["type"] for case in cases}
     by_scene = []
     grouped = defaultdict(list)
     action_by_file = {str(Path(x["file"])): x for x in decisions["scenes"]}
@@ -160,7 +159,8 @@ def build_summary(root: Path, warmup: int, cases: list[dict]) -> dict:
         "experiment": "Phase 18 controller-activation coverage, no threshold retuning",
         "warmup": warmup,
         "tested_methods": sorted(material["methods"]),
-        "ml_trained_model_supplied": decisions["learned_model_executed"],
+        "ml_weights_executed": decisions["learned_model_executed"],
+        "ml_training_provenance_independently_verified": False,
         "bullet_executed": decisions["bullet_executed"],
         "natural_and_artificial_diagnostic_never_pooled": True,
         "data": cases,
@@ -181,7 +181,7 @@ def build_summary(root: Path, warmup: int, cases: list[dict]) -> dict:
             "Diagnostic rigid translations are mathematically shifted snapshots, not newly solved physics",
             "CPU current AABB broad phase only; no CCD, narrow phase or full solver speedup",
             "Single-pass ordered policies can retain thermal drift despite seeded order randomization",
-            "Only trained independently held-out ML models may support a learned-policy efficacy claim",
+            "Supplying a native ML file does not establish training provenance or held-out validity",
             "No automatic threshold retuning or per-frame hindsight oracle",
             "Independent random seeds are repeated trajectories; adjacent frames are correlated",
         ],
@@ -199,7 +199,7 @@ def write_summary(result: dict, output: Path) -> None:
         "**The artificial rigid-translation diagnostic is NOT a physically "
         "solved material workload and must not be pooled with natural dynamics.**", "",
         f"Executed algorithms: {', '.join(result['tested_methods'])}", "",
-        f"Trained ML file supplied and executed: **{result['ml_trained_model_supplied']}**. "
+        f"Native ML weight file supplied and executed: **{result['ml_weights_executed']}**. "
         f"Bullet executed: **{result['bullet_executed']}**.", "",
         "| Cohort | Trajectories | Size eligible | Guard frames | SAP frames | Trial frames | Switches |",
         "|---|---:|---:|---:|---:|---:|---:|",
