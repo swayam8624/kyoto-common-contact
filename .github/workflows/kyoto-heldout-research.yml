@@ -47,11 +47,11 @@ jobs:
             --output output/kyoto-heldout-independent-ci \
             --materials cloth sponge \
             --regimes rapid \
-            --budgets 128 \
-            --heldout-count 2 \
-            --frames 12 --warmup 2 \
-            --coupled-frames 48 \
-            --coupled-scenarios free fold
+            --budgets 128 512 1024 \
+            --heldout-count 3 \
+            --frames 60 --warmup 8 \
+            --coupled-frames 60 \
+            --coupled-scenarios free pull fold
       - name: Strict source fingerprints, pair and coupled mesh audit
         run: |
           python3 scripts/test_kyoto_heldout_research.py \
