@@ -164,9 +164,20 @@ void execute(const char* destination,int frames,
         for(std::size_t m=0;m<sims.size();++m){
             const auto& sim=*sims[m];
             const auto& metric=sim.metrics();
-            if(metric.candidatePairs!=sapMetric.candidatePairs)
+            // Legacy GlobalGuard deliberately returns a fat-envelope
+            // SUPERSET; it is not a bug when its candidate count differs
+            // from fresh SAP. Frozen V4 and NEW RBC must be exact-current.
+            // Independently verify FULL IDs, not only candidate counts.
+            if(m==1){
+                if(!std::includes(metric.candidatePairs.begin(),
+                                  metric.candidatePairs.end(),
+                                  sapMetric.candidatePairs.begin(),
+                                  sapMetric.candidatePairs.end()))
+                    throw std::runtime_error(
+                        "legacy GlobalGuard omitted true SAP candidate");
+            }else if(metric.candidatePairs!=sapMetric.candidatePairs)
                 throw std::runtime_error(
-                    "RBC physical SAME-STATE final-query candidate mismatch frame="+
+                    "physical exact-current candidate mismatch frame="+
                     std::to_string(frame)+" policy="+names[m]);
             if(metric.oracleMisses!=0)
                 throw std::runtime_error("physical oracle reported missed pairs");
