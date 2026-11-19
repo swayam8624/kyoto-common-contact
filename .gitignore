@@ -64,3 +64,25 @@ docs/ONLINE_CONTROLLER_RESULTS.md
 **/*.gif
 **/*.mp4
 **/*.kmcb
+
+
+# Cleanup branch: prevent NEW local build/test noise without erasing
+# any of the older tracked negative experiments or original evidence.
+# These patterns only affect future untracked additions.
+**/.venv-*/
+**/venv-*/
+**/.tox/
+**/.ruff_cache/
+**/.coverage
+**/coverage.xml
+**/.hypothesis/
+**/CMakeCache.txt
+**/CMakeFiles/
+**/compile_commands.json
+**/*.o
+**/*.obj
+**/*.a
+**/*.dSYM/
+**/*.profraw
+**/*.profdata
+**/sanitizer-logs/
