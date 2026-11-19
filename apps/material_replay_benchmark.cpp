@@ -503,15 +503,27 @@ int main(int argc,char** argv){
   if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
   std::string model;
   std::uint32_t orderSeed=0;
+  const auto parseOrderSeed=[](const char* input)->std::uint32_t {
+   const std::string value(input);
+   if(value.empty()||
+      !std::all_of(value.begin(),value.end(),[](char c){
+       return c>='0'&&c<='9';
+      }))
+    throw std::invalid_argument("Order seed must be decimal digits only");
+   const auto parsed=std::stoull(value);
+   if(parsed==0||parsed>std::numeric_limits<std::uint32_t>::max())
+    throw std::out_of_range("Order seed must fit an unsigned nonzero 32-bit value");
+   return std::uint32_t(parsed);
+  };
   if(argc>=5&&std::string(argv[4])!="--order-seed")model=argv[4];
   if(argc==6){
    if(std::string(argv[4])!="--order-seed")
     throw std::runtime_error("Use --order-seed N after optional ML model path");
-   orderSeed=std::uint32_t(std::stoul(argv[5]));
+   orderSeed=parseOrderSeed(argv[5]);
   }else if(argc==7){
    if(std::string(argv[5])!="--order-seed")
     throw std::runtime_error("Expected --order-seed before seed value");
-   orderSeed=std::uint32_t(std::stoul(argv[6]));
+   orderSeed=parseOrderSeed(argv[6]);
   }else if(argc==5&&std::string(argv[4])=="--order-seed"){
    throw std::runtime_error("Missing order seed");
   }
