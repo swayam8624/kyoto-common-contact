@@ -97,23 +97,44 @@ Run the full **new-geometry** matrix with a NEW directory; this
 creates three independently topologized/perturbed fixtures for
 each of cloth, sponge, mixed at requested budgets 128, 512 and
 1024, with both baseline and rapid regimes (54 material trajectories
-in total). It does NOT reuse original Mac
-Phase 18 snapshots. The coupled audit separately runs free,
+in total). The 60-FRAME MATERIAL HORIZON is essential: frozen V4 can
+enter a trial around frame 32 and requires up to eight SAP trial
+frames before promotion. A 36-frame run is too short to judge
+stable SAP selection after that transition. The original 19 November
+Mac 36-frame experiment is immutable historical evidence; NEVER
+overwrite its output directory. The current runner's new default
+is 60 material frames; specify --frames 60 explicitly for auditability.
+
+This study does NOT reuse original Mac Phase 18 snapshots. The
+coupled audit separately runs free,
 pull and fold with two cloth sheets and two spheres:
 
-    python3 scripts/run_kyoto_heldout_research.py --exporter build/kyoto-final-cpu/ccp_material_export --replayer build/kyoto-final-cpu/ccp_material_replay --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled --output output/kyoto-heldout-original-01
+    python3 scripts/run_kyoto_heldout_research.py --exporter build/kyoto-final-cpu/ccp_material_export --replayer build/kyoto-final-cpu/ccp_material_replay --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled --output output/kyoto-heldout-mac-60f-new --frames 60 --warmup 8
 
-    python3 scripts/test_kyoto_heldout_research.py output/kyoto-heldout-original-01
+    python3 scripts/test_kyoto_heldout_research.py output/kyoto-heldout-mac-60f-new
 
-    open output/kyoto-heldout-original-01/HELDOUT_RESULTS.md
+    open output/kyoto-heldout-mac-60f-new/HELDOUT_RESULTS.md
 
-    python3 scripts/analyze_kyoto_heldout_evidence.py --results output/kyoto-heldout-original-01 --output output/kyoto-heldout-original-01/full-method-scores --warmup 8
-    open output/kyoto-heldout-original-01/full-method-scores/HELDOUT_ALL_METHODS.md
+    python3 scripts/analyze_kyoto_heldout_evidence.py --results output/kyoto-heldout-mac-60f-new --output output/kyoto-heldout-mac-60f-new/full-method-scores --warmup 8
+    open output/kyoto-heldout-mac-60f-new/full-method-scores/HELDOUT_ALL_METHODS.md
 
 For the separately verified six-family rapid-motion matrix already
 run under Linux Actions, explicitly request six families:
 
     python3 scripts/run_kyoto_heldout_research.py --exporter build/kyoto-final-cpu/ccp_material_export --replayer build/kyoto-final-cpu/ccp_material_replay --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled --output output/kyoto-six-family-mac-first --materials cloth sponge cushion soft_ball spring mixed --regimes rapid --budgets 128 512 1024 --heldout-count 3 --frames 60 --warmup 8 --coupled-frames 60 --coupled-scenarios free pull fold
+
+The published Mac 54-scene console from 19 November 2026 had 36
+material frames and 60 coupled frames. Its subsequently supplied
+11-method report recorded 1895 Guard frames and 49 SAP frames,
+42 of which were TRIAL frames and only seven nontrial SAP frames
+(all in sponge/rapid/N1331). All 12 large rapid-cloth SAP frames
+were unfinished trials at the truncated 36-frame horizon.
+Corrected full 11-method ranking and caveats:
+[Mac source report](KYOTO_HELDOUT_54_SCENE_MAC_FIRST_2026-11-19.md).
+The original Linux six-family run had 60 material frames.
+Do not compare their controller adoption fractions as
+a matched temporal test.
+
 
 The all-algorithm analysis is POSTPROCESSING only, reads existing
 original source SHA-256 receipts, verifies strict SAP candidate count
