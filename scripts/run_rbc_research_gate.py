@@ -36,9 +36,9 @@ from run_kyoto_decision_coverage import sha256, snapshot_metadata
 
 METHODS = {
     "sap_rebuild", "guard_fixed_exact", "v4_frozen",
-    "sap_persistent", "rbc_indexed_repair"
+    "sap_persistent", "rbc_indexed_repair", "rbc_flat_repair"
 }
-PHYSICAL = {"sap_rebuild","global_guard","frozen_v4","rbc_indexed"}
+PHYSICAL = {"sap_rebuild","global_guard","frozen_v4","rbc_indexed","rbc_flat"}
 MATERIALS=("cloth","sponge","cushion","soft_ball","spring","mixed")
 SCENARIOS=("free","pull","fold")
 
@@ -98,6 +98,7 @@ def validate_material(path:Path, frames:int, warmup:int)->dict:
                     for f in range(warmup,frames))/(frames-warmup)
            for name in METHODS}
     rbc=[by["rbc_indexed_repair"][f] for f in range(frames)]
+    flat=[by["rbc_flat_repair"][f] for f in range(frames)]
     v4=[by["v4_frozen"][f] for f in range(frames)]
     return {
         "source":str(path),"sha256":sha256(path),
@@ -106,6 +107,8 @@ def validate_material(path:Path, frames:int, warmup:int)->dict:
         "actual_method_names":sorted(METHODS),
         "per_method_mean_ms":means,
         "guard_over_rbc":means["guard_fixed_exact"]/means["rbc_indexed_repair"],
+        "guard_over_rbc_flat":means["guard_fixed_exact"]/means["rbc_flat_repair"],
+        "indexed_rbc_over_flat_rbc":means["rbc_indexed_repair"]/means["rbc_flat_repair"],
         "guard_over_v4":means["guard_fixed_exact"]/means["v4_frozen"],
         "guard_over_persistent_sap":
             means["guard_fixed_exact"]/means["sap_persistent"],
@@ -116,6 +119,16 @@ def validate_material(path:Path, frames:int, warmup:int)->dict:
             sum(int(r["rbc_query_pair_checks"]) for r in rbc),
         "rbc_potential_pairs_after_final_frame":
             int(rbc[-1]["rbc_potential_pairs"]),
+        "rbc_flat_local_repairs":
+            sum(int(r["rbc_local_repairs"]) for r in flat),
+        "rbc_flat_full_builds":
+            sum(int(r["rbc_full_build_delta"]) for r in flat),
+        "rbc_flat_index_tests":
+            sum(int(r["rbc_index_comparisons"]) for r in flat),
+        "rbc_flat_filtered_pair_checks":
+            sum(int(r["rbc_query_pair_checks"]) for r in flat),
+        "rbc_flat_potential_pairs_after_final_frame":
+            int(flat[-1]["rbc_potential_pairs"]),
         "frozen_v4_actual_sap_actions":
             sum(int(r["v4_action"]=="sap_persistent_coherent") for r in v4),
         "frozen_v4_trial_frames":sum(int(r["v4_trial"]) for r in v4),
@@ -147,9 +160,11 @@ def validate_physics(path:Path,frames:int,scenario:str,
             if not math.isfinite(value) or value<0:
                 raise ValueError("Nonfinite or negative physical metric")
         if int(r["rbc_queries"])!=5 and name=="rbc_indexed":
-            raise ValueError("RBC failed to run five true contact solver queries")
-        if strict and name=="rbc_indexed" and not int(r["oracle_checked"]):
-            raise ValueError("Strict physics run did not audit RBC candidates")
+            raise ValueError("RBC indexed failed five true contact queries")
+        if int(r["rbc_flat_queries"])!=5 and name=="rbc_flat":
+            raise ValueError("RBC flat failed five true contact queries")
+        if strict and name in ("rbc_indexed","rbc_flat") and not int(r["oracle_checked"]):
+            raise ValueError("Strict physics run did not audit all RBC candidates")
         by[name][f]=r
     if set(by)!=PHYSICAL or len(rows)!=len(PHYSICAL)*frames:
         raise ValueError("Native physical policy coverage incomplete")
@@ -167,7 +182,7 @@ def validate_physics(path:Path,frames:int,scenario:str,
             # Extra candidates can legitimately increase preciseTests.
             # Exact-current V4 and RBC instead require exact full sets
             # in the native runner; check count too in this summary.
-            if name in ("frozen_v4","rbc_indexed"):
+            if name in ("frozen_v4","rbc_indexed","rbc_flat"):
                 if r["candidate_pairs"]!=truth["candidate_pairs"]:
                     raise ValueError(
                         f"Native exact policy candidate count mismatch: {name}")
@@ -193,7 +208,9 @@ def validate_physics(path:Path,frames:int,scenario:str,
         "all_last_query_contact_response_counts_equal_sap":True,
         "precise_test_counts_may_differ_for_conservative_guard":True,
         "rbc_actual_contact_queries":frames*5,
+        "rbc_flat_actual_contact_queries":frames*5,
         "rbc_strict_oracle_queries":frames*5 if strict else 0,
+        "rbc_flat_strict_oracle_queries":frames*5 if strict else 0,
         "rbc_actual_full_index_builds":
             sum(int(by["rbc_indexed"][f]["rbc_index_builds"])
                 for f in range(frames)),
@@ -203,9 +220,20 @@ def validate_physics(path:Path,frames:int,scenario:str,
         "rbc_pairs_charged":
             sum(int(by["rbc_indexed"][f]["rbc_candidate_checks"])
                 for f in range(frames)),
+        "rbc_flat_actual_full_index_builds":
+            sum(int(by["rbc_flat"][f]["rbc_flat_index_builds"])
+                for f in range(frames)),
+        "rbc_flat_actual_local_repairs":
+            sum(int(by["rbc_flat"][f]["rbc_flat_local_repairs"])
+                for f in range(frames)),
+        "rbc_flat_pairs_charged":
+            sum(int(by["rbc_flat"][f]["rbc_flat_candidate_checks"])
+                for f in range(frames)),
         "solver_mean_full_step_ms_by_policy":means,
         "exploratory_guard_over_rbc_full_step":guarded/means["rbc_indexed"]
             if means["rbc_indexed"]>0 else None,
+        "exploratory_guard_over_rbc_flat_full_step":
+            guarded/means["rbc_flat"] if means["rbc_flat"]>0 else None,
         "real_sphere_contacts":
             sum(int(by["rbc_indexed"][f]["sphere_contacts"])
                 for f in range(frames)),
@@ -250,8 +278,8 @@ def report_document(d:dict)->str:
         "",
         "## Per-family/size result (multiple independently seeded inputs)",
         "",
-        "| Family | Budget | Actual N range | Scenes | Guard/RBC geomean | Guard/V4 geomean | RBC scene wins |",
-        "|---|---:|---|---:|---:|---:|---:|",
+        "| Family | Budget | N range | Scenes | Guard/indexed geomean | Guard/flat geomean | Guard/V4 geomean | Flat wins |",
+        "|---|---:|---|---:|---:|---:|---:|---:|",
     ]
     by=defaultdict(list)
     for scene in scenes:
@@ -259,28 +287,33 @@ def report_document(d:dict)->str:
     for (mat,budget),items in sorted(by.items()):
         n=sorted({x["actual_n"] for x in items})
         ratios=[x["result"]["guard_over_rbc"] for x in items]
+        flat_ratios=[x["result"]["guard_over_rbc_flat"] for x in items]
         v4=[x["result"]["guard_over_v4"] for x in items]
         lines.append(f"| {mat} | {budget} | {n[0]}..{n[-1]} | {len(items)} | "
-                     f"{geometric(ratios):.5f}x | {geometric(v4):.5f}x | "
-                     f"{sum(x>1 for x in ratios)}/{len(items)} |")
+                     f"{geometric(ratios):.5f}x | {geometric(flat_ratios):.5f}x | "
+                     f"{geometric(v4):.5f}x | "
+                     f"{sum(x>1 for x in flat_ratios)}/{len(items)} |")
     lines += [
         "", "## Real coupled physical solver comparison", "",
-        f"Scenarios executed: {len(coupled)}. Every scenario ran four",
+        f"Scenarios executed: {len(coupled)}. Every scenario ran five",
         "independently stepped solver policy streams with 2 cloth sheets,",
         "2 real moving spheres, five contact queries per physics frame,",
         "identical source seeds and full particle state comparisons.",
         "",
-        "| Scenario | Geometry seed | Topology seed | Frames | Strict 5-query RBC audit | Guard/RBC FULL step ratio* | Real sphere contacts | Self contacts | RBC local repairs |",
-        "|---|---:|---:|---:|---|---:|---:|---:|---:|",
+        "| Scenario | Geometry seed | Topology seed | Frames | Strict 5-query RBC audit | Guard/indexed full step* | Guard/flat full step* | Sphere contacts | Self contacts | Indexed repairs | Flat repairs |",
+        "|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|",
     ]
     for c in coupled:
         x=c["result"]
         ratio=x["exploratory_guard_over_rbc_full_step"]
+        flat_ratio=x["exploratory_guard_over_rbc_flat_full_step"]
         lines.append(f"| {c['scenario']} | {c['geometry']} | {c['topology']} "
                      f"| {c['frames']} | {str(c['audit']).lower()} | "
-                     f"{ratio:.4f}x | {x['real_sphere_contacts']} | "
+                     f"{ratio:.4f}x | {flat_ratio:.4f}x | "
+                     f"{x['real_sphere_contacts']} | "
                      f"{x['real_same_sheet_self_contacts']} | "
-                     f"{x['rbc_actual_local_repairs']} |")
+                     f"{x['rbc_actual_local_repairs']} | "
+                     f"{x['rbc_flat_actual_local_repairs']} |")
     lines += [
         "",
         "**Interpretation of the starred full-step ratios:** this is one",
@@ -386,9 +419,10 @@ def main()->None:
                         "result":datum,
                     })
                     print("PASS RBC MATERIAL",label,"N",metadata["n"],
-                          f"Guard/RBC={datum['guard_over_rbc']:.5f}x",
+                          f"Guard/indexed={datum['guard_over_rbc']:.5f}x",
+                          f"Guard/flat={datum['guard_over_rbc_flat']:.5f}x",
                           f"Guard/V4={datum['guard_over_v4']:.5f}x",
-                          "repairs",datum["rbc_local_repairs"],flush=True)
+                          "flat_repairs",datum["rbc_flat_local_repairs"],flush=True)
     coupled=[]
     for var in HELDOUT[:a.coupled_variants]:
         for scenario in a.coupled_scenarios:
@@ -409,7 +443,8 @@ def main()->None:
             })
             print("PASS RBC COUPLED",label,
                   "actual solver frame parity",a.coupled_frames,
-                  "RBC repairs",result["rbc_actual_local_repairs"],
+                  "RBC indexed repairs",result["rbc_actual_local_repairs"],
+                  "RBC flat repairs",result["rbc_flat_actual_local_repairs"],
                   "contact corrections",result["real_sphere_contacts"],
                   flush=True)
     result={
