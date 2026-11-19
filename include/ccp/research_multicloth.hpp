@@ -93,6 +93,13 @@ public:
   // triangles, constraints and broad-phase controller caches.
   void setFixtureVariation(std::uint32_t geometrySeed,
                            std::uint32_t topologySeed,double jitter=.010);
+  // Opt-in PREPARED (not naturally-generated) same-sheet fold initial
+  // condition. Reflects the lower half of the first real mesh about a
+  // mid-sheet hinge while preserving original rest constraints.
+  // Must be called at frame zero before grabbing/advancing. This is a
+  // contact-rich physical solver STRESS INPUT, NOT a claim that the
+  // solver spontaneously folded a flat cloth or solved full CCD.
+  void prepareFoldedInitialStateForResearch();
   void step();
   void setPolicy(Policy policy);
   void setAdaptive(bool adaptive);
