@@ -175,7 +175,11 @@ def main():
     p.add_argument("--regimes", nargs="+", default=["baseline", "rapid"])
     p.add_argument("--budgets", nargs="+", type=int, default=[128, 512, 1024])
     p.add_argument("--heldout-count", type=int, default=3)
-    p.add_argument("--frames", type=int, default=36)
+    # The original exploratory default of 36 truncated the frozen V4's
+    # eight-frame SAP acceptance window when it entered trial near frame 32.
+    # New experiments default to 60 frames. Old evidence retains its exact
+    # 36-frame provenance and can be recreated with explicit --frames 36.
+    p.add_argument("--frames", type=int, default=60)
     p.add_argument("--warmup", type=int, default=8)
     p.add_argument("--coupled-frames", type=int, default=60)
     p.add_argument("--coupled-scenarios", nargs="+",
@@ -207,6 +211,17 @@ def main():
     if not all(path.is_file() for path in binaries.values()):
         p.error("build native exporter, replayer and coupled audit first")
 
+    if a.frames < 48:
+        print("WARNING: short material replay horizon ("
+              + str(a.frames) +
+              " frames) may censor frozen V4's eight-frame "
+              "SAP trial acceptance window; full motion sequences "
+              "should use --frames 60 or longer.", file=sys.stderr)
+    print("HELDOUT MATERIAL HORIZON frames="
+          + str(a.frames) + " warmup=" + str(a.warmup)
+          + " measured=" + str(a.frames - a.warmup)
+          + " (coupled frames=" + str(a.coupled_frames) + ")",
+          flush=True)
     a.output.mkdir(parents=True, exist_ok=False)
     for child in ("snapshots", "replays", "logs", "coupled"):
         (a.output / child).mkdir()
