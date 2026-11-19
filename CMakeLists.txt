@@ -301,9 +301,10 @@ if(BUILD_TESTING)
     COMMAND ccp_kyoto_heldout_fixture_tests)
   add_test(NAME kyoto_coupled_contact_independent_mesh_topology_oracle
     COMMAND ccp_kyoto_coupled_variation_tests)
-  add_test(NAME kyoto_heldout_coupled_fold_solver_parity
-    COMMAND ccp_kyoto_heldout_coupled
-      ${CMAKE_CURRENT_BINARY_DIR}/kyoto-heldout-coupled-ci 8 1 1 fold)
+  # Coupled multi-policy fold integration is exercised by the additive
+  # held-out CI runner, which allocates a NEW output directory. Do not run
+  # the native no-overwrite evidence exporter as a CTest against a fixed
+  # directory: second CTest invocation would fail despite identical code.
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
     COMMAND ${CMAKE_COMMAND} -E env CCP_CTEST_SMOKE=1
