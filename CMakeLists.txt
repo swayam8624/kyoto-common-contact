@@ -286,8 +286,19 @@ target_link_libraries(ccp_cbp_kmcb_replay PRIVATE ccp_live)
 target_include_directories(ccp_cbp_kmcb_replay PRIVATE include)
 target_compile_options(ccp_cbp_kmcb_replay PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
+# RBC / Reach-Budget Calculus Stage 0: independent O(N^2)
+# reference-certificate correctness test. This is intentionally NOT
+# a new production broad phase, physics solver or benchmarked speed claim.
+# Frozen final_broadphase.hpp remains untouched.
+add_executable(ccp_rbc_reach_budget_tests tests/rbc_reach_budget_tests.cpp)
+target_include_directories(ccp_rbc_reach_budget_tests PRIVATE include)
+target_compile_options(ccp_rbc_reach_budget_tests PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
+
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME rbc_exact_reach_certificate_and_invalidation_oracle
+    COMMAND ccp_rbc_reach_budget_tests)
   add_test(NAME cbp_exact_region_oracle COMMAND ccp_cbp_router_tests)
   add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
