@@ -10,6 +10,7 @@ on:
       - 'tests/rbc_physical_geometry_tests.cpp'
       - 'apps/rbc_coupled_tournament.cpp'
       - 'CMakeLists.txt'
+      - 'scripts/render_rbc_physics_studio.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -83,6 +84,31 @@ jobs:
               'contact_quality_not_continuous_CCD_certified':True,
               'receipts':receipts},indent=2)+'\n')
           print('PASS: 3 source variants x 80 frames x 5 REAL independent policies, zero nonlocal mesh penetrations after every solver step')
+          PY
+      - name: Render truly depth-tested 5-policy cloth, actual spheres and verified zero-penetration source into looping GIF
+        run: |
+          python3 -m pip install --quiet Pillow numpy
+          python3 scripts/render_rbc_physics_studio.py \
+            --mesh-dir output/rbc-rounded-clean-80/g73013-mesh \
+            --output output/rbc-rounded-clean-80/FIVE_POLICY_STUDIO.gif \
+            --stride 3 --fps 12
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('output/rbc-rounded-clean-80')
+          movie=root/'FIVE_POLICY_STUDIO.gif'
+          preview=root/'FIVE_POLICY_STUDIO.png'
+          receipt=root/'FIVE_POLICY_STUDIO.json'
+          manifest=json.loads(receipt.read_text())
+          assert manifest['policy_count']==5
+          assert manifest['source_original_frames']==80
+          assert manifest['all_source_frames_endpoint_piercing_free']
+          assert manifest['true_software_Z_buffer']
+          assert manifest['native_source_geometry_not_edited']
+          assert manifest['gif_sha256']==hashlib.sha256(movie.read_bytes()).hexdigest()
+          assert manifest['preview_png_sha256']==hashlib.sha256(preview.read_bytes()).hexdigest()
+          assert movie.stat().st_size>100000
+          print('PASS actual 5-policy source geometry, same camera and depth-tested GIF')
           PY
       - name: Preserve original failure or success source, not fake physics visual
         if: always()
