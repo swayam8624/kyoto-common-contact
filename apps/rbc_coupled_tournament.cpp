@@ -155,7 +155,14 @@ void write_mesh_frame(std::ostream& out,const MultiCloth& sim,
     out<<"{\"type\":\"frame\",\"frame\":"<<frame
        <<",\"positions\":";
     write_mesh_positions(out,sim);
-    out<<",\"metrics\":{\"self_contacts\":"<<m.selfContacts
+    out<<",\"spheres\":[";
+    for(std::size_t i=0;i<sim.spheres().size();++i){
+        if(i)out<<',';
+        const auto& sphere=sim.spheres()[i];
+        out<<"{\"center\":["<<sphere.center.x<<','<<sphere.center.y<<','
+           <<sphere.center.z<<"],\"radius\":"<<sphere.radius<<"}";
+    }
+    out<<"],\"metrics\":{\"self_contacts\":"<<m.selfContacts
        <<",\"sphere_contacts\":"<<m.sphereContacts
        <<",\"self_crossings\":"<<m.selfCrossings
        <<",\"step_ms\":"<<m.stepMs
