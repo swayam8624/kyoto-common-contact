@@ -937,3 +937,48 @@ identical new six-family rapid fixture matrix,
 matched 60 material frames, identical original
 policy cohort where capabilities allow, controlled
 A/A repetitions, and real solver SAP activation.
+
+
+## 2026-11-19 — matched Mac/Linux 60-frame cross-platform result
+
+The user completed the real 54-scene Mac heldout run with all
+six material fixture families, rapid motion, 3 size budgets,
+3 new geometry/topology seed tuples and 60 AABB frames with
+warmup eight; 9 coupled 60-frame solver cases passed exact
+SAP reference physical geometry/source/contact parity.
+The original generated full 11-method Mac Markdown ranking
+was pasted and independently compared to the 10-method
+Linux 60-frame CI artifact from run 44468375567.
+
+Guard/V4 per-scene geomean Mac=1.0577x (39/54 wins),
+Linux=1.0552x (25/54 wins). Mac includes Bullet DBVT,
+Linux does not; deterministic shuffle seed thus does
+not imply identical method timing slots. Both have
+identical per-condition aggregate SAP/trial/switch counts
+across ALL 18 matched conditions, total Guard=2730,
+SAP=510, trial=176, nontrial SAP=334 and switches=34.
+The source original Mac CSV and per-frame action trace
+have NOT been uploaded, so we cannot yet assert identical
+per-frame choices or bitwise-identical source AABB bytes.
+
+Positive conditions on both machines: large cloth, soft_ball
+and spring; negative mixed N727 and sponge N1331. On
+Mac equal-scene geometric mean V4 ranks highest, but by
+sum-of-scene-means the original OnlineCostAware is better
+(Guard/Online=1.3021x vs Guard/V4=1.1689x).
+No overall full-solver adaptive runtime or calibrated
+CCD/penetration claims are justified.
+
+The complete derived source-backed comparison is in
+docs/KYOTO_MAC_LINUX_MATCHED_60F_2026-11-19.md. Linux
+artifact ZIP SHA256 4224c8c13123e45a3bccb9a75cd341b116a4b6daddd7482a99d3ab702f4df2f5.
+
+Added source-verified no-rerun compact trace exporter
+scripts/export_kyoto_heldout_trace.py plus true per-frame
+cross-platform trace comparison
+scripts/compare_kyoto_heldout_traces.py. Each original
+snapshot/replay receipt and SAP frame fingerprint is
+verified before source trace export, and original files
+are never overwritten. GitHub CI tests both scripts;
+future independent Mac compact trace can establish
+exact snapshot hashes and per-frame switching parity.
