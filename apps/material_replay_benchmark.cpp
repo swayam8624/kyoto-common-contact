@@ -392,7 +392,7 @@ public:
  }
 };
 void run(const std::string& filename,const std::string& output,int verbose,
-         const std::string& model,std::uint32_t orderSeed=0){
+         const std::string& model,std::uint32_t orderSeed=0,bool aaControl=false){
  MaterialReplay header(filename);
  if(std::filesystem::exists(output))throw std::runtime_error("refusing to overwrite CPU replay results");
  std::filesystem::path file(output);
@@ -417,6 +417,18 @@ void run(const std::string& filename,const std::string& output,int verbose,
   methods.push_back(Kind::Learned);
   methods.push_back(Kind::LearnedConservative);
  }
+ // Dedicated A/A mode: identical, fresh, independent stateful copies of the
+ // exact same production Guard and frozen V4 implementations. The duplicate
+ // gets its own method object, preserving its own caches and EWMA. No result
+ // from one copy is passed into another. Everything is timed just as usual.
+ // Only a label distinguishes the original and duplicate, not their logic.
+ // This mode is opt-in and NEVER changes historical default benchmark rows.
+ if(aaControl){
+  if(orderSeed==0)throw std::invalid_argument(
+    "A/A controls require an explicit randomized --order-seed");
+  methods.push_back(Kind::Global);
+  methods.push_back(Kind::GuardSapTrial);
+ }
  // An explicitly seeded policy-order experiment is not allowed to rely on
  // rebuilt SAP executing first. Build one untimed, independent reference from
  // the frozen AABB stream before changing execution order. This reference
@@ -433,8 +445,14 @@ void run(const std::string& filename,const std::string& output,int verbose,
   std::mt19937 shuffleEngine(orderSeed);
   std::shuffle(methods.begin(),methods.end(),shuffleEngine);
  }
+ int guardCopies=0,v4Copies=0;
  for(std::size_t slot=0;slot<methods.size();++slot){
   const Kind method=methods[slot];
+  std::string backendName=name(method);
+  if(method==Kind::Global&&++guardCopies==2)
+   backendName="global_guarded_exact_aa";
+  if(method==Kind::GuardSapTrial&&++v4Copies==2)
+   backendName="guard_sap_bounded_trial_aa";
   MaterialReplay stream(filename);
   Method algorithm(method,model);
   double sum=0;
@@ -457,11 +475,11 @@ void run(const std::string& filename,const std::string& output,int verbose,
       throw std::runtime_error("SAP disagrees with independent exhaustive AABB oracle");
     }
    }else if(hash!=expectedHashes[frame]||observed.pairs.size()!=expectedCounts[frame]){
-    throw std::runtime_error("replay pair mismatch: "+std::string(name(method))+
+    throw std::runtime_error("replay pair mismatch: "+backendName+
                              " frame "+std::to_string(frame));
    }
    sum+=observed.ms;
-   csv<<name(method)<<','<<header.material<<','<<header.n<<','<<frame<<','<<header.seed<<','
+   csv<<backendName<<','<<header.material<<','<<header.n<<','<<frame<<','<<header.seed<<','
       <<observed.ms<<','<<observed.pairs.size()<<','<<hash<<','<<(audited?1:0)
       <<",0,"<<observed.builds<<','<<observed.reuses<<','<<observed.repairs<<','
       <<observed.aabbTests<<','<<observed.workers<<','<<observed.span<<','
@@ -474,12 +492,12 @@ void run(const std::string& filename,const std::string& output,int verbose,
    for(double f:observed.features)csv<<','<<f;
    csv<<','<<slot<<','<<orderSeed<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
-    std::cerr<<"[REPLAY] method="<<name(method)<<" frame="<<frame+1<<'/'
+    std::cerr<<"[REPLAY] method="<<backendName<<" frame="<<frame+1<<'/'
       <<header.frames<<" ms="<<observed.ms<<" pairs="<<observed.pairs.size()
       <<" path="<<(observed.usedGlobal?"localguard":"region")
       <<" oracle="<<(audited?"PASS":"SAP reference match")<<'\n';
   }
-  std::cout<<"[RESULT] method="<<name(method)<<" mean_ms="<<sum/header.frames
+  std::cout<<"[RESULT] method="<<backendName<<" mean_ms="<<sum/header.frames
    <<" frames="<<header.frames<<" n="<<header.n<<"\n";
  }
  if(!csv)throw std::runtime_error("failed to write replay CSV");
@@ -494,11 +512,11 @@ int main(int argc,char** argv){
   if(argc==2&&std::string(argv[1])=="--capabilities"){
    std::cout<<"KYOTO_REPLAY_ABLATION_V4 sap_persistent_coherent "
                "ml_cost_aware_conservative guard_sap_measured_probe guard_sap_bounded_trial "
-               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched\n";
+               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched aa_guard_v4_clones\n";
    return 0;
   }
-  if(argc<3||argc>7)
-   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt] [--order-seed N]");
+  if(argc<3||argc>8)
+   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt] [--order-seed N] [--aa-control]");
   int verbose=argc>=4?std::stoi(argv[3]):1;
   if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
   std::string model;
@@ -515,21 +533,26 @@ int main(int argc,char** argv){
     throw std::out_of_range("Order seed must fit an unsigned nonzero 32-bit value");
    return std::uint32_t(parsed);
   };
-  if(argc>=5&&std::string(argv[4])!="--order-seed")model=argv[4];
-  if(argc==6){
-   if(std::string(argv[4])!="--order-seed")
-    throw std::runtime_error("Use --order-seed N after optional ML model path");
-   orderSeed=parseOrderSeed(argv[5]);
-  }else if(argc==7){
-   if(std::string(argv[5])!="--order-seed")
-    throw std::runtime_error("Expected --order-seed before seed value");
-   orderSeed=parseOrderSeed(argv[6]);
-  }else if(argc==5&&std::string(argv[4])=="--order-seed"){
-   throw std::runtime_error("Missing order seed");
+  // Fixed, documented optional-argument order. Parse no flags by accident
+  // as paths; legacy invocations remain byte-for-byte equivalent.
+  int arg=4;
+  if(arg<argc&&std::string(argv[arg])!="--order-seed"&&
+      std::string(argv[arg])!="--aa-control")
+   model=argv[arg++];
+  if(arg<argc&&std::string(argv[arg])=="--order-seed"){
+   if(arg+1>=argc)throw std::runtime_error("--order-seed needs a value");
+   orderSeed=parseOrderSeed(argv[arg+1]);
+   arg+=2;
   }
-  if((argc==6||argc==7)&&orderSeed==0)
-   throw std::runtime_error("Randomized execution-order seed must be positive");
-  run(argv[1],argv[2],verbose,model,orderSeed);
+  bool aaControl=false;
+  if(arg<argc&&std::string(argv[arg])=="--aa-control"){
+   aaControl=true;++arg;
+  }
+  if(arg!=argc)
+   throw std::runtime_error("Unexpected or badly ordered replay option");
+  if(aaControl&&orderSeed==0)
+   throw std::runtime_error("--aa-control requires --order-seed N");
+  run(argv[1],argv[2],verbose,model,orderSeed,aaControl);
  }catch(const std::exception& e){
   std::cerr<<"MATERIAL CPU REPLAY FAILED: "<<e.what()<<'\n';return 1;
  }
