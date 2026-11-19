@@ -18,6 +18,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -391,7 +392,7 @@ public:
  }
 };
 void run(const std::string& filename,const std::string& output,int verbose,
-         const std::string& model){
+         const std::string& model,std::uint32_t orderSeed=0){
  MaterialReplay header(filename);
  if(std::filesystem::exists(output))throw std::runtime_error("refusing to overwrite CPU replay results");
  std::filesystem::path file(output);
@@ -403,7 +404,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
        "chosen_backend,ml_switched,ml_bypassed,ml_feature_ms,ml_inference_ms,"
        "ml_decision_ms,ml_backend_ms,ml_bookkeeping_ms,ml_wrapper_ms,hybrid_probed,hybrid_switched";
  for(int i=0;i<ccp::learned::kInputs;++i)csv<<",f"<<i;
- csv<<'\n';
+ csv<<",execution_slot,order_seed\n";
  csv<<std::fixed<<std::setprecision(9);
  std::vector<uint64_t> expectedHashes(header.frames,0);
  std::vector<std::size_t> expectedCounts(header.frames,0);
@@ -416,7 +417,24 @@ void run(const std::string& filename,const std::string& output,int verbose,
   methods.push_back(Kind::Learned);
   methods.push_back(Kind::LearnedConservative);
  }
- for(Kind method:methods){
+ // An explicitly seeded policy-order experiment is not allowed to rely on
+ // rebuilt SAP executing first. Build one untimed, independent reference from
+ // the frozen AABB stream before changing execution order. This reference
+ // generation is outside every method's timed callback (including SAP).
+ if(orderSeed!=0){
+  MaterialReplay truth(filename);
+  for(std::uint32_t frame=0;frame<header.frames;++frame){
+   const auto boxes=truth.next();
+   const auto pairs=ccp::live::candidates(boxes,true);
+   requireSortedUnique(pairs,boxes.size());
+   expectedHashes[frame]=pairHash(pairs);
+   expectedCounts[frame]=pairs.size();
+  }
+  std::mt19937 shuffleEngine(orderSeed);
+  std::shuffle(methods.begin(),methods.end(),shuffleEngine);
+ }
+ for(std::size_t slot=0;slot<methods.size();++slot){
+  const Kind method=methods[slot];
   MaterialReplay stream(filename);
   Method algorithm(method,model);
   double sum=0;
@@ -427,7 +445,12 @@ void run(const std::string& filename,const std::string& output,int verbose,
    const auto hash=pairHash(observed.pairs);
    bool audited=frame%5==0;
    if(method==Kind::Sap){
-    expectedHashes[frame]=hash;expectedCounts[frame]=observed.pairs.size();
+    if(orderSeed==0){
+     expectedHashes[frame]=hash;expectedCounts[frame]=observed.pairs.size();
+    }else if(hash!=expectedHashes[frame]||
+             observed.pairs.size()!=expectedCounts[frame]){
+     throw std::runtime_error("Randomized SAP baseline disagrees with precomputed oracle");
+    }
     if(audited&&header.n<=512){
      const auto brute=ccp::live::candidates(boxes,false);
      if(brute!=observed.pairs)
@@ -449,7 +472,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
       <<observed.mlBookkeepingMs<<','<<observed.mlWrapperMs<<','
       <<(observed.hybridProbed?1:0)<<','<<(observed.hybridSwitched?1:0);
    for(double f:observed.features)csv<<','<<f;
-   csv<<'\n';
+   csv<<','<<slot<<','<<orderSeed<<'\n';
    if(verbose>=2||(verbose==1&&(frame==0||(frame+1)%std::max(1u,header.frames/10)==0)))
     std::cerr<<"[REPLAY] method="<<name(method)<<" frame="<<frame+1<<'/'
       <<header.frames<<" ms="<<observed.ms<<" pairs="<<observed.pairs.size()
@@ -474,11 +497,27 @@ int main(int argc,char** argv){
                "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched\n";
    return 0;
   }
-  if(argc<3||argc>5)
-   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt]");
-  int verbose=argc==4?std::stoi(argv[3]):1;
+  if(argc<3||argc>7)
+   throw std::runtime_error("usage: ccp_material_replay INPUT.kmcb OUTPUT.csv [VERBOSE=1] [ML_MODEL.txt] [--order-seed N]");
+  int verbose=argc>=4?std::stoi(argv[3]):1;
   if(verbose<0||verbose>2)throw std::runtime_error("verbosity must be 0..2");
-  run(argv[1],argv[2],verbose,argc==5?argv[4]:"");
+  std::string model;
+  std::uint32_t orderSeed=0;
+  if(argc>=5&&std::string(argv[4])!="--order-seed")model=argv[4];
+  if(argc==6){
+   if(std::string(argv[4])!="--order-seed")
+    throw std::runtime_error("Use --order-seed N after optional ML model path");
+   orderSeed=std::uint32_t(std::stoul(argv[5]));
+  }else if(argc==7){
+   if(std::string(argv[5])!="--order-seed")
+    throw std::runtime_error("Expected --order-seed before seed value");
+   orderSeed=std::uint32_t(std::stoul(argv[6]));
+  }else if(argc==5&&std::string(argv[4])=="--order-seed"){
+   throw std::runtime_error("Missing order seed");
+  }
+  if((argc==6||argc==7)&&orderSeed==0)
+   throw std::runtime_error("Randomized execution-order seed must be positive");
+  run(argv[1],argv[2],verbose,model,orderSeed);
  }catch(const std::exception& e){
   std::cerr<<"MATERIAL CPU REPLAY FAILED: "<<e.what()<<'\n';return 1;
  }
