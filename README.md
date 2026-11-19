@@ -268,3 +268,35 @@ passed. One 512-AABB test showed identical frozen V4 copies differing by
 1.4222x **without a backend-action difference**, emphasizing that tiny
 one-run speedups demand stability controls. This specific Linux variance
 is not asserted to hold on the Mac.
+
+### Original 144 Mac A/A timings and corrected scheduling-label audit
+
+The Mac completed 144 same-snapshot timed replay runs, reporting natural
+Guard/V4 1.0188x and rapid-cloth N=1058 1.2139x. The unweighted
+geometric mean across the remaining 11 natural conditions is ~1.0027x,
+indicating near-parity outside that one fixture family. The full results,
+exact limitations, and an instrument-order correction are preserved in
+[the Mac A/A evidence note](docs/CBP_PHASE18_MAC_AA_RESULTS_2026-11-19.md).
+
+**Measurement caveat:** the ORIGINAL optional A/A instrumentation assigned
+copy A/B labels *after* the shuffled Kind order, making A always timed
+before B. Its timing-disagreement ratios are descriptive but NOT
+balanced early/late label controls. Fixed code now binds identities BEFORE
+random shuffling. The original old Mac output remains frozen and the
+new replay requires capability aa_labels_shuffled_independently.
+
+To inspect the old 144 Mac replays without timing ANYTHING again:
+
+```bash
+python3 scripts/analyze_kyoto_phase18_aa_robustness.py \
+  --aa output/kyoto-phase18-aa-mac/AA_RECHECK.json \
+  --output output/kyoto-phase18-aa-original-robustness \
+  --draws 2000
+open output/kyoto-phase18-aa-original-robustness/AA_ROBUSTNESS.md
+```
+
+This source-hash-verified report audits A/B execution slots, prints the
+actual V4 action-disagreement frame indices from the old CSVs, and
+calculates balanced-condition leave-one-out and fixed-scene resampling
+sensitivity. Resampling conditional on fixed geometry is not a
+population confidence interval and does not establish physical solver speed.
