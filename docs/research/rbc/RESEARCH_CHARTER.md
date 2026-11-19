@@ -465,6 +465,47 @@ No stock renders passed off as actual simulation data.
 10. Promote nothing until correctness, costs and novelty have
     survived the most adversarial independent evaluations.
 
+## Stage 1 exact swept-query gate, after Mac Stage 0
+
+**Mac Stage-0 human terminal evidence (19 Nov 2026):**
+the researcher created and pushed annotated tag
+archive/pre-cleanup-2026-11-19 and locally compiled both RBC
+targets on Apple Silicon. CTest reported 2/2 RBC tests passing.
+GitHub API independently confirms annotated tag object
+e7b7687b8501bc43d24656bfa255c3ef97be8cc4 peels
+to original historical commit
+0809dea20d6b186f68fcb1acac4ab7200984e24f.
+Linux CI 44532575267 independently passed the full build,
+CTest, and RBC ASan/UBSan controls at branch
+41b460f5430b9df60213cb647d559c0a047a3716.
+
+**New Stage-1 query and oracle:** linear_swept_reach_candidates()
+builds inclusive componentwise AABB endpoint hulls and enumerates
+candidate pairs at the declared per-primitive contact reach.
+The test checks two objects that intersect MID-STEP but are
+separated at both endpoints, intentionally conservative pairs
+when bodies translate with the same velocity, 48 randomized
+32-primitive independent linear trajectories each sampled at
+26 normalized times, and stable identity/mask validation.
+
+The separate curved trajectory counterexample intentionally
+shows an object whose midpoint contacts another object
+despite separated stationary endpoints. This is a demonstration
+of the contract's limitation: endpoint swept AABBs are not
+a safe broad phase for unrestricted nonlinear motion.
+
+The Stage-1 tests are in tests/rbc_swept_reach_tests.cpp
+and rbc_linear_swept_reach_conservative_candidate_contract.
+The CI workflow executes CTest and ASan/UBSan. This method
+is intentionally O(N^2) and is NOT a continuous narrow-phase
+CCD oracle or a guarantee of penetration-free dynamics.
+
+Next gate: independent solver-specific path enclosure, honest
+motion bounds, actual dynamic candidate reuse under Newton/XPBD
+substeps and a full-pair baseline with nonlocal contact-rich
+physical scenes. If the stage-1 tests fail, preserve the failing
+case and the old accepted behavior; do not shrink the oracle.
+
 ## 10. Permission boundaries for future agents
 
 NEVER delete negative controls or older source merely because
