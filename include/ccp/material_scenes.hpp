@@ -25,6 +25,13 @@ struct Node {Vec3 x{},previous{};bool pin{};double damping{.985};};
 struct Bond {int a{},b{};double rest{},strength{};};
 struct Element {std::array<int,8> vertices{};int count{},material{};};
 struct Spec {double damping{},strength{},weight{},impact{};};
+// Optional independent held-out fixture variation. These seeds deliberately
+// do NOT reuse the World motion/forcing seed. Zero/zero preserves every
+// historical fixture byte-for-byte. Never tune a policy against test seeds.
+struct Variation {
+ std::uint32_t geometrySeed{},topologySeed{};
+ double jitter{.012};
+};
 inline Spec specification(int material){
  switch(material){
  case 0:return {.997,.82,.000045,.22}; // cloth / membrane
@@ -47,11 +54,38 @@ class World {
  std::vector<Bond> bonds_;
  std::vector<Element> elements_;
  std::uint32_t seed_{};
+ Variation variation_{};
  std::string regime_{"baseline"};
+ // Integer mixing only; deterministic cross-platform geometry/topology
+ // randomization. Independent seeds affect actual node coordinates and
+ // connectivity, not merely temporal forcing phase.
+ static std::uint32_t mix32(std::uint32_t x){
+  x^=x>>16;x*=0x7feb352du;
+  x^=x>>15;x*=0x846ca68bu;
+  return x^(x>>16);
+ }
+ static double signedUnit(std::uint32_t seed,std::uint32_t item,
+                          std::uint32_t dimension){
+  const std::uint32_t mixed=mix32(seed^mix32(item+0x9e3779b9u*dimension));
+  return 2.*(double(mixed)/4294967295.)-1.;
+ }
+ bool alternateDiagonal(int x,int y)const{
+  if(variation_.topologySeed==0)return false;
+  return (mix32(variation_.topologySeed^
+          (std::uint32_t(x)*73856093u)^
+          (std::uint32_t(y)*19349663u))&1u)!=0u;
+ }
+
  int step_{};
  static constexpr double pi=3.14159265358979323846264338;
  int node(Vec3 p,bool pin, double damping){
   const int id=static_cast<int>(nodes_.size());
+  if(variation_.geometrySeed!=0){
+   const auto index=std::uint32_t(id);
+   p.x+=variation_.jitter*signedUnit(variation_.geometrySeed,index,1u);
+   p.y+=variation_.jitter*signedUnit(variation_.geometrySeed,index,2u);
+   p.z+=variation_.jitter*signedUnit(variation_.geometrySeed,index,3u);
+  }
   nodes_.push_back({p,p,pin,damping});return id;
  }
  void bond(int a,int b,double strength){
@@ -73,7 +107,9 @@ class World {
    Vec3 p={center.x+2.0*(double(x)/cells-.5),
            center.y+2.0*(double(y)/cells-.5),
            center.z+1.5+.04*std::sin(double(x+y)*.13)};
-   ids[size_t(y)*side+x]=node(p,y==cells&&(x==0||x==cells),s.damping);
+   const bool pinned=y==cells&&(x==0||x==cells||
+     (variation_.topologySeed!=0 && variation_.topologySeed%3u==0u&&x==cells/2));
+   ids[size_t(y)*side+x]=node(p,pinned,s.damping);
   }
   for(int y=0;y<side;++y)for(int x=0;x<side;++x){
    const int a=ids[size_t(y)*side+x];
@@ -81,8 +117,16 @@ class World {
    if(y<cells)bond(a,ids[size_t(y+1)*side+x],s.strength);
    if(x<cells&&y<cells){
     const int b=ids[size_t(y)*side+x+1],c=ids[size_t(y+1)*side+x],d=ids[size_t(y+1)*side+x+1];
-    bond(a,d,s.strength*.45);bond(b,c,s.strength*.45);
-    element({a,b,d},0);element({a,d,c},0);
+    if(alternateDiagonal(x,y)){
+     // Exactly two non-overlapping triangles, using the opposing b-c
+     // diagonal rather than always sharing a-d. Stable primitive IDs
+     // remain intact; this is genuine triangle adjacency variation.
+     bond(b,c,s.strength*.45);
+     element({a,b,c},0);element({b,d,c},0);
+    }else{
+     bond(a,d,s.strength*.45);
+     element({a,b,d},0);element({a,d,c},0);
+    }
    }
   }
  }
@@ -106,10 +150,20 @@ class World {
    if(x<xy)bond(a,ids[index(x+1,y,z)],s.strength);
    if(y<xy)bond(a,ids[index(x,y+1,z)],s.strength);
    if(z<zcells)bond(a,ids[index(x,y,z+1)],s.strength);
-   if(x<xy&&y<xy&&z<zcells)
-    element({a,ids[index(x+1,y,z)],ids[index(x,y+1,z)],ids[index(x+1,y+1,z)],
+   if(x<xy&&y<xy&&z<zcells){
+    const int nxid=ids[index(x+1,y,z)],nyid=ids[index(x,y+1,z)];
+    const int far=ids[index(x+1,y+1,z+1)];
+    // Alternate diagonal cross-bracing in volumetric lattices without
+    // changing hexahedral cell vertex identity or count.
+    if(variation_.topologySeed!=0){
+     if(alternateDiagonal(x+y,z))
+      bond(a,far,s.strength*.16);
+     else bond(nxid,nyid,s.strength*.16);
+    }
+    element({a,nxid,nyid,ids[index(x+1,y+1,z)],
              ids[index(x,y,z+1)],ids[index(x+1,y,z+1)],
-             ids[index(x,y+1,z+1)],ids[index(x+1,y+1,z+1)]},material);
+             ids[index(x,y+1,z+1)],far},material);
+   }
   }
  }
  void ball(int target,Vec3 center){
@@ -152,8 +206,12 @@ class World {
   }
  }
 public:
- World(const std::string& kind,int requested,std::uint32_t seed,std::string regime="baseline"):
-  seed_(seed),regime_(std::move(regime)){
+ World(const std::string& kind,int requested,std::uint32_t seed,
+       std::string regime="baseline",Variation variation={}):
+  seed_(seed),variation_(variation),regime_(std::move(regime)){
+  if(!std::isfinite(variation_.jitter)||variation_.jitter<0.||
+     variation_.jitter>.04)
+   throw std::invalid_argument("held-out geometry jitter must be finite in 0..0.04");
   if(regime_!="baseline"&&regime_!="impact"&&regime_!="shear"&&
      regime_!="compression"&&regime_!="rapid"&&regime_!="relax")
    throw std::invalid_argument("unknown material deformation regime");
@@ -175,6 +233,7 @@ public:
  size_t elements()const{return elements_.size();}
  size_t nodes()const{return nodes_.size();}
  size_t bonds()const{return bonds_.size();}
+ Variation variation()const noexcept{return variation_;}
  // Read-only positions/connectivity for scientific mesh visualizations.
  // Exporters must not mutate the solver or substitute envelopes for meshes.
  const std::vector<Node>& visualNodes()const noexcept{return nodes_;}
