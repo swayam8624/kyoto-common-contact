@@ -116,12 +116,65 @@ struct RestQuality {
         return peak;
     }
 };
+void write_mesh_positions(std::ostream& out,const MultiCloth& sim){
+    out<<'[';
+    const auto& p=sim.positions();
+    for(std::size_t i=0;i<p.size();++i){
+        if(i)out<<',';
+        out<<'['<<p[i].x<<','<<p[i].y<<','<<p[i].z<<']';
+    }
+    out<<']';
+}
+void write_mesh_header(std::ostream& out,const MultiCloth& sim,
+                       const std::string& method,const std::string& scenario,
+                       int geo,int topo) {
+    out<<"{\"type\":\"mesh_header\",\"schema\":2,\"policy\":\""
+       <<method<<"\",\"scenario\":\""<<scenario
+       <<"\",\"geometry_seed\":"<<geo
+       <<",\"topology_seed\":"<<topo
+       <<",\"source_is_prepared_initial_fold\":"
+       <<(scenario=="prefold_relax"?"true":"false")
+       <<",\"triangles\":[";
+    for(std::size_t i=0;i<sim.triangles().size();++i){
+        if(i)out<<',';
+        const auto& t=sim.triangles()[i];
+        out<<'['<<t[0]<<','<<t[1]<<','<<t[2]<<']';
+    }
+    out<<"],\"triangle_sheets\":[";
+    for(std::size_t i=0;i<sim.triangleSheets().size();++i){
+        if(i)out<<',';
+        out<<sim.triangleSheets()[i];
+    }
+    out<<"],\"initial_positions\":";
+    write_mesh_positions(out,sim);
+    out<<"}\n";
+}
+void write_mesh_frame(std::ostream& out,const MultiCloth& sim,
+                      int frame,double maxError) {
+    const auto& m=sim.metrics();
+    out<<"{\"type\":\"frame\",\"frame\":"<<frame
+       <<",\"positions\":";
+    write_mesh_positions(out,sim);
+    out<<",\"metrics\":{\"self_contacts\":"<<m.selfContacts
+       <<",\"sphere_contacts\":"<<m.sphereContacts
+       <<",\"self_crossings\":"<<m.selfCrossings
+       <<",\"step_ms\":"<<m.stepMs
+       <<",\"broad_ms\":"<<m.broadMs
+       <<",\"narrow_ms\":"<<m.narrowMs
+       <<",\"source_max_position_error_sap\":"<<maxError
+       <<"}}\n";
+}
+
 void execute(const char* destination,int frames,
              const std::string& scenario,int geo,int topo,
-             bool strict){
+             bool strict,const char* geometryDir){
     if(std::filesystem::exists(destination))
         throw std::runtime_error(
             "refusing to overwrite original RBC solver experiment");
+    if(geometryDir && std::filesystem::exists(geometryDir))
+        throw std::runtime_error(
+            "refusing to overwrite existing genuine mesh JSONL evidence directory");
+    if(geometryDir)std::filesystem::create_directories(geometryDir);
     std::ofstream out(destination);
     if(!out)throw std::runtime_error("cannot create RBC coupled CSV");
     out<<std::fixed<<std::setprecision(11);
@@ -137,6 +190,15 @@ void execute(const char* destination,int frames,
           "rbc_flat_potential_pairs_sum,rbc_flat_index_comparisons,"
           "rbc_flat_candidate_checks,rbc_last_event\n";
     std::vector<std::unique_ptr<MultiCloth>> sims;
+    std::array<std::ofstream,5> visual;
+    if(geometryDir)for(std::size_t m=0;m<visual.size();++m) {
+        const auto path=std::filesystem::path(geometryDir)/
+                        (std::string(names[m])+".jsonl");
+        visual[m].open(path);
+        if(!visual[m])
+            throw std::runtime_error("cannot open true mesh JSONL");
+        visual[m]<<std::fixed<<std::setprecision(10);
+    }
     // The standard scenario grabs a central triangle. Over-fold
     // instead chooses a real bottom-center triangle, so continuous
     // barycentric driving pulls a free flap across the same sheet.
@@ -154,6 +216,9 @@ void execute(const char* destination,int frames,
             if(!s->beginGrab(tri,{1./3,1./3,1./3},start))
                 throw std::runtime_error("failed identical barycentric grab");
         }
+        if(visual[std::size_t(sims.size())].is_open())
+            write_mesh_header(visual[std::size_t(sims.size())],*s,
+                              names[sims.size()],scenario,geo,topo);
         sims.push_back(std::move(s));
     }
     // Positions are first checked BEFORE advancing any independent arm.
@@ -236,6 +301,8 @@ void execute(const char* destination,int frames,
                 allFlatRepairs+=metric.rbcFlatLocalRepairs;
                 allFlatIndexTests+=metric.rbcFlatIndexComparisons;
             }
+            if(visual[m].is_open())
+                write_mesh_frame(visual[m],sim,frame,worst);
             out<<frame<<','<<names[m]<<','<<scenario<<','<<geo<<','<<topo
                <<','<<int(strict)<<','<<slots[m]<<','
                <<metric.stepMs<<','<<metric.broadMs<<','<<metric.narrowMs<<','
@@ -281,11 +348,11 @@ void execute(const char* destination,int frames,
 } // namespace
 int main(int argc,char** argv){
     try {
-        if(argc!=7)
+        if(argc!=7&&argc!=8)
             throw std::invalid_argument(
                 "usage: ccp_rbc_coupled_tournament NEW.csv FRAMES(8..160)"
                 " free|pull|fold|fold_over|prefold_relax GEOMETRY_SEED TOPOLOGY_SEED"
-                " STRICT_AUDIT(0|1)");
+                " STRICT_AUDIT(0|1) [NEW_TRUE_MESH_JSONL_DIR]");
         const int frames=integer(argv[2],8,160);
         const std::string scenario(argv[3]);
         if(scenario!="free"&&scenario!="pull"&&scenario!="fold"&&
@@ -294,7 +361,8 @@ int main(int argc,char** argv){
         const int geo=integer(argv[4],0,2000000000);
         const int topo=integer(argv[5],0,2000000000);
         const bool audit=integer(argv[6],0,1)!=0;
-        execute(argv[1],frames,scenario,geo,topo,audit);
+        execute(argv[1],frames,scenario,geo,topo,audit,
+                argc==8?argv[7]:nullptr);
         return 0;
     } catch(const std::exception& e){
         std::cerr<<"FAIL RBC real physical solver tournament: "<<e.what()<<"\n";
