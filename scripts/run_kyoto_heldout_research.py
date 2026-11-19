@@ -88,6 +88,16 @@ def parse_coupled(path: Path, expected_frames: int, expected_scenario: str,
             raise ValueError("Invalid coupled physical metric")
         if float(r["max_position_difference_from_sap"]) > 1e-7:
             raise ValueError("Coupled solver states differ from SAP")
+        if r["policy"] == "guard_sap_bounded_trial":
+            if (int(r["frozen_guard_queries"])+int(r["frozen_sap_queries"]))!=5:
+                raise ValueError("V4 physical solver did not report all 5 query iterations")
+            if r["last_broadphase_action"] not in (
+                    "global_guarded_exact","sap_persistent_coherent"):
+                raise ValueError("Unknown frozen V4 physical solver backend decision")
+        elif any(int(r[key]) for key in (
+                "frozen_guard_queries","frozen_sap_queries",
+                "frozen_trial_queries","frozen_switches")):
+            raise ValueError("Non-V4 policy reported V4 selector decisions")
     return {
         "scenario": expected_scenario, "frames": expected_frames,
         "geometry_seed": geometry_seed, "topology_seed": topology_seed,
@@ -95,6 +105,22 @@ def parse_coupled(path: Path, expected_frames: int, expected_scenario: str,
         "source": str(path), "sha256": sha256(path),
         "full_geometry_agreement": True,
         "all_oracle_misses_zero": True,
+        "pinned_vertices": sorted({int(r["pinned_vertices"]) for r in rows}),
+        "frozen_v4_actual_queries": {
+            "guard": sum(int(r["frozen_guard_queries"]) for r in rows
+                         if r["policy"]=="guard_sap_bounded_trial"),
+            "sap": sum(int(r["frozen_sap_queries"]) for r in rows
+                       if r["policy"]=="guard_sap_bounded_trial"),
+            "trial": sum(int(r["frozen_trial_queries"]) for r in rows
+                         if r["policy"]=="guard_sap_bounded_trial"),
+            "switches": sum(int(r["frozen_switches"]) for r in rows
+                            if r["policy"]=="guard_sap_bounded_trial"),
+        },
+        "self_crossings_by_method": {
+            label: sum(int(r["self_crossings"]) for r in rows
+                       if r["policy"]==label)
+            for label in sorted(methods)
+        },
         "contacts_by_method": {
             label: sum(int(r["self_contacts"])+int(r["sphere_contacts"])
                        for r in rows if r["policy"] == label)
