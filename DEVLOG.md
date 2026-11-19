@@ -982,3 +982,94 @@ verified before source trace export, and original files
 are never overwritten. GitHub CI tests both scripts;
 future independent Mac compact trace can establish
 exact snapshot hashes and per-frame switching parity.
+
+
+## 2026-11-19 — RBC visual/physics postmortem and actual non-intersection gate
+
+**Critical correction to earlier research reporting:** Original
+prefold_relax source had an explicitly overlapping half-sheet.
+Independent third-party-style NumPy analysis of its saved C++
+triangle/vertex states found **45 nonlocal strict triangle piercings
+still present after frame 0 and 31 after frame 79**.
+Five exact broad phases producing identical solver positions was
+NOT a correctness certificate. The 121,376 attempted real
+self-contact corrections from this old fixture do not establish
+that cloth penetrations were removed; preserve the source as a
+NEGATIVE control.
+
+Additive NEW rounded_fold_relax source: real original 13x13
+deformable cloth with a finite-radius U-fold (R=.11),
+unchanged physical constraints, and a second original sheet
+relocated rigidly into a separate visual/physical bay.
+Old material fixtures, V4 and negative pre-fold source
+retained untouched. The new source is prepared, not a
+spontaneously formed physical fold.
+
+Implemented independent C++ end-of-frame strict nonlocal
+triangle–triangle edge/face penetration count
+(countNonlocalSelfIntersections) and randomized negative
+and positive CTest; integrated into all five policy native
+solver outputs; any geometric hit fails NEW rounded-fold
+benchmark. Independent NEW NumPy post-processing performs
+full source/current SAP equality and seven linearly
+interpolated within-step geometry checks per recorded
+frame, not claiming true continuous CCD.
+
+Native Linux CI 44557971724 checked three independent
+geometry/topology variants x 80 physics frames and ALL
+five original policy arms. Results: initial overlaps 0,
+strict true endpoint piercings **0/240** recorded source
+states, intermediate sampled strict piercings **0/1680**.
+Source SAP trajectories recorded 215+141+288 = **644**
+real same-sheet contact corrections. Max source edge
+stretch approximately 1.27, 1.30, 1.30. All five policies
+produced identical source states within 1e-7.
+
+The previous 2D painter/polygon renderer did not
+respect depth and the overlapping initial mesh was
+not physically sound. NEW software Z-buffer renderer
+uses true 3D current mesh/obstacle positions,
+correct surface occlusion, muted double-sided shading,
+a same-camera 5-policy timing grid plus a sixth
+magnified SOURCE fold inspector, looping native GIF
+and cryptographic original source receipts.
+
+NEW source-backed interactive browser:
+five individually real WebGL Three.js source visualizations
+with synchronized orbit and timeline, wireframe, sheet
+isolation, sphere toggles, actual framewise source
+CPU times and exact geometry alarm. Fully offline
+single-HTML bundling with pinned three@0.180.0 and
+esbuild@0.25.12; native data embedded and checked
+against original SHA256; WebGL-disabled browsers
+retain original metrics and display a clear fallback.
+No fabricated or method-specific improved cloth.
+
+NEW one-command reproducible complete visual proof
+pipeline scripts/run_rbc_visual_proof_package.py:
+native C++ five-policy 16..160 frame run, independent
+C++/Python piercing source validation, sampled
+subframes, actual 3D shaded GIF and PNG, interactive
+offline orbit HTML, complete original source
+SHA256 manifest; refuses overwrite. Its short CI
+smoke validated the entire artifact chain at
+44560036560, while original 3x80 full run and
+all original negative cohorts remain independent
+sources (NOT all one experiment).
+
+The new three prepared smooth-fold one-shot Linux
+Guard/RBC-flat mean full-step ratios were 1.2532,
+1.2242 and 1.2043 (geomean around 1.2271).
+**Exploratory correlated fixtures: no A/A independent
+confidence interval or external FEM/IPC validation.
+Do not promote this to a statistically supported
+general simulation speedup.** The heldout 54-scene
+material query cohort's negative 0.871x Guard/flat
+geomean remains visible and unchanged.
+
+Scientific next gates: exact IPC/CCD integration,
+a genuinely naturally formed fold from nonoverlapping
+flat geometry, source-based penetration depth and
+coplanar-overlap checks, new independent physical
+families/A-A timing sessions, and external published
+broad phases with identical contact semantics.
