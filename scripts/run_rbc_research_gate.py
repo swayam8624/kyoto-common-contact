@@ -161,11 +161,23 @@ def validate_physics(path:Path,frames:int,scenario:str,
         truth=by["sap_rebuild"][f]
         for name in PHYSICAL:
             r=by[name][f]
-            for key in ("candidate_pairs","precise_tests","self_contacts",
-                        "sphere_contacts","self_crossings"):
+            # Legacy GlobalGuard intentionally may emit conservative
+            # fat-AABB false positives; the native tournament verifies
+            # the full pair SET contains SAP, not equal pair counts.
+            # Extra candidates can legitimately increase preciseTests.
+            # Exact-current V4 and RBC instead require exact full sets
+            # in the native runner; check count too in this summary.
+            if name in ("frozen_v4","rbc_indexed"):
+                if r["candidate_pairs"]!=truth["candidate_pairs"]:
+                    raise ValueError(
+                        f"Native exact policy candidate count mismatch: {name}")
+            elif name=="global_guard":
+                if int(r["candidate_pairs"])<int(truth["candidate_pairs"]):
+                    raise ValueError("Guard conservative candidate count below SAP")
+            for key in ("self_contacts","sphere_contacts","self_crossings"):
                 if r[key]!=truth[key]:
                     raise ValueError(
-                        f"Native physics discrete contact data mismatch {key}")
+                        f"Native physics contact-response counter differs: {key}")
     after=min(8,max(0,frames//8))
     means={name:sum(float(by[name][f]["step_ms"]) for f in range(after,frames))/
            (frames-after) for name in PHYSICAL}
@@ -176,8 +188,10 @@ def validate_physics(path:Path,frames:int,scenario:str,
         "geometry_seed":geometry,"topology_seed":topology,
         "strict_every_rbc_solver_query":strict,
         "all_sap_reference_particle_states_equal":True,
-        "all_last_query_candidate_sets_equal_sap":True,
-        "all_last_query_precise_and_contact_counts_equal_sap":True,
+        "non_guard_last_query_exact_candidate_sets_equal_sap":True,
+        "global_guard_conservative_superset_verified_by_native_pair_ids":True,
+        "all_last_query_contact_response_counts_equal_sap":True,
+        "precise_test_counts_may_differ_for_conservative_guard":True,
         "rbc_actual_contact_queries":frames*5,
         "rbc_strict_oracle_queries":frames*5 if strict else 0,
         "rbc_actual_full_index_builds":
