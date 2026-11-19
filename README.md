@@ -232,3 +232,39 @@ raw candidate-ID streams. It separates natural and intentionally artificial
 motion. The three seed values vary only the forcing phase of a fixed
 material/topology fixture, not initial scene geometry. Linux [CI regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461)
 passed both valid and deliberately corrupted evidence checks.
+
+### Phase 18 next: same-snapshot A/A noise floor
+
+The complete Mac **eleven-algorithm** natural-material ranking has been
+reported and archived in
+[the Phase 18 Mac evidence note](docs/CBP_PHASE18_MAC_ACTUAL_2026-11-19.md).
+V4 ranks first (geomean Guard/V4 1.0306x, 21/36 wins), but this
+approximately 3% apparent benefit has **not** been shown statistically
+robust against timing drift. The three scene seed values vary only
+forcing phase, not initial topology.
+
+The additive, strictly optional same-code replication protocol in
+[docs/CBP_PHASE18_AA_REPLICATION_PROTOCOL.md](docs/CBP_PHASE18_AA_REPLICATION_PROTOCOL.md)
+times two independently instantiated Guard policies and two independently
+instantiated, **unchanged** V4 policies per original snapshot. It replays
+each saved natural scene under several randomized method orders; no
+mass-spring simulation or exporter runs again. Source snapshot SHA-256,
+original replay CSV SHA-256 and original-versus-new SAP candidate
+fingerprints are rechecked.
+
+After pulling and rebuilding only ccp_material_replay, reproduce with:
+
+```bash
+python3 scripts/recheck_kyoto_phase18_aa.py \
+  --results output/kyoto-decision-mac-first \
+  --replayer build/kyoto-final-cpu/ccp_material_replay \
+  --output output/kyoto-phase18-aa-mac \
+  --repeats 4
+open output/kyoto-phase18-aa-mac/AA_RECHECK.md
+```
+
+Linux [A/A regression and source-fingerprint CI](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44455846122)
+passed. One 512-AABB test showed identical frozen V4 copies differing by
+1.4222x **without a backend-action difference**, emphasizing that tiny
+one-run speedups demand stability controls. This specific Linux variance
+is not asserted to hold on the Mac.
