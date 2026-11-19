@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyoto RBC | Verified cloth collision laboratory</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1219;--panel:#17222d;--line:#334150;--muted:#9eb2c2;--text:#eff5fa;--mint:#a4e6cf;--warn:#ff917f}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding:22px clamp(14px,3vw,48px) 60px}
+main{max-width:1770px;margin:0 auto}
+header{display:flex;gap:24px;align-items:flex-end;justify-content:space-between;padding:4px 0 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#70cbba;font-weight:800}
+h1{font-size:clamp(25px,2.8vw,44px);letter-spacing:-.03em;font-weight:660;line-height:1.1;margin:10px 0 8px}
+.subtitle{font-size:13px;color:var(--muted);max-width:900px;line-height:1.6}
+.status{border:1px solid #2c796b;background:#16382f;padding:10px 16px;color:#a5ecd5;font-size:12px;border-radius:8px;font-weight:650;white-space:nowrap}
+.status.danger{border-color:#9b564c;background:#4b2021;color:#ffc4b6}
+.toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:19px 0}
+button{background:#263544;border:1px solid #465a6b;color:var(--text);border-radius:7px;padding:9px 14px;cursor:pointer;font-size:12px;font-weight:650}
+button:hover{background:#344a5b}
+button.primary{background:#adf0dc;color:#122a28;border-color:#adf0dc}
+.control{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted)}
+.control input{accent-color:#90ddc6}
+#timeline{width:min(370px,40vw);min-width:130px}
+.counter{font-variant-numeric:tabular-nums;color:#e4f3f7;font-size:12px;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.stage{position:relative;min-height:360px;border:1px solid #304252;background:#18242f;border-radius:12px;overflow:hidden;box-shadow:0 14px 40px #0002}
+.stage.focus{border-color:#73d6bb}
+.stage canvas{display:block;width:100%;height:282px;touch-action:none;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.stage .head{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;z-index:1;background:linear-gradient(#141d28f0,#141d2800)}
+.head strong{font-size:13px;font-weight:680}
+.index{font-size:10px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.metrics{height:77px;border-top:1px solid #364b58;padding:11px 16px}
+.row{display:flex;gap:10px;justify-content:space-between;align-items:center}
+.num{font-size:15px;font-weight:730;font-variant-numeric:tabular-nums}
+.mini{font-size:10px;color:var(--muted);letter-spacing:.02em}
+.valid{color:var(--mint);font-size:11px;font-weight:700}
+.invalid{color:var(--warn);font-size:11px;font-weight:700}
+.note{padding:27px 24px;min-height:360px;background:#15232c;border:1px solid #304252;border-radius:12px}
+.note h2{font-size:19px;font-weight:660;margin:0 0 12px}
+.note p{font-size:13px;line-height:1.7;color:#b3c5d1;margin:8px 0}
+.legend{display:flex;gap:17px;flex-wrap:wrap;margin:20px 0 10px}
+.swatch{display:inline-flex;gap:7px;align-items:center;font-size:12px;color:#cadde6}
+.dot{height:12px;width:12px;border-radius:3px;display:inline-block}
+.audit{display:flex;flex-wrap:wrap;gap:15px;border-top:1px solid var(--line);padding-top:20px;margin-top:22px;font-size:11px;line-height:1.6;color:#9eb1c0}
+.audit strong{color:#d2e3e9}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stage canvas{height:310px}}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.stage{min-height:350px}.stage canvas{height:270px}#timeline{min-width:210px;width:calc(100vw - 55px)}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<main>
+<header>
+ <div><div class="kicker">Kyoto University • Reach–Budget Calculus • Source-backed physics</div>
+ <h1>Five broad phases. One physical reality.</h1>
+ <div class="subtitle">Real C++ deformable-sheet solver states, measured per-policy CPU times and independent triangle-piercing audits. Drag any viewport to orbit; cameras and timeline stay synchronized.</div></div>
+ <div id="global-status" class="status">Checking source physics...</div>
+</header>
+<div class="toolbar">
+ <button id="play" class="primary" type="button">Pause</button>
+ <button id="step" type="button">Next frame</button>
+ <label class="control">Simulation frame <input id="timeline" type="range" value="0" min="0" max="79" step="1"></label>
+ <span id="time" class="counter">Frame 001/080</span>
+ <label class="control"><input id="wireframe" type="checkbox">Wireframe</label>
+ <label class="control"><input id="spheres" type="checkbox" checked>Moving spheres</label>
+ <label class="control"><input id="sheet-b" type="checkbox" checked>Second sheet</label>
+ <button id="reset" type="button">Reset cameras</button>
+ <span class="mini">Playback is slowed for inspection; timing readouts are the original native measurements.</span>
+</div>
+<div class="grid" id="grid">
+ <article class="stage" data-policy="sap_rebuild"><div class="head"><strong>01 / Rebuilt SAP</strong><span class="index">REFERENCE</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
+ <article class="stage" data-policy="global_guard"><div class="head"><strong>02 / Global Guard</strong><span class="index">LEGACY BASELINE</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
+ <article class="stage" data-policy="frozen_v4"><div class="head"><strong>03 / Frozen V4</strong><span class="index">UNMODIFIED</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
+ <article class="stage" data-policy="rbc_indexed"><div class="head"><strong>04 / RBC node index</strong><span class="index">NEGATIVE CONTROL</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
+ <article class="stage focus" data-policy="rbc_flat"><div class="head"><strong>05 / RBC flat frontier</strong><span class="index">RESEARCH CANDIDATE</span></div><div class="viewport"></div><div class="metrics"><div class="row"><span class="num" data-step>—</span><span class="num" data-broad>—</span></div><div class="row mini"><span>Whole step (ms)</span><span>Broad phase (ms)</span></div><div class="row"><span class="mini" data-contacts>—</span><span class="valid" data-audit>Validating</span></div></div></article>
+ <article class="note"><div class="kicker">What you are seeing</div><h2>A real solver experiment, not an animation trick</h2>
+   <p>Each of these panels displays the same real particle positions and topology produced by independently advancing the five candidate-pair algorithms. Their runtimes are measured separately.</p>
+   <p>The rounded U-fold is a <strong>deliberately prepared, initially nonintersecting</strong> mesh. A valid broad phase must leave the physics trajectory unchanged; it does not magically produce a less folded cloth.</p>
+   <p>The geometry counter checks strict nonlocal edge–triangle piercings at the <strong>end of each simulation frame</strong>. It is not a swept CCD or penetration-depth proof.</p>
+   <div class="legend"><span class="swatch"><span class="dot" style="background:#399bb0"></span>Folded original sheet</span><span class="swatch"><span class="dot" style="background:#db9168"></span>Second real sheet</span><span class="swatch"><span class="dot" style="background:#8191ac"></span>Moving obstacles</span></div>
+ </article>
+</div>
+<div class="audit">
+ <span><strong>Source integrity:</strong> five independently emitted original native mesh trajectories, validated identical positions against SAP</span>
+ <span><strong>Geometry:</strong> true depth-tested 3D triangles; no fabricated vertices or aesthetic warping</span>
+ <span><strong>Limit:</strong> no continuous CCD guarantee; no cross-device timing comparisons</span>
+ <span><strong>3D engine:</strong> Three.js r180, loaded from a pinned CDN</span>
+ <span id="source-hash"><strong>SHA-256:</strong> loading...</span>
+</div>
+</main>
+<script id="native-evidence" type="application/json">__NATIVE_SOURCE_PAYLOAD__</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const data=JSON.parse(document.getElementById('native-evidence').textContent);
+const names=['sap_rebuild','global_guard','frozen_v4','rbc_indexed','rbc_flat'];
+const order=names.map(n=>document.querySelector('[data-policy="'+n+'"]'));
+const mainFrames=data.policies.sap_rebuild;
+const F=mainFrames.length;
+const slider=document.getElementById('timeline');
+slider.max=String(F-1);
+const valid=mainFrames.every(f=>f.metrics.geometric_self_intersections===0);
+const global=document.getElementById('global-status');
+global.textContent=valid?'ZERO NONLOCAL ENDPOINT PIERCINGS / '+F+' FRAMES':'GEOMETRIC INTERSECTION DETECTED';
+if(!valid)global.classList.add('danger');
+const sha=data.source_sha256.sap_rebuild;
+document.getElementById('source-hash').innerHTML='<strong>Reference mesh SHA-256:</strong> <code>'+sha+'</code>';
+const points=mainFrames.flatMap(f=>f.positions);
+const bbox=new THREE.Box3();
+for(const p of points)bbox.expandByPoint(new THREE.Vector3(...p));
+const center=bbox.getCenter(new THREE.Vector3());
+const size=bbox.getSize(new THREE.Vector3());
+const span=Math.max(size.x,size.y,size.z,2);
+const initialCamera=new THREE.Vector3(center.x+span*.79,center.y-span*1.05,center.z+span*.78);
+
+const triangles=data.header.triangles;
+const owners=data.header.triangle_sheets;
+const meshIndices=[[],[]];
+for(let i=0;i<triangles.length;i++)meshIndices[owners[i]].push(...triangles[i]);
+const sheetMaterials=[
+ new THREE.MeshStandardMaterial({color:0x3c9db4,metalness:0.02,roughness:0.88,side:THREE.DoubleSide}),
+ new THREE.MeshStandardMaterial({color:0xdc9973,metalness:0.02,roughness:0.88,side:THREE.DoubleSide})
+];
+const obstacleMaterial=new THREE.MeshStandardMaterial({color:0x8194ad,roughness:0.41,metalness:0.12});
+const obstacleSphere=new THREE.SphereGeometry(1,32,24);
+const rigs=[];
+let syncing=false;
+
+for(let pi=0;pi<names.length;pi++){
+ const name=names[pi],holder=order[pi].querySelector('.viewport');
+ const scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x17232e);
+ scene.fog=new THREE.Fog(0x17232e,span*5,span*11);
+ const camera=new THREE.PerspectiveCamera(38,1,0.01,span*25);
+ camera.up.set(0,0,1);
+ camera.position.copy(initialCamera);
+ camera.lookAt(center);
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+ renderer.outputColorSpace=THREE.SRGBColorSpace;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;
+ renderer.toneMappingExposure=1.27;
+ holder.appendChild(renderer.domElement);
+ const control=new OrbitControls(camera,renderer.domElement);
+ control.target.copy(center);
+ control.enableDamping=true;control.dampingFactor=.06;
+ control.minDistance=span*.28;control.maxDistance=span*8;
+ control.addEventListener('change',()=>{
+  if(syncing)return;
+  syncing=true;
+  for(const rig of rigs)if(rig.control!==control){
+    rig.camera.position.copy(camera.position);
+    rig.control.target.copy(control.target);
+    rig.camera.quaternion.copy(camera.quaternion);
+  }
+  syncing=false;
+ });
+ const ambient=new THREE.HemisphereLight(0xe3f5ff,0x4c536b,2.25);
+ ambient.position.set(0,0,8);scene.add(ambient);
+ const key=new THREE.DirectionalLight(0xfff1de,3.0);
+ key.position.set(center.x+6,center.y-5,center.z+9);scene.add(key);
+ const fill=new THREE.DirectionalLight(0x89bbf2,1.0);
+ fill.position.set(center.x-4,center.y+7,center.z+4);scene.add(fill);
+ const grid=new THREE.GridHelper(span*2.6,20,0x324856,0x293b49);
+ grid.rotation.x=Math.PI/2;grid.position.z=.02;
+ grid.material.transparent=true;grid.material.opacity=.26;scene.add(grid);
+ const cloth=[];
+ for(let sheet=0;sheet<2;sheet++){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(
+    new Float32Array(data.header.initial_positions.length*3),3));
+  geometry.setIndex(meshIndices[sheet]);
+  const mesh=new THREE.Mesh(geometry,sheetMaterials[sheet].clone());
+  mesh.frustumCulled=false;scene.add(mesh);cloth.push(mesh);
+ }
+ const spheres=[];
+ for(let i=0;i<2;i++){
+   const ball=new THREE.Mesh(obstacleSphere,obstacleMaterial);
+   scene.add(ball);spheres.push(ball);
+ }
+ const rig={name,holder,scene,camera,renderer,control,cloth,spheres,card:order[pi]};
+ rigs.push(rig);
+}
+function resize(){
+ for(const rig of rigs){
+  const w=rig.holder.clientWidth,h=rig.holder.clientHeight||282;
+  rig.renderer.setSize(w,h,false);
+  rig.camera.aspect=w/h;rig.camera.updateProjectionMatrix();
+ }
+}
+const observer=new ResizeObserver(resize);
+for(const rig of rigs)observer.observe(rig.holder);
+let frame=0,playing=true,last=0,acc=0;
+const playButton=document.getElementById('play');
+function putFrame(f){
+ frame=(f+F)%F;slider.value=String(frame);
+ document.getElementById('time').textContent='FRAME '+String(frame+1).padStart(3,'0')+'/'+String(F).padStart(3,'0');
+ for(const rig of rigs){
+  const native=data.policies[rig.name][frame];
+  const vertices=new Float32Array(native.positions.flat());
+  for(const sheet of rig.cloth){
+    sheet.geometry.attributes.position.array.set(vertices);
+    sheet.geometry.attributes.position.needsUpdate=true;
+    sheet.geometry.computeVertexNormals();
+  }
+  for(let i=0;i<rig.spheres.length;i++){
+    const s=native.spheres[i],mesh=rig.spheres[i];
+    mesh.position.set(...s.center);mesh.scale.setScalar(s.radius);
+  }
+  const metric=native.metrics,card=rig.card;
+  card.querySelector('[data-step]').textContent=Number(metric.step_ms).toFixed(3);
+  card.querySelector('[data-broad]').textContent=Number(metric.broad_ms).toFixed(3);
+  card.querySelector('[data-contacts]').textContent=metric.self_contacts+' real self-contact corrections';
+  const audit=card.querySelector('[data-audit]');
+  const invalid=metric.geometric_self_intersections;
+  audit.textContent=invalid?invalid+' PIERCINGS':'0 endpoint piercings';
+  audit.className=invalid?'invalid':'valid';
+ }
+}
+putFrame(0);
+function animate(now){
+ requestAnimationFrame(animate);
+ if(last===0)last=now;
+ const dt=Math.min(100,now-last);last=now;
+ if(playing){acc+=dt;if(acc>=1000/12){putFrame(frame+1);acc%=1000/12;}}
+ for(const rig of rigs){rig.control.update();rig.renderer.render(rig.scene,rig.camera);}
+}
+requestAnimationFrame(animate);
+document.getElementById('timeline').addEventListener('input',ev=>{putFrame(Number(ev.target.value));});
+playButton.addEventListener('click',()=>{
+ playing=!playing;playButton.textContent=playing?'Pause':'Play';
+});
+document.getElementById('step').addEventListener('click',()=>{
+ playing=false;playButton.textContent='Play';putFrame(frame+1);
+});
+document.getElementById('wireframe').addEventListener('change',ev=>{
+ for(const rig of rigs)for(const mesh of rig.cloth)mesh.material.wireframe=ev.target.checked;
+});
+document.getElementById('spheres').addEventListener('change',ev=>{
+ for(const rig of rigs)for(const mesh of rig.spheres)mesh.visible=ev.target.checked;
+});
+document.getElementById('sheet-b').addEventListener('change',ev=>{
+ for(const rig of rigs)rig.cloth[1].visible=ev.target.checked;
+});
+document.getElementById('reset').addEventListener('click',()=>{
+ for(const rig of rigs){rig.camera.position.copy(initialCamera);rig.control.target.copy(center);rig.control.update();}
+});
+</script>
+</body>
+</html>
