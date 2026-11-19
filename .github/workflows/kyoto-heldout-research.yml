@@ -17,6 +17,7 @@ on:
       - 'scripts/test_kyoto_heldout_research.py'
       - 'scripts/analyze_kyoto_heldout_evidence.py'
       - 'scripts/export_kyoto_heldout_trace.py'
+      - 'scripts/compare_kyoto_heldout_traces.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +33,7 @@ jobs:
           python3 -m py_compile scripts/test_kyoto_heldout_research.py
           python3 -m py_compile scripts/analyze_kyoto_heldout_evidence.py
           python3 -m py_compile scripts/export_kyoto_heldout_trace.py
+          python3 -m py_compile scripts/compare_kyoto_heldout_traces.py
       - name: Build exact geometry, candidate and physically coupled methods
         run: |
           cmake --preset kyoto-final-cpu
@@ -121,6 +123,27 @@ jobs:
                          for f in x['observations']) for x in obj['scenes'])
           print('PASS: actual saved source and 3240 V4 frames exported with every exact native SAP pair fingerprint')
           PY
+      - name: Prove exact per-frame comparison can detect altered decisions
+        run: |
+          python3 scripts/compare_kyoto_heldout_traces.py \
+            --a output/kyoto-heldout-independent-ci-compact-trace.json.gz \
+            --b output/kyoto-heldout-independent-ci-compact-trace.json.gz \
+            --output output/kyoto-heldout-selfcomparison-ci \
+            --warmup 8
+          python3 - <<'PY'
+          import gzip, json
+          from pathlib import Path
+          p=Path('output/kyoto-heldout-selfcomparison-ci/CROSSPLATFORM_TRACE_COMPARISON.json')
+          data=json.loads(p.read_text())
+          assert data['v4_action_frame_disagreements']==0
+          assert data['v4_action_frame_matches']==3240
+          assert data['snapshot_sha_matches']==54
+          assert data['exact_pair_hash_matches']==3240
+          assert data['policy_method_cohort_matches']==54
+          assert data['policy_execution_slot_map_matches']==54
+          assert abs(data['guard_over_v4_geomean_a']-data['guard_over_v4_geomean_b']) < 1e-12
+          print('PASS: source-parity comparator validates all original frames, methods and receipt identities')
+          PY
       - name: Preserve new source snapshots and real solver visual exports
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,6 +153,7 @@ jobs:
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.md
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.json
             output/kyoto-heldout-independent-ci-compact-trace.json.gz
+            output/kyoto-heldout-selfcomparison-ci/
             output/kyoto-heldout-independent-ci/full-method-scores/
             output/kyoto-heldout-independent-ci/snapshots/
             output/kyoto-heldout-independent-ci/replays/
