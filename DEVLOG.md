@@ -514,3 +514,52 @@ independent physical geometry trials. The strict replay scorer checks
 framewise candidate counts and pair hashes (plus existing C++ correctness
 oracles), NOT independently persisted raw pair-ID lists for every one of
 the 39 replays. Larger real-world generalization claims remain unsupported.
+
+## 19 November 2026 — full original-method Mac ranking and A/A validation
+
+The user completed the new SHA-verified **no-rerun** all-algorithm scorer
+against the same Phase 18 Mac replay CSVs. PASS: 11 methods verified.
+Natural Guard-relative geometric mean across 36 trajectory means:
+frozen V4 1.0306x, Global Guard 1.0000x, Selective Guard .8450x,
+original generalized Online .7493x, fixed region .7145x,
+adaptive region .7018x, hierarchical region .6974x, measured
+Guard/SAP probe .6874x, persistent SAP .4728x, rebuild SAP .4513x,
+external Bullet DBVT .2474x. V4 had 21/36 Guard wins. Do NOT
+reinterpret negative original Online/Bullet values as invalid
+algorithms: they executed and passed current-AABB candidate checks
+on this **particular** saved snapshot cohort.
+
+The artificial translation cohort is intentionally separate:
+persistent SAP 2.7190x vs Guard, frozen V4 2.6567x, rebuilt SAP
+2.5306x, measured probe 2.4676x, original Online 1.2864x.
+A single benchmark collection cannot establish worldwide or
+solver-level superiority. Exact ranking and limitations are now
+recorded in docs/CBP_PHASE18_MAC_ACTUAL_2026-11-19.md.
+
+After the ranking, a further *optional* native --aa-control mode was
+added, without changing the default replay or frozen V4 thresholds.
+It independently instantiates a second Global Guard and V4 policy,
+giving each its own complete cache and causal decision state. The
+new scripts/recheck_kyoto_phase18_aa.py checks unchanged source
+snapshot/CSV SHA-256, framewise SAP fingerprints against the original
+Mac receipts, and runs multiple randomized whole-trajectory policy
+orders on precisely the same already-saved AABBs. The output is a
+descriptive A/A noise and backend-action divergence report, not
+a manufactured p-value or new material simulation.
+
+GitHub Actions run
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44455846122
+**passed** building, SAP parity, original policy checks, independently
+instantiated A/A clones, and invalid-argument rejection. A striking
+negative control was one Linux 512-object rapid-cloth repeat where
+the two identical V4 copies differed by 1.4222x in measured time,
+while choosing identical backend actions. This is a single CI
+noise example, not a Mac noise estimate. Since the observed natural
+V4 advantage was ~3%, repeated Mac A/A measurements are now the
+proper next gate. The user's original Mac snapshots and earlier
+reports have not been modified.
+
+See docs/CBP_PHASE18_AA_REPLICATION_PROTOCOL.md for exact commands
+and measurement boundaries. Next: evaluate actual Mac A/A distributions,
+then consider stricter balanced ABBA sweeps and genuinely independent
+topology/geometry sets. Do not retune V4 with the same evidence.
