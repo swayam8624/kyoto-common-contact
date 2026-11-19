@@ -1,0 +1,93 @@
+name: RBC independent physical triangle penetration gate - smooth rounded fold
+on:
+  push:
+    branches:
+      - research/reach-budget-calculus
+    paths:
+      - '.github/workflows/rbc-geometry-physics.yml'
+      - 'include/ccp/research_multicloth.hpp'
+      - 'src/research_multicloth.cpp'
+      - 'tests/rbc_physical_geometry_tests.cpp'
+      - 'apps/rbc_coupled_tournament.cpp'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  physical-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm frozen V4 has not been changed
+        run: |
+          git fetch origin research/kyoto-decision-coverage:refs/remotes/origin/research/kyoto-decision-coverage
+          git diff --exit-code origin/research/kyoto-decision-coverage -- include/ccp/final_broadphase.hpp
+      - name: Build REAL solver, nonintersecting fold geometry oracle
+        run: |
+          cmake -S . -B build/rbc-geometry-ci -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build build/rbc-geometry-ci --parallel 3 \
+            --target ccp_rbc_physical_geometry_tests \
+                     ccp_rbc_coupled_tournament
+          ctest --test-dir build/rbc-geometry-ci \
+            -R 'rbc_nonpenetrating_rounded_fold' --output-on-failure
+      - name: Five independent real 80-frame physics trajectories, exact candidate/SAP state parity and STRICT NO ENDPOINT PIERCING
+        run: |
+          set -euo pipefail
+          mkdir -p output/rbc-rounded-clean-80
+          build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
+            output/rbc-rounded-clean-80/g73013.csv \
+            80 rounded_fold_relax 73013 86011 0 \
+            output/rbc-rounded-clean-80/g73013-mesh \
+            > output/rbc-rounded-clean-80/g73013.log
+          build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
+            output/rbc-rounded-clean-80/g74017.csv \
+            80 rounded_fold_relax 74017 86019 0 \
+            > output/rbc-rounded-clean-80/g74017.log
+          build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
+            output/rbc-rounded-clean-80/g75029.csv \
+            80 rounded_fold_relax 75029 86029 0 \
+            > output/rbc-rounded-clean-80/g75029.log
+          python3 - <<'PY'
+          import csv,hashlib,json,math
+          from pathlib import Path
+          root=Path('output/rbc-rounded-clean-80')
+          policies={'sap_rebuild','global_guard','frozen_v4','rbc_indexed','rbc_flat'}
+          receipts=[]
+          for source in sorted(root.glob('g*.csv')):
+              with source.open(newline='') as f: rows=list(csv.DictReader(f))
+              assert len(rows)==80*5
+              assert {r['policy'] for r in rows}==policies
+              assert all(int(r['geometric_self_intersections'])==0 for r in rows), (
+                  'REAL GEOMETRIC SELF-PENETRATION: do NOT publish a clean source'
+              )
+              assert all(int(r['oracle_misses'])==0 for r in rows)
+              assert all(float(r['max_position_diff_sap'])<=1e-7 for r in rows)
+              for policy in policies:
+                  subset=[r for r in rows if r['policy']==policy]
+                  assert [int(r['frame']) for r in subset]==list(range(80))
+              receipts.append({'source':source.name,
+                'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
+                'independent_final_geometry_self_intersections':0})
+          assert len(receipts)==3
+          mesh=root/'g73013-mesh'
+          for name in policies:
+              lines=[json.loads(t) for t in (mesh/(name+'.jsonl')).read_text().splitlines()]
+              assert len(lines)==81
+              assert all(f['metrics']['geometric_self_intersections']==0
+                         for f in lines[1:])
+          (root/'GATE.json').write_text(json.dumps({
+              'geometry_type':'prepared continuous finite-radius U-bend; NOT spontaneous dynamic fold',
+              'method_count':5,'source_scene_count':3,
+              'independent_solver_final_endpoint_triangle_piercing_zero':True,
+              'contact_quality_not_continuous_CCD_certified':True,
+              'receipts':receipts},indent=2)+'\n')
+          print('PASS: 3 source variants x 80 frames x 5 REAL independent policies, zero nonlocal mesh penetrations after every solver step')
+          PY
+      - name: Preserve original failure or success source, not fake physics visual
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbc-independent-exact-endpoint-piercing-3-source-5-policy-80-frames
+          path: output/rbc-rounded-clean-80/
+          if-no-files-found: warn
