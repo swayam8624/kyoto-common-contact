@@ -87,6 +87,7 @@ def inspect(root: Path):
     total_coupled = 0
     distinct_coupled_geometry = defaultdict(set)
     distinct_coupled_topology = defaultdict(set)
+    actual_contact_variants = set()
     for scenario in data["coupled_solver_runs"]:
         csv_path = Path(scenario["source"])
         directory = csv_path.parent
@@ -104,6 +105,10 @@ def inspect(root: Path):
             subset = [r for r in rows if r["policy"] == name]
             ensure([int(r["frame"]) for r in subset] == list(range(n_frames)),
                    "wrong coupled solver frame indices")
+        if (sum(int(r["precise_tests"]) for r in rows if r["policy"]=="sap_rebuild")>0 and
+            sum(int(r["self_contacts"])+int(r["sphere_contacts"])
+                for r in rows if r["policy"]=="sap_rebuild")>0):
+            actual_contact_variants.add((scenario["geometry_seed"],scenario["topology_seed"]))
         for r in rows:
             ensure(int(r["geometry_seed"]) == scenario["geometry_seed"] and
                    int(r["topology_seed"]) == scenario["topology_seed"],
@@ -160,6 +165,10 @@ def inspect(root: Path):
         total_coupled += n_frames
     ensure(total_coupled>0,"no coupled-contact simulations")
     n_variants = len(data["independent_geometry_topology_seeds_used"])
+    ensure(data.get("actual_physical_contact_coverage_enforced") is True,
+           "actual physical contact gate not recorded")
+    ensure(len(actual_contact_variants)==n_variants,
+           "one or more independent coupled physical meshes generated no real contact")
     for kind in {item["scenario"] for item in data["coupled_solver_runs"]}:
         ensure(len(distinct_coupled_geometry[kind]) == n_variants,
                "coupled physical geometry failed to vary with independent seeds")
