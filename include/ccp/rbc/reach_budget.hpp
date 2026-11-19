@@ -222,8 +222,18 @@ private:
                                                  const Bounds& b) {
     if (a.id!=b.id)
         throw std::invalid_argument("RBC swept endpoints must share stable IDs");
-    validate(std::vector<Bounds>{a,b},
-             std::vector<Reach>{{},{}}); // unique-ID validation unsuitable
-    return a;
+    validate(std::vector<Bounds>{a},std::vector<Reach>{{}});
+    validate(std::vector<Bounds>{b},std::vector<Reach>{{}});
+    if (a.category!=b.category || a.mask!=b.mask)
+        throw std::invalid_argument(
+            "RBC linear swept endpoints require fixed category/mask within step");
+    Bounds h=a;
+    h.min.x=std::min(a.min.x,b.min.x);
+    h.min.y=std::min(a.min.y,b.min.y);
+    h.min.z=std::min(a.min.z,b.min.z);
+    h.max.x=std::max(a.max.x,b.max.x);
+    h.max.y=std::max(a.max.y,b.max.y);
+    h.max.z=std::max(a.max.z,b.max.z);
+    return h;
 }
 } // namespace ccp::rbc
