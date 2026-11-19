@@ -1,0 +1,68 @@
+name: Kyoto Phase 18 — real eligible online decisions and randomized original policies
+on:
+  push:
+    branches:
+      - research/kyoto-decision-coverage
+    paths:
+      - '.github/workflows/kyoto-decision-coverage.yml'
+      - 'apps/material_replay_benchmark.cpp'
+      - 'scripts/run_kyoto_decision_coverage.py'
+      - 'scripts/test_kyoto_decision_coverage.py'
+      - 'scripts/audit_kyoto_phase17_decisions.py'
+      - 'scripts/kyoto_research_dashboard.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-policy-decision-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python and shell syntax
+        run: |
+          python3 -m py_compile scripts/run_kyoto_decision_coverage.py scripts/test_kyoto_decision_coverage.py
+      - name: Build original full-output policies without modifying frozen V4
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --target ccp_material_export ccp_material_replay --parallel 2
+      - name: Independent SAP checks under seeded execution-order permutations
+        run: |
+          python3 scripts/test_kyoto_decision_coverage.py \
+            build/kyoto-final-cpu/ccp_material_export \
+            build/kyoto-final-cpu/ccp_material_replay
+      - name: Exercise at least one actual size-eligible V4 trajectory and a separate diagnostic
+        run: |
+          python3 scripts/run_kyoto_decision_coverage.py \
+            --exporter build/kyoto-final-cpu/ccp_material_export \
+            --replayer build/kyoto-final-cpu/ccp_material_replay \
+            --output output/phase18-decision-ci \
+            --budgets 512 --materials cloth \
+            --regimes baseline rapid --seeds 3203 --frames 24 --warmup 4
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('output/phase18-decision-ci')
+          data = json.loads((root/'DECISION_COVERAGE.json').read_text())
+          assert data['groups']['natural']['trajectories'] == 2
+          assert data['groups']['natural']['observed_eligible_scenes'] == 2
+          assert data['groups']['rigid_translation_diagnostic']['trajectories'] == 1
+          assert all(x['actual_n'] >= 384 for x in data['results'])
+          assert len({x['order_seed'] for x in data['results']}) == 3
+          assert {'global_guarded_exact','online_cost_aware',
+                  'guard_sap_bounded_trial','sap_persistent_coherent'}.issubset(
+                  data['tested_methods'])
+          print('PASS: all actual-N eligible; full pair set verified; actions counted')
+          PY
+      - name: Preserve evidence regardless of benchmark outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-phase18-decision-coverage-evidence
+          path: |
+            output/phase18-decision-ci/DECISION_COVERAGE.json
+            output/phase18-decision-ci/DECISION_COVERAGE.md
+            output/phase18-decision-ci/replays/
+            output/phase18-decision-ci/logs/
+          retention-days: 14
+          if-no-files-found: warn
