@@ -294,11 +294,17 @@ add_executable(ccp_rbc_reach_budget_tests tests/rbc_reach_budget_tests.cpp)
 target_include_directories(ccp_rbc_reach_budget_tests PRIVATE include)
 target_compile_options(ccp_rbc_reach_budget_tests PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_rbc_margin_model_tests tests/rbc_margin_model_tests.cpp)
+target_include_directories(ccp_rbc_margin_model_tests PRIVATE include)
+target_compile_options(ccp_rbc_margin_model_tests PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME rbc_exact_reach_certificate_and_invalidation_oracle
     COMMAND ccp_rbc_reach_budget_tests)
+  add_test(NAME rbc_analytic_margin_proxy_formula
+    COMMAND ccp_rbc_margin_model_tests)
   add_test(NAME cbp_exact_region_oracle COMMAND ccp_cbp_router_tests)
   add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
