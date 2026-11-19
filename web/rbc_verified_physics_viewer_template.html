@@ -142,7 +142,19 @@ for(let pi=0;pi<names.length;pi++){
  camera.up.set(0,0,1);
  camera.position.copy(initialCamera);
  camera.lookAt(center);
- const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+ let renderer;
+ try {
+   renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+ }catch(error){
+   // The sandbox can prohibit WebGL even when the original source is
+   // fully correct. Never crash the entire research timeline or
+   // suppress independent penetration counts when graphics fail.
+   const notice=document.createElement('div');
+   notice.style.cssText='display:flex;height:282px;padding:28px;align-items:center;justify-content:center;text-align:center;color:#b9cbd4;font-size:13px;line-height:1.7';
+   notice.textContent='This browser cannot create a WebGL context. Original frame data and measured metrics remain available below; use the separately verified GIF for a static visual comparison.';
+   holder.appendChild(notice);
+   continue;
+ }
  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
  renderer.outputColorSpace=THREE.SRGBColorSpace;
  renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -214,7 +226,12 @@ function putFrame(f){
     const s=native.spheres[i],mesh=rig.spheres[i];
     mesh.position.set(...s.center);mesh.scale.setScalar(s.radius);
   }
-  const metric=native.metrics,card=rig.card;
+ }
+ // Keep original native metrics and geometry-validity indicators
+ // interactive EVEN WHEN the browser disables hardware WebGL.
+ for(let i=0;i<names.length;i++){
+  const metric=data.policies[names[i]][frame].metrics;
+  const card=order[i];
   card.querySelector('[data-step]').textContent=Number(metric.step_ms).toFixed(3);
   card.querySelector('[data-broad]').textContent=Number(metric.broad_ms).toFixed(3);
   card.querySelector('[data-contacts]').textContent=metric.self_contacts+' real self-contact corrections';
