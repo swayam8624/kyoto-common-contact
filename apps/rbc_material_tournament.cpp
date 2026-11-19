@@ -132,7 +132,6 @@ void replay(const char* sourcePath,const char* outputPath,
         source.n,ccp::rbc::Reach{0.,skin}); // input ALREADY padded
     std::array<double,5> sum{};
     std::array<std::size_t,5> count{};
-    std::array<std::size_t,5> wins{};
     for(std::uint32_t frame=0;frame<source.frames;++frame){
         const auto current=source.next();
         std::array<Method,5> measurements{};
@@ -159,9 +158,9 @@ void replay(const char* sourcePath,const char* outputPath,
             }else if(id==3){
                 m.pairs=persistent.query(current);
             }else{
+                const auto before=rbc.global_builds();
                 if(!rbc.initialized())
                     rbc.initialize(current,radius);
-                const auto before=rbc.global_builds();
                 auto result=rbc.query(current);
                 m.pairs=std::move(result.pairs);
                 m.potential=result.potential_pairs;
@@ -187,7 +186,6 @@ void replay(const char* sourcePath,const char* outputPath,
             if(frame>=std::uint32_t(warmup)){
                 sum[std::size_t(i)]+=m.ms;
                 ++count[std::size_t(i)];
-                if(i>0&&m.ms<measurements[1].ms)++wins[std::size_t(i)];
             }
             csv<<frame<<','<<methods[std::size_t(i)]<<','<<m.ms<<','
                <<m.pairs.size()<<','<<fingerprint(m.pairs)<<','
