@@ -54,6 +54,25 @@ jobs:
                   data['tested_methods'])
           print('PASS: all actual-N eligible; full pair set verified; actions counted')
           PY
+      - name: Diagnostic at 2048 primitives and 60 frames without changing V4 thresholds
+        run: |
+          python3 scripts/run_kyoto_decision_coverage.py \
+            --exporter build/kyoto-final-cpu/ccp_material_export \
+            --replayer build/kyoto-final-cpu/ccp_material_replay \
+            --output output/phase18-highstress-ci \
+            --budgets 2048 --materials cloth \
+            --regimes rapid --seeds 3217 --frames 60 --warmup 8
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('output/phase18-highstress-ci/DECISION_COVERAGE.json').read_text())
+          assert len(data['results'])==2
+          assert all(x['actual_n']>=2048 for x in data['results'])
+          for cohort, result in data['groups'].items():
+              assert result['guard_frames']+result['sap_frames'] == (
+                  result['trajectories']*60)
+              print('2048-object control decisions:',cohort,result)
+          PY
       - name: Preserve evidence regardless of benchmark outcome
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,5 +83,8 @@ jobs:
             output/phase18-decision-ci/DECISION_COVERAGE.md
             output/phase18-decision-ci/replays/
             output/phase18-decision-ci/logs/
+            output/phase18-highstress-ci/DECISION_COVERAGE.json
+            output/phase18-highstress-ci/DECISION_COVERAGE.md
+            output/phase18-highstress-ci/replays/
           retention-days: 14
           if-no-files-found: warn
