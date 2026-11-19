@@ -9,6 +9,7 @@ on:
       - 'scripts/run_kyoto_decision_coverage.py'
       - 'scripts/analyze_kyoto_decision_coverage.py'
       - 'scripts/recheck_kyoto_phase18_aa.py'
+      - 'scripts/analyze_kyoto_phase18_aa_robustness.py'
       - 'scripts/test_kyoto_decision_coverage.py'
       - 'scripts/audit_kyoto_phase17_decisions.py'
       - 'scripts/kyoto_research_dashboard.py'
@@ -23,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Python and shell syntax
         run: |
-          python3 -m py_compile scripts/run_kyoto_decision_coverage.py scripts/test_kyoto_decision_coverage.py scripts/analyze_kyoto_decision_coverage.py scripts/recheck_kyoto_phase18_aa.py
+          python3 -m py_compile scripts/run_kyoto_decision_coverage.py scripts/test_kyoto_decision_coverage.py scripts/analyze_kyoto_decision_coverage.py scripts/recheck_kyoto_phase18_aa.py scripts/analyze_kyoto_phase18_aa_robustness.py
       - name: Build original full-output policies without modifying frozen V4
         run: |
           cmake --preset kyoto-final-cpu
@@ -149,6 +150,43 @@ jobs:
           assert not target.exists()
           print('PASS: invalid A/A invocation rejected before opening evidence CSV')
           PY
+      - name: Verify post-run A/A robustness and conditional resampling without new timings
+        run: |
+          python3 scripts/analyze_kyoto_phase18_aa_robustness.py \
+            --aa output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.json \
+            --output output/phase18-decision-ci/aa-closedloop-ci/robustness \
+            --draws 200 --resampling-seed 19
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('output/phase18-decision-ci/aa-closedloop-ci/robustness/AA_ROBUSTNESS.json')
+          d=json.loads(p.read_text())
+          assert d['native_replays_executed_by_this_script']==0
+          assert d['recorded_replays_revalidated_by_sap']==4
+          assert len(d['conditions'])==2
+          assert d['natural']['guard_over_v4_geomean']>0
+          assert all(c['timing_repeat_envelope']['draws']==200 for c in d['conditions'])
+          assert d['natural']['timing_repeat_envelope']['lower_2_5_percent_speedup']>0
+          print('PASS: independent A/A source hashes and full framewise SAP verified, no new timing')
+          PY
+          python3 - <<'PY'
+          # Fail closed if original A/A evidence is altered. No CSVs modified.
+          import json, pathlib, subprocess, tempfile
+          with tempfile.TemporaryDirectory() as root:
+              root=pathlib.Path(root)
+              src=pathlib.Path('output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.json')
+              d=json.loads(src.read_text())
+              d['per_repeat'][0]['new_csv_sha256']='0'*64
+              bad=root/'tampered.json'
+              bad.write_text(json.dumps(d))
+              target=root/'bad-output'
+              p=subprocess.run(['python3','scripts/analyze_kyoto_phase18_aa_robustness.py',
+                  '--aa',str(bad),'--output',str(target),'--draws','100'],
+                  capture_output=True,text=True)
+              assert p.returncode != 0
+              assert not target.exists()
+              print('PASS: manipulated existing A/A timing receipt rejected before output')
+          PY
       - name: Preserve evidence regardless of benchmark outcome
         if: always()
         uses: actions/upload-artifact@v4
@@ -166,5 +204,6 @@ jobs:
             output/phase18-highstress-ci/verified-methods/
             output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.json
             output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.md
+            output/phase18-decision-ci/aa-closedloop-ci/robustness/
           retention-days: 14
           if-no-files-found: warn
