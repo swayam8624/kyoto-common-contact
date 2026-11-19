@@ -8,6 +8,7 @@ on:
       - 'apps/material_replay_benchmark.cpp'
       - 'scripts/run_kyoto_decision_coverage.py'
       - 'scripts/analyze_kyoto_decision_coverage.py'
+      - 'scripts/recheck_kyoto_phase18_aa.py'
       - 'scripts/test_kyoto_decision_coverage.py'
       - 'scripts/audit_kyoto_phase17_decisions.py'
       - 'scripts/kyoto_research_dashboard.py'
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Python and shell syntax
         run: |
-          python3 -m py_compile scripts/run_kyoto_decision_coverage.py scripts/test_kyoto_decision_coverage.py scripts/analyze_kyoto_decision_coverage.py
+          python3 -m py_compile scripts/run_kyoto_decision_coverage.py scripts/test_kyoto_decision_coverage.py scripts/analyze_kyoto_decision_coverage.py scripts/recheck_kyoto_phase18_aa.py
       - name: Build original full-output policies without modifying frozen V4
         run: |
           cmake --preset kyoto-final-cpu
@@ -111,6 +112,43 @@ jobs:
               assert not (root/'should-not-exist').exists()
               print('PASS: altered source SHA-256 is rejected without writing a report')
           PY
+      - name: Independent Guard/V4 A/A clones on the exact saved material snapshots
+        run: |
+          python3 scripts/recheck_kyoto_phase18_aa.py \
+            --results output/phase18-decision-ci \
+            --replayer build/kyoto-final-cpu/ccp_material_replay \
+            --output output/phase18-decision-ci/aa-closedloop-ci \
+            --repeats 2
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.json')
+          data=json.loads(p.read_text())
+          assert data['performed_no_new_material_simulations'] is True
+          assert data['source_trajectories']==2
+          assert data['timed_native_replays']==4
+          assert data['cohorts']['natural']['paired_runs']==4
+          for trial in data['per_repeat']:
+              methods=set(trial['methods'])
+              assert {'global_guarded_exact','global_guarded_exact_aa',
+                      'guard_sap_bounded_trial','guard_sap_bounded_trial_aa',
+                      'online_cost_aware','sap_rebuild'}.issubset(methods)
+              assert trial['v4_action_mismatch_frames']>=0
+              assert trial['guard_aa_ratio']>0
+          print('PASS: frozen Guard and V4 independently instantiated twice, all framewise pairs match original SAP')
+          PY
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          root=pathlib.Path('output/phase18-decision-ci')
+          inp=next((root/'snapshots').glob('*.kmcb'))
+          target=root/'invalid-no-orderseed.csv'
+          run=subprocess.run(['build/kyoto-final-cpu/ccp_material_replay',
+              str(inp),str(target),'0','--aa-control'],
+              capture_output=True,text=True)
+          assert run.returncode != 0
+          assert not target.exists()
+          print('PASS: invalid A/A invocation rejected before opening evidence CSV')
+          PY
       - name: Preserve evidence regardless of benchmark outcome
         if: always()
         uses: actions/upload-artifact@v4
@@ -126,5 +164,7 @@ jobs:
             output/phase18-highstress-ci/replays/
             output/phase18-decision-ci/verified-methods/
             output/phase18-highstress-ci/verified-methods/
+            output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.json
+            output/phase18-decision-ci/aa-closedloop-ci/AA_RECHECK.md
           retention-days: 14
           if-no-files-found: warn
