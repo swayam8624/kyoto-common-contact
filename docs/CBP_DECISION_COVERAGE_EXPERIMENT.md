@@ -21,7 +21,7 @@ The follow-up implementation lives on branch
 1. The original complete-pair material replayer now supports the optional
    argument `--order-seed N`, deterministically shuffling full-output
    method execution order. The reference SAP pair list is precomputed in a
-   separate UNTImed verification pass before shuffled runs. The CSV carries
+   separate untimed verification pass before shuffled runs. The CSV carries
    the actual execution slot and shuffle seed for inspection.
 2. The new `scripts/run_kyoto_decision_coverage.py` exports actual original
    mass-spring material snapshots at requested budgets 512 and 1024, with
@@ -79,8 +79,19 @@ The initial Linux 512-AABB integration control produced 48 natural and
 execution-order checks, but **all 72 selected Guard and none selected SAP**.
 That is a valid negative *activation* result, not a correctness failure.
 
-The more expensive 2048-AABB control is tracked in the separate CI workflow
-and must be assessed from its actual run, not presumed to switch.
+The 2048-AABB control was then actually executed on Linux and passed full
+candidate-set checks. In its 60-frame **natural rapid cloth** trajectory,
+V4 chose Guard for all 60 frames (no trial). On its distinct 60-frame
+**rigid-translation diagnostic**, V4 chose Guard for 3 frames, SAP for
+57 frames, recorded 8 SAP trial frames, and recorded 1 switch.
+This is evidence that the original switching mechanism is reachable on an
+adversarial fixture, NOT proof that it improves natural cloth simulation.
+
+A separate 512-AABB integration run switched once on the diagnostic (3
+Guard and 21 SAP frames), while an earlier Linux 512-AABB run did not
+switch at all. The 512 result is explicitly **timing/host-sensitive**;
+neither result should be generalized without per-machine replications.
+See the [source-bound full CI job](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44432043265).
 
 Do not equate full-output AABB candidate time with narrow phase,
 continuous collision detection, contact solver, mesh quality or the
