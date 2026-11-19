@@ -11,8 +11,15 @@ archive/pre-cleanup-2026-11-19
 
 Requested annotated Git tag:
 archive/pre-cleanup-2026-11-19
-**NOT YET CREATED** through connected tools; must be created
-locally and pushed by the researcher before ANY file move/deletion.
+**CREATED AND VERIFIED** on 19 November 2026 by the researcher,
+then independently checked against GitHub's annotated-tag object.
+The annotated tag object SHA is
+`e7b7687b8501bc43d24656bfa255c3ef97be8cc4` and its
+peeled object is the protected original commit
+`0809dea20d6b186f68fcb1acac4ab7200984e24f`.
+The original archive branch still references the same commit.
+The tag establishes historical reachability; external release/Zenodo
+archival of large evidence is a **separate unfinished gate**.
 
 Created separately:
 - cleanup/prune: reachability and ignore-only changes, no removals.
