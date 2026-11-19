@@ -97,3 +97,32 @@ frequency/thermal confounds. A more carefully balanced, interleaved
 and independently generated held-out workload will be needed for a paper.
 
 No frozen V4 thresholds are changed. No production method is deleted.
+
+## Measurement correction after the first 144-run Mac A/A experiment
+
+The first Mac 144-run experiment successfully executed independent
+Global Guard and V4 instances but accidentally labeled the first timed
+copy A and second timed copy B AFTER shuffling the method Kind list.
+Thus A ALWAYS executed before B for both algorithms; a systematic
+early/late order difference could affect the A/B geomeans and
+noise-floor summaries. The original results MUST be reported with
+this limitation. They are not balanced A/B identity-order trials.
+
+The C++ optional A/A mode is now fixed: copy identities are assigned
+BEFORE random schedule shuffling, so either copy can appear first.
+It does NOT change underlying algorithms or historical default runs.
+The updated runner requires the new capability marker
+aa_labels_shuffled_independently. Run new measurements in a distinct
+destination and never overwrite the original Mac evidence.
+
+The complete original Mac A/A results are preserved in
+[CBP_PHASE18_MAC_AA_RESULTS_2026-11-19.md](CBP_PHASE18_MAC_AA_RESULTS_2026-11-19.md).
+
+The no-new-timing source reviewer
+scripts/analyze_kyoto_phase18_aa_robustness.py accepts the old
+AA_RECHECK.json, checks the old CSVs and reports the historical
+A/B label bias directly from recorded method execution slots.
+Its fixed-scene bootstrap envelope is merely a resampling
+sensitivity analysis over the **same** timing repetitions, not a
+population confidence interval.
+
