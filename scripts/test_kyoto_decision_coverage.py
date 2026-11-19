@@ -70,6 +70,16 @@ class DecisionCoverageRegressions(unittest.TestCase):
             # parity is required between orders, which the strict scorer
             # checks against SAP independently for every frame.
             self.assertEqual(set(reports[0]["methods"]), set(reports[1]["methods"]))
+            # A malformed order seed must be rejected BEFORE an evidence
+            # CSV can be created. Silent partial parsing breaks provenance.
+            for malformed in ("27garbage", "-1", "4294967296", "0"):
+                nonexistent = root / ("invalid-" + malformed + ".csv")
+                response = subprocess.run(
+                    [self.replayer, str(original), str(nonexistent), "0",
+                     "--order-seed", malformed],
+                    capture_output=True, text=True, timeout=10, check=False)
+                self.assertNotEqual(response.returncode, 0)
+                self.assertFalse(nonexistent.exists())
 
     def test_translation_preserves_pair_geometry(self):
         with tempfile.TemporaryDirectory(prefix="kyoto-motion-test-") as name:
