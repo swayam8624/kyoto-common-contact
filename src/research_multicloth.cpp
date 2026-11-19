@@ -442,6 +442,106 @@ void MultiCloth::prepareFoldedInitialStateForResearch(){
  rbcFlat_.reset();
  metrics_={};
 }
+void MultiCloth::prepareRoundedNonintersectingFoldForResearch(){
+ // A continuous geometric U-bend with finite radius R. Walking down
+ // from the central hinge, the sheet initially travels toward -Y,
+ // curves through a true half-circle, and finally travels toward +Y
+ // on a second layer with physical vertical clearance 2R.
+ // NO overlapping mirror/offset sheet is fabricated. The original
+ // historical overlapping fixture remains a separate negative control.
+ if(frame_!=0||grab_.active||sheets_<1)
+  throw std::logic_error("rounded fold requires pristine frame-zero solver");
+ constexpr double R=.11;
+ constexpr double pi=3.14159265358979323846;
+ const int creaseRow=kSide/2;
+ for(int y=0;y<creaseRow;++y)
+  for(int x=0;x<kSide;++x){
+   const int id=y*kSide+x;
+   const int hinge=creaseRow*kSide+x;
+   if(pinned_[std::size_t(id)])
+    throw std::logic_error("rounded fold must not move pinned vertices");
+   const auto original=positions_[std::size_t(id)];
+   const auto center=positions_[std::size_t(hinge)];
+   const double along=std::max(0.,center.y-original.y);
+   const double arc=std::min(along,pi*R);
+   const double angle=arc/R;
+   const double beyond=std::max(0.,along-pi*R);
+   const double yOffset=-R*std::sin(angle)+beyond;
+   const double zOffset=R*(1.-std::cos(angle));
+   positions_[std::size_t(id)]={
+      original.x,center.y+yOffset,original.z+zOffset
+   };
+   previous_[std::size_t(id)]=positions_[std::size_t(id)];
+  }
+ // A second original cloth sheet would otherwise be right inside the
+ // upper folded flap. Translate each unmodified additional sheet
+ // rigidly UP (rest lengths invariant), including its kinematic
+ // reference anchors. This is disclosed initial fixture preparation.
+ for(int layer=1;layer<sheets_;++layer)
+  for(int j=0;j<kSide*kSide;++j){
+    const std::size_t id=std::size_t(layer*kSide*kSide+j);
+    positions_[id].z+=1.15;
+    previous_[id].z+=1.15;
+    initialPins_[id].z+=1.15;
+  }
+ regional_.reset();
+ global_.invalidate();
+ finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};
+ rbc_.reset();
+ rbcFlat_.reset();
+ metrics_={};
+ if(countNonlocalSelfIntersections()!=0)
+  throw std::runtime_error(
+    "rounded fold constructed an invalid intersecting initial sheet");
+}
+
+std::size_t MultiCloth::countNonlocalSelfIntersections() const {
+ // Independent direct triangle geometry evaluation; no chosen policy,
+ // GPU rasterization, cached broad-phase or contact RESPONSE counters.
+ // Only STRICT interior edge-face piercings qualify. Coplanar overlap
+ // and temporal tunneling require separate oracles and are NOT covered.
+ std::size_t intersections=0;
+ for(std::size_t a=0;a<triangles_.size();++a){
+  const auto ta=triangles_[a];
+  for(std::size_t b=a+1;b<triangles_.size();++b){
+   if(!nonlocalSelfPair(int(a),int(b)))continue;
+   const auto tb=triangles_[b];
+   Vec3 minA=positions_[ta[0]],maxA=minA;
+   Vec3 minB=positions_[tb[0]],maxB=minB;
+   for(int k=1;k<3;++k){
+    const Vec3 va=positions_[ta[k]],vb=positions_[tb[k]];
+    minA={std::min(minA.x,va.x),std::min(minA.y,va.y),
+          std::min(minA.z,va.z)};
+    maxA={std::max(maxA.x,va.x),std::max(maxA.y,va.y),
+          std::max(maxA.z,va.z)};
+    minB={std::min(minB.x,vb.x),std::min(minB.y,vb.y),
+          std::min(minB.z,vb.z)};
+    maxB={std::max(maxB.x,vb.x),std::max(maxB.y,vb.y),
+          std::max(maxB.z,vb.z)};
+   }
+   if(maxA.x<minB.x||maxB.x<minA.x||
+      maxA.y<minB.y||maxB.y<minA.y||
+      maxA.z<minB.z||maxB.z<minA.z)continue;
+   bool piercing=false;
+   for(int order=0;order<2&&!piercing;++order){
+    const auto& ed=order==0?ta:tb;
+    const auto& fa=order==0?tb:ta;
+    for(int k=0;k<3&&!piercing;++k){
+      const auto hit=segmentFace(
+          positions_[ed[k]],positions_[ed[(k+1)%3]],
+          positions_[fa[0]],positions_[fa[1]],positions_[fa[2]]);
+      if(!hit)continue;
+      constexpr double eps=1e-6;
+      const auto& w=hit->bary;
+      piercing=hit->edgeParameter>eps&&hit->edgeParameter<1.-eps&&
+               w[0]>eps&&w[1]>eps&&w[2]>eps;
+    }
+   }
+   intersections+=std::size_t(piercing);
+  }
+ }
+ return intersections;
+}
 void MultiCloth::reset(int sheetCount,int sphereCount){
  if(sheetCount<1||sheetCount>3||sphereCount<1||sphereCount>8)
   throw std::invalid_argument("supported configuration: 1-3 cloths and 1-8 moving spheres");
