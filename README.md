@@ -381,8 +381,10 @@ Build on the Mac, using a fresh output directory:
     python3 scripts/test_kyoto_heldout_research.py output/kyoto-heldout-mac-first
     open output/kyoto-heldout-mac-first/HELDOUT_RESULTS.md
 
-This default matrix generates 36 truly different material
-geometry/topology AABB sequences and nine independently seeded
+This default matrix generates 54 truly different material
+geometry/topology AABB sequences (three material families, two regimes,
+three budgets including the critical 1024 budget, three new seeds)
+and nine independently seeded
 free/pull/fold coupled physical solver cases (three initial meshes,
 three drive scenarios). Reported original-policy query times are
 separate from physically coupled full-step times. The output stores
@@ -397,3 +399,34 @@ Exact source snapshots, not fabricated artistic cloth deformation,
 drive the visuals. Never infer CCD, guaranteed non-penetration,
 successful self-intersection avoidance or a new V4 speedup from
 the baseline smoke pass.
+
+### Source-verified six-family held-out Linux results (November 2026)
+
+The expanded native rapid-motion CI proof covers **54 independently
+seeded geometrical/topological scenes**, SIX material families and ten
+actually executed CPU broad phases. See
+[the full measured 54-scene result](docs/KYOTO_HELDOUT_54_SCENE_NATIVE_RESULT_2026-11-19.md)
+and [its passing GitHub native CI](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44468375567).
+
+Frozen V4 Guard-relative geomean is **1.0552x** with only **25/54**
+scene wins: not general superiority. Larger rapid-cloth N1058
+1.2853x, soft-ball N1024 1.2601x/N2116 1.3300x, and spring
+N504 1.2018x/N1008 1.2230x are promising workload-specific
+conditions. Other material regimes often tied or regressed.
+
+All **32400 CPU method-frame AABB candidate signatures**, the
+144 archived source-file SHA-256 receipts, and the separate coupled
+SAP/Guard/V4 physical state comparisons passed independent
+post-download checks. On naturally driven coupled solver scenes,
+V4 stayed on Guard for all 2700 broad-phase iterations; no SAP
+trial or switch occurred, and no naturally driven nonlocal cloth
+self-contact response occurred. An isolated *constructed* self-overlap
+fixture did produce real bounded self-contact correction on all three
+independent meshes (283, 276, 317 responses). These are different
+scientific claims and must not be conflated.
+
+For the same ten-policy post-analysis from the original full Mac
+output, with NO native rerun:
+
+    python3 scripts/analyze_kyoto_heldout_evidence.py --results output/kyoto-heldout-mac-first --output output/kyoto-heldout-mac-first/full-method-scores --warmup 8
+    open output/kyoto-heldout-mac-first/full-method-scores/HELDOUT_ALL_METHODS.md
