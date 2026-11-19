@@ -725,3 +725,76 @@ real held-out different geometry classes, an independent
 penetration/CCD contact oracle, and balanced solver timing with
 frozen V4 actually trying SAP. Do not modify frozen selector
 thresholds to force a superficial positive.
+
+## 2026-11-19 — 54 independent rapid-material scenes, all ten actual policies and controlled self-contact
+
+New native CI run 44468375567, passing with ALL six material scene
+families cloth/sponge/cushion/soft_ball/spring/mixed, three requested
+budgets and three independent vertex-geometry/topology seed pairs per
+family (54 new 60-frame rapid trajectories; not old Phase 18
+forcing-only replicas). Original frozen V4 thresholds unchanged.
+
+Added opt-in true alternate surface triangle/bond connectivity for
+soft_ball and variable long-range structural spring links so
+topologySeed genuinely changes actual connectivity for each of ALL
+SIX heterogeneous material generator families, rather than only
+cloth/volume. Unit tests prove independent geometry and topology
+changes, zero-seed history preservation and native exhaustive
+AABB pair-list correctness. The actual coupled XPBD-style solver
+supports independently varied 13x13 mesh triangulation, initial
+positions, constraints and anchors, verified in independent tests.
+
+Original ten available Linux CPU methods all ran on EVERY saved
+new source frame. 54x60x10=32,400 method/frame candidate count/hash
+signatures agreed with SAP. 144 independent original source SHA256
+receipts verified again from downloaded GitHub native ZIP (54 snapshots,
+54 replay CSV, nine coupled solver CSV, 27 physical mesh JSONL).
+Archive digest: 4224c8c13123e45a3bccb9a75cd341b116a4b6daddd7482a99d3ab702f4df2f5.
+Trained ML weights and external Bullet DBVT were NOT executed in
+this cohort and are not ranked. New no-benchmark postprocessor
+scripts/analyze_kyoto_heldout_evidence.py computes all actual
+method rankings and on-policy V4 decisions, including fail-closed
+SHA256 corrupt-manifest regression.
+
+Frozen V4 Guard-relative per-trajectory geometric mean across all
+54 scenes: 1.0552x, 25/54 scene wins (not generally faster).
+Sum of per-scene means ratio 1.1804x, NOT end-to-end speedup.
+Actual chosen: Guard 2730, SAP 510, trial frames 176, switches 34.
+At rapid cloth N1058 geomean 1.2853x over three independently
+meshed fixtures, with identical frame-32 transition to SAP
+under the SAME rapid forcing schedule. Soft-ball N1024 = 1.2601x
+and N2116 = 1.3300x, with all three variants winning in each
+condition; spring N504 = 1.2018x and N1008 = 1.2230x,
+but only two of three seeds won each. Cushion, sponge and
+mixed had near parity or genuine regressions.
+
+Nine other truly seeded coupled physical solver free/pull/fold
+60-frame runs all achieved SAP/Guard/V4 complete vertex-state
+parity to 1e-7, 5,769,002 discrete precise tests and
+81,390 sphere-contact response events on SAP reference streams.
+Zero naturally driven nonlocal cloth self-contact responses and
+zero SAP actions/trials/switches from frozen V4 in ALL 2700
+physical solver query iterations. This is a negative physical
+activation result; **no full-solver adaptive speedup claimed**.
+
+The separate **constructed** nonlocal cloth overlap oracle
+displaced one 3x3 physical patch against distant same-sheet
+triangles, using the existing test-only hook; verified 283/276/317
+bounded self-contact corrections on the three new topologies,
+and zero corrections with self-collision disabled. Does NOT
+demonstrate naturally driven folding, CCD or a V4 speedup.
+
+Complete source-backed evidence:
+docs/KYOTO_HELDOUT_54_SCENE_NATIVE_RESULT_2026-11-19.md;
+workflow: https://github.com/swayam8624/kyoto-common-contact/actions/runs/44468375567.
+
+Native Mac command in
+docs/KYOTO_HELDOUT_GEOMETRY_COUPLED_PROTOCOL.md; the default
+Mac matrix now includes all three budgets including N1058/N1331,
+54 actual new geometry trajectories across cloth/sponge/mixed,
+baseline/rapid, three seeds. An optional explicit six-family
+rapid matrix matches Linux CI. Evidence directories refuse
+overwrite. Follow-up scientific work requires independently
+varied forcing histories, genuine nonlocal self-contact
+under continuous natural motion, independent penetration/CCD
+truth, and balanced whole solver ABBA timings, keeping V4 frozen.
