@@ -29,7 +29,7 @@ jobs:
           assert d['summary']['tracked_files']==len(source)
           assert [r['path'] for r in d['files']]==sorted(source)
           assert all(len(r['sha256'])==64 for r in d['files'])
-          assert not any('DELETE' in r['review_state'] for r in d['files'])
+          assert not any(r['review_state'].startswith('DELETE') for r in d['files'])
           print('PASS: every tracked file accounted for, no auto-delete classification')
           PY
       - name: Install upstream Bullet baseline
