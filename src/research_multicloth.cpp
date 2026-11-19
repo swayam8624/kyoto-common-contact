@@ -1011,12 +1011,12 @@ void MultiCloth::step(){
    // when current raw AABBs are within margin (same SAP padded input).
    // One persistent frontier serves ALL five independent XPBD queries.
    // Source geometry and contact projection remain unchanged.
+   const auto beforeBuilds=rbc_.global_builds();
    if(!rbc_.initialized()){
     const std::vector<ccp::rbc::Reach> reach(
       bounds.size(),ccp::rbc::Reach{kMargin*.5,.045});
     rbc_.initialize(bounds,reach);
    }
-   const auto beforeBuilds=rbc_.global_builds();
    auto outcome=rbc_.query(bounds);
    pairs=std::move(outcome.pairs);
    ++metrics_.rbcQueries;
@@ -1042,7 +1042,9 @@ void MultiCloth::step(){
    ++metrics_.queryCount;metrics_.pairs=pairs.size();
   }
   metrics_.candidatePairs=pairs;
-  if(auditing_&&(iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)){
+  if(auditing_&&(
+      policy_==Policy::RBCSpatialCertified||
+      ((iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)))){
    std::vector<Bounds> exact;
    exact.reserve(bounds.size());
    for(auto b:bounds)exact.push_back(expand(b,kMargin*.5));
