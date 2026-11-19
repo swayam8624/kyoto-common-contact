@@ -190,8 +190,16 @@ class World {
    if(j<sectors)bond(a,ids[idx(i,j+1)],s.strength);
    if(i<rings&&j<sectors){
     const int b=ids[idx(i,j+1)],c=ids[idx(i+1,j)],d=ids[idx(i+1,j+1)];
-    bond(a,d,.2*s.strength);
-    element({a,b,d},3);element({a,d,c},3);
+    // Genuine alternate surface triangulation for the soft ball.
+    // Preserve original a-d diagonal, bond and triangle IDs when the
+    // optional independent topology seed is zero.
+    if(alternateDiagonal(i,j)){
+     bond(b,c,.2*s.strength);
+     element({a,b,c},3);element({b,d,c},3);
+    }else{
+     bond(a,d,.2*s.strength);
+     element({a,b,d},3);element({a,d,c},3);
+    }
    }
   }
  }
@@ -206,7 +214,18 @@ class World {
   }
   for(int i=0;i<segments;++i){
    bond(ids[i],ids[i+1],s.strength);
-   if(i+3<=segments)bond(ids[i],ids[i+3],s.strength*.06);
+   if(variation_.topologySeed==0){
+    // Historical helical three-hop supporting spring; preserved exactly.
+    if(i+3<=segments)bond(ids[i],ids[i+3],s.strength*.06);
+   }else{
+    // Vary LONG-RANGE structural support links independently of the
+    // motion seed and initial vertex geometry. The adjacent segment
+    // identity and per-element AABB IDs remain unchanged.
+    const bool longStrut=(mix32(variation_.topologySeed^
+                              std::uint32_t(i*2654435761u))&1u)!=0u;
+    const int span=longStrut?4:2;
+    if(i+span<=segments)bond(ids[i],ids[i+span],s.strength*.06);
+   }
    element({ids[i],ids[i+1]},4);
   }
  }
