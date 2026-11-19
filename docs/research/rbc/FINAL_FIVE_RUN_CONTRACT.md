@@ -1,5 +1,22 @@
 # Kyoto / RBC - five-run finalization contract (19 November 2026)
 
+## Current run budget: 1 / 5 completed; 4 / 5 remain
+
+**Run 1 completed on the user's Mac on 19 November 2026.** The isolated
+11-policy repeated A/A runner compiled, verified native exact-pair identities
+across the same 36 development sources, and reported paired
+Frozen-V4 / RBC-Flat query geometric mean **1.05243x**, with Flat winning
+**22/36** scenes. Printed Guard A/A ratios range **0.8548–1.1561x**
+and warn against inferring statistical significance.
+
+Source evidence note and all 36 rounded A/A transcript ratios:
+[Run 1 log interpretation](RUN_01_REPEATABILITY_MAC_2026-11-19.md).
+The original raw Mac Run-1 CSV/JSON is not present in this research
+documentation and must be archived before publication.
+
+**Next slot is Run 2; exactly four further native Mac experiment batches
+remain.** Paper/slide regeneration is not a new native run.
+
 ## Decision: stop architecture sprawl, freeze the target and the budget
 
 **Maximum additional native Mac experiment batches: FIVE.** No more "one
