@@ -306,6 +306,13 @@ add_executable(ccp_rbc_sweep_certificate_tests tests/rbc_sweep_certificate_tests
 target_include_directories(ccp_rbc_sweep_certificate_tests PRIVATE include)
 target_compile_options(ccp_rbc_sweep_certificate_tests PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+# Independent SOURCE-BYTES exact material replay. This deliberately does
+# not modify or replace the historical ccp_material_replay executable.
+add_executable(ccp_rbc_material_replay apps/rbc_material_replay.cpp)
+target_link_libraries(ccp_rbc_material_replay PRIVATE ccp_live)
+target_include_directories(ccp_rbc_material_replay PRIVATE include)
+target_compile_options(ccp_rbc_material_replay PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_rbc_spatial_frontier_tests tests/rbc_spatial_frontier_tests.cpp)
 target_include_directories(ccp_rbc_spatial_frontier_tests PRIVATE include)
 target_compile_options(ccp_rbc_spatial_frontier_tests PRIVATE
@@ -368,6 +375,11 @@ if(BUILD_TESTING)
   add_test(NAME scaling_cpu_parallel_oracle COMMAND ccp_scaling_cpu --self-test)
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
+    add_test(NAME rbc_immutable_material_native_replay_smoke
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_rbc_material_replay.py
+        $<TARGET_FILE:ccp_material_export>
+        $<TARGET_FILE:ccp_rbc_material_replay>)
     add_test(NAME cbp_flat_persistent_parallel_independent_oracle
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cbp_pressure_parallel.py
