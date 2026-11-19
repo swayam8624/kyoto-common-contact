@@ -311,6 +311,13 @@ target_link_libraries(ccp_rbc_material_tournament PRIVATE ccp_live)
 target_include_directories(ccp_rbc_material_tournament PRIVATE include)
 target_compile_options(ccp_rbc_material_tournament PRIVATE
   -Wall -Wextra -Wpedantic -Werror)
+# Genuine physically stepped solver. Do NOT conflate AABB-only query
+# improvement with this separately measured full XPBD-style step.
+add_executable(ccp_rbc_coupled_tournament apps/rbc_coupled_tournament.cpp)
+target_link_libraries(ccp_rbc_coupled_tournament PRIVATE ccp_multicloth)
+target_include_directories(ccp_rbc_coupled_tournament PRIVATE include)
+target_compile_options(ccp_rbc_coupled_tournament PRIVATE
+  -Wall -Wextra -Wpedantic -Werror)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -322,6 +329,9 @@ if(BUILD_TESTING)
     COMMAND ccp_rbc_swept_reach_tests)
   add_test(NAME rbc_indexed_spatial_frontier_exact_pair_and_local_repair
     COMMAND ccp_rbc_spatial_frontier_tests)
+  # Full real coupled experiment and immutable KYOTOM01 replay run in
+  # GitHub Actions with NEW no-overwrite evidence directories; not in
+  # normal CTest to avoid polluting existing source or repeat failures.
   add_test(NAME cbp_exact_region_oracle COMMAND ccp_cbp_router_tests)
   add_test(NAME cbp_shared_bvh_oracle COMMAND ccp_cbp_shared_bvh_tests)
   add_test(NAME cbp_certified_graph_oracle COMMAND ccp_cbp_certified_cache_tests)
