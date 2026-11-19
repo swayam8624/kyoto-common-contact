@@ -490,3 +490,45 @@ been uploaded. No new Mac execution or separate Mac
 source verification was performed in GitHub. Exact
 original source fixtures must stay untouched; run a
 separate 60-frame matched experiment on a NEW path.
+
+
+### Matched 60-frame Apple Silicon and Linux frozen V4 study
+
+The researcher completed a NEW 54-scene 60-frame Mac execution of
+the same six rapid-motion material families, three budgets and three
+independent mesh/forcing seeds tested in the original Linux CI suite.
+
+[Full 18-condition matched Mac/Linux comparison](docs/KYOTO_MAC_LINUX_MATCHED_60F_2026-11-19.md).
+
+The Mac original derived report: 11 CPU methods, including Bullet,
+Guard/V4 geomean 1.0577x with 39/54 scene wins. The Linux original:
+10 methods without Bullet, Guard/V4 1.0552x with 25/54 wins.
+All 18 matched source conditions recorded identical V4
+Guard/SAP/trial/switch COUNT totals on both machines:
+Guard 2730, SAP 510, trials 176, nontrial SAP 334, switches 34.
+This does not yet prove identical per-frame action sequences,
+identical binary snapshot hashes or controlled timing conditions.
+The prior 36-frame Mac experiment was a shortened DIFFERENT cohort,
+not suitable for direct merging with these 60-frame data.
+
+Shared positive conditions: large rapid cloth, soft-ball surface and
+spring fixtures; negative cases include sponge N1331 and mixed N727.
+V4 leads by equal-scene geomean on Mac, while the original
+OnlineCostAware leads its ratio-of-sums metric (1.3021x versus
+1.1689x for V4). Neither is timed full physics solver wall time.
+
+New additive evidence-only utilities (no benchmark rerun needed):
+
+    python3 scripts/export_kyoto_heldout_trace.py --results output/kyoto-mac-matched-60f --output output/kyoto-mac-matched-60f-source-trace.json.gz
+
+This generates a small source-receipt-verified Mac source trace
+covering every actual per-frame V4 backend, trial, switch, Guard/V4
+time, pair hash, and execution slot. Never touches original data.
+Two such traces can be compared with:
+
+    python3 scripts/compare_kyoto_heldout_traces.py --a MAC_TRACE.json.gz --b LINUX_TRACE.json.gz --output output/kyoto-platform-compare-new --warmup 8
+
+The comparator distinguishes exact bytewise snapshot SHA matches,
+SAP pair fingerprints, frame-by-frame action equality and policy
+execution slot differences. CI tests both code paths on original
+immutable research source inputs.
