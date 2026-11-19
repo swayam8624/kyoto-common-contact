@@ -427,3 +427,39 @@ unbiased broad external library tournament or a proved new contact-graph
 algorithm. Preserve both original frozen V4 and negative V5/V6 evidence.
 
 Study/navigation reference: docs/KYOTO_RESEARCH_UNIFIED_MAP.md.
+
+## 19 November 2026 — V4 actual decisions and trial-eligible replay
+
+The user-side Phase 17 audit confirmed 36 material trajectories, 864 V4
+frames, all N below 384: 864 Guard calls, zero SAP calls, zero trials
+and switches, warm Guard/V4 geomean 0.4475x. This is a valid small-N
+negative result and also means the tested V4 selector was never eligible
+to explore another backend.
+
+Branch `research/kyoto-decision-coverage` is an **additive diagnostic**,
+not a retune or replacement of frozen V4. The full-output material replay
+supports deterministic randomized method order, a separate untimed
+SAP parity oracle, and per-method execution slots and seed receipts.
+The new bounded Python experiment exports genuine material trajectories
+with actual N>=384; repeats independent seeds; audits the original Online,
+Global Guard, V4, SAP, regional, optional Bullet and optional native ML
+weights; and stores input/output SHA-256 receipts. It never substitutes
+an ML smoke model for trained evidence.
+
+A rigid-translation diagnostic is explicitly segregated from natural
+material dynamics. Linux correctness tests passed randomized-order
+pair equivalence and candidate preservation under translation. In the
+2048-object diagnostic, V4 chose Guard for three frames then SAP for
+57 frames, recorded eight trial frames and one switch. In the 2048
+natural cloth run it chose Guard for all 60. The smaller 512 diagnostic
+was timing sensitive across runner executions. Production threshold
+behavior remains unchanged. CI:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44432043265
+
+Scientific caveat: different user-side Mac and Linux shared-runner
+performance must not be pooled. The raw material CSVs on the user's Mac
+remain immutable. No claims about real contact physics, CCD, mesh
+deformation improvement or universal online-policy speedup follow from
+this activation check. The complete Mac decision matrix is reproducible
+through scripts/run_kyoto_decision_coverage.py and documented in
+docs/CBP_DECISION_COVERAGE_EXPERIMENT.md.
