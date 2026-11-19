@@ -34,7 +34,7 @@ from score_replay import score
 # changing physical solver topology elsewhere.
 HELDOUT = (
     {"motion": 91003, "geometry": 73013, "topology": 86011},
-    {"motion": 91009, "geometry": 74017, "topology": 86017},
+    {"motion": 91009, "geometry": 74017, "topology": 86019},
     {"motion": 91033, "geometry": 75029, "topology": 86029},
     {"motion": 91079, "geometry": 77041, "topology": 86069},
 )
@@ -151,7 +151,7 @@ def main():
     p.add_argument("--heldout-count", type=int, default=3)
     p.add_argument("--frames", type=int, default=36)
     p.add_argument("--warmup", type=int, default=8)
-    p.add_argument("--coupled-frames", type=int, default=24)
+    p.add_argument("--coupled-frames", type=int, default=60)
     p.add_argument("--coupled-scenarios", nargs="+",
                    default=["free", "pull", "fold"])
     p.add_argument("--timeout", type=int, default=240)
