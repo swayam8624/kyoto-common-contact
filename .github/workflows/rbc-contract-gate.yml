@@ -32,5 +32,9 @@ jobs:
             -fsanitize=address,undefined -fno-omit-frame-pointer \
             -Iinclude tests/rbc_margin_model_tests.cpp -o build/rbc-model-sanitized
           ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 ./build/rbc-model-sanitized
+          clang++ -std=c++23 -O1 -g -Wall -Wextra -Wpedantic -Werror \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -Iinclude tests/rbc_swept_reach_tests.cpp -o build/rbc-swept-sanitized
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 ./build/rbc-swept-sanitized
       - name: All Python files still parse
         run: python3 -m compileall -q scripts benchmarks tests
