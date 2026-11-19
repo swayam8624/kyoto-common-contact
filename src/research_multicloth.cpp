@@ -995,6 +995,13 @@ void MultiCloth::step(){
     box.max=add(box.max,{kMargin*.5,kMargin*.5,kMargin*.5});
    }
    const auto outcome=finalBounded_.query(paddedBounds);
+   // Telemetry of ACTUAL on-policy choice during every one of the five
+   // coupled solver iterations. Do not infer use of SAP from scene size.
+   // The frozen selector is not changed in any way.
+   if(outcome.action[0]=='s')++metrics_.frozenSapQueries;
+   else ++metrics_.frozenGuardQueries;
+   if(outcome.trialFrame)++metrics_.frozenTrialQueries;
+   if(outcome.switched)++metrics_.frozenSwitches;
    pairs=std::move(outcome.pairs);
    metrics_.lastEvent=outcome.action;
   }else{
