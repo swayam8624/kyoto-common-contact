@@ -13,6 +13,7 @@ on:
       - 'scripts/render_rbc_physics_studio.py'
       - 'scripts/build_rbc_physics_viewer.py'
       - 'scripts/audit_rbc_subframe_geometry.py'
+      - 'scripts/run_rbc_visual_proof_package.py'
       - 'web/rbc_verified_physics_viewer_template.html'
   workflow_dispatch:
 permissions:
@@ -179,10 +180,36 @@ jobs:
           print('PASS original 5-policy 3D browser source data, 400 verified original physics frames and SHA-256 receipt')
           PY
           node --check /tmp/kyoto-rbc-3d-viewer-syntax.js
+      - name: Verify ONE-COMMAND complete real source, offline WebGL, GIF and independent geometry-receipted package on new 16-frame smoke
+        run: |
+          python3 scripts/run_rbc_visual_proof_package.py \
+            --solver build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
+            --output output/rbc-visual-package-smoke \
+            --frames 16 --geometry-seed 91489 --topology-seed 81817 \
+            --subdivisions 8 --stride 3 --fps 12 --offline
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('output/rbc-visual-package-smoke')
+          m=json.loads((root/'PHYSICAL_EVIDENCE_MANIFEST.json').read_text())
+          assert m['actual_source_solver_frames']==16
+          assert m['method_count']==5
+          assert m['independent_original_current_piercing_count']==0
+          assert m['independent_original_linear_sampled_piercing_count']==0
+          assert m['independent_linearly_sampled_states']==16*7
+          assert m['interactive']['viewer_is_self_contained_offline']
+          assert len(m['original_artifacts_sha256'])==13
+          for name,sha in m['original_artifacts_sha256'].items():
+              path=root/name
+              assert path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()==sha
+          print('PASS one-command full physics->independent geometry->depth-tested GIF->offline orbit viewer->all source hash evidence')
+          PY
       - name: Preserve original failure or success source, not fake physics visual
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rbc-independent-exact-endpoint-piercing-3-source-5-policy-80-frames
-          path: output/rbc-rounded-clean-80/
+          path: |
+            output/rbc-rounded-clean-80/
+            output/rbc-visual-package-smoke/
           if-no-files-found: warn
