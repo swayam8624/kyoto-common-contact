@@ -21,6 +21,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Compile the source
         run: python3 -m py_compile scripts/rbc_benchmark_observatory.py tests/test_rbc_benchmark_observatory.py
       - name: Verify receipt checking and offline chart data
