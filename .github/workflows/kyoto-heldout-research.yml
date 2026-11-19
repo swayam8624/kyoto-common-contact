@@ -16,6 +16,7 @@ on:
       - 'scripts/run_kyoto_heldout_research.py'
       - 'scripts/test_kyoto_heldout_research.py'
       - 'scripts/analyze_kyoto_heldout_evidence.py'
+      - 'scripts/export_kyoto_heldout_trace.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,6 +31,7 @@ jobs:
           python3 -m py_compile scripts/run_kyoto_heldout_research.py
           python3 -m py_compile scripts/test_kyoto_heldout_research.py
           python3 -m py_compile scripts/analyze_kyoto_heldout_evidence.py
+          python3 -m py_compile scripts/export_kyoto_heldout_trace.py
       - name: Build exact geometry, candidate and physically coupled methods
         run: |
           cmake --preset kyoto-final-cpu
@@ -99,6 +101,26 @@ jobs:
               assert not dst.exists()
               print('PASS: tampered full-method receipt cannot generate scored evidence')
           PY
+      - name: Export source-verified portable V4 decision traces without benchmarking again
+        run: |
+          python3 scripts/export_kyoto_heldout_trace.py \
+            --results output/kyoto-heldout-independent-ci \
+            --output output/kyoto-heldout-independent-ci-compact-trace.json.gz
+          python3 - <<'PY'
+          import gzip, json
+          from pathlib import Path
+          path=Path('output/kyoto-heldout-independent-ci-compact-trace.json.gz')
+          with gzip.open(path,'rt',encoding='utf-8') as stream:
+              obj=json.load(stream)
+          assert obj['schema']=='kyoto-heldout-source-verified-trace-v1'
+          assert obj['original_scene_count']==54
+          assert obj['original_method_counts']==[10]
+          assert sum(len(x['observations']) for x in obj['scenes'])==54*60
+          assert all(sum(int(f['v4_trial']) for f in x['observations']) <=
+                     sum(f['v4_backend']=='sap_persistent_coherent'
+                         for f in x['observations']) for x in obj['scenes'])
+          print('PASS: actual saved source and 3240 V4 frames exported with every exact native SAP pair fingerprint')
+          PY
       - name: Preserve new source snapshots and real solver visual exports
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,6 +129,7 @@ jobs:
           path: |
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.md
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.json
+            output/kyoto-heldout-independent-ci-compact-trace.json.gz
             output/kyoto-heldout-independent-ci/full-method-scores/
             output/kyoto-heldout-independent-ci/snapshots/
             output/kyoto-heldout-independent-ci/replays/
