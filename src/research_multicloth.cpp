@@ -410,7 +410,7 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  triangles_.clear();triangleSheets_.clear();triangleRegions_.clear();
  pinned_.clear();initialPins_.clear();constraints_.clear();spheres_.clear();
  grab_={};
- regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};metrics_={};
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();metrics_={};
  const double spacing=2.2/(kSide-1);
  const auto mix32=[](std::uint32_t x){
   x^=x>>16;x*=0x7feb352du;
@@ -516,7 +516,7 @@ void MultiCloth::setPolicy(Policy policy){
   patchCellSpan_=0;
   setPatchCellSpan(span);
  }
- regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};
+ regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};rbc_.reset();
 }
 void MultiCloth::setAdaptive(bool adaptive){adaptive_=adaptive;regional_.reset();}
 void MultiCloth::setHierarchicalRegions(bool enabled){
@@ -561,6 +561,7 @@ void MultiCloth::setSelfCollisions(bool enabled){
  selfCollisions_=enabled;
  regional_.reset();
  global_.invalidate(); // eligibility masks now include/exclude same-sheet pairs
+ rbc_.reset(); // conservative reset on solver collision-mask setting changes
 }
 // Same-cloth triangles in the same cell or neighboring mesh cells share
 // an edge, vertex or structural one-ring neighborhood. Excluding them
@@ -1004,6 +1005,28 @@ void MultiCloth::step(){
    if(outcome.switched)++metrics_.frozenSwitches;
    pairs=std::move(outcome.pairs);
    metrics_.lastEvent=outcome.action;
+  }else if(policy_==Policy::RBCSpatialCertified){
+   // REAL solver-in-the-loop RBC engine: the original solver's margin
+   // is split equally between primitives. A pair qualifies exactly
+   // when current raw AABBs are within margin (same SAP padded input).
+   // One persistent frontier serves ALL five independent XPBD queries.
+   // Source geometry and contact projection remain unchanged.
+   if(!rbc_.initialized()){
+    const std::vector<ccp::rbc::Reach> reach(
+      bounds.size(),ccp::rbc::Reach{kMargin*.5,.045});
+    rbc_.initialize(bounds,reach);
+   }
+   const auto beforeBuilds=rbc_.global_builds();
+   auto outcome=rbc_.query(bounds);
+   pairs=std::move(outcome.pairs);
+   ++metrics_.rbcQueries;
+   metrics_.rbcGlobalBuilds+=rbc_.global_builds()-beforeBuilds;
+   metrics_.rbcDirtyRepairs+=outcome.local_repairs;
+   metrics_.rbcPotentialPairs+=outcome.potential_pairs;
+   metrics_.rbcIndexComparisons+=outcome.build_comparisons;
+   metrics_.rbcCandidateChecks+=outcome.query_pair_checks;
+   metrics_.lastEvent=outcome.global_rebuilt?"RBC_GLOBAL_REBUILD":
+     outcome.local_repairs?"RBC_LOCAL_REPAIR":"RBC_CERTIFICATE_REUSE";
   }else{
    // Pad only the query copy. The independent brute-force oracle below
    // starts from RAW geometry bounds and must not pad a second time.
@@ -1038,6 +1061,8 @@ void MultiCloth::step(){
    }
    if(policy_==Policy::RegionalCertified&&pairs!=oracle)
     throw std::runtime_error("REGIONAL EXACT-CURRENT AABB REVALIDATION DISAGREES");
+   if(policy_==Policy::RBCSpatialCertified&&pairs!=oracle)
+    throw std::runtime_error("RBC EXACT-CURRENT AABB CANDIDATES DISAGREE WITH SAP");
    metrics_.oracleChecked=true;
   }
   const auto narrowStart=Clock::now();
