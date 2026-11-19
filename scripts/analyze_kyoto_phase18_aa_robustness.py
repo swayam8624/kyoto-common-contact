@@ -75,6 +75,16 @@ def validate_record(row: dict, warmup: int) -> dict:
         measured = observed[method]["mean_ms"]
         if not close_to(measured, row["mean_ms"][method]):
             raise ValueError("Stored native mean changed for " + method)
+    # A vital historical confound: the first A/A replayer assigned
+    # copy A/B identity AFTER policy shuffling. Therefore A was always
+    # earlier than B, and an A/B mean ratio may contain temporal drift.
+    # New versions assign identities BEFORE randomizing the whole schedule.
+    order = row["order"]
+    slots = [int(order[m]) for m in METHODS]
+    if len(set(slots)) != 4:
+        raise ValueError("A/A controls did not occupy distinct execution slots")
+    guard_a_earlier = int(order[GUARD_A]) < int(order[GUARD_B])
+    v4_a_earlier = int(order[V4_A]) < int(order[V4_B])
     values = {
         "ga": finite_positive(row["mean_ms"][GUARD_A]),
         "gb": finite_positive(row["mean_ms"][GUARD_B]),
@@ -97,6 +107,8 @@ def validate_record(row: dict, warmup: int) -> dict:
     return {
         "type": row["type"], "material": row["material"],
         "regime": row["regime"], "n": int(row["n"]),
+        "guard_a_earlier": guard_a_earlier,
+        "v4_a_earlier": v4_a_earlier,
         "seed": int(row["seed"]), "repeat": int(row["repeat"]),
         "log_guard_v4": .5 * (math.log(ratios["paired_guard_over_v4_a"]) +
                               math.log(ratios["paired_guard_over_v4_b"])),
@@ -248,6 +260,14 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
     rest = {key: rows for key, rows in conditions.items() if key != strongest}
     main_stats = {
         "guard_over_v4_geomean": overall,
+        "guard_A_executed_before_B": sum(
+            x["guard_a_earlier"] for x in by_cohort["natural"]),
+        "guard_B_executed_before_A": sum(
+            not x["guard_a_earlier"] for x in by_cohort["natural"]),
+        "v4_A_executed_before_B": sum(
+            x["v4_a_earlier"] for x in by_cohort["natural"]),
+        "v4_B_executed_before_A": sum(
+            not x["v4_a_earlier"] for x in by_cohort["natural"]),
         "total_natural_repeat_runs": len(by_cohort["natural"]),
         "guard_aa_geomean": geom_from_logs(
             r["log_guard_aa"] for r in by_cohort["natural"]),
@@ -285,6 +305,8 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
     ]
     return {
         "experiment": "Post-hoc Phase 18 A/A robustness, no timings rerun",
+        "a_b_identities_assigned_before_shuffle": bool(
+            doc.get("a_b_identities_assigned_before_shuffle", False)),
         "source_json": str(aa), "source_json_sha256": hashlib.sha256(raw).hexdigest(),
         "native_replays_executed_by_this_script": 0,
         "recorded_replays_revalidated_by_sap": len(parsed),
@@ -302,6 +324,8 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
             "Resampling intervals are conditional on already observed execution-order repeats, not population confidence intervals.",
             "Three phase-seed values do not independently randomize material geometry or topology.",
             "Four method-order repetitions are not independent physical experiments.",
+            "The original 144-run Mac report labeled copy A as the first timed clone AFTER shuffling, so A always preceded B. This is a documented label-order bias, not balanced randomized A/B assignment.",
+            "New source reports explicitly mark whether A/B identities were assigned BEFORE shuffling, which is needed for balanced order estimates.",
             "Whole-trajectory randomized scheduling may retain CPU heat/clock order effects.",
             "Per-replay A/B clones share hardware and timing environment; treat them as paired, not independent.",
             "V4 decision rules can react to clock variation; disagreement is not pair-correctness failure.",
@@ -328,6 +352,20 @@ def save(report, destination):
         "Re-analysis ONLY. Native query timings were NOT rerun.",
         "All input replay CSV SHA-256 receipts rechecked; strict framewise "
         "candidate count/hash parity rechecked against SAP.",
+        "",
+        "## A/B execution-order audit",
+        "",
+        "Source has fixed A/B identities before shuffling: **" +
+          str(report["a_b_identities_assigned_before_shuffle"]) + "**.",
+        "Guard A earlier / B earlier: " +
+          str(n["guard_A_executed_before_B"]) + " / " +
+          str(n["guard_B_executed_before_A"]) + ".",
+        "V4 A earlier / B earlier: " +
+          str(n["v4_A_executed_before_B"]) + " / " +
+          str(n["v4_B_executed_before_A"]) + ".",
+        "WARNING: If A always ran earlier, A/A ratios reflect a fixed "
+        "label-order confound; they remain useful as descriptive timing "
+        "disagreement but do NOT provide a balanced A/B noise estimate.",
         "",
         "## Fixed natural suite",
         "",
