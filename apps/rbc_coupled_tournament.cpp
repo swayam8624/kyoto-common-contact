@@ -62,7 +62,7 @@ double distance(Vec3 a,Vec3 b){
 }
 void drive(MultiCloth& sim,const std::string& scenario,
            Vec3 origin,int frame,int total){
-    if(scenario=="free")return;
+    if(scenario=="free"||scenario=="prefold_relax")return;
     const double fraction=double(frame+1)/double(total);
     constexpr double pi=3.141592653589793;
     Vec3 target=origin;
@@ -145,9 +145,11 @@ void execute(const char* destination,int frames,
         auto s=std::make_unique<MultiCloth>(2,2,policy);
         if(geo||topo)
             s->setFixtureVariation(std::uint32_t(geo),std::uint32_t(topo));
+        if(scenario=="prefold_relax")
+            s->prepareFoldedInitialStateForResearch();
         s->setSelfCollisions(true);
         s->setAuditing(strict);
-        if(scenario!="free"){
+        if(scenario!="free"&&scenario!="prefold_relax"){
             const Vec3 start=pick(*s,tri);
             if(!s->beginGrab(tri,{1./3,1./3,1./3},start))
                 throw std::runtime_error("failed identical barycentric grab");
@@ -282,12 +284,12 @@ int main(int argc,char** argv){
         if(argc!=7)
             throw std::invalid_argument(
                 "usage: ccp_rbc_coupled_tournament NEW.csv FRAMES(8..160)"
-                " free|pull|fold|fold_over GEOMETRY_SEED TOPOLOGY_SEED"
+                " free|pull|fold|fold_over|prefold_relax GEOMETRY_SEED TOPOLOGY_SEED"
                 " STRICT_AUDIT(0|1)");
         const int frames=integer(argv[2],8,160);
         const std::string scenario(argv[3]);
         if(scenario!="free"&&scenario!="pull"&&scenario!="fold"&&
-           scenario!="fold_over")
+           scenario!="fold_over"&&scenario!="prefold_relax")
             throw std::invalid_argument("unsupported coupled scenario");
         const int geo=integer(argv[4],0,2000000000);
         const int topo=integer(argv[5],0,2000000000);
