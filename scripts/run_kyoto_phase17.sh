@@ -74,6 +74,7 @@ for scene in $SCENES; do
 done
 
 python3 scripts/kyoto_research_dashboard.py --materials "$OUT" --phase16 "$OUT/phase16" --warmup 4 --output "$OUT/reports"
+python3 scripts/audit_kyoto_phase17_decisions.py --materials "$OUT" --warmup 4 --output "$OUT/reports/decision-audit"
 python3 scripts/render_kyoto_phase17_html.py --evidence "$OUT/reports/KYOTO_UNIFIED_EVIDENCE.json" --output "$OUT/reports/KYOTO_METHODS_OFFLINE.html"
 echo "[PHASE 17] Complete original-method comparison: $OUT/reports/KYOTO_UNIFIED_EVIDENCE.md"
 echo "[PHASE 17] Exact binary pair audit: $OUT/pair-proofs/"
