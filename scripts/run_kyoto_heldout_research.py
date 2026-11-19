@@ -173,7 +173,7 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--materials", nargs="+", default=["cloth", "sponge", "mixed"])
     p.add_argument("--regimes", nargs="+", default=["baseline", "rapid"])
-    p.add_argument("--budgets", nargs="+", type=int, default=[128, 512])
+    p.add_argument("--budgets", nargs="+", type=int, default=[128, 512, 1024])
     p.add_argument("--heldout-count", type=int, default=3)
     p.add_argument("--frames", type=int, default=36)
     p.add_argument("--warmup", type=int, default=8)
