@@ -391,6 +391,17 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
 MultiCloth::MultiCloth(int sheetCount,int sphereCount,Policy policy):policy_(policy){
  reset(sheetCount,sphereCount);
 }
+void MultiCloth::setFixtureVariation(std::uint32_t geometrySeed,
+                                     std::uint32_t topologySeed,double jitter){
+ if(frame_!=0)
+  throw std::logic_error("cannot change independent solver fixture after stepping");
+ if(!std::isfinite(jitter)||jitter<0.||jitter>.035)
+  throw std::invalid_argument("coupled fixture jitter must be finite in 0..0.035");
+ fixtureGeometrySeed_=geometrySeed;
+ fixtureTopologySeed_=topologySeed;
+ fixtureJitter_=jitter;
+ reset(sheets_,balls_); // New physical state AND invalidated policy caches.
+}
 void MultiCloth::reset(int sheetCount,int sphereCount){
  if(sheetCount<1||sheetCount>3||sphereCount<1||sphereCount>8)
   throw std::invalid_argument("supported configuration: 1-3 cloths and 1-8 moving spheres");
@@ -401,6 +412,25 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
  grab_={};
  regional_.reset();global_.invalidate();finalBounded_=ccp::final_broadphase::GuardSAPBoundedTrial{};metrics_={};
  const double spacing=2.2/(kSide-1);
+ const auto mix32=[](std::uint32_t x){
+  x^=x>>16;x*=0x7feb352du;
+  x^=x>>15;x*=0x846ca68bu;
+  return x^(x>>16);
+ };
+ const auto jitter=[&](std::uint32_t vertex,std::uint32_t axis){
+  if(fixtureGeometrySeed_==0)return 0.;
+  const auto mixed=mix32(fixtureGeometrySeed_^
+                 mix32(vertex+0x9e3779b9u*axis));
+  return fixtureJitter_*(2.*double(mixed)/4294967295.-1.);
+ };
+ const auto flip=[&](int layer,int x,int y){
+  if(fixtureTopologySeed_==0)return false;
+  const auto hash=mix32(fixtureTopologySeed_^
+                    (std::uint32_t(layer+1)*83492791u)^
+                    (std::uint32_t(x+1)*73856093u)^
+                    (std::uint32_t(y+1)*19349663u));
+  return (hash&1u)!=0u;
+ };
  for(int layer=0;layer<sheets_;++layer){
   const int base=static_cast<int>(positions_.size());
   const double phi=layer*.13;
@@ -413,8 +443,13 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
     const double u=(x-(kSide-1)*.5)*spacing;
     const double v=(y-(kSide-1)*.5)*spacing;
     Vec3 p{u+0.055*layer+0.055*v*phi,v+0.045*layer,dz+0.025*std::sin(u*2.0+v*1.7+phi)};
+    if(fixtureGeometrySeed_!=0){
+     const std::uint32_t id=static_cast<std::uint32_t>(positions_.size());
+     p.x+=jitter(id,1u);p.y+=jitter(id,2u);p.z+=jitter(id,3u);
+    }
     positions_.push_back(p);previous_.push_back(p);initialPins_.push_back(p);
-    const bool anchor=y==kSide-1&&(x==0||x==kSide-1);
+    const bool anchor=y==kSide-1&&(x==0||x==kSide-1||
+      (fixtureTopologySeed_!=0&&fixtureTopologySeed_%3u==0u&&x==kSide/2));
     pinned_.push_back(anchor?1:0);
     inverseMasses_.push_back(anchor?0.0:1.0);
    }
@@ -422,7 +457,13 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
   for(int y=0;y<kSide-1;++y)
    for(int x=0;x<kSide-1;++x){
     const int a=base+y*kSide+x,b=a+1,c=a+kSide,d=c+1;
-    for(auto tri:{std::array<int,3>{a,b,d},std::array<int,3>{a,d,c}}){
+    const bool swapped=flip(layer,x,y);
+    // Keep exactly two triangles per cell and stable triangle IDs.
+    // Different topology seeds change actual triangle adjacency.
+    const std::array<std::array<int,3>,2> cellTriangles=swapped?
+      std::array<std::array<int,3>,2>{{{a,b,c},{b,d,c}}}:
+      std::array<std::array<int,3>,2>{{{a,b,d},{a,d,c}}};
+    for(auto tri:cellTriangles){
      triangles_.push_back(tri);triangleSheets_.push_back(layer);
      // Span three preserves the already-benchmarked reference region IDs.
      // Other spans use a disjoint range, including span one (144 patches
@@ -442,8 +483,14 @@ void MultiCloth::reset(int sheetCount,int sphereCount){
     if(x+1<kSide)addConstraint(i,i+1,1e-6);
     if(y+1<kSide)addConstraint(i,i+kSide,1e-6);
     if(x+1<kSide&&y+1<kSide){
-     addConstraint(i,i+kSide+1,5e-6);
-     addConstraint(i+1,i+kSide,5e-6);
+     if(fixtureTopologySeed_==0){
+      // Preserve historical BOTH diagonal spring constraints for all
+      // existing callers: only opt-in topological fixtures change them.
+      addConstraint(i,i+kSide+1,5e-6);
+      addConstraint(i+1,i+kSide,5e-6);
+     }else if(flip(layer,x,y))
+      addConstraint(i+1,i+kSide,5e-6);
+     else addConstraint(i,i+kSide+1,5e-6);
     }
     if(x+2<kSide)addConstraint(i,i+2,1.5e-4);
     if(y+2<kSide)addConstraint(i,i+2*kSide,1.5e-4);
