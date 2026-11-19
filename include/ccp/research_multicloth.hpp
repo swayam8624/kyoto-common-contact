@@ -35,7 +35,9 @@ struct Metrics {
               regionalPairReuses{}, dirtyRegions{}, cachedPairsRejected{}, oracleMisses{},
               regionTopLevelTests{}, regionTopLevelOverlaps{}, regionPairsSkipped{},
               regionCacheEvictions{},onlinePatches{},onlineSplits{},onlineMerges{},
-              onlineStrategySwitches{};
+              onlineStrategySwitches{},
+              frozenGuardQueries{},frozenSapQueries{},frozenTrialQueries{},
+              frozenSwitches{};
   double grabError{}, broadMs{}, narrowMs{}, stepMs{}, meanRegionBudget{},onlineDecisionMs{},
          onlineMeasuredWork{},onlineContactHeat{},onlineCoarsePairFraction{},
          maxFrameParticleTravel{},maxStructuralEdgeStretch{},maxWorldCoordinate{};
@@ -122,6 +124,11 @@ public:
   const Metrics& metrics() const {return metrics_;}
   int sheetCount() const {return sheets_;}
   int sphereCount() const {return balls_;}
+  std::size_t pinnedCount() const noexcept{
+   std::size_t count=0;
+   for(const auto flag:pinned_)count+=(flag!=0);
+   return count;
+  }
   int frame() const {return frame_;}
   Policy policy() const {return policy_;}
   // Immutable broad-phase adapter for independent, equal-input published
