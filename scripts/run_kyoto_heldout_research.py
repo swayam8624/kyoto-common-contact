@@ -100,6 +100,31 @@ def parse_coupled(path: Path, expected_frames: int, expected_scenario: str,
                        for r in rows if r["policy"] == label)
             for label in sorted(methods)
         },
+        "precise_tests_by_method": {
+            label: sum(int(r["precise_tests"]) for r in rows
+                       if r["policy"] == label)
+            for label in sorted(methods)
+        },
+        "self_contacts_by_method": {
+            label: sum(int(r["self_contacts"]) for r in rows
+                       if r["policy"] == label)
+            for label in sorted(methods)
+        },
+        "sphere_contacts_by_method": {
+            label: sum(int(r["sphere_contacts"]) for r in rows
+                       if r["policy"] == label)
+            for label in sorted(methods)
+        },
+        "max_strain_by_method": {
+            label: max(float(r["rms_relative_edge_strain"]) for r in rows
+                       if r["policy"] == label)
+            for label in sorted(methods)
+        },
+        "max_collapsed_triangles_by_method": {
+            label: max(int(r["near_degenerate_triangles"]) for r in rows
+                       if r["policy"] == label)
+            for label in sorted(methods)
+        },
         "step_time_mean_ms_by_method": {
             label: sum(float(r["step_ms"]) for r in rows
                        if r["policy"] == label) / expected_frames
@@ -258,6 +283,18 @@ def main():
             print("PASS COUPLED", label, "frames", a.coupled_frames,
                   "independent physical solver mesh/contacts agree with SAP",
                   flush=True)
+    # Safety gate: a coupled test without ANY actual precise collision
+    # checks or contact responses is merely motion/geometry parity. Reject
+    # a deceptive physically vacuous successful report.
+    for variation in HELDOUT[:a.heldout_count]:
+        matching = [x for x in coupled
+                    if x["geometry_seed"] == variation["geometry"] and
+                       x["topology_seed"] == variation["topology"]]
+        if not any(x["precise_tests_by_method"]["sap_rebuild"] > 0 and
+                   x["contacts_by_method"]["sap_rebuild"] > 0 for x in matching):
+            raise ValueError(
+                "No actual precise tests/contact responses for independently "
+                "varied coupled solver mesh " + str(variation))
     for scenario in a.coupled_scenarios:
         tested = [x for x in coupled if x["scenario"] == scenario]
         if len({x["source_rest_positions_sha256"] for x in tested}) != len(tested):
@@ -273,6 +310,7 @@ def main():
         "new_varied_material_scenes": len(natural),
         "material_replays": natural,
         "coupled_solver_runs": coupled,
+        "actual_physical_contact_coverage_enforced": True,
         "important_limits": [
             "Independent geometry and triangle connectivity are now varied in BOTH the mass-spring fixture and coupled MultiCloth solver under explicitly different independent seeds",
             "Mass-spring fixture uses damped Verlet plus constrained spherical/floor projection; it is not a calibrated contact solver",
