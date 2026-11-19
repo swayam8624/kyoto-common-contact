@@ -47,7 +47,7 @@ jobs:
             --replayer build/kyoto-final-cpu/ccp_material_replay \
             --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled \
             --output output/kyoto-heldout-independent-ci \
-            --materials cloth sponge \
+            --materials cloth sponge cushion soft_ball spring mixed \
             --regimes rapid \
             --budgets 128 512 1024 \
             --heldout-count 3 \
@@ -70,11 +70,11 @@ jobs:
           p=Path('output/kyoto-heldout-independent-ci/full-method-scores/HELDOUT_ALL_METHODS.json')
           d=json.loads(p.read_text())
           assert d['native_benchmarks_rerun_by_this_script']==0
-          assert d['original_policy_replay_csvs_reverified']==18
+          assert d['original_policy_replay_csvs_reverified']==54
           assert len(d['all_method_scores']) >= 10
-          assert d['new_scenes']==18
+          assert d['new_scenes']==54
           assert all(c['distinct_seeded_geometry_scenes']==3 for c in d['physical_scene_conditions'])
-          assert sum(d['on_policy_v4_total_decisions'][m] for m in ('guard_frames','sap_frames'))==18*60
+          assert sum(d['on_policy_v4_total_decisions'][m] for m in ('guard_frames','sap_frames'))==54*60
           print('PASS: all actually executed policies ranked from immutable independent-mesh replays; real V4 backend counts reverified')
           PY
           python3 - <<'PY'
