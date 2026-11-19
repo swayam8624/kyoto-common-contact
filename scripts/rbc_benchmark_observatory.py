@@ -402,31 +402,110 @@ function matrix(){
   return {mats,budgets,cells,regime,method};
 }
 function drawHeat(){const z=matrix();const grid=$("heatmap");grid.replaceChildren();grid.className="heat";grid.style.gridTemplateColumns="115px repeat("+z.budgets.length+",minmax(0,1fr))";
-  grid.append(text("div",""));z.budgets.forEach(b=>{const e=text("div",String(b)+" objects");e.className="heading";grid.append(e)});
+  grid.append(text("div",""));z.budgets.forEach(b=>{const e=text("div","budget "+String(b));e.className="heading";grid.append(e)});
   z.mats.forEach((m,i)=>{const h=text("div",m);h.className="heading";grid.append(h);z.budgets.forEach((b,j)=>{
     let v=z.cells[i][j];const el=text("div",v===null?"NO DATA":fmt(v,2)+"×");el.className="cell";el.style.background=colorRatio(v);el.title=m+" / "+b+": "+(v===null?"unmeasured":fmt(v,5)+" Guard/method");grid.append(el);
   });});$("surfacecaption").textContent="Regime: "+z.regime+" · Method: "+z.method+" · missing cells are not interpolated";drawSurface();
 }
 let yaw=-0.65,pitch=.48, dragging=false,lastX=0,lastY=0;
-function drawSurface(){if(!data.research)return;const {c,w,h}=setupCanvas("surface"),z=matrix();
- c.clearRect(0,0,w,h);c.fillStyle="#111b28";c.fillRect(0,0,w,h);
- const rows=z.mats.length,cols=z.budgets.length,flat=z.cells.flat().filter(x=>x!==null);
- if(!flat.length){c.fillStyle="#b4c8d5";c.fillText("No measured cells",24,34);return;}
- const zz=Math.max(1.1,...flat),range=Math.max(.15,zz-.55),scale=Math.min(w*.68,h*.78);
- const transform=(x,y,v)=>{const X=(x/Math.max(1,cols-1)-.5)*2.3,Y=(y/Math.max(1,rows-1)-.5)*2.0,Z=((v-.55)/range)*1.5-.5;
- const X1=X*Math.cos(yaw)-Y*Math.sin(yaw), Y1=X*Math.sin(yaw)+Y*Math.cos(yaw);
- const Y2=Y1*Math.cos(pitch)-Z*Math.sin(pitch), Z2=Y1*Math.sin(pitch)+Z*Math.cos(pitch);
- return [w/2+X1*scale*.36,h*.60+Y2*scale*.34,Z2];};
- const quad=[];for(let i=0;i<rows-1;i++)for(let j=0;j<cols-1;j++){let vals=[z.cells[i][j],z.cells[i][j+1],z.cells[i+1][j+1],z.cells[i+1][j]];if(vals.some(v=>v===null))continue;
- let pts=[transform(j,i,vals[0]),transform(j+1,i,vals[1]),transform(j+1,i+1,vals[2]),transform(j,i+1,vals[3])];
- quad.push({pts,depth:pts.reduce((a,p)=>a+p[2],0)/4,value:aggregate(vals)});}
- quad.sort((a,b)=>a.depth-b.depth);
- quad.forEach(q=>{c.beginPath();q.pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fillStyle=colorRatio(q.value);c.globalAlpha=.88;c.fill();c.globalAlpha=1;c.strokeStyle="#a4bbcc";c.lineWidth=.7;c.stroke();});
- for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){let v=z.cells[i][j];if(v===null)continue;let p=transform(j,i,v);c.beginPath();c.arc(p[0],p[1],3,0,Math.PI*2);c.fillStyle="#f6edd4";c.fill();}
- c.fillStyle="#c5d9e3";c.font="12px system-ui";c.fillText("Z: Guard / method (×)",14,24);c.fillText("X: object budget →",14,h-18);c.fillText("Y: materials (axis rotated with surface)",14,h-38);
+let surfacePoints=[];
+function drawSurface(){
+ if(!data.research)return;
+ const {c,w,h}=setupCanvas("surface"),z=matrix(),rows=z.mats.length,cols=z.budgets.length;
+ c.fillStyle="#111b28";c.fillRect(0,0,w,h);
+ surfacePoints=[];
+ const observed=z.cells.flat().filter(x=>x!==null);
+ if(!observed.length){c.fillStyle="#b4c8d5";c.fillText("No measured cohorts",24,34);return;}
+ // Material families are discrete categories, not points on a continuous
+ // physical manifold. Each native cohort gets a SEPARATE solid column.
+ const maximum=Math.max(1.15,...observed)*1.12;
+ const scale=Math.min(w/8.4,h/8.4);
+ function project(b,m,v){
+   const X=(b-(cols-1)/2)*1.55,Y=(m-(rows-1)/2)*.93,Z=(v/maximum)*2.5;
+   const xr=X*Math.cos(yaw)-Y*Math.sin(yaw);
+   const yr=X*Math.sin(yaw)+Y*Math.cos(yaw);
+   return [w/2+xr*scale,h*.74+(yr*Math.sin(pitch)-Z*Math.cos(pitch))*scale,
+           yr*Math.cos(pitch)+Z*Math.sin(pitch)];
+ }
+ function stroke(points,color,width=1,dash=[]){
+   c.beginPath();points.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));
+   c.strokeStyle=color;c.lineWidth=width;c.setLineDash(dash);c.stroke();c.setLineDash([]);
+ }
+ function face(points,fill,overlay){
+   c.beginPath();points.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));
+   c.closePath();c.fillStyle=fill;c.fill();
+   if(overlay){c.fillStyle=overlay;c.fill();}
+   c.strokeStyle="#adc5d453";c.lineWidth=.85;c.stroke();
+ }
+ // Coordinate floor and a set of explicitly labeled native sample locations.
+ for(let i=0;i<rows;i++){
+   stroke([project(-.45,i,0),project(cols-.55,i,0)],"#385065",1);
+ }
+ for(let j=0;j<cols;j++){
+   stroke([project(j,-.5,0),project(j,rows-.5,0)],"#385065",1);
+ }
+ const bars=[];
+ for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){
+   const value=z.cells[i][j];
+   if(value===null)continue; // Never draw a simulated result.
+   const corners=[
+     [j-.26,i-.25],[j+.26,i-.25],[j+.26,i+.25],[j-.26,i+.25]
+   ];
+   const bottom=corners.map(a=>project(a[0],a[1],0));
+   const top=corners.map(a=>project(a[0],a[1],value));
+   const centre=project(j,i,value),depth=project(j,i,0)[2];
+   bars.push({i,j,value,top,bottom,centre,depth});
+ }
+ // Painter order for opaque source-value columns, not a continuous mesh.
+ bars.sort((a,b)=>a.depth-b.depth);
+ for(const bar of bars){
+   const {i,j,value,top:t,bottom:b}=bar,color=colorRatio(value);
+   face([b[0],b[1],t[1],t[0]],color,"#00000028");
+   face([b[1],b[2],t[2],t[1]],color,"#ffffff16");
+   face([b[2],b[3],t[3],t[2]],color,"#00000042");
+   face([b[3],b[0],t[0],t[3]],color,"#ffffff09");
+   face([t[0],t[1],t[2],t[3]],color,"#ffffff40");
+   // Independent 1x marks show parity without inventing a surface.
+   const parity=project(j,i,1);
+   c.fillStyle="#f7e1ab";c.beginPath();c.arc(parity[0],parity[1],2,0,Math.PI*2);c.fill();
+   const matching=data.research.scenes.filter(s=>s.material===z.mats[i]&&s.budget===z.budgets[j]&&s.regime===z.regime);
+   const n=[...new Set(matching.map(s=>s.n))].join(", ");
+   surfacePoints.push({x:bar.centre[0],y:bar.centre[1],
+     title:z.mats[i]+" | requested "+z.budgets[j]+
+       " | actual native N "+n+" | Guard / "+z.method+" = "+fmt(value,4)+"x"});
+ }
+ c.font="11px system-ui";c.fillStyle="#cfdeea";
+ for(let j=0;j<cols;j++){
+   const p=project(j,rows-.3,0);
+   c.fillText(String(z.budgets[j]),p[0]-13,Math.min(h-12,p[1]+28));
+ }
+ for(let i=0;i<rows;i++){
+   const p=project(-.5,i,0);
+   c.fillText(z.mats[i].replace("_"," "),Math.max(8,p[0]-70),p[1]+3);
+ }
+ c.font="12px system-ui";c.fillStyle="#bcebdc";
+ c.fillText("Z: same-scene Guard / method speedup",14,24);
+ c.fillStyle="#c5d9e3";c.fillText("Requested budget  →",14,h-19);
+ c.fillText("Independent material categories",14,h-38);
+ c.fillStyle="#f7e1ab";c.fillRect(w-133,17,8,8);c.fillStyle="#c5d9e3";c.fillText("1.0× parity marks",w-120,25);
 }
+
 $("surface").addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;$("surface").setPointerCapture(e.pointerId);});
-$("surface").addEventListener("pointermove",e=>{if(!dragging)return;yaw+=(e.clientX-lastX)*.008;pitch=Math.max(-1.25,Math.min(1.25,pitch+(e.clientY-lastY)*.006));lastX=e.clientX;lastY=e.clientY;drawSurface();});
+$("surface").addEventListener("pointermove",e=>{
+ if(dragging){
+  yaw+=(e.clientX-lastX)*.008;
+  pitch=Math.max(.12,Math.min(1.25,pitch+(e.clientY-lastY)*.006));
+  lastX=e.clientX;lastY=e.clientY;drawSurface();
+  return;
+ }
+ const rect=e.currentTarget.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+ let best=null,dist=Infinity;
+ for(const p of surfacePoints){
+  const d=Math.hypot(p.x-x,p.y-y);
+  if(d<dist){dist=d;best=p;}
+ }
+ e.currentTarget.title=best&&dist<38?best.title:"Rotate by dragging. Hover an actual measured 3D column.";
+});
 $("surface").addEventListener("pointerup",()=>dragging=false);
 function buildLeaderboard(){if(!data.research){$("material-section").style.display="none";$("physical-section").style.display="none";return;}
  const r=data.summary,table=$("leaderboard");let head=document.createElement("tr");["Method","Guard / method GM","Mean query ms","Faster scenes","Measured scenes"].forEach(s=>head.append(text("th",s)));table.append(head);
@@ -438,7 +517,7 @@ function buildLeaderboard(){if(!data.research){$("material-section").style.displ
  const regimes=[...new Set(data.research.scenes.map(s=>s.regime))].sort();
  regimes.forEach(m=>{const x=text("option",m);x.value=m;$("regime").append(x);});
  data.summary.forEach(x=>{const e=text("option",x.method);e.value=x.method;$("method").append(e);});
- $("method").value="rbc_indexed_repair";$("regime").addEventListener("change",drawHeat);$("method").addEventListener("change",drawHeat);drawHeat();
+ $("method").value="rbc_flat_repair";$("regime").addEventListener("change",drawHeat);$("method").addEventListener("change",drawHeat);drawHeat();
  const phys=$("physical");let h=document.createElement("tr");["Scenario",...data.physical_methods.map(s=>s+" (ms)")].forEach(s=>h.append(text("th",s)));phys.append(h);
  data.research.physical.forEach(s=>{const tr=document.createElement("tr");tr.append(text("td",s.scenario));data.physical_methods.forEach(m=>tr.append(text("td",fmt(s.means[m]))));phys.append(tr);});
  if(!data.research.physical.length)$("physical-section").style.display="none";
