@@ -193,15 +193,19 @@ def main():
         parser.error("Output must end with .json.gz")
     report = export(args.results)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    created = False
     try:
         with args.output.open("xb") as stream:
+            created = True
             with gzip.GzipFile(fileobj=stream, mode="wb", mtime=0,
                                filename="") as compressed:
                 compressed.write((json.dumps(
                     report, sort_keys=True, separators=(",", ":")
                 ) + "\n").encode("utf-8"))
     except BaseException:
-        if args.output.exists():
+        # Atomic create-exclusive protects concurrent evidence producers.
+        # Do NOT unlink an existing output that someone else created.
+        if created and args.output.exists():
             args.output.unlink()
         raise
     print("PASS: original binary/CSV receipts and per-frame SAP candidate "
