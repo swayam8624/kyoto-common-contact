@@ -417,17 +417,21 @@ void run(const std::string& filename,const std::string& output,int verbose,
   methods.push_back(Kind::Learned);
   methods.push_back(Kind::LearnedConservative);
  }
- // Dedicated A/A mode: identical, fresh, independent stateful copies of the
- // exact same production Guard and frozen V4 implementations. The duplicate
- // gets its own method object, preserving its own caches and EWMA. No result
- // from one copy is passed into another. Everything is timed just as usual.
- // Only a label distinguishes the original and duplicate, not their logic.
- // This mode is opt-in and NEVER changes historical default benchmark rows.
+ // Preserve the identity of each independent method object BEFORE policy
+ // shuffling. Assigning A/B labels afterward wrongly made A always run
+ // earlier than B, introducing a fixed temporal-order bias in A/A ratios.
+ // This scheduling metadata never reaches any algorithm implementation.
+ using ScheduledMethod=std::pair<Kind,std::string>;
+ std::vector<ScheduledMethod> scheduled;
+ scheduled.reserve(methods.size()+(aaControl?2:0));
+ for(const auto kind:methods)scheduled.emplace_back(kind,name(kind));
+ // The historical default still executes precisely the same algorithms.
+ // Only the opt-in A/A audit adds independently instantiated copies.
  if(aaControl){
   if(orderSeed==0)throw std::invalid_argument(
     "A/A controls require an explicit randomized --order-seed");
-  methods.push_back(Kind::Global);
-  methods.push_back(Kind::GuardSapTrial);
+  scheduled.emplace_back(Kind::Global,"global_guarded_exact_aa");
+  scheduled.emplace_back(Kind::GuardSapTrial,"guard_sap_bounded_trial_aa");
  }
  // An explicitly seeded policy-order experiment is not allowed to rely on
  // rebuilt SAP executing first. Build one untimed, independent reference from
@@ -443,16 +447,11 @@ void run(const std::string& filename,const std::string& output,int verbose,
    expectedCounts[frame]=pairs.size();
   }
   std::mt19937 shuffleEngine(orderSeed);
-  std::shuffle(methods.begin(),methods.end(),shuffleEngine);
+  std::shuffle(scheduled.begin(),scheduled.end(),shuffleEngine);
  }
- int guardCopies=0,v4Copies=0;
- for(std::size_t slot=0;slot<methods.size();++slot){
-  const Kind method=methods[slot];
-  std::string backendName=name(method);
-  if(method==Kind::Global&&++guardCopies==2)
-   backendName="global_guarded_exact_aa";
-  if(method==Kind::GuardSapTrial&&++v4Copies==2)
-   backendName="guard_sap_bounded_trial_aa";
+ for(std::size_t slot=0;slot<scheduled.size();++slot){
+  const Kind method=scheduled[slot].first;
+  const std::string& backendName=scheduled[slot].second;
   MaterialReplay stream(filename);
   Method algorithm(method,model);
   double sum=0;
@@ -501,7 +500,7 @@ void run(const std::string& filename,const std::string& output,int verbose,
    <<" frames="<<header.frames<<" n="<<header.n<<"\n";
  }
  if(!csv)throw std::runtime_error("failed to write replay CSV");
- std::cout<<"[PASS] exact pair hashes matched across "<<methods.size()<<" CPU policies for "
+ std::cout<<"[PASS] exact pair hashes matched across "<<scheduled.size()<<" CPU policies for "
    <<header.frames<<" frames: "<<output<<"\n";
 }
 }
@@ -512,7 +511,7 @@ int main(int argc,char** argv){
   if(argc==2&&std::string(argv[1])=="--capabilities"){
    std::cout<<"KYOTO_REPLAY_ABLATION_V4 sap_persistent_coherent "
                "ml_cost_aware_conservative guard_sap_measured_probe guard_sap_bounded_trial "
-               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched aa_guard_v4_clones\n";
+               "ml_bookkeeping_ms ml_wrapper_ms hybrid_probed hybrid_switched aa_guard_v4_clones aa_labels_shuffled_independently\n";
    return 0;
   }
   if(argc<3||argc>8)
