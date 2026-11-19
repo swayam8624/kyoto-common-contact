@@ -74,7 +74,11 @@ def require_native_csv(source:Path, frames:int, geo:int,topo:int)->dict:
             "native_sphere_contact_corrections":sum(
                 int(r["sphere_contacts"]) for r in observed[m]),
             "mean_whole_step_ms_after_first_eight":sum(
-                float(r["step_ms"]) for r in observed[m][8:])/max(1,frames-8)
+                float(r["step_ms"]) for r in observed[m][8:])/max(1,frames-8),
+            "mean_broadphase_ms_after_first_eight":sum(
+                float(r["broad_ms"]) for r in observed[m][8:])/max(1,frames-8),
+            "mean_narrowphase_ms_after_first_eight":sum(
+                float(r["narrow_ms"]) for r in observed[m][8:])/max(1,frames-8)
         } for m in POLICIES
     }
 
@@ -141,6 +145,21 @@ def execute(args)->dict:
         raise RuntimeError("Native physical solver failed; retain "+str(log))
     scores=require_native_csv(native,args.frames,
                               args.geometry_seed,args.topology_seed)
+    # Emit real native measurements as a terminal table BEFORE expensive
+    # geometry inspection and GIF/3D rendering. No inferred GPU timings.
+    print("\nNATIVE FIVE-POLICY COUPLED SOLVER BENCHMARK", flush=True)
+    print("POLICY                 STEP ms   BROAD ms  NARROW ms  SELF CONTACTS  SPHERE CONTACTS", flush=True)
+    print("-"*89, flush=True)
+    for name in POLICIES:
+        row=scores[name]
+        print(f"{name:<22} "
+              f"{row['mean_whole_step_ms_after_first_eight']:>8.4f} "
+              f"{row['mean_broadphase_ms_after_first_eight']:>10.4f} "
+              f"{row['mean_narrowphase_ms_after_first_eight']:>10.4f} "
+              f"{row['native_same_sheet_contact_corrections']:>14} "
+              f"{row['native_sphere_contact_corrections']:>16}", flush=True)
+    print("Timings are CPU measurements after excluding the first eight frames; "
+          "do not infer broader statistical significance.", flush=True)
     source_audit=root/"INDEPENDENT_TRIANGLE_SUBFRAMES.json"
     evidence=audit(mesh,source_audit,args.subdivisions,require_zero=True)
     if evidence["source_endpoint_piercing_total"]!=0 or \
