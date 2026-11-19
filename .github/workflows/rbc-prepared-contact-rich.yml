@@ -8,6 +8,7 @@ on:
       - 'src/research_multicloth.cpp'
       - 'include/ccp/research_multicloth.hpp'
       - 'apps/rbc_coupled_tournament.cpp'
+      - 'scripts/render_rbc_physics_grid.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -138,6 +139,30 @@ jobs:
                           'independent_source_scenes':3,'cases':cases},indent=2)+'\n')
           print('PASS: 3 real pre-folded same-sheet physical sources with actual contact corrections; all 5 independent solver policy trajectories identical')
           print(json.dumps(cases,indent=2))
+          PY
+      - name: Render the original 5-policy 3D solver state into an infinitely looping GIF and a proof manifest
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 scripts/render_rbc_physics_grid.py \
+            --mesh-dir output/rbc-prepared-fold-contact-rich/mesh-g73013 \
+            --output output/rbc-prepared-fold-contact-rich/source-five-policy.gif \
+            --stride 3 --fps 12
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('output/rbc-prepared-fold-contact-rich')
+          png=root/'source-five-policy.png'
+          gif=root/'source-five-policy.gif'
+          receipt=root/'source-five-policy.json'
+          evidence=json.loads(receipt.read_text())
+          assert png.is_file() and gif.is_file()
+          assert gif.stat().st_size>25000
+          assert evidence['real_native_source_only']
+          assert evidence['frames_in_original_native_solver']==80
+          assert evidence['same_camera_and_scale_all_five_policies']
+          assert len(evidence['native_sources_sha256'])==5
+          assert evidence['gif_sha256']==hashlib.sha256(gif.read_bytes()).hexdigest()
+          print('PASS: real native five-policy 3D cloth-and-sphere GIF, source SHA receipts and PNG preview')
           PY
       - name: Preserve original five-method solver CSVs even for negative/failure case
         if: always()
