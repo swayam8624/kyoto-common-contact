@@ -61,6 +61,41 @@ Compilation, static analysis, report regeneration and GitHub CI can happen
 without consuming a new native experiment, but DO NOT trigger more Mac
 native benchmarking outside these five slots.
 
+## RUN 1 / 5 - exact command (native runner CI preflight passed)
+
+The original 36-scene Mac source cohort already exists. Use it as a
+DEVELOPMENT/repeatability cohort; do not call it untouched holdout.
+The isolated native ccp_rbc_final_repeated executes 11 exact full-pair
+methods, including two Guard A/A copies, Frozen V4 and RBC Flat, with
+four repetitions and alternating forward/reverse whole-trajectory orders.
+This is a source-matched repeated query experiment, not a balanced
+independent thermal ABBA study or a whole-solver timing experiment.
+
+~~~bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git switch research/reach-budget-calculus
+git pull --ff-only origin research/reach-budget-calculus
+
+cmake --preset kyoto-final-cpu
+cmake --build build/kyoto-final-cpu --parallel 4 \
+  --target ccp_rbc_final_repeated
+
+python3 -u scripts/run_rbc_final_repeated.py \
+  --replayer build/kyoto-final-cpu/ccp_rbc_final_repeated \
+  --manifest output/rbc-observatory-native-pilot-01/RBC_RESULTS.json \
+  --output output/rbc-final-run01-controlled-01 \
+  --repeats 4 --warmup 8 \
+  | tee output/rbc-final-run01-controlled-01.console.txt
+~~~
+
+Return RBC_FINAL_REPEATED_RESULTS.md and RBC_FINAL_REPEATED_RESULTS.json
+from that new evidence directory. Do not re-run merely to replace a
+negative score. The source-backed native CI smoke already passed:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44574344244
+
+No subsequent native Mac experiment should be launched until the
+Run-1 A/A and paired V4/Flat results have been assessed.
+
 ## Prior registration and fairness
 
 - Snapshot the exact branch/commit, source SHA256, compiler, build mode,
