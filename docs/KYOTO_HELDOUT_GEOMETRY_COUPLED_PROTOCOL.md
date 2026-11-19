@@ -46,11 +46,18 @@ This new work explicitly separates two scientific questions:
    assertions abort. It also writes truthful mesh JSONL usable
    in synchronized visual grids.
 
-   Crucial limitation: MultiCloth itself has a fixed grid
-   triangulation. The independent-topology variations in (1)
-   have NOT been integrated into MultiCloth. It is therefore
-   incorrect to claim simultaneous new topology AND independent
-   coupled collision physics from a single experiment.
+   Independent geometry and topology seeds are now integrated into
+   MultiCloth itself. The optional new fixture changes TRUE triangle
+   adjacency, structural spring edges, anchor constraints and initial
+   vertex positions BEFORE contact simulation. Three policies step
+   independent solver instances from the same particular new mesh.
+
+   Remaining limitation: MultiCloth still has a 13x13 rectangular
+   mesh lattice as its underlying parameterization. The seed changes
+   diagonals/geometry/constraints but does NOT implement arbitrary
+   remeshing, tearing, subdivision, FEM or independently measured
+   physical material parameters. These are multiple real topologies
+   within one mesh family, not arbitrary topology classes.
 
 ## Backward compatibility
 
@@ -68,10 +75,13 @@ independent variations, explicitly provide BOTH additional seeds:
 
 There is no silent reinterpretation of Phase 18 motion seeds.
 New coordinates/connectivity depend on new seed pairs, rather than
-being rebranded forcing-phase variants. The new C++ regression
-checks independent seed effects, deterministic replay, historical
-zero-variation compatibility, mesh validity and exact current-AABB
-pair oracle results across six material families.
+being rebranded forcing-phase variants. The new C++ regression checks independent seed effects, deterministic
+replay, historical zero-variation compatibility, mesh validity and
+exact current-AABB pair oracle results across six material families.
+A separate native coupled solver regression verifies that geometry
+seeds independently change actual solver vertex positions, topology
+seeds independently change triangle adjacency, and SAP, Guard and V4
+solve identical resulting physical states under varied topology.
 
 ## Full runnable Mac/Ubuntu experiment
 
@@ -79,8 +89,9 @@ From the repository root on research/kyoto-decision-coverage:
 
     git pull --ff-only origin research/kyoto-decision-coverage
     cmake --preset kyoto-final-cpu
-    cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_material_export ccp_material_replay ccp_kyoto_heldout_fixture_tests ccp_kyoto_heldout_coupled
+    cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_material_export ccp_material_replay ccp_kyoto_heldout_fixture_tests ccp_kyoto_coupled_variation_tests ccp_kyoto_heldout_coupled
     build/kyoto-final-cpu/ccp_kyoto_heldout_fixture_tests
+    build/kyoto-final-cpu/ccp_kyoto_coupled_variation_tests
 
 Run the full **new-geometry** matrix with a NEW directory; this
 creates three independently topologized/perturbed fixtures for
@@ -108,11 +119,14 @@ or performance claims before the native Mac runs.
 
 ## Visual grids and synchronized contact motion
 
-The existing mesh renderer accepts the new per-policy JSONL directly:
+The existing mesh renderer accepts the new per-policy JSONL directly.
+Choose one of the actual seeded solver directories, rather than a
+nonexistent single shared fold path:
 
-    python3 scripts/render_kyoto_visuals.py solver --input-dir output/kyoto-heldout-original-01/coupled/fold --output output/kyoto-heldout-original-01/coupled/fold-visual --fps 9 --stride 1
+    python3 scripts/render_kyoto_visuals.py solver --input-dir output/kyoto-heldout-original-01/coupled/fold-geom73013-topo86011 --output output/kyoto-heldout-original-01/coupled/fold-geom73013-visual --fps 9 --stride 1
 
-Repeat for coupled/pull and coupled/free. Requires Pillow; ffmpeg is
+Repeat with other coupled/fold-geom*-topo* and pull/free directories
+for different real mesh connectivities. Requires Pillow; ffmpeg is
 optional. It creates a looping GIF and optional MP4 with synchronized,
 real simulation vertices and measured contact diagnostics, NOT
 decorative, physically altered meshes. Every panel is supposed
@@ -128,6 +142,14 @@ No claim is made that the serialized AABB file alone proves an
 alternate mesh topology. Comparisons use all current broad-phase
 candidate pairs and exact SAP count/hash parity. There is also a
 separate complete brute-force small-scene pair oracle.
+
+The coupled solver diagnostics now enforce that EVERY independent
+seeded geometry/topology variant produces at least one real precise
+contact test and contact response, somewhere across its scenarios.
+Earlier eight-frame Linux smoke evidence had zero real narrow-phase
+contacts and was correctly insufficient as collision physics coverage.
+That weakness motivated a longer CI contact gate. No-contact-only
+solver geometry parity is not promoted as proof of collision handling.
 
 The existing solver diagnostics count narrow-phase tests and
 contacts and compare full vertex geometry. They do NOT measure
