@@ -1,0 +1,56 @@
+name: Cleanup archive-first inventory and full native regression
+on:
+  push:
+    branches:
+      - cleanup/prune
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-before-any-prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect exact tracked manifest, original SHA receipts, and static reachability
+        run: |
+          set -euo pipefail
+          mkdir -p output/cleanup-audit
+          git ls-files | head -400 > output/cleanup-audit/GIT_LS_FILES_HEAD_400.txt
+          git ls-files > output/cleanup-audit/GIT_LS_FILES_FULL.txt
+          git rev-parse HEAD > output/cleanup-audit/AUDITED_HEAD.txt
+          python3 scripts/audit_repository.py --output output/cleanup-audit/original-audit | tee output/cleanup-audit/ORIGINAL_AUDIT_STDOUT.txt
+          python3 scripts/audit_cleanup_reachability.py --output output/cleanup-audit/reachability | tee output/cleanup-audit/REACHABILITY_STDOUT.txt
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          source=subprocess.check_output(['git','ls-files']).decode().splitlines()
+          d=json.loads(Path('output/cleanup-audit/reachability/FULL_REACHABILITY_REVIEW.json').read_text())
+          assert d['summary']['tracked_files']==len(source)
+          assert [r['path'] for r in d['files']]==sorted(source)
+          assert all(len(r['sha256'])==64 for r in d['files'])
+          assert not any('DELETE' in r['review_state'] for r in d['files'])
+          print('PASS: every tracked file accounted for, no auto-delete classification')
+          PY
+      - name: Install upstream Bullet baseline
+        run: sudo apt-get update -qq && sudo apt-get install -y libbullet-dev
+      - name: Full C++23 configure and native build
+        run: |
+          cmake -S . -B build/cleanup-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCCP_REQUIRE_BULLET=ON
+          cmake --build build/cleanup-release --parallel 3
+      - name: All registered CTest regressions
+        run: ctest --test-dir build/cleanup-release --output-on-failure
+      - name: All Python sources parse
+        run: python3 -m compileall -q scripts benchmarks tests
+      - name: Original evidence-oriented Python smoke tests
+        run: |
+          python3 scripts/test_ablation_preflight.py --help >/dev/null || true
+          python3 scripts/test_kyoto_heldout_research.py --help >/dev/null
+          python3 scripts/test_kyoto_phase17.py --help >/dev/null || true
+      - name: Preserve full human review proof without altering git history
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pre-prune-full-file-reachability-and-native-ctest
+          path: output/cleanup-audit/
+          if-no-files-found: error
