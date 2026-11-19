@@ -69,6 +69,40 @@ void test_independent_references() {
             candidates+=b.pairs.size();
         }
     }
+    // Random motion may cause EVERY object to exceed its tiny skin,
+    // exercising only bulk rebuild. This explicit independent
+    // deterministic control guarantees local repair is actually
+    // executed rather than weakening the test's coverage requirement.
+    {
+        std::vector<Bounds> isolated;
+        std::vector<Reach> skins;
+        for(int i=0;i<32;++i){
+            isolated.push_back(box(900+i,i==1?.06:double(i)*2.,
+                                   0,0,.1));
+            skins.push_back({0.,.065});
+        }
+        ccp::rbc::CertifiedFlatFrontier flat;
+        flat.initialize(isolated,skins);
+        // Exactly one escaped object: must take the dirty-local path.
+        move(isolated[0],.2,0,0);
+        const auto q=flat.query(isolated);
+        require(q.local_repairs==1 && !q.global_rebuilt,
+                "explicitly isolated escape did not use local repair");
+        require(q.pairs==ccp::rbc::exhaustive(isolated,skins),
+                "local repair disagreed with independent exact oracle");
+        local+=q.local_repairs;
+        candidates+=q.pairs.size();
+        // Eleven simultaneous escapes exceed the 1/5 threshold and
+        // force the distinct bulk-build branch.
+        for(int i=3;i<14;++i)
+            move(isolated[std::size_t(i)],.2,0,0);
+        const auto bulkResult=flat.query(isolated);
+        require(bulkResult.global_rebuilt,
+                "explicit multi-dirty episode did not enter bulk rebuild");
+        require(bulkResult.pairs==ccp::rbc::exhaustive(isolated,skins),
+                "bulk repair disagreed with independent exact oracle");
+        bulk+=int(bulkResult.global_rebuilt);
+    }
     require(local>0&&bulk>0&&candidates>0,
             "flat property test did not exercise all code branches");
     std::cout<<"PASS RBC 36x105 all-frame oracle crosscheck, "
