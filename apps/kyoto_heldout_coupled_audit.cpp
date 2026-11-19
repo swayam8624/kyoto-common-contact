@@ -134,10 +134,13 @@ void setDrive(MultiCloth& sim,const std::string& scenario,Vec3 original,int fram
  sim.updateGrab(target);
 }
 void header(std::ostream& out,const MultiCloth& sim,const char* label,
-            const std::string& scenario){
+            const std::string& scenario,std::uint32_t geometrySeed,
+            std::uint32_t topologySeed){
  out<<"{\"type\":\"mesh_header\",\"schema\":1,\"policy\":\""<<label
     <<"\",\"scenario\":\""<<scenario
-    <<"\",\"units\":\"simulation units\",\"triangles\":[";
+    <<"\",\"geometry_seed\":"<<geometrySeed
+    <<",\"topology_seed\":"<<topologySeed
+    <<",\"units\":\"simulation units\",\"triangles\":[";
  for(std::size_t i=0;i<sim.triangles().size();++i){
   if(i)out<<',';
   const auto t=sim.triangles()[i];
@@ -184,13 +187,14 @@ void frame(std::ostream& out,const MultiCloth& sim,int index,
 }
 
 void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
-         const std::string& scenario){
+         const std::string& scenario,std::uint32_t geometrySeed,
+         std::uint32_t topologySeed){
  if(std::filesystem::exists(dest))
   throw std::runtime_error("refusing to overwrite coupled solver evidence");
  std::filesystem::create_directories(dest);
  std::ofstream csv(dest/"COUPLED_SOLVER.csv");
  if(!csv)throw std::runtime_error("cannot open coupled solver CSV");
- csv<<"scenario,policy,frame,sheets,spheres,triangles,candidate_pairs,"
+ csv<<"scenario,geometry_seed,topology_seed,policy,frame,sheets,spheres,triangles,candidate_pairs,"
        "precise_tests,self_contacts,sphere_contacts,velocity_clamps,"
        "oracle_misses,broad_ms,narrow_ms,step_ms,max_position_difference_from_sap,"
        "rms_relative_edge_strain,max_edge_stretch,near_degenerate_triangles,min_height\n";
@@ -200,13 +204,15 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
  for(std::size_t p=0;p<kPolicies.size();++p){
   const auto& policy=kPolicies[p];
   MultiCloth sim(sheets,spheres,policy.policy);
+  if(geometrySeed!=0||topologySeed!=0)
+   sim.setFixtureVariation(geometrySeed,topologySeed);
   configure(sim,scenario);
   const Quality quality(sim);
   const Vec3 initial=grabReference(sim,2*(5*12+5));
   std::ofstream visual(dest/(std::string(policy.name)+".jsonl"));
   if(!visual)throw std::runtime_error("cannot open coupled solver visual output");
   visual<<std::fixed<<std::setprecision(10);
-  header(visual,sim,policy.name,scenario);
+  header(visual,sim,policy.name,scenario,geometrySeed,topologySeed);
   for(int i=0;i<frames;++i){
    setDrive(sim,scenario,initial,i,frames);
    sim.step();
@@ -229,7 +235,7 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
                               " at frame "+std::to_string(i));
     ++comparisonFrames;
    }
-   csv<<scenario<<','<<policy.name<<','<<i<<','<<sheets<<','<<spheres<<','
+   csv<<scenario<<','<<geometrySeed<<','<<topologySeed<<','<<policy.name<<','<<i<<','<<sheets<<','<<spheres<<','
       <<sim.triangles().size()<<','<<m.pairs<<','<<m.preciseTests<<','
       <<m.selfContacts<<','<<m.sphereContacts<<','<<m.velocityClamps<<','
       <<m.oracleMisses<<','<<m.broadMs<<','<<m.narrowMs<<','<<m.stepMs
@@ -242,6 +248,7 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
  if(!csv)throw std::runtime_error("failed writing coupled CSV");
  std::cout<<"PASS COUPLED_SOLVER: "<<scenario
           <<" frames="<<frames<<" sheets="<<sheets<<" spheres="<<spheres
+          <<" geometry_seed="<<geometrySeed<<" topology_seed="<<topologySeed
           <<" independent_policy_frame_parity="<<comparisonFrames
           <<" actual XPBD-style solver contact, precise tests and geometry"
           <<" validated against SAP; original V4 unchanged\n";
@@ -249,15 +256,17 @@ void run(const std::filesystem::path& dest,int frames,int sheets,int spheres,
 }
 int main(int argc,char** argv){
  try{
-  if(argc!=6)
-   throw std::runtime_error("usage: ccp_kyoto_heldout_coupled OUTPUT_DIR FRAMES(8..120) SHEETS(1..3) SPHERES(1..3) SCENARIO(free,pull,fold)");
+  if(argc!=6&&argc!=8)
+   throw std::runtime_error("usage: ccp_kyoto_heldout_coupled OUTPUT_DIR FRAMES(8..120) SHEETS(1..3) SPHERES(1..3) SCENARIO(free,pull,fold) [GEOMETRY_SEED TOPOLOGY_SEED]");
   const int frames=bounded(argv[2],8,120);
   const int sheets=bounded(argv[3],1,3);
   const int spheres=bounded(argv[4],1,3);
   const std::string scenario(argv[5]);
   if(scenario!="free"&&scenario!="pull"&&scenario!="fold")
    throw std::invalid_argument("invalid scenario; use free/pull/fold");
-  run(argv[1],frames,sheets,spheres,scenario);
+  const auto geometrySeed=argc==8?std::uint32_t(bounded(argv[6],1,2000000000)):0u;
+  const auto topologySeed=argc==8?std::uint32_t(bounded(argv[7],1,2000000000)):0u;
+  run(argv[1],frames,sheets,spheres,scenario,geometrySeed,topologySeed);
   return 0;
  }catch(const std::exception& e){
   std::cerr<<"KYOTO COUPLED SOLVER AUDIT FAILED: "<<e.what()<<'\n';return 1;
