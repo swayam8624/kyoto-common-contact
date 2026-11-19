@@ -126,7 +126,8 @@ def font_of(size: int, bold: bool = False):
 class OrthographicCamera:
     """Exactly one fitted projection over the complete shared source run."""
 
-    def __init__(self, frames: list, width: int, height: int):
+    def __init__(self, frames: list, width: int, height: int,
+                 focus_vertices: int | None = None):
         up = np.array([0., 0., 1.])
         observer = np.array([3.2, -5.0, 3.8])
         observer /= np.linalg.norm(observer)
@@ -136,7 +137,9 @@ class OrthographicCamera:
         self.up = np.cross(self.right, self.forward)
         self.up /= np.linalg.norm(self.up)
         all_points = np.concatenate([
-            np.asarray(f["positions"], dtype=float) for f in frames
+            np.asarray(f["positions"][:focus_vertices]
+                       if focus_vertices is not None else f["positions"],
+                       dtype=float) for f in frames
         ], axis=0)
         self.target = (all_points.min(axis=0)+all_points.max(axis=0))/2
         x = (all_points-self.target)@self.right
@@ -275,6 +278,48 @@ def draw_panel(source, cam, frame: int, policy_number: int,
     return image
 
 
+def draw_original_fold_inspector(source, cam, frame: int,
+                                 width: int, height: int):
+    """Sixth panel: REAL first sheet, fitted independently for inspection.
+
+    It is a CLOSE-UP, not a sixth algorithm. The second sheet and
+    obstacles are intentionally hidden in this panel to reveal
+    the true U-fold cross section. No geometry is modified.
+    """
+    from PIL import Image, ImageDraw
+    pixels=np.zeros((height,width,3),dtype=np.uint8)
+    pixels[:,:,:]=[23,31,40]
+    depth=np.full((height,width),float("inf"))
+    head,frames,_=source
+    sample=frames[frame]
+    tri=np.asarray(head["triangles"],dtype=int)
+    sheets=np.asarray(head["triangle_sheets"],dtype=int)
+    selected=tri[sheets==0]
+    render_mesh(pixels,depth,sample["positions"],selected,
+                np.zeros(len(selected),dtype=int),cam)
+    image=Image.fromarray(pixels,"RGB")
+    d=ImageDraw.Draw(image)
+    d.rounded_rectangle((5,5,width-6,height-6),radius=9,
+                        outline=(83,95,110),width=2)
+    d.text((18,15),"SOURCE FOLD / MAGNIFIED",font=font_of(15,True),
+           fill=(240,245,250))
+    d.text((width-112,18),f"{frame+1:03d}/{len(frames):03d}",
+           font=font_of(11),fill=(168,185,199))
+    metric=sample["metrics"]
+    bad=int(metric["geometric_self_intersections"])
+    d.rounded_rectangle((16,height-74,width-16,height-13),radius=7,
+                        fill=(15,22,31))
+    d.text((26,height-66),
+           ("TRUE SOURCE: ZERO CURRENT PIERCINGS" if bad==0 else
+            f"INVALID SOURCE: {bad} PIERCINGS"),
+           font=font_of(11,True),
+           fill=(128,228,189) if bad==0 else (255,115,96))
+    d.text((26,height-43),
+           "Sheet A only | obstacles & second sheet hidden",
+           font=font_of(11),fill=(194,207,222))
+    return image
+
+
 def render(sources: dict, output: Path, stride: int,
            fps: int, width: int = 440, height: int = 330):
     from PIL import Image, ImageDraw
@@ -288,35 +333,23 @@ def render(sources: dict, output: Path, stride: int,
     if times[-1]!=len(frames)-1:
         times.append(len(frames)-1)
     cam=OrthographicCamera(frames,width,height)
+    folded_vertices=1+max(
+        max(tri) for tri,sid in
+        zip(head["triangles"],head["triangle_sheets"]) if sid==0)
+    close_cam=OrthographicCamera(frames,width,height,
+                                 focus_vertices=folded_vertices)
     images=[]
     for t in times:
         grid=Image.new("RGB",(3*width,2*height),(20,27,35))
         for i,name in enumerate(POLICIES):
             panel=draw_panel(sources[name],cam,t,i,width,height)
             grid.paste(panel,(i%3*width,i//3*height))
-        d=ImageDraw.Draw(grid)
-        ox=2*width
-        oy=height
-        d.rounded_rectangle((ox+6,oy+6,ox+width-7,oy+height-7),
-                            radius=9,fill=(25,36,48),
-                            outline=(83,95,110),width=2)
-        is_clean=all(f["metrics"]["geometric_self_intersections"]==0
-                     for f in frames)
-        d.text((ox+19,oy+26),"VERIFIED PHYSICAL GEOMETRY",
-               font=font_of(16,True),fill=(240,244,251))
-        facts=[
-            "Native C++ solver vertices, no AI art",
-            "Depth-tested triangle and sphere surfaces",
-            "Five policies, identical real trajectories",
-            "Zero endpoint piercings on ALL frames" if is_clean
-                else "WARNING: invalid intersecting source",
-            "True native contact + timing receipts",
-            "Prepared bend; NOT spontaneous folding",
-            "Endpoint audits are NOT swept CCD"
-        ]
-        for i,line in enumerate(facts):
-            d.text((ox+19,oy+67+i*32),line,
-                   font=font_of(11),fill=(183,203,219))
+        # Six policy-grid cells: FIVE identical-world method views,
+        # plus one magnified source fold inspection perspective.
+        # Magnification never changes particle coordinates.
+        detail=draw_original_fold_inspector(sources[POLICIES[0]],
+                                            close_cam,t,width,height)
+        grid.paste(detail,(2*width,height))
         images.append(grid)
     output.parent.mkdir(parents=True,exist_ok=True)
     images[0].save(output,save_all=True,append_images=images[1:],
@@ -339,6 +372,9 @@ def render(sources: dict, output: Path, stride: int,
         "zero_nonlocal_self_intersection_is_not_3d_continuous_CCD":True,
         "fixed_camera_and_scale_for_all_frames_policies":True,
         "true_software_Z_buffer":True,
+        "sixth_panel_original_source_fold_closeup":True,
+        "sixth_panel_is_not_sixth_algorithm":True,
+        "second_sheet_and_obstacles_hidden_only_in_closeup":True,
         "native_source_geometry_not_edited":True,
         "gif_sha256":file_sha256(output),
         "preview_png_sha256":file_sha256(preview),
