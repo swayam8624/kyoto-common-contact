@@ -44,11 +44,27 @@ def action_stats(path):
     chosen={r["chosen_backend"] for r in actions}
     if not chosen.issubset({"global_guarded_exact","sap_persistent_coherent"}):
         raise ValueError("Unknown frozen V4 decision backend")
+    # The frozen source defines trialFrame from the mode at query start:
+    # every trial frame executes SAP, but an ordinary SAP-mode frame is
+    # NOT a trial. Distinguish these to avoid crediting unconfirmed SAP
+    # trials as sustained adaptive selection.
+    for r in actions:
+        trial=int(r["hybrid_probed"])
+        switched=int(r["hybrid_switched"])
+        if trial not in (0,1) or switched not in (0,1):
+            raise ValueError("Nonboolean V4 trial/switch action metadata")
+        if trial and r["chosen_backend"]!="sap_persistent_coherent":
+            raise ValueError("V4 reported trial while executing Guard")
+    trial_count=sum(int(r["hybrid_probed"]) for r in actions)
+    sap_count=sum(r["chosen_backend"]=="sap_persistent_coherent" for r in actions)
+    if trial_count>sap_count:
+        raise ValueError("Frozen V4 trial count exceeds SAP execution")
     return {
         "frames":len(actions),
         "guard_frames":sum(r["chosen_backend"]=="global_guarded_exact" for r in actions),
-        "sap_frames":sum(r["chosen_backend"]=="sap_persistent_coherent" for r in actions),
-        "trial_frames":sum(int(r["hybrid_probed"]) for r in actions),
+        "sap_frames":sap_count,
+        "trial_frames":trial_count,
+        "nontrial_sap_frames":sap_count-trial_count,
         "switches":sum(int(r["hybrid_switched"]) for r in actions)
     }
 
@@ -142,7 +158,8 @@ def analyze(root,warmup):
     conditions=[]
     for (mat,reg,n),subset in sorted(group.items()):
         choices={key:sum(s["v4_decisions_all_frames"][key] for s in subset)
-                 for key in ("guard_frames","sap_frames","trial_frames","switches")}
+                 for key in ("guard_frames","sap_frames","trial_frames",
+                             "nontrial_sap_frames","switches")}
         conditions.append({
             "material":mat,"regime":reg,"actual_n":n,
             "distinct_seeded_geometry_scenes":len(subset),
@@ -156,10 +173,18 @@ def analyze(root,warmup):
         "original_policy_replay_csvs_reverified":len(scenes),
         "native_benchmarks_rerun_by_this_script":0,
         "new_scenes":len(scenes),"warmup_excluded":warmup,
+        "native_source_frames_per_trajectory":sorted({
+            s["v4_decisions_all_frames"]["frames"] for s in scenes}),
+        "native_measured_frames_per_trajectory":sorted({
+            s["measured_frames"] for s in scenes}),
+        "native_total_source_method_frames":sum(
+            s["v4_decisions_all_frames"]["frames"]*len(s["all_policy_means_ms"])
+            for s in scenes),
         "all_method_scores":bymethod,
         "physical_scene_conditions":conditions,
         "on_policy_v4_total_decisions":{key:sum(s["v4_decisions_all_frames"][key] for s in scenes)
-           for key in ("guard_frames","sap_frames","trial_frames","switches")},
+           for key in ("guard_frames","sap_frames","trial_frames",
+                       "nontrial_sap_frames","switches")},
         "individual_scenes":scenes,
         "limitations":[
             "AABB candidate generation only; not a timed coupled solver comparison",
@@ -179,11 +204,28 @@ def write(report,out):
     out.mkdir(parents=True,exist_ok=False)
     (out/"HELDOUT_ALL_METHODS.json").write_text(
         json.dumps(report,indent=2)+"\n",encoding="utf-8")
+    frames=report["native_source_frames_per_trajectory"]
+    measured=report["native_measured_frames_per_trajectory"]
     lines=[
         "# Kyoto new independently seeded geometry — full original-policy comparison",
         "",
         "No new simulations, native timings or model training. Immutable original",
         "source SHA-256 and framewise SAP count/hash parity verified.",
+        "",
+        "## Actual frame horizon — avoid mixing 36-frame Mac with 60-frame Linux",
+        "",
+        "Source frames per trajectory: "+", ".join(map(str,frames))+
+        "; measured frames per trajectory after warmup: "+
+        ", ".join(map(str,measured))+
+        "; total original method/frame records: "+
+        str(report["native_total_source_method_frames"])+".",
+        "",
+        "A frozen V4 SAP trial can require eight consecutive SAP frames to",
+        "confirm sustained SAP operation. If a trial starts around frame 32,",
+        "a 36-frame replay only observes its first four trial frames.",
+        "Such a run does NOT establish whether the selector would have",
+        "accepted SAP on a longer trajectory. Keep original evidence",
+        "unchanged and use new 60+-frame trajectories for that question.",
         "",
         "## Natural material fixture AABB replay only",
         "",
@@ -201,11 +243,12 @@ def write(report,out):
               "Guard frames: "+str(total["guard_frames"])+
               "; SAP frames: "+str(total["sap_frames"])+
               "; trial frames: "+str(total["trial_frames"])+
+              "; SAP non-trial frames: "+str(total["nontrial_sap_frames"])+
               "; switches: "+str(total["switches"])+".",
               "",
               "## Independently varied geometry/topology conditions","",
-              "| Material | Motion | Actual N | Distinct initial meshes | Guard/V4 geomean | SAP action frames | Trials | Switches |",
-              "|---|---|---:|---:|---:|---:|---:|---:|"]
+              "| Material | Motion | Actual N | Distinct initial meshes | Guard/V4 geomean | SAP action frames | Trials | Non-trial SAP | Switches |",
+              "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
     for d in report["physical_scene_conditions"]:
         a=d["v4_decisions_all_frames"]
         lines.append("| "+d["material"]+" | "+d["regime"]+
@@ -213,7 +256,7 @@ def write(report,out):
                      " | "+str(d["distinct_seeded_geometry_scenes"])+
                      " | "+format(d["guard_over_v4_geomean"],".4f")+"x | "+
                      str(a["sap_frames"])+" | "+str(a["trial_frames"])+" | "+
-                     str(a["switches"])+" |")
+                     str(a["nontrial_sap_frames"])+" | "+str(a["switches"])+" |")
     lines += ["","## Evidence boundaries",""]+["- "+x for x in report["limitations"]]
     (out/"HELDOUT_ALL_METHODS.md").write_text(
         "\n".join(lines)+"\n",encoding="utf-8")
