@@ -73,8 +73,14 @@ jobs:
           assert d['original_policy_replay_csvs_reverified']==54
           assert len(d['all_method_scores']) >= 10
           assert d['new_scenes']==54
+          assert d['native_source_frames_per_trajectory']==[60]
+          assert d['native_measured_frames_per_trajectory']==[52]
+          assert d['native_total_source_method_frames']==54*60*10
           assert all(c['distinct_seeded_geometry_scenes']==3 for c in d['physical_scene_conditions'])
           assert sum(d['on_policy_v4_total_decisions'][m] for m in ('guard_frames','sap_frames'))==54*60
+          assert d['on_policy_v4_total_decisions']['nontrial_sap_frames'] == (
+              d['on_policy_v4_total_decisions']['sap_frames'] -
+              d['on_policy_v4_total_decisions']['trial_frames'])
           print('PASS: all actually executed policies ranked from immutable independent-mesh replays; real V4 backend counts reverified')
           PY
           python3 - <<'PY'
