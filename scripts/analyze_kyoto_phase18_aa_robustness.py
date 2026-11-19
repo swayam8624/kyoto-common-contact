@@ -249,9 +249,6 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
     main_stats = {
         "guard_over_v4_geomean": overall,
         "total_natural_repeat_runs": len(by_cohort["natural"]),
-        "total_v4_paired_action_frames": sum(
-            r["v4_a_trial_frames"] * 0 + 60 for r in []
-        ),  # Replaced immediately below using actual raw CSV frame counts.
         "guard_aa_geomean": geom_from_logs(
             r["log_guard_aa"] for r in by_cohort["natural"]),
         "v4_aa_geomean": geom_from_logs(
@@ -266,7 +263,6 @@ def analyze(aa: Path, draws: int, rng_seed: int) -> dict:
         "timing_repeat_envelope": conditional_resampling(
             conditions, draws, rng_seed),
     }
-    del main_stats["total_v4_paired_action_frames"]
     main_stats["leave_strongest_out"] = {
         "removed_material": strongest[0],
         "removed_regime": strongest[1], "removed_n": strongest[2],
