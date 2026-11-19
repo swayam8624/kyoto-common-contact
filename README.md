@@ -202,3 +202,31 @@ Read `DECISION_COVERAGE.md`: each source-derived backend count, SAP trial
 frame and switch is reported explicitly, rather than inferring activation
 from scene size. No trained ML result is invented when the native weights
 are absent. Linux CI: [random-order and size-eligible V4 regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44431580036).
+
+### Phase 18 Mac results: 101 natural SAP frames
+
+The 19 November Apple Silicon 39-trajectory evaluation is recorded in
+[the source-backed actual Mac results](docs/CBP_PHASE18_MAC_ACTUAL_2026-11-19.md).
+Original V4 selected SAP for 101 of 2160 naturally generated frames,
+including three sustained SAP adoptions during N=1058 rapid cloth and
+two rejected 8-frame trials on N=1331 sponge. Natural Guard/V4 geometric
+mean was 1.0306x (21/36 trajectory wins); artificial rigid translation
+results remain separate. Trained ML was NOT executed.
+
+The original full pair-count/hash-validated CSVs on the Mac contain all
+eleven measured algorithms even though the first decision JSON reported
+only Guard/V4 timings. To **score all original methods without rerunning**:
+
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git pull --ff-only origin research/kyoto-decision-coverage
+python3 scripts/analyze_kyoto_decision_coverage.py \
+  --results output/kyoto-decision-mac-first \
+  --output output/kyoto-decision-mac-first/verified-all-methods-v1
+open output/kyoto-decision-mac-first/verified-all-methods-v1/VERIFIED_ALL_METHODS.md
+```
+
+The report fails if source SHA-256, execution-order receipts or actual
+full-pair sets disagree; it separates natural and intentionally artificial
+motion. Linux [CI regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461)
+passed both valid and deliberately corrupted evidence checks.
