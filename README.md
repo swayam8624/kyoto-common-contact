@@ -66,9 +66,41 @@ New downloadable visual formats:
 [Read the physical and visual failure postmortem](docs/research/rbc/GEOMETRY_VALIDITY_VISUAL_POSTMORTEM_2026-11-19.md).
 
 Run a complete new source-verified package ONCE from your
-Mac. Requires original C++23 solver build, NumPy/Pillow,
-and local Node packages Three.js 0.180.0 and esbuild
-0.25.12 for offline WebGL:
+Mac. The original solver and depth-tested GIF require only
+C++23, NumPy and Pillow. **Node/npm is OPTIONAL**: omit
+`--offline` to generate exactly the same original physics evidence,
+geometry proof, source timings, SHA-256 receipts and a browser
+HTML viewer that fetches pinned Three.js online.
+
+On Macs where Conda's `pip` aborts even though NumPy/Pillow
+are already importable, skip `pip install`; verify instead with
+`python3 -c "import numpy, PIL; print('OK')"`.
+A Homebrew Node dylib error such as missing
+`libsimdjson.36.dylib` is a stale Homebrew binary/ABI
+linkage, NOT a failure of this research solver.
+Repair it separately using an up-to-date Homebrew
+`node@22` reinstall; never fake a versioned simdjson dylib
+with a manual symlink.
+
+**No-Node continuation (recommended first)**, using a NEW output
+directory and deliberately NOT specifying `--offline`:
+
+~~~bash
+cd ~/Desktop/Programming/kyoto-common-contact
+python3 -c "import numpy, PIL; print('Python dependencies OK')"
+python3 scripts/run_rbc_visual_proof_package.py \
+  --solver build/kyoto-final-cpu/ccp_rbc_coupled_tournament \
+  --output output/rbc-clean-physics-mac-no-node-01 \
+  --frames 80 --geometry-seed 73013 --topology-seed 86011 \
+  --subdivisions 8 --stride 3 --fps 12
+open output/rbc-clean-physics-mac-no-node-01/INTERACTIVE_ORIGINAL_PHYSICS.html
+open output/rbc-clean-physics-mac-no-node-01/ACTUAL_CLOTH_FIVE_POLICIES.gif
+~~~
+
+**For a completely offline HTML viewer**, local Node packages
+Three.js 0.180.0 and esbuild 0.25.12 are required. Once
+`node -v && npm -v` work on your Mac, follow this original
+offline workflow:
 
 ~~~bash
 git switch research/reach-budget-calculus
