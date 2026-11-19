@@ -7,6 +7,8 @@ on:
       - '.github/workflows/kyoto-heldout-research.yml'
       - 'CMakeLists.txt'
       - 'include/ccp/material_scenes.hpp'
+      - 'include/ccp/research_multicloth.hpp'
+      - 'src/research_multicloth.cpp'
       - 'apps/material_snapshot_export.cpp'
       - 'apps/kyoto_heldout_coupled_audit.cpp'
       - 'tests/kyoto_heldout_fixture_tests.cpp'
