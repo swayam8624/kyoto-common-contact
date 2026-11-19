@@ -473,16 +473,19 @@ void MultiCloth::prepareRoundedNonintersectingFoldForResearch(){
    };
    previous_[std::size_t(id)]=positions_[std::size_t(id)];
   }
- // A second original cloth sheet would otherwise be right inside the
- // upper folded flap. Translate each unmodified additional sheet
- // rigidly UP (rest lengths invariant), including its kinematic
- // reference anchors. This is disclosed initial fixture preparation.
+ // A second original cloth sheet would occlude the rounded fold
+ // when viewed from above. Displace the second complete sheet into
+ // a parallel physical bay with CLEAR horizontal separation.
+ // Translation is rigid and includes the kinematic reference pins,
+ // preserving all original constraints/rest lengths and two-sheet
+ // policy coverage. THIS IS PREPARED geometry, not natural motion.
  for(int layer=1;layer<sheets_;++layer)
   for(int j=0;j<kSide*kSide;++j){
     const std::size_t id=std::size_t(layer*kSide*kSide+j);
-    positions_[id].z+=1.15;
-    previous_[id].z+=1.15;
-    initialPins_[id].z+=1.15;
+    const double shiftX=3.65*layer;
+    positions_[id].x+=shiftX;
+    previous_[id].x+=shiftX;
+    initialPins_[id].x+=shiftX;
   }
  regional_.reset();
  global_.invalidate();
