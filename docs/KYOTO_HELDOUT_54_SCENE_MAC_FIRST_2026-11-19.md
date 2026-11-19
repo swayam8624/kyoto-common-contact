@@ -2,10 +2,12 @@
 
 ## Evidence provenance
 
-This note is derived exclusively from the author-supplied
-Mac terminal transcript of a successful local execution of
-scripts/run_kyoto_heldout_research.py, scripts/test_kyoto_heldout_research.py,
-and scripts/analyze_kyoto_heldout_evidence.py on 19 November 2026.
+This note is derived from two user-supplied 19 November 2026
+Mac artifacts: (1) the terminal transcript of successful native
+run + integrity checks, and (2) the complete textual contents
+of the analyzer-generated HELDOUT_ALL_METHODS.md report.
+The original raw native Mac CSVs, binary snapshots and JSONL
+streams remain local; they were NOT provided to the repository.
 
 The Mac run fast-forwarded the working branch from commit 37475ea to
 243e325, built all five requested targets, and printed successful
@@ -20,21 +22,22 @@ messages:
   with SAP, no reruns.
 
 The complete original Mac raw CSVs, immutable snapshots,
-HELDOUT_RESULTS.json and full-methods report were NOT uploaded with
-the console excerpt. Consequently, the numbers here are calculated
-from the 54 **rounded-to-four-decimal Guard/V4 ratios** in the
-terminal excerpt, and the exact original method ranking, pair hashes,
-per-frame V4 actions, source SHA256 values and original solver timings
-have NOT been independently re-examined in this GitHub note.
-The successful local verifier is evidence of those checks, not a
-license to claim that the raw Mac evidence is archived here.
+HELDOUT_RESULTS.json and full-methods JSON were NOT uploaded.
+The 54 per-scene Guard/V4 ratios in this note were calculated
+from the terminal's four-decimal printed values. The 11-policy
+aggregate ranking and V4 action totals below were separately
+copied from the actual Markdown report subsequently provided
+by the user. Neither raw per-frame original pair hashes nor
+individual method timings have been independently inspected
+outside the Mac. Successful local verification supports their
+validity but is not an original-source re-verification here.
 
 Mac CMake configuration reported external Bullet DBVT enabled.
-The console did NOT display the full heldout all-method ranking; the
-local file output/kyoto-heldout-mac-first/full-method-scores/
-HELDOUT_ALL_METHODS.md contains that ranking. Do not copy the
-Linux ten-method ranking into the Mac report, or assume an exact
-Mac method count without inspecting its generated file.
+The user's subsequently supplied original
+output/kyoto-heldout-mac-first/full-method-scores/HELDOUT_ALL_METHODS.md
+establishes that 11 algorithms actually ran on the Mac,
+including real Bullet DBVT (but NOT an ML model). Do not copy
+the Linux ten-method ranking into the Mac report.
 
 The zsh "command not found: #" messages are from literal pasted
 comment lines, not failed build or benchmark steps. Eight Clang
@@ -46,11 +49,18 @@ headers. Compilation and linking succeeded.
 The default Mac suite is THREE material families (cloth, sponge,
 mixed), TWO forcing regime names (baseline, rapid), three requested
 budgets (128, 512, 1024), and THREE new mesh/geometry/forcing
-seed tuples = 54 trajectories. Each was stepped for 60 frames,
-with the first eight excluded from the reported mean CPU query
-times. The coupled solver separately ran free, pull and fold on
-three independently varied two-sheet mesh variants, 60 frames
-each (540 scenario frames in total, separate policy runs).
+seed tuples = 54 trajectories. Each material trajectory was stepped for **36 frames**,
+with the first eight excluded from its reported mean CPU
+query time (28 timed frames per trajectory). The runner at
+this source commit defaulted to --frames 36. This yields
+54 x 36 = 1944 V4 backend decisions, 54 x 28 = 1512
+post-warmup timing frames per method and 54 x 36 x 11 =
+21384 original policy/frame records on the Mac.
+
+The COUPLED solver separately ran free, pull and fold on
+three independently varied two-sheet mesh variants for
+60 frames each (540 scenario frames, per-policy independent
+runs). Do not confuse these with the 36-frame AABB replays.
 
 Guard/V4 >1 favors the frozen V4 implementation. All values
 are broad-phase candidate query times, not end-to-end solver time.
@@ -176,3 +186,114 @@ contents are accessible. Prefer targeted, balanced Mac
 A/A time repeats with independent A/B identity before
 shuffling, and additional forcing histories on new meshes
 over further broad superiority claims.
+
+
+## Complete Mac eleven-algorithm ranking from submitted derived report
+
+The data below are the original locally generated
+HELDOUT_ALL_METHODS.md contents pasted into the conversation.
+Guard/method > 1 indicates the alternative has a smaller
+geometric mean of per-scene average AABB query times.
+These are query timings, NOT full end-to-end physics, native
+solver performance or controlled population confidence intervals.
+
+| Actually executed Mac method | Guard/method geomean | Scene wins vs Guard | Sum of scene-means ratio |
+|---|---:|---:|---:|
+| global_guarded_exact | 1.0000x | 0/54 | 1.0000x |
+| guard_sap_bounded_trial (frozen V4) | 0.9992x | 27/54 | 0.9903x |
+| selective_guard_exact | 0.8856x | 22/54 | 1.0789x |
+| guard_sap_measured_probe | 0.8166x | 12/54 | 0.6412x |
+| online_cost_aware | 0.7977x | 14/54 | 0.9929x |
+| region_fixed | 0.7429x | 11/54 | 0.9722x |
+| region_adaptive | 0.7233x | 11/54 | 0.9445x |
+| region_hierarchical | 0.7224x | 11/54 | 0.9368x |
+| sap_persistent_coherent | 0.4284x | 1/54 | 0.5550x |
+| sap_rebuild | 0.4116x | 0/54 | 0.5341x |
+| bullet_dbvt_persistent | 0.2274x | 0/54 | 0.3355x |
+
+Global Guard ranks first by the stated geometric benchmark
+summary; V4 is a near tie and wins exactly half the scenes.
+Persistently rebuilt SAP and Bullet DBVT are slow on these
+specific material AABB streams; they were not physically
+validated beyond exact current candidate counts/hashes.
+The native Bullet presence on the Mac makes this 11-policy
+Mac ranking materially different from ten-policy Linux CI.
+
+Selective Guard illustrates why metrics must remain distinct:
+its geometric ratio 0.8856x means it is generally less
+competitive multiplicatively across scenes, yet its
+1.0789x *sum-of-scene-means* ratio means it did better
+on the larger-cost scene means that dominate that separate
+weighting. Neither score is total native process wall time
+or a balanced-noise benchmark.
+
+## Mac V4 on-policy actions: actual trials versus established SAP
+
+Original submitted all-method report:
+Guard frames 1895, SAP frames 49, trial frames 42,
+backend action changes 10. The totals exactly reconcile
+to **54 trajectories x 36 frames = 1944** decisions.
+
+- Guard: 1895 / 1944 = 97.48%.
+- SAP: 49 / 1944 = 2.52%.
+- SAP trial: 42 of the 49 SAP frames.
+- Non-trial SAP: **7 of 1944**. These are the only
+  SAP query frames outside the bounded trial mode, and
+  ALL seven fall in the rapid sponge N1331 condition.
+- There were 10 changes in the currently executed
+  backend action across the 54 trajectories.
+
+| Source condition | SAP action frames | Trial frames | Non-trial SAP frames | Backend action changes |
+|---|---:|---:|---:|---:|
+| cloth rapid N512 | 4 | 4 | 0 | 1 |
+| cloth rapid N1058 | 12 | 12 | 0 | 3 |
+| mixed rapid N727 | 8 | 8 | 0 | 2 |
+| mixed rapid N1382 | 10 | 10 | 0 | 2 |
+| sponge rapid N1331 | 15 | 8 | 7 | 2 |
+| All other 13 conditions | 0 | 0 | 0 | 0 |
+| **All 18 conditions** | **49** | **42** | **7** | **10** |
+
+**Important horizon censoring, not evidence that Mac always
+rejects SAP:** frozen V4 requires as many as eight trial frames
+to promote a candidate SAP choice into committed SAP mode.
+The original Linux rapid cloth N1058 trial began near frame
+index 32 and then continued past frame 36. The original Mac
+AABB replay STOPPED after index 35. Consequently all 12
+rapid-cloth Mac SAP frames were still *trials*; a 36-frame
+stream cannot reveal whether sustained SAP mode would have
+been accepted on later frames.
+
+This makes the earlier interpretation "Linux V4 switched
+but Mac V4 did not" methodologically premature. The
+different motion/time horizon, different source cohorts,
+hardware and scheduling confound that comparison.
+The rapid-cloth Mac query ratio of 1.1146x is therefore
+a **real reported ratio on 28 post-warmup frames**, but it
+cannot be attributed to sustained adaptive SAP operation.
+The trial/SAP behavior is an exploratory controller
+observation, not an efficiency explanation.
+
+The seven nontrial SAP frames in the sponge rapid N1331
+condition coexist with its poor 0.9003x aggregate ratio.
+Even here, the aggregate three-seed count is not sufficient
+to infer which particular seed drove the seven committed
+SAP frames or the 0.7388x regression. That requires
+reading the original per-seed CSVs, not speculation.
+
+## Corrected protocol for FUTURE matched runs
+
+The research orchestrator now defaults to --frames 60,
+and prints the actual material frame horizon separately
+from the coupled solver frame horizon. This change
+does NOT alter, overwrite or retroactively repair the
+completed 36-frame Mac evidence.
+
+An intentionally matched six-family Linux-versus-Mac
+study must explicitly request the same six material
+families, rapid regime, 128/512/1024 budgets, three
+geometry/topology seeds, **60 frames**, and warmup=8.
+In particular the 60-frame horizon is required to
+observe more of V4's trial-and-adoption behavior after
+the rapid-cloth transition at frame index 32.
+Still use balanced method-order repeated A/A controls
+before presenting cross-platform performance CIs.
