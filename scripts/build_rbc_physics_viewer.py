@@ -19,11 +19,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import subprocess
+import tempfile
 from pathlib import Path
 from render_rbc_physics_studio import POLICIES, source_data, file_sha256
 
 
-def make(source: Path, output: Path) -> dict:
+def make(source: Path, output: Path, offline: bool = False) -> dict:
     if output.exists():
         raise FileExistsError("Refusing to overwrite original interactive evidence")
     manifest_path=output.with_suffix(".viewer-receipts.json")
@@ -59,6 +62,39 @@ def make(source: Path, output: Path) -> dict:
                     allow_nan=False)
     data=data.replace("<","\\u003c").replace(">","\\u003e")
     html=template.replace(token,data)
+    if offline:
+        # Build the VERIFIED original viewer's JS with a pinned local
+        # Three.js copy. Keep *all* original 3D source bytes embedded.
+        # Never silently switch to a network-dependent fallback.
+        source_module=re.search(
+            r'<script type="module">([\s\S]*?)</script>',html)
+        if source_module is None:
+            raise ValueError("Original native viewer source module missing")
+        esbuild=root/"node_modules"/".bin"/"esbuild"
+        if not esbuild.is_file():
+            raise RuntimeError(
+                "Offline HTML requires npm install --no-save "
+                "--no-package-lock three@0.180.0 esbuild@0.25.12"
+            )
+        with tempfile.TemporaryDirectory(prefix="rbc-webgl-bundle-",dir=root) as td:
+            js_input=Path(td)/"viewer_source.mjs"
+            js_output=Path(td)/"viewer_bundled.js"
+            js_input.write_text(source_module.group(1),encoding="utf-8")
+            subprocess.run([
+                str(esbuild),str(js_input),"--bundle",
+                "--format=iife","--target=es2020","--minify",
+                "--platform=browser","--outfile="+str(js_output)
+            ],check=True,capture_output=True,text=True,timeout=90)
+            bundled=js_output.read_text(encoding="utf-8")
+        if "</script" in bundled.lower():
+            raise ValueError("Unsafe inline bundle closing script sequence")
+        html=(html[:source_module.start()] + "<script>\n" +
+              bundled + "\n</script>" + html[source_module.end():])
+        html,count=re.subn(
+            r'<script type="importmap">[\s\S]*?</script>',"",
+            html,count=1)
+        if count!=1:
+            raise ValueError("Expected exactly one original Three.js import map")
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(html,encoding="utf-8")
     receipt={
@@ -73,8 +109,11 @@ def make(source: Path, output: Path) -> dict:
             cohort["all_original_geometric_endpoint_piercings_zero"],
         "HTML_sha256":file_sha256(output),
         "source_mesh_topology_unchanged":True,
-        "renderer_asset":"Three.js pinned 0.180.0 on CDN",
-        "renderer_requires_network_for_external_library":True,
+        "renderer_asset":("Three.js pinned 0.180.0 bundled in HTML with "
+                          "esbuild pinned 0.25.12" if offline else
+                          "Three.js pinned 0.180.0 on CDN"),
+        "renderer_requires_network_for_external_library":not offline,
+        "viewer_is_self_contained_offline":offline,
         "data_embedded_no_remote_data_request":True,
     }
     manifest_path.write_text(json.dumps(receipt,indent=2)+"\n",
@@ -89,10 +128,12 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--mesh-dir",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
+    p.add_argument("--offline",action="store_true",
+                   help="Bundle pinned Three.js in one HTML; no CDN or local server")
     args=p.parse_args()
     if args.output.suffix.lower()!=".html":
         p.error("Interactive viewer output must have .html extension")
-    make(args.mesh_dir,args.output)
+    make(args.mesh_dir,args.output,offline=args.offline)
 
 
 if __name__=="__main__":
