@@ -15,6 +15,7 @@ on:
       - 'tests/kyoto_coupled_variation_tests.cpp'
       - 'scripts/run_kyoto_heldout_research.py'
       - 'scripts/test_kyoto_heldout_research.py'
+      - 'scripts/analyze_kyoto_heldout_evidence.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +29,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/run_kyoto_heldout_research.py
           python3 -m py_compile scripts/test_kyoto_heldout_research.py
+          python3 -m py_compile scripts/analyze_kyoto_heldout_evidence.py
       - name: Build exact geometry, candidate and physically coupled methods
         run: |
           cmake --preset kyoto-final-cpu
@@ -56,6 +58,41 @@ jobs:
         run: |
           python3 scripts/test_kyoto_heldout_research.py \
             output/kyoto-heldout-independent-ci
+      - name: Score all original algorithms and actual V4 decisions without rerun
+        run: |
+          python3 scripts/analyze_kyoto_heldout_evidence.py \
+            --results output/kyoto-heldout-independent-ci \
+            --output output/kyoto-heldout-independent-ci/full-method-scores \
+            --warmup 8
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('output/kyoto-heldout-independent-ci/full-method-scores/HELDOUT_ALL_METHODS.json')
+          d=json.loads(p.read_text())
+          assert d['native_benchmarks_rerun_by_this_script']==0
+          assert d['original_policy_replay_csvs_reverified']==18
+          assert len(d['all_method_scores']) >= 10
+          assert d['new_scenes']==18
+          assert all(c['distinct_seeded_geometry_scenes']==3 for c in d['physical_scene_conditions'])
+          assert sum(d['on_policy_v4_total_decisions'][m] for m in ('guard_frames','sap_frames'))==18*60
+          print('PASS: all actually executed policies ranked from immutable independent-mesh replays; real V4 backend counts reverified')
+          PY
+          python3 - <<'PY'
+          # Verify manifest receipt tamper fails with zero new output.
+          import json,pathlib,subprocess,tempfile
+          with tempfile.TemporaryDirectory() as temp:
+              p=pathlib.Path(temp)
+              d=json.loads(pathlib.Path('output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.json').read_text())
+              d['material_replays'][0]['replay_sha256']='0'*64
+              (p/'HELDOUT_RESULTS.json').write_text(json.dumps(d))
+              dst=p/'invalid'
+              r=subprocess.run(['python3','scripts/analyze_kyoto_heldout_evidence.py',
+                  '--results',str(p),'--output',str(dst)],
+                  capture_output=True,text=True)
+              assert r.returncode != 0
+              assert not dst.exists()
+              print('PASS: tampered full-method receipt cannot generate scored evidence')
+          PY
       - name: Preserve new source snapshots and real solver visual exports
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,6 +101,7 @@ jobs:
           path: |
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.md
             output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.json
+            output/kyoto-heldout-independent-ci/full-method-scores/
             output/kyoto-heldout-independent-ci/snapshots/
             output/kyoto-heldout-independent-ci/replays/
             output/kyoto-heldout-independent-ci/coupled/
