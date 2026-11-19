@@ -154,3 +154,20 @@ checks every pair, duplicate and complete sorted pair set. Historical models
 are only scored if the original native trained weights are supplied. The
 new report does not rank unlike-for-unlike timing boundaries, nor claim
 solver/CCD or end-to-end performance superiority.
+
+### Mac Phase 17 findings and V4 decision coverage
+
+The 19 November Apple Silicon run is analyzed in
+[the Phase 17 Mac results note](docs/CBP_PHASE17_MAC_RESULTS_2026-11-19.md).
+All 36 material trajectories used fewer than 384 primitives, so the
+frozen V4 algorithm could not enter its SAP trial. The measured
+small-scene Global Guard result should not be mistaken for an online
+switching study. The newly added post-run decision audit works on the
+**existing** CSV files without repeating the benchmark:
+
+    python3 scripts/audit_kyoto_phase17_decisions.py --materials output/kyoto-phase17-mac-01 --output output/kyoto-phase17-mac-01/decision-audit-20261119
+    open output/kyoto-phase17-mac-01/decision-audit-20261119/V4_DECISION_AUDIT.md
+
+The report identifies actual chosen backends, V4 trial/switch counts,
+ML execution status and the difference between all-frame console means
+and warmup-excluded CSV means. Model weights are never invented.
