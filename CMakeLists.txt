@@ -53,6 +53,15 @@ target_compile_options(ccp_material_replay PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(ccp_material_export apps/material_snapshot_export.cpp)
 target_link_libraries(ccp_material_export PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_export PRIVATE -Wall -Wextra -Wpedantic)
+# Next-stage opt-in held-out geometry/connectivity correctness and real
+# coupled-contact solver comparison. Historical material CLI and frozen V4
+# executable behavior remain unchanged.
+add_executable(ccp_kyoto_heldout_fixture_tests tests/kyoto_heldout_fixture_tests.cpp)
+target_link_libraries(ccp_kyoto_heldout_fixture_tests PRIVATE ccp_live)
+target_compile_options(ccp_kyoto_heldout_fixture_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(ccp_kyoto_heldout_coupled apps/kyoto_heldout_coupled_audit.cpp)
+target_link_libraries(ccp_kyoto_heldout_coupled PRIVATE ccp_multicloth)
+target_compile_options(ccp_kyoto_heldout_coupled PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(ccp_material_benchmark apps/material_suite_benchmark.cpp)
 target_link_libraries(ccp_material_benchmark PRIVATE ccp_multicloth)
 target_compile_options(ccp_material_benchmark PRIVATE -Wall -Wextra -Wpedantic)
@@ -285,6 +294,11 @@ if(BUILD_TESTING)
 
   add_test(NAME cbp_region_sweep_oracle COMMAND ccp_cbp_region_sweep_tests)
   add_test(NAME final_broadphase_public_api_exact_pair_oracle COMMAND ccp_final_broadphase_api_tests)
+  add_test(NAME kyoto_heldout_independent_geometry_topology_oracle
+    COMMAND ccp_kyoto_heldout_fixture_tests)
+  add_test(NAME kyoto_heldout_coupled_fold_solver_parity
+    COMMAND ccp_kyoto_heldout_coupled
+      ${CMAKE_CURRENT_BINARY_DIR}/kyoto-heldout-coupled-ci 8 1 1 fold)
   add_test(NAME selective_guard_exact_pair_oracle COMMAND ccp_selective_guard_tests)
   add_test(NAME deformable_material_suite_oracle
     COMMAND ${CMAKE_COMMAND} -E env CCP_CTEST_SMOKE=1
