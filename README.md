@@ -171,3 +171,34 @@ switching study. The newly added post-run decision audit works on the
 The report identifies actual chosen backends, V4 trial/switch counts,
 ML execution status and the difference between all-frame console means
 and warmup-excluded CSV means. Model weights are never invented.
+
+## After the 864-frame V4 no-switch result: controlled decision coverage
+
+The user's Phase 17 Mac evidence showed 36 trajectories below the frozen
+384-AABB eligibility floor: V4 executed Guard on all 864 frames, with no SAP
+trial. That establishes a small-scene negative result, not an evaluated
+adaptive policy. [The new decision-coverage experiment](docs/CBP_DECISION_COVERAGE_EXPERIMENT.md)
+does not modify frozen V4.
+
+A separate repeatable experiment now exports genuine 512/1024-budget
+mass-spring snapshots across multiple seeds, verifies actual primitive
+counts, and randomizes the order of *all original full-output algorithms*
+while independently checking SAP candidate pairs. A distinct artificial
+rigid-translation case tests whether V4's bounded SAP trial can activate;
+its results never enter the physically stepped material ranking.
+
+Start on this research branch using a new output directory:
+
+```bash
+cmake --preset kyoto-final-cpu
+cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_material_export ccp_material_replay
+python3 scripts/run_kyoto_decision_coverage.py \
+  --exporter build/kyoto-final-cpu/ccp_material_export \
+  --replayer build/kyoto-final-cpu/ccp_material_replay \
+  --output output/kyoto-decision-mac-first
+```
+
+Read `DECISION_COVERAGE.md`: each source-derived backend count, SAP trial
+frame and switch is reported explicitly, rather than inferring activation
+from scene size. No trained ML result is invented when the native weights
+are absent. Linux CI: [random-order and size-eligible V4 regression](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44431580036).
