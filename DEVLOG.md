@@ -650,3 +650,78 @@ or coupled solver improvement from this AABB-only phase.
 Do not continue infinite retiming of the same saved scenes to
 manufacture evidence. Priority is independently varied topology/
 geometry and physically coupled collision verification.
+
+
+## 2026-11-19 — new truly independent coupled material mesh and collision audit
+
+The previous Phase 18 Mac repeated A/A result (1.0188x natural
+Guard/V4 geomean, mainly rapid-cloth N1058) was a fixed mesh and
+forcing-phase comparison. A new held-out track was ADDED, not
+substituted for any frozen evidence.
+
+In include/ccp/material_scenes.hpp and apps/material_snapshot_export.cpp:
+optional independent geometry and topology seeds add genuine
+physically varied nodes, cloth diagonal connectivity, structural
+bonds, pins and cross-braced volumetric cells. Zero variation
+preserves historical both-diagonal spring geometry exactly. Native
+direct tests verify deterministic per-seed geometry, topology
+differences and full pair-list brute-force equality to frozen V4.
+
+In actual contact solver include/ccp/research_multicloth.hpp and
+src/research_multicloth.cpp: optional pre-step mesh variation can
+change initial physical vertex positions, cloth triangle diagonal
+patterns, structural constraints and anchor counts while resetting
+caches. This is still a 13x13 structured grid cloth FAMILY,
+not tearing/remeshing or arbitrary tet mesh FEM. Direct tests
+verify independent geometry vs triangle topology changes, unchanged
+zero seed behavior, stable 4/6 anchors and SAP vs Guard vs frozen
+V4 physical particle-state parity.
+
+In apps/kyoto_heldout_coupled_audit.cpp, a new real coupled-contact
+solver compare can advance free, grab-pull and grab-fold driven motion
+over multiple independently seeded meshes. It serializes full
+solver and broad/narrow timing, precise collision tests, actual
+contact responses by self/sphere category, source triangles and
+every vertex position, quality metrics, and ACTUAL per-iteration
+frozen V4 Guard/SAP/trial/switch choices. A Python orchestration
+script creates new SHA-256-controlled AABB replay fixtures plus
+full-contact solver evidence, with fail-closed source audits and
+a new contact-event gate.
+
+Github Actions:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44465880693
+PASSED C++ build, two independent geometry/topology oracle binaries,
+new full-pair original method replay checks, actual source vertex
+and topology SHA differences, 48-frame physically coupled solver
+exercise and exact per-frame solver mesh-state equality. Actual
+first CI 48-frame results, archived in
+docs/KYOTO_HELDOUT_FIRST_NATIVE_RESULT_2026-11-19.md:
+4-anchor mesh A and 6-anchor mesh B each with free/fold:
+347227/343785/363710/352487 discrete precise tests,
+5014/5470/4942/5256 sphere-contact response events,
+ZERO nonlocal cloth self contacts, and ZERO frozen V4
+SAP choices/trials/switches (Guard all 240 queries in every
+48-frame coupled solver case). Zero collapsed triangles under
+existing numerical threshold. Three original broad-phase
+controllers generated identical solver geometry/contact response.
+
+The early eight-frame smoke was caught as having NO actual narrow
+phase contact responses, so tests were extended to 48 frames and
+contact-coverage auditing made mandatory. These changes follow
+actual negative evidence rather than inventing benchmark victory.
+Full solver CI timing numbers are descriptive, fixed sequential
+order only; not ABBA, statistically controlled Mac throughput
+or independently validated physical fidelity. No CCD or
+analytic penetration truth is implemented.
+
+A genuine synchronized 2-seed x 3-algorithm looping mesh GIF
+was rendered directly from GitHub 48-frame raw JSONL evidence
+for visual inspection (not embedded in Git history); the
+same-geometry panes have equal particle positions by design.
+No artificial lesser folding is shown for V4.
+
+Next gate: meaningful nonlocal cloth self-contact responses,
+real held-out different geometry classes, an independent
+penetration/CCD contact oracle, and balanced solver timing with
+frozen V4 actually trying SAP. Do not modify frozen selector
+thresholds to force a superficial positive.
