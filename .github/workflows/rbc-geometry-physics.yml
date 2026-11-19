@@ -12,6 +12,7 @@ on:
       - 'CMakeLists.txt'
       - 'scripts/render_rbc_physics_studio.py'
       - 'scripts/build_rbc_physics_viewer.py'
+      - 'scripts/audit_rbc_subframe_geometry.py'
       - 'web/rbc_verified_physics_viewer_template.html'
   workflow_dispatch:
 permissions:
@@ -46,10 +47,12 @@ jobs:
           build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
             output/rbc-rounded-clean-80/g74017.csv \
             80 rounded_fold_relax 74017 86019 0 \
+            output/rbc-rounded-clean-80/g74017-mesh \
             > output/rbc-rounded-clean-80/g74017.log
           build/rbc-geometry-ci/ccp_rbc_coupled_tournament \
             output/rbc-rounded-clean-80/g75029.csv \
             80 rounded_fold_relax 75029 86029 0 \
+            output/rbc-rounded-clean-80/g75029-mesh \
             > output/rbc-rounded-clean-80/g75029.log
           python3 - <<'PY'
           import csv,hashlib,json,math
@@ -111,6 +114,33 @@ jobs:
           assert manifest['preview_png_sha256']==hashlib.sha256(preview.read_bytes()).hexdigest()
           assert movie.stat().st_size>100000
           print('PASS actual 5-policy source geometry, same camera and depth-tested GIF')
+          PY
+      - name: Independently audit all original mesh endpoints AND 7 between-frame linear samples on three five-policy trajectories
+        run: |
+          set -euo pipefail
+          for geometry in 73013 74017 75029; do
+            python3 scripts/audit_rbc_subframe_geometry.py \
+              --mesh-dir "output/rbc-rounded-clean-80/g${geometry}-mesh" \
+              --output "output/rbc-rounded-clean-80/g${geometry}-linear-subframes.json" \
+              --subdivisions 8
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("output/rbc-rounded-clean-80")
+          reports=[json.loads(x.read_text()) for x in sorted(root.glob("*-linear-subframes.json"))]
+          assert len(reports)==3
+          assert all(r["source_frame_count"]==80 for r in reports)
+          assert all(r["native_policy_count"]==5 for r in reports)
+          assert all(r["independent_endpoint_checks"]==80 for r in reports)
+          assert all(r["independent_linear_subframe_checks"]==80*7 for r in reports)
+          assert all(r["original_initial_configuration_intersecting_pairs"]==0 for r in reports)
+          assert all(r["source_endpoint_piercing_total"]==0 for r in reports)
+          assert all(r["source_linear_subframe_piercing_total"]==0 for r in reports)
+          assert all(len(r["all_five_original_policy_sha256"])==5 for r in reports)
+          print("PASS original geometry on 3 sources: 240 exact endpoint audits"
+                " and 1680 original linearly interpolated subframe audits;"
+                " no measured strict nonlocal piercings")
           PY
       - name: Build real 80-frame five-policy interactive orbit and timeline browser, with embedded SOURCE RECEIPTS
         run: |
