@@ -332,3 +332,68 @@ CSV cannot show the controller's internal rebuild streaks/EWMAs or
 a counterfactual optimal backend. Pair correctness remained verified.
 No changes to frozen V4 were made. Further research requires actual
 independently varied geometry/topology and end-to-end solver evidence.
+
+
+## Kyoto independent geometry/topology and real-contact solver gate
+
+After Phase 18 Mac revealed Guard/V4 near parity on most fixed
+geometries, this branch now contains a NEW, additive held-out
+material/solver research protocol. Do not retune frozen V4 based on
+those previous results.
+
+The independent material fixture code now has separate motion, initial
+vertex geometry and topology seeds. Cloth triangle diagonals, actual
+physical spring constraints, anchor layout and volumetric crossbracing
+can change. Historical zero-variation fixtures and binary KYOTOM01
+replay semantics are preserved exactly.
+
+The existing MultiCloth coupled solver ALSO supports opt-in
+independent physical vertex jitter, triangle diagonal connectivity,
+springs and anchor layouts, with **actual nonzero narrow-phase
+contact tests and sphere-contact responses**. Original SAP, Guard
+and frozen V4 solve the exact same source geometry per variant,
+and exact frame-by-frame solver vertex state equality to SAP is
+enforced. All original policies remain available.
+
+[Complete experimental instructions](docs/KYOTO_HELDOUT_GEOMETRY_COUPLED_PROTOCOL.md)
+and [actual source-verified Linux native evidence](docs/KYOTO_HELDOUT_FIRST_NATIVE_RESULT_2026-11-19.md).
+
+**First Linux results and essential negative outcomes:** independent
+4-anchor and 6-anchor actual cloth fixtures with 48 frames showed
+many sphere–cloth contact responses and exact SAP/Guard/V4 solver
+mesh agreement, with zero collapsed triangles, but **zero nonlocal
+cloth self-contact responses** and **zero V4 SAP actions/trials/
+switches** (Guard all 240 queries per scenario). This is genuine
+coupled-contact correctness evidence, NOT an adaptive full-solver
+speedup or self-folding validation. Native CI:
+[verified held-out experiment](https://github.com/swayam8624/kyoto-common-contact/actions/runs/44465880693).
+
+Build on the Mac, using a fresh output directory:
+
+    cd ~/Desktop/Programming/kyoto-common-contact
+    git switch research/kyoto-decision-coverage
+    git pull --ff-only origin research/kyoto-decision-coverage
+    cmake --preset kyoto-final-cpu
+    cmake --build build/kyoto-final-cpu --parallel 4 --target ccp_material_export ccp_material_replay ccp_kyoto_heldout_fixture_tests ccp_kyoto_coupled_variation_tests ccp_kyoto_heldout_coupled
+    build/kyoto-final-cpu/ccp_kyoto_heldout_fixture_tests
+    build/kyoto-final-cpu/ccp_kyoto_coupled_variation_tests
+    python3 scripts/run_kyoto_heldout_research.py --exporter build/kyoto-final-cpu/ccp_material_export --replayer build/kyoto-final-cpu/ccp_material_replay --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled --output output/kyoto-heldout-mac-first
+    python3 scripts/test_kyoto_heldout_research.py output/kyoto-heldout-mac-first
+    open output/kyoto-heldout-mac-first/HELDOUT_RESULTS.md
+
+This default matrix generates 36 truly different material
+geometry/topology AABB sequences and nine independently seeded
+free/pull/fold coupled physical solver cases (three initial meshes,
+three drive scenarios). Reported original-policy query times are
+separate from physically coupled full-step times. The output stores
+immutable source geometry hashes and solver meshes.
+
+Render any real solver visual comparison into a looping GIF (requires
+Pillow, optionally ffmpeg for MP4), keeping method geometry identical:
+
+    python3 scripts/render_kyoto_visuals.py solver --input-dir output/kyoto-heldout-mac-first/coupled/fold-geom73013-topo86011 --output output/kyoto-heldout-mac-first/coupled/fold-geom73013-visual --fps 9 --stride 1
+
+Exact source snapshots, not fabricated artistic cloth deformation,
+drive the visuals. Never infer CCD, guaranteed non-penetration,
+successful self-intersection avoidance or a new V4 speedup from
+the baseline smoke pass.
