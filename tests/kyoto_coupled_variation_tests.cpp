@@ -110,6 +110,45 @@ int main(){
          frozen.metrics().oracleMisses==0,
          "heldout solver returned missing candidates");
   }
+  // Explicitly constructed self-overlap is an ISOLATED discrete-contact
+  // diagnostic, separate from natural free/pull/fold scenarios. The
+  // historical test-only displacePatchForTest shifts a non-anchored patch
+  // onto a distant part of the SAME sheet; runContactPassForTest uses a
+  // fresh SAP reference pair set and projects precise self-contacts.
+  // It does not time V4 or demonstrate self-contact induced naturally
+  // by a drag gesture. Its only purpose is fail-closed self-collision
+  // coverage across genuinely different mesh triangulations.
+  for(const auto [geometry,topology]:
+      std::array<std::array<std::uint32_t,2>,3>{{
+       {{73013u,86011u}},{{74017u,86019u}},{{75029u,86029u}}
+      }}){
+   MultiCloth folded(1,1,Policy::RebuildSAP);
+   setup(folded,geometry,topology);
+   folded.displacePatchForTest(0,2,2,3,{.915,0,.016});
+   const auto before=folded.positions();
+   const std::size_t self=folded.runContactPassForTest();
+   check(self>0,"heldout constructed nonlocal overlap yielded zero self-contacts");
+   check(folded.metrics().selfCandidatePairs>=self,
+         "same-sheet contacts exceed independent SAP candidate set");
+   check(folded.metrics().selfTopologyFiltered>0,
+         "self-neighbor topology exclusions no longer apply");
+   double maxMoved=0.;
+   for(std::size_t j=0;j<before.size();++j)
+    maxMoved=std::max(maxMoved,distance(before[j],folded.positions()[j]));
+   check(maxMoved>1e-6&&maxMoved<.05,
+         "same-sheet contact did not produce a finite bounded correction");
+   MultiCloth control(1,1,Policy::RebuildSAP);
+   setup(control,geometry,topology);
+   control.setSelfCollisions(false);
+   control.displacePatchForTest(0,2,2,3,{.915,0,.016});
+   check(control.runContactPassForTest()==0,
+         "disabled nonlocal self-contact emitted false response");
+   std::cout<<"PASS ISOLATED NONLOCAL SELF CONTACT geometry="<<geometry
+            <<" topology="<<topology
+            <<" precise_self_responses="<<self
+            <<" bounded_max_correction="<<maxMoved<<"\\n";
+  }
+
   bool blocked=false;
   try{a.setFixtureVariation(17u,19u);}catch(const std::logic_error&){blocked=true;}
   check(blocked,"late topology change illegally invalidated running physics");
