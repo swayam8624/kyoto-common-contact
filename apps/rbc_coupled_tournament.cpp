@@ -62,7 +62,8 @@ double distance(Vec3 a,Vec3 b){
 }
 void drive(MultiCloth& sim,const std::string& scenario,
            Vec3 origin,int frame,int total){
-    if(scenario=="free"||scenario=="prefold_relax")return;
+    if(scenario=="free"||scenario=="prefold_relax"||
+       scenario=="rounded_fold_relax")return;
     const double fraction=double(frame+1)/double(total);
     constexpr double pi=3.141592653589793;
     Vec3 target=origin;
@@ -150,7 +151,8 @@ void write_mesh_header(std::ostream& out,const MultiCloth& sim,
     out<<"}\n";
 }
 void write_mesh_frame(std::ostream& out,const MultiCloth& sim,
-                      int frame,double maxError) {
+                      int frame,double maxError,
+                      std::size_t geometricCrossings) {
     const auto& m=sim.metrics();
     out<<"{\"type\":\"frame\",\"frame\":"<<frame
        <<",\"positions\":";
@@ -165,6 +167,7 @@ void write_mesh_frame(std::ostream& out,const MultiCloth& sim,
     out<<"],\"metrics\":{\"self_contacts\":"<<m.selfContacts
        <<",\"sphere_contacts\":"<<m.sphereContacts
        <<",\"self_crossings\":"<<m.selfCrossings
+       <<",\"geometric_self_intersections\":"<<geometricCrossings
        <<",\"step_ms\":"<<m.stepMs
        <<",\"broad_ms\":"<<m.broadMs
        <<",\"narrow_ms\":"<<m.narrowMs
@@ -195,7 +198,8 @@ void execute(const char* destination,int frames,
           "rbc_candidate_checks,"
           "rbc_flat_queries,rbc_flat_index_builds,rbc_flat_local_repairs,"
           "rbc_flat_potential_pairs_sum,rbc_flat_index_comparisons,"
-          "rbc_flat_candidate_checks,rbc_last_event\n";
+          "rbc_flat_candidate_checks,rbc_last_event,"
+          "geometric_self_intersections\n";
     std::vector<std::unique_ptr<MultiCloth>> sims;
     std::array<std::ofstream,5> visual;
     if(geometryDir)for(std::size_t m=0;m<visual.size();++m) {
@@ -216,9 +220,12 @@ void execute(const char* destination,int frames,
             s->setFixtureVariation(std::uint32_t(geo),std::uint32_t(topo));
         if(scenario=="prefold_relax")
             s->prepareFoldedInitialStateForResearch();
+        if(scenario=="rounded_fold_relax")
+            s->prepareRoundedNonintersectingFoldForResearch();
         s->setSelfCollisions(true);
         s->setAuditing(strict);
-        if(scenario!="free"&&scenario!="prefold_relax"){
+        if(scenario!="free"&&scenario!="prefold_relax"&&
+           scenario!="rounded_fold_relax"){
             const Vec3 start=pick(*s,tri);
             if(!s->beginGrab(tri,{1./3,1./3,1./3},start))
                 throw std::runtime_error("failed identical barycentric grab");
@@ -293,6 +300,18 @@ void execute(const char* destination,int frames,
             if(strict&&(m==3||m==4)&&!metric.oracleChecked)
                 throw std::runtime_error(
                     "strict RBC frame lacked any independent SAP oracle check");
+            // Independent REAL triangle piercing test, executed AFTER
+            // the native solver step and intentionally OUTSIDE its
+            // reported step_ms. Exact broad-phase pair equality alone
+            // is not physics validity.
+            const auto geometricCrossings=
+                sim.countNonlocalSelfIntersections();
+            if(scenario=="rounded_fold_relax"&&geometricCrossings!=0)
+                throw std::runtime_error(
+                    "rounded folded real cloth still intersects AFTER step:"
+                    " scenario frame="+std::to_string(frame)+
+                    " policy="+names[m]+
+                    " offending_pairs="+std::to_string(geometricCrossings));
             const double maxStretch=rest.maxStretch(sim);
             stepTotal[m]+=metric.stepMs;
             broadTotal[m]+=metric.broadMs;
@@ -309,7 +328,8 @@ void execute(const char* destination,int frames,
                 allFlatIndexTests+=metric.rbcFlatIndexComparisons;
             }
             if(visual[m].is_open())
-                write_mesh_frame(visual[m],sim,frame,worst);
+                write_mesh_frame(visual[m],sim,frame,worst,
+                                 geometricCrossings);
             out<<frame<<','<<names[m]<<','<<scenario<<','<<geo<<','<<topo
                <<','<<int(strict)<<','<<slots[m]<<','
                <<metric.stepMs<<','<<metric.broadMs<<','<<metric.narrowMs<<','
@@ -328,7 +348,7 @@ void execute(const char* destination,int frames,
                <<metric.rbcFlatPotentialPairs<<','
                <<metric.rbcFlatIndexComparisons<<','
                <<metric.rbcFlatCandidateChecks<<','
-               <<metric.lastEvent<<'\n';
+               <<metric.lastEvent<<','<<geometricCrossings<<'\n';
         }
     }
     if(!out)throw std::runtime_error("coupled physical CSV write failed");
@@ -358,12 +378,13 @@ int main(int argc,char** argv){
         if(argc!=7&&argc!=8)
             throw std::invalid_argument(
                 "usage: ccp_rbc_coupled_tournament NEW.csv FRAMES(8..160)"
-                " free|pull|fold|fold_over|prefold_relax GEOMETRY_SEED TOPOLOGY_SEED"
+                " free|pull|fold|fold_over|prefold_relax|rounded_fold_relax GEOMETRY_SEED TOPOLOGY_SEED"
                 " STRICT_AUDIT(0|1) [NEW_TRUE_MESH_JSONL_DIR]");
         const int frames=integer(argv[2],8,160);
         const std::string scenario(argv[3]);
         if(scenario!="free"&&scenario!="pull"&&scenario!="fold"&&
-           scenario!="fold_over"&&scenario!="prefold_relax")
+           scenario!="fold_over"&&scenario!="prefold_relax"&&
+           scenario!="rounded_fold_relax")
             throw std::invalid_argument("unsupported coupled scenario");
         const int geo=integer(argv[4],0,2000000000);
         const int topo=integer(argv[5],0,2000000000);
