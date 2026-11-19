@@ -98,3 +98,34 @@ continuous collision detection, contact solver, mesh quality or the
 large-scale grid digest queries. For a research paper, preserve these
 measurement boundaries, use repeated independent seeds, report
 trajectory-level evidence and compare external libraries on equal terms.
+
+
+## Mac evidence from the completed 39-trajectory experiment
+
+The Mac's full 36 natural + 3 artificial run is summarized in
+[CBP_PHASE18_MAC_ACTUAL_2026-11-19.md](CBP_PHASE18_MAC_ACTUAL_2026-11-19.md).
+Natural frames: 2,059 Guard and 101 SAP; 40 SAP trial frames and 7 actual
+backend transitions. Warmup-excluded Guard/V4 trajectory-geomean:
+1.030587x, with 21/36 trajectories favoring V4. The meaningful
+success cases were three rapid cloth, actual N=1058, independently seeded
+trajectories; two sponge trials were rejected and returned to Guard.
+Artificial translation has its own separately reported, nonphysical cohort.
+
+The earlier Mac run at N<384, where V4 chose Guard on all 864 frames,
+remains an equally important negative example. The two reports answer
+different questions; do not overwrite either with the other.
+
+The first 39-run decision report retained only Guard/V4 timings despite
+successfully executing 11 algorithms. The additive post-run analyzer
+reuses the **original CSVs** and enforces their recorded hashes:
+
+    cd ~/Desktop/Programming/kyoto-common-contact
+    git pull --ff-only origin research/kyoto-decision-coverage
+    python3 scripts/analyze_kyoto_decision_coverage.py --results output/kyoto-decision-mac-first --output output/kyoto-decision-mac-first/verified-all-methods-v1
+    open output/kyoto-decision-mac-first/verified-all-methods-v1/VERIFIED_ALL_METHODS.md
+
+The analyzer never times a backend, cannot silently pool artificial with
+natural scenes, refuses evidence replacement and validates all policy
+pair lists against SAP. A complete Linux integration regression with
+a deliberately falsified manifest hash passed:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461
