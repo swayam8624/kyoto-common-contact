@@ -505,3 +505,12 @@ https://github.com/swayam8624/kyoto-common-contact/actions/runs/44434453461
 
 No changes were made to the frozen V4 controller, the trained model,
 the old scientifically frozen results, or large-scale CBP core.
+
+Source-code limitation found after inspection: the three seed values
+in material_scenes.hpp vary the forcing phase as seed % 101, NOT the
+initial geometry or material topology. Thus the three successful rapid
+cloth runs are phase-varied replicates of one fixture class, not three
+independent physical geometry trials. The strict replay scorer checks
+framewise candidate counts and pair hashes (plus existing C++ correctness
+oracles), NOT independently persisted raw pair-ID lists for every one of
+the 39 replays. Larger real-world generalization claims remain unsupported.
