@@ -34,6 +34,7 @@ jobs:
           build/rbc-prefold-ci/ccp_rbc_coupled_tournament \
             output/rbc-prepared-fold-contact-rich/prefold-g73013-t86011.csv \
             80 prefold_relax 73013 86011 0 \
+            output/rbc-prepared-fold-contact-rich/mesh-g73013 \
             > output/rbc-prepared-fold-contact-rich/g73013.log
           build/rbc-prefold-ci/ccp_rbc_coupled_tournament \
             output/rbc-prepared-fold-contact-rich/prefold-g74017-t86019.csv \
@@ -92,6 +93,44 @@ jobs:
                             'initial_geometry':'deliberately PRE-FOLDED real sheet with unchanged flat rest constraints',
                             'methods':by_method})
           assert len(cases)==3
+          # The opt-in geometry is ACTUAL solver state, not a render
+          # guessed from force inputs or a fake cloth animation.
+          import json as _json
+          meshdir=root/'mesh-g73013'
+          assert meshdir.is_dir()
+          visual={}
+          for policy in methods:
+              source=meshdir/(policy+'.jsonl')
+              assert source.is_file()
+              lines=[_json.loads(x) for x in source.read_text().splitlines()]
+              assert len(lines)==81
+              header=lines[0]
+              assert header['type']=='mesh_header'
+              assert header['schema']==2
+              assert header['source_is_prepared_initial_fold'] is True
+              assert len(header['triangles'])>0
+              assert len(header['triangle_sheets'])==len(header['triangles'])
+              frames=lines[1:]
+              assert [f['frame'] for f in frames]==list(range(80))
+              assert all(len(f['positions'])==len(header['initial_positions'])
+                         for f in frames)
+              assert all(len(f['spheres'])==2 for f in frames)
+              assert all(f['metrics']['source_max_position_error_sap']<=1e-7
+                         for f in frames)
+              visual[policy]={'header':header,'frames':frames}
+          sap=visual['sap_rebuild']
+          for policy in methods-{'sap_rebuild'}:
+              current=visual[policy]
+              assert current['header']['triangles']==sap['header']['triangles']
+              assert current['header']['initial_positions']==sap['header']['initial_positions']
+              for f,g in zip(current['frames'],sap['frames']):
+                  # Serialized decimal positions may differ by sub-1e-7
+                  # due to method evaluation order; compare geometry
+                  # numerically, not lexically.
+                  assert all(max(abs(a-b) for a,b in zip(p,q))<=1e-7
+                             for p,q in zip(f['positions'],g['positions']))
+                  assert f['metrics']['self_contacts']==g['metrics']['self_contacts']
+          print('PASS: 5 x 80 original source-backed mesh frames, two moving spheres, identical trajectories and actual nonlocal self-contact counters')
           (root/'PREPARED_TRUE_SELF_CONTACT_RESULTS.json').write_text(
               json.dumps({'actual_native_contact_corrections_verified':True,
                           'no_naturally_generated_flat_sheet_fold_claim':True,
