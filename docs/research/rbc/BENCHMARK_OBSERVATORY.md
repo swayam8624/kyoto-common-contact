@@ -3,6 +3,38 @@
 The five-policy cloth proof is a limited physics-validation scene, not a
 multi-material benchmarking dashboard. We now keep those evidence paths separate.
 
+## Rebuild the dashboard from the completed 36-scene run (no new simulation)
+
+The first pilot is already complete and its original source CSVs must stay
+unchanged. The old dashboard was generated before the 3D-categorical and
+coupled-frame fixes. Pull this branch and create a NEW reporting folder:
+
+~~~bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git switch research/reach-budget-calculus
+git pull --ff-only origin research/reach-budget-calculus
+
+python3 -u scripts/rbc_benchmark_observatory.py \
+  --research output/rbc-observatory-native-pilot-01/RBC_RESULTS.json \
+  --output output/rbc-observatory-dashboard-02
+
+open output/rbc-observatory-dashboard-02/RESEARCH_OBSERVATORY.html
+~~~
+
+The new version defaults to RBC Flat Repair (change the method filter to
+Frozen V4 or Indexed RBC as needed), renders **independent 3D categorical
+columns instead of interpolating across unrelated materials**, and shows
+actual 60-frame whole-step/broad/narrow native traces and heatmaps from
+the already verified three coupled-solver CSVs. Each tooltip distinguishes
+requested object budget from the actual number of AABBs in that scene.
+The fourth summary tile counts the 180 true coupled-solver frames instead
+of incorrectly displaying "real cloth frames: not supplied". The separate
+five-policy original-geometry proof is still optional and is **not** inferred
+from the coupled CSVs.
+
+This regeneration costs no C++ run time. It does NOT add new physically
+simulated scenarios, independent timing repetitions, or a CCD proof.
+
 ## 1. Update and build (Mac)
 
 ~~~bash
