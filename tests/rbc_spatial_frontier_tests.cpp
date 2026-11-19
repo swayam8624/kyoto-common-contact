@@ -88,12 +88,12 @@ void local_dirty_is_real_local_repair() {
            "collective teleport did not bulk invalidate");
 }
 void bound_inclusive_and_zero_width() {
-    std::vector<Bounds> b={make(8,0,0,0,0),make(5,.4,0,0,0)};
-    std::vector<Reach> r={{.1,.1},{.1,.1}};
+    std::vector<Bounds> b={make(8,0,0,0,0),make(5,.5,0,0,0)};
+    std::vector<Reach> r={{.125,.125},{.125,.125}};
     CertifiedSpatialFrontier f; f.initialize(b,r);
     demand(f.potential_pairs()==1,
            "exact touching padded reference envelopes missing");
-    move(b[0],.1,0,0);move(b[1],-.1,0,0);
+    move(b[0],.125,0,0);move(b[1],-.125,0,0);
     matches(f.query(b),b,r);
     demand(f.query(b).pairs.size()==1,
            "inclusive reach boundary must be a candidate");
