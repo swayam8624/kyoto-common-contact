@@ -1,0 +1,68 @@
+name: Kyoto held-out topology and coupled solver challenge
+on:
+  push:
+    branches:
+      - research/kyoto-decision-coverage
+    paths:
+      - '.github/workflows/kyoto-heldout-research.yml'
+      - 'CMakeLists.txt'
+      - 'include/ccp/material_scenes.hpp'
+      - 'apps/material_snapshot_export.cpp'
+      - 'apps/kyoto_heldout_coupled_audit.cpp'
+      - 'tests/kyoto_heldout_fixture_tests.cpp'
+      - 'scripts/run_kyoto_heldout_research.py'
+      - 'scripts/test_kyoto_heldout_research.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independently-varied-fixtures-and-coupled-solver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python source validation
+        run: |
+          python3 -m py_compile scripts/run_kyoto_heldout_research.py
+          python3 -m py_compile scripts/test_kyoto_heldout_research.py
+      - name: Build exact geometry, candidate and physically coupled methods
+        run: |
+          cmake --preset kyoto-final-cpu
+          cmake --build build/kyoto-final-cpu --parallel 3 --target \
+            ccp_kyoto_heldout_fixture_tests ccp_material_export \
+            ccp_material_replay ccp_kyoto_heldout_coupled
+      - name: Prove topology/geometry independence and candidate exactness
+        run: |
+          build/kyoto-final-cpu/ccp_kyoto_heldout_fixture_tests
+      - name: Exercise distinct physical fixtures and original frozen methods
+        run: |
+          python3 scripts/run_kyoto_heldout_research.py \
+            --exporter build/kyoto-final-cpu/ccp_material_export \
+            --replayer build/kyoto-final-cpu/ccp_material_replay \
+            --coupled build/kyoto-final-cpu/ccp_kyoto_heldout_coupled \
+            --output output/kyoto-heldout-independent-ci \
+            --materials cloth sponge \
+            --regimes rapid \
+            --budgets 128 \
+            --heldout-count 2 \
+            --frames 12 --warmup 2 \
+            --coupled-frames 8 \
+            --coupled-scenarios free fold
+      - name: Strict source fingerprints, pair and coupled mesh audit
+        run: |
+          python3 scripts/test_kyoto_heldout_research.py \
+            output/kyoto-heldout-independent-ci
+      - name: Preserve new source snapshots and real solver visual exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-heldout-geometry-contact-evidence
+          path: |
+            output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.md
+            output/kyoto-heldout-independent-ci/HELDOUT_RESULTS.json
+            output/kyoto-heldout-independent-ci/snapshots/
+            output/kyoto-heldout-independent-ci/replays/
+            output/kyoto-heldout-independent-ci/coupled/
+            output/kyoto-heldout-independent-ci/logs/
+          retention-days: 14
+          if-no-files-found: warn
