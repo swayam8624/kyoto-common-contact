@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,54 @@ class ObservatoryTests(unittest.TestCase):
         self.assertIn('id="heatmap"', document)
         self.assertIn("guard_fixed_exact", document)
         self.assertNotIn("__DATA__", document)
+
+    def test_verified_coupled_solver_source_drives_frame_chart(self):
+        coupled = self.root / "coupled_csv"
+        coupled.mkdir()
+        source = coupled / "free.csv"
+        rows = []
+        for method in obs.PHYSICAL_METHODS:
+            for frame in range(10):
+                rows.append({
+                    "policy": method, "frame": frame,
+                    "step_ms": 2.5, "broad_ms": .4, "narrow_ms": .8,
+                    "self_contacts": 3, "sphere_contacts": 2,
+                    "self_crossings": 0, "max_stretch": 1.15,
+                    "oracle_misses": 0,
+                })
+        self.write_csv(source, rows)
+        doc = json.loads(self.manifest.read_text(encoding="utf-8"))
+        doc["coupled_physical_scenes"] = [{
+            "scenario": "free",
+            "result": {
+                "source": str(source), "sha256": obs.sha256(source),
+                "all_sap_reference_particle_states_equal": True,
+                "solver_mean_full_step_ms_by_policy": {
+                    m: 2.5 for m in obs.PHYSICAL_METHODS},
+            },
+        }]
+        self.manifest.write_text(json.dumps(doc), encoding="utf-8")
+        parsed = obs.read_research(self.manifest)
+        self.assertEqual(len(parsed["physical"]), 1)
+        free = parsed["physical"][0]
+        self.assertEqual(free["frames"], 10)
+        self.assertEqual(len(free["series"]["rbc_flat"]), 10)
+        self.assertEqual(free["series"]["rbc_flat"][0]["sphere_contacts"], 2)
+        self.assertEqual(free["means"]["rbc_flat"], 2.5)
+
+    def test_offline_embedded_javascript_parses_with_node(self):
+        if not shutil.which("node"):
+            self.skipTest("Node absent; CI installs Node 22 explicitly")
+        research = obs.read_research(self.manifest)
+        doc = obs.html_document({
+            "research": research, "proof": None,
+            "summary": obs.aggregate(research["scenes"]),
+            "physical_methods": obs.PHYSICAL_METHODS,
+        })
+        script = doc.rsplit("<script>", 1)[1].split("</script>", 1)[0]
+        run = subprocess.run(["node", "--check"], input=script,
+                             text=True, capture_output=True, check=False)
+        self.assertEqual(run.returncode, 0, run.stderr)
 
     def test_changed_pair_fingerprint_rejected_even_with_valid_manifest_hash(self):
         self.research_rows[0]["pair_fnv64"] = 99
