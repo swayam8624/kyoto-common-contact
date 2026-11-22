@@ -1,0 +1,51 @@
+name: Kyoto high-fidelity VTK studio proof
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'scripts/render_feature_vtk_studio.py'
+      - '.github/workflows/vtk-studio.yml'
+  workflow_dispatch:
+jobs:
+  render-native-scene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install OpenGL offscreen rendering dependencies
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 xvfb
+      - name: Build and verify native C++ geometry
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target kyoto_feature_scene kyoto_feature_tests --parallel 4
+          ctest --test-dir build -R typed_mesh_feature_candidate_parity --output-on-failure
+          ./build/kyoto_feature_scene results/feature-scene
+      - name: Install pinned native scientific visualization
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 pillow==12.0.0 vtk==9.6.2
+      - name: Render studio frames with native VTK
+        run: |
+          xvfb-run -a python scripts/render_feature_vtk_studio.py \
+            --input results/feature-scene \
+            --output results/vtk-studio
+      - name: Validate exact output size and provenance
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          p=Path("results/vtk-studio")
+          for f in (0,30,60):
+              image=p/f"studio_frame_{f:02}.png"
+              assert image.is_file(), image
+              assert Image.open(image).size==(1500,960), image
+              assert image.stat().st_size>100000, image
+          print("PASS: 3 real-source VTK studio frames, 1500x960, independent native mesh input")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-vtk-studio-source-backed-3d
+          path: results/vtk-studio/
+          if-no-files-found: error
+          retention-days: 30
