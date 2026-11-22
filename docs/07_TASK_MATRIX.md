@@ -36,7 +36,10 @@ running. Gate status must be evidenced by native outputs or CI links.
 
 ## Scientific visualization and film
 
-- [ ] Common typed trace/scene schema with raw manifest + hashes.
+- [x] Stage-1 typed native CSV trace, candidate audit and JSON manifest (kinematic test only; hashes pending).
+- [x] Stage-1 3D trajectory, spacetime, time-position and analytical contour plots; offline interactive 3D.
+- [x] Stage-1 121-frame ParaView VTK exporter (CI artifact validation pending).
+- [ ] Common solver-grade typed trace/scene schema with original state hashes.
 - [ ] Interactive scene playback with synchronized contact graph.
 - [ ] Real strain/displacement contour and isoline field render.
 - [ ] Instrumented hierarchy / frontier / invalidation 3D overlay.
