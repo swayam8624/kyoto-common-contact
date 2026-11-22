@@ -41,9 +41,9 @@ def load(root):
     return frames,faces,edges,links
 
 def font(size,bold=False):
-    p="/usr/share/fonts/truetype/dejavu/DejaVuSans-"
+    p="/usr/share/fonts/truetype/dejavu/DejaVuSans"
     try:
-        return ImageFont.truetype(p+("Bold" if bold else "")+".ttf",size)
+        return ImageFont.truetype(p+("-Bold" if bold else "")+".ttf",size)
     except OSError:
         return ImageFont.load_default()
 
@@ -130,7 +130,7 @@ def spatial_grid(renderer):
     renderer.AddActor(actor)
 
 def candidate_links(renderer,frames,faces,edges,candidates,frame):
-    by_id={fid:verts for fid,_,*verts in faces}
+    by_id={fid:verts for fid,_,verts in faces}
     scene=frames[frame];all_candidates=candidates[frame]
     count=min(len(all_candidates),220)
     subset=[all_candidates[i] for i in
