@@ -67,6 +67,34 @@ jobs:
           assert (p/"visuals"/"07_interactive_spacetime_observatory.html").stat().st_size>100000
           print("PASS: full native experiment, 120 rows, 6 figures, interactive observatory")
           PY
+      - name: Generate native 3D mesh feature trajectories and candidates
+        run: ./build/kyoto_feature_scene results/feature-scene
+      - name: Render 3D shell/cage atlas and ParaView time series
+        run: python scripts/render_feature_scene.py --input results/feature-scene --output results/feature-scene/visuals
+      - name: Audit Stage-3 scene outputs
+        run: |
+          python - <<'PY'
+          import csv, json, pathlib
+          p=pathlib.Path("results/feature-scene")
+          m=json.loads((p/"scene_manifest.json").read_text())
+          assert (m["vertex_count"],m["face_count"],m["edge_count"])==(420,836,1254)
+          assert m["frames"]==61 and not m["continuous_CCD"]
+          state=list(csv.DictReader((p/"mesh_states.csv").open()))
+          assert len(state)==61*420
+          timeline=list(csv.DictReader((p/"frame_metrics.csv").open()))
+          assert len(timeline)==61
+          assert len(list((p/"visuals").glob("[0-9][0-9]_*.png")))==5
+          assert len(list((p/"visuals"/"vtk").glob("*.vtk")))==61
+          assert (p/"visuals"/"06_interactive_mesh_3d.html").stat().st_size>100000
+          assert (p/"visuals"/"STAGE3_MESH_FEATURE_ATLAS.png").stat().st_size>100000
+          print("PASS: 3D topological mesh scene, 61 states, canonical typed candidates, 5 scientific figures, interactive replay and VTK")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage3-3d-mesh-feature-evidence
+          path: results/feature-scene/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage2-temporal-certificate-evidence
