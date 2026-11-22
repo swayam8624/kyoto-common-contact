@@ -13,7 +13,8 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Stage-3 stable VF/EE feature IDs and explicit incident/topology contract, with 140 randomized meshes + 140 reorderings.
 - [x] Stage-2 interval-de-Casteljau enclosure (restricted IEEE FP model), independent broad-phase parity and randomized constructive contacts.
 - [ ] Independently certify finite-precision handling across all supported FP modes.
-- [ ] Official independent continuous CCD oracle and tunnelling attacks.
+- [x] Actual upstream IPC Toolkit linear VF/EE CCD gate authored; full feature-enumeration coverage and analytic tunnelling/near-miss cases (see latest CI for passing status).
+- [ ] Independently developed CCD mathematical oracle and numerical robustness audit.
 - [ ] Solver-specific invalidation/version safety audit.
 - [ ] ASan/UBSan/fuzz across malformed and extreme cases.
 
@@ -31,7 +32,7 @@ running. Gate status must be evidenced by native outputs or CI links.
 
 ## Physics scenes and adapters
 
-- [ ] First validated self-contact-rich free deforming mesh.
+- [ ] First validated self-contact-rich free deforming solver mesh (prior source 3D shell/cage is only kinematic).
 - [ ] Rigid-deformable articulated gripper and shaped object.
 - [ ] Net / ring / packaging / tube complex scenes.
 - [ ] Independent solver second integration and a named external dataset.
