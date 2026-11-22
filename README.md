@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: STAGE 2. Analytical swept-boundary and temporal-refinement studies; no full solver, independent general CCD, published LBVH comparison, SCA hierarchy, or novelty claim.**
+**Status: STAGE 3. Typed C++23 moving-mesh broad phase and real official IPC Toolkit v1.6.1 candidate parity verified; no full physics solver, general CCD oracle, paid LBVH performance comparison, novel hierarchy or novelty claim.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -85,10 +85,68 @@ cost surfaces, a 3D candidate network and a standalone offline 3D
 observatory. Every chart is traceable to the native experiment CSV.
 For theory and exact constraints read docs/09_CERTIFIED_TEMPORAL_REFINEMENT.md.
 
-Official IPC Toolkit stable tag pinned for the NEXT adapter: v1.6.1
+Official IPC Toolkit stable tag for external feature reference: v1.6.1
 (19bcab7e1f5a0d2addfcd28513422ff248ea504e). Its vertex-face and
-edge-edge candidate API must not be confused with this experimental
-triangle-triangle pair contract.
+edge-edge candidate API is now tested separately using the new typed mesh contract.
+
+
+
+## Stage 3 — mesh-feature semantics, real IPC Toolkit and native 3D
+
+The real new common-feature baseline is
+include/kyoto/feature_broadphase.hpp. It independently enumerates
+vertex-face and edge-edge pairs from a connected 3D mesh with
+stable feature IDs, masks, explicit incidence, cubic swept vertex
+boxes and topology epochs. Nonlocal same-object pairs remain valid.
+
+The native correctness test checks 140 randomized moving 3D meshes,
+140 shuffled input orderings and adversarial adjacency/topology
+conditions against an independent O(E^2+VF) oracle.
+
+The first **actual upstream IPC Toolkit v1.6.1** opt-in integration
+built and passed on Ubuntu via CMake FetchContent pinned to
+19bcab7e1f5a0d2addfcd28513422ff248ea504e. Across 13
+matched-semantic 3D fixtures, official LBVH and our reference each
+returned **36,799 normalized candidates, with zero extras or misses**.
+This is candidate-set parity, NOT a speed benchmark or CCD proof.
+
+    cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release \
+      -DKYOTO_WITH_OFFICIAL_IPC=ON \
+      -DIPC_TOOLKIT_WITH_SIMD=OFF
+    cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests --parallel 4
+    ctest --test-dir build-ipc \
+      -R pinned_official_ipc_lbvh_feature_coverage --output-on-failure
+
+The default build stays free of IPC Toolkit's transitive dependencies.
+See docs/11_OFFICIAL_IPC_PARITY.md for every actual original receipt.
+
+The new native C++23 mesh scene is a moving triangulated toroidal
+shell through a separate breathing spherical cage: 420 vertices,
+1,254 edges, 836 faces and 61 source-derived geometry frames.
+Original C++ instantaneous feature candidates, native vertex
+displacements, surface connectivity and ParaView series are
+exported without invented physics.
+
+    ./build/kyoto_feature_scene results/feature-scene
+    python3 scripts/render_feature_scene.py \
+      --input results/feature-scene \
+      --output results/feature-scene/visuals
+
+This produces five scientific figures, a standalone interactive 3D
+viewer, and 61 VTK time-series frames. An optional higher-fidelity
+VTK studio is in scripts/render_feature_vtk_studio.py:
+
+    python3 -m pip install vtk numpy matplotlib pillow
+    python3 scripts/render_feature_vtk_studio.py \
+      --input results/feature-scene \
+      --output results/vtk-studio
+
+All these 3D objects have *scripted kinematics*, not elastic
+contact-response physics. Surface colors are displacement,
+and candidate links do not mean true CCD events or impulses.
+
+See docs/10_MESH_FEATURE_BROADPHASE.md,
+docs/11_OFFICIAL_IPC_PARITY.md and docs/12_VTK_STUDIO.md.
 
 
 Read the docs in numbered order:
@@ -101,7 +159,12 @@ Read the docs in numbered order:
 - docs/07_TASK_MATRIX.md
 - docs/08_CERTIFIED_MOTION_LAB.md
 - docs/09_CERTIFIED_TEMPORAL_REFINEMENT.md
+- docs/10_MESH_FEATURE_BROADPHASE.md
+- docs/11_OFFICIAL_IPC_PARITY.md
+- docs/12_VTK_STUDIO.md
 - AGENTS.md
 
-The next gate is a pinned IPC Toolkit LBVH plus independent CCD adapter.
-Do not substitute candidate parity for true continuous collision proof.
+The NEXT gate is true independent feature-level CCD and a deformable solver
+with physically valid contact-rich trajectories, then a matched paid
+performance study versus the now-integrated official IPC LBVH.
+Do not substitute candidate parity for actual continuous collision proof.
