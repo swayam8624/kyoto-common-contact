@@ -29,6 +29,8 @@ Read the docs in numbered order:
 - docs/04_RESET.md
 - docs/05_PRIOR_ART.md
 - docs/06_METHOD_BLUEPRINT.md
+- docs/07_TASK_MATRIX.md
+- AGENTS.md
 
 The next gate is a pinned IPC Toolkit LBVH plus independent CCD adapter.
 Do not substitute candidate parity for true continuous collision proof.
