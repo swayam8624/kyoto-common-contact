@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 4 implementation — official continuous CCD gate committed; upstream build/test results must be checked in Actions. True deformable solver, independently developed CCD oracle, full paid solver benchmark and novel SCA hierarchy remain open.**
+**Status: PASS 5 — true 3D neo-Hookean tetrahedral reference FEM, 900-step impact physics, full-source stress/impulse/energy traces and real VTK visuals verified. The official IPC audit of solver trajectories is an additional distinct gate, not yet equivalent to a general mesh-contact solver.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -190,6 +190,65 @@ methodological limitations. Verification: consult the latest
 github.com Actions run; a source commit alone is not test evidence.
 
 
+
+## Pass 5 — actually integrated 3D hyperelastic physics
+
+A real closed 3D *solid* torus now moves under integrated gravity,
+elastic stress and contact impulses. It is NOT an animated or
+prescribed-deformation surface. The C++23 core is
+include/kyoto/solid_dynamics.hpp: 180 mass-carrying 3D vertices,
+480 volumetric tetrahedra, actual compressible neo-Hookean W(F),
+analytical first Piola forces, true Cauchy von Mises stress and
+a limited analytical z>=0 rigid-plane impulse response.
+
+Verification: independent 900-step native physics tests on macOS
+and Ubuntu in Debug and Release, checking FEM energy-force finite
+difference, invariance, mass conservation, free-fall COM,
+positive Jacobians, no floor penetration and actual contact.
+Complete 900-step science and visualization CI:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45072204086
+
+Actual native receipt: 0.675 s, 201.845 kg body, 0.7403 minimum
+det(F), 7.018 kPa peak von Mises and 10,380 vertex-step floor
+impulse records. Those records are NOT distinct collision episodes.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
+    ./build/kyoto_solid_simulation results/solid-fem
+    python3 -m pip install numpy matplotlib pandas plotly pillow
+    python3 scripts/render_solid_fem.py \
+      --input results/solid-fem \
+      --output results/solid-fem/visuals
+
+Outputs: six *real physical* plots, source-backed interactive
+3D von Mises viewer, 181 volumetric tetrahedral ParaView frames,
+contact location events, energy and material fields. Optional
+cinematic high-fidelity VTK studio + 31-frame native-motion GIF:
+
+    python3 -m pip install vtk matplotlib pillow numpy
+    python3 scripts/render_solid_vtk_studio.py \
+      --input results/solid-fem \
+      --output results/solid-fem/studio --gif
+
+Independent native VTK CI:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45072461124
+
+The official IPC Toolkit reviewer in
+tests/ipc_solid_trajectory_audit.cpp is a separate opt-in
+cross-object/self-contact survey on ACTUAL accepted integrator
+steps. It must report unresolved self events rather than quietly
+claiming self-contact-safe dynamics.
+
+**Limits:** the solver is explicit-force, the ground is an
+analytical infinite plane with lumped impulses, there is no
+general mesh-mesh IPC constraint response, no two-solver
+replication, no demonstrated SCA speedup or novelty.
+
+Read docs/14_FIRST_VOLUMETRIC_FEM.md for the full derivation,
+numerical assumptions, source manifest and open science gates.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -204,9 +263,10 @@ Read the docs in numbered order:
 - docs/11_OFFICIAL_IPC_PARITY.md
 - docs/12_VTK_STUDIO.md
 - docs/13_REAL_CONTINUOUS_CCD.md
+- docs/14_FIRST_VOLUMETRIC_FEM.md
 - AGENTS.md
 
-The NEXT gate after real upstream CCD verification is solver-integrated
-3D deformable trajectories and independently calibrated contact response,
-then a matched paid performance study versus official IPC LBVH.
+The NEXT gate is actual-solver mesh-mesh contact validation and
+solver-integrated official IPC constrained response on arbitrary connected
+obstacles, before a matched full-paid comparison versus official IPC LBVH.
 Do not substitute candidate parity for actual continuous collision proof.
