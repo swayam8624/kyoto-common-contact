@@ -5,6 +5,7 @@ on:
     paths:
       - 'CMakeLists.txt'
       - 'tests/ipc_lbvh_parity_tests.cpp'
+      - 'tests/ipc_continuous_ccd_tests.cpp'
       - '.github/workflows/ipc-reference.yml'
   workflow_dispatch:
 jobs:
@@ -25,9 +26,45 @@ jobs:
             -DIPC_TOOLKIT_WITH_SIMD=OFF \
             -DIPC_TOOLKIT_WITH_MESHFEM_SPARSE=OFF
       - name: Build real external LBVH comparison
-        run: cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests --parallel 4
+        run: cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests kyoto_official_ipc_ccd_tests --parallel 4
       - name: Execute official LBVH conservative-pair coverage oracle
         run: ctest --test-dir build-ipc -R '^pinned_official_ipc_lbvh_feature_coverage$' --output-on-failure -V | tee ipc-lbvh-coverage.log
+      - name: Run actual upstream CCD against exhaustive feature enumeration
+        run: |
+          ./build-ipc/kyoto_official_ipc_ccd_tests results/ccd-gate | tee ipc-ccd-gate.log
+          ctest --test-dir build-ipc -R '^pinned_official_ipc_continuous_CCD_coverage
+        if: always()
+        with:
+          name: kyoto-official-ipc-v1-6-1-build-evidence
+          path: ipc-lbvh-coverage.log
+          if-no-files-found: ignore
+          retention-days: 30
+ --output-on-failure
+      - name: Check raw CCD audit coverage
+        run: |
+          python - <<'PY'
+          import csv, json, pathlib
+          p=pathlib.Path("results/ccd-gate")
+          lines=list(csv.DictReader((p/"ccd_cases.csv").open()))
+          assert len(lines)==35,len(lines)
+          assert all(int(x["total_events"])==int(x["exhaustive_events"]) for x in lines)
+          by_name={x["case_name"]:x for x in lines}
+          for k in ("VF_TRUE_MIDSTEP","EE_TRUE_MIDSTEP","VF_TRUE_ASYMMETRIC"):
+              assert int(by_name[k]["total_events"])>0,k
+          for k in ("VF_BOX_FALSE_POSITIVE","VF_DISJOINT_Z","EE_SEPARATE_Y",
+                    "EE_TIME_ALIAS_NO_COLLISION"):
+              assert int(by_name[k]["total_events"])==0,k
+          assert (p/"linear_vertex_paths.csv").is_file()
+          print("PASS: actual upstream narrow-phase CCD, analytic fixtures, exhaustive feature enumeration")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-real-ipc-v161-continuous-ccd-evidence
+          path: |
+            results/ccd-gate/
+            ipc-ccd-gate.log
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
