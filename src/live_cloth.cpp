@@ -133,6 +133,10 @@ std::array<double,3> barycentric(Vec3 p, Vec3 a, Vec3 b, Vec3 c) {
 }
 }
 
+// Isolated candidate-generation oracle: brute force checks all eligible
+// unordered AABB pairs, while SAP sorts by minimum X and breaks when subsequent
+// intervals cannot overlap. Both return stable sorted unique IDs, not
+// narrow-phase contacts.
 std::vector<Pair> candidates(const std::vector<Bounds>& bounds, bool useSAP, std::size_t* pairTests) {
     std::vector<int> order(bounds.size());
     std::iota(order.begin(), order.end(), 0);
@@ -172,6 +176,10 @@ std::vector<Pair> candidates(const std::vector<Bounds>& bounds, bool useSAP, std
     return out;
 }
 
+// A global guard cache reuses a prior superset of broad-phase pairs only when
+// the exact request/backend/topology matches and every CURRENT padded box lies
+// inside its saved fat envelope. Callers must revalidate tight geometry before
+// applying contact response.
 const std::vector<Pair>& BroadPhaseService::query(const std::vector<Bounds>& rawGeometryBounds,
                                                    QueryRequest request,
                                                    bool useSAP,
@@ -205,7 +213,10 @@ const std::vector<Pair>& BroadPhaseService::query(const std::vector<Bounds>& raw
             break;
         }
     }
-    if(canReuse) {
+    // CertifiedReuse means containment and metadata checks passed, not that current
+// padded AABBs all overlap. The stored candidate list can include stale but
+// harmless pairs; narrow phase must filter them.
+if(canReuse) {
         ++metrics.reuses;
         metrics.lastDecision="CERTIFIED_REUSE";
         metrics.broadMs+=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
@@ -226,6 +237,9 @@ const std::vector<Pair>& BroadPhaseService::query(const std::vector<Bounds>& raw
 }
 
 const std::vector<Bounds>& BroadPhaseService::envelopes() const { return envelopes_; }
+// Discard the certificate when a caller changes collision masks, policy,
+// geometry topology or any contract not covered by the stored QueryRequest. An
+// old guard pair list cannot be assumed safe after those changes.
 void BroadPhaseService::invalidate() {
     cacheValid_=false;
     envelopes_.clear(); pairs_.clear();
@@ -233,6 +247,9 @@ void BroadPhaseService::invalidate() {
 
 ClothSimulation::ClothSimulation() { reset(); }
 
+// Reinitialize the historical single-cloth fixture and solver state. This is a
+// separate baseline from MultiCloth's coupled cloth/sphere experiments and
+// should not be confused with their current runtime comparisons.
 void ClothSimulation::reset() {
     const bool sap=stats_.sap, collisions=stats_.collisions;
     positions_.clear(); previousPositions_.clear(); triangles_.clear(); constraints_.clear();
@@ -269,6 +286,9 @@ void ClothSimulation::reset() {
     stats_.minGap=std::numeric_limits<double>::infinity();
 }
 
+// Advance the legacy fixed-step Verlet/constraint/contact path. Global guarded
+// candidate reuse and optional brute-force audit are exercised here, but the
+// primary multi-cloth research pipeline lives in research_multicloth.cpp.
 void ClothSimulation::step() {
     constexpr Vec3 sphere{0.0,0.0,0.9};
     constexpr double radius=0.8;
@@ -430,6 +450,9 @@ void ClothSimulation::setOracleEnabled(bool enabled) {
     stats_.oracleMisses=0;
 }
 bool ClothSimulation::oracleEnabled() const { return oracleEnabled_; }
+// Changing broad-phase margin, guard displacement budget or reuse policy
+// invalidates cached geometry assumptions. The request is validated before the
+// next query rather than trusting the old candidate list.
 void ClothSimulation::setQueryRequest(QueryRequest request) {
     if(!std::isfinite(request.margin) || request.margin<kThickness)
         throw std::invalid_argument("query margin must be finite and at least the response thickness");
