@@ -76,4 +76,12 @@ if(KYOTO_WITH_OFFICIAL_IPC)
   target_link_libraries(kyoto_official_ipc_ccd_tests PRIVATE kyoto_contact ipc::toolkit)
   add_test(NAME pinned_official_ipc_continuous_CCD_coverage COMMAND kyoto_official_ipc_ccd_tests)
 
+  # Pass 5: official upstream CCD on genuine solver-integrated
+  # tetrahedral trajectories, reporting unresolved self-contact.
+  add_executable(kyoto_official_ipc_solid_audit tests/ipc_solid_trajectory_audit.cpp)
+  target_link_libraries(kyoto_official_ipc_solid_audit PRIVATE kyoto_contact ipc::toolkit)
+  add_test(NAME real_hyperelastic_solver_ipc_geometry_audit
+           COMMAND kyoto_official_ipc_solid_audit \${CMAKE_CURRENT_BINARY_DIR}/ipc-solid-audit)
+
+
 endif()
