@@ -19,6 +19,9 @@ bool lessPatch(const OnlinePatch& a,const OnlinePatch& b){
  return a.span>b.span;
 }
 }
+// Encode sheet, patch level and cell origin into stable region IDs. Primitive
+// IDs and moving-sphere region IDs use separate namespaces. Returned IDs feed
+// both work accounting and RegionalCandidates cache keys.
 int OnlinePartitioner::stableId(const OnlinePatch& p){
  if(p.sheet<0||p.sheet>=3||p.x<0||p.x>=12||p.y<0||p.y>=12 ||
     (p.span!=3&&p.span!=6&&p.span!=12))
@@ -28,6 +31,8 @@ int OnlinePartitioner::stableId(const OnlinePatch& p){
  const int level=p.span==12?0:p.span==6?1:2;
  return 5000+p.sheet*1000+level*200+p.y*12+p.x;
 }
+// Create initial 6x6 patches over each 12x12 cloth-cell lattice, then reset
+// cooldown and EWMA histories. Old feedback must not influence a new scene.
 void OnlinePartitioner::reset(int sheets){
  if(sheets<1||sheets>3)throw std::invalid_argument("online partition sheets must be 1..3");
  patches_.clear();patches_.reserve(std::size_t(sheets)*8);
@@ -40,6 +45,8 @@ void OnlinePartitioner::reset(int sheets){
  flatTimeEwma_=hierTimeEwma_=0;
  flatSamples_=hierSamples_=0;
 }
+// Map a triangle cell to its current region after split or merge. A partition
+// hole indicates lost candidate coverage and is rejected, not silently ignored.
 int OnlinePartitioner::regionForCell(int sheet,int x,int y) const{
  if(x<0||x>=12||y<0||y>=12)
   throw std::invalid_argument("online patch cell out of 12x12 domain");
@@ -48,6 +55,9 @@ int OnlinePartitioner::regionForCell(int sheet,int x,int y) const{
    return stableId(p);
  throw std::runtime_error("online patch cover has a hole");
 }
+// Replace one high-work patch by four half-span children. Their inherited
+// quarter-work is an estimate; the downstream regional query will measure them
+// again.
 void OnlinePartitioner::split(std::size_t index){
  const OnlinePatch source=patches_.at(index);
  if(source.span<=3)throw std::logic_error("minimum online patch cannot split");
@@ -64,6 +74,9 @@ void OnlinePartitioner::split(std::size_t index){
  }
  std::sort(patches_.begin(),patches_.end(),lessPatch);
 }
+// Require and remove every child of a quiet four-sibling set before restoring
+// its parent. Repartitioning changes only broad-phase association, not cloth
+// geometry.
 void OnlinePartitioner::merge(std::size_t first,const OnlinePatch& parent){
  const int half=parent.span/2;
  for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){
@@ -78,6 +91,10 @@ void OnlinePartitioner::merge(std::size_t first,const OnlinePatch& parent){
  patches_.push_back(parent);
  std::sort(patches_.begin(),patches_.end(),lessPatch);
 }
+// Consume real broad-phase checks, cache revalidation, rejected candidates and
+// contact-correction feedback. EWMAs plus multi-window thresholds and cooldown
+// govern topology edits and traversal selection; no independent oracle is used
+// for this decision.
 OnlineUpdate OnlinePartitioner::observe(int frame,
  const std::map<int,RegionWork>& work,
  const std::vector<ccp::live::Bounds>& guards,
@@ -112,7 +129,10 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
    ++possible;
    if(overlaps(guards[i],guards[j]))++near;
   }
- result.coarsePairFraction=possible?double(near)/double(possible):1.0;
+ // This fraction counts coarse guard overlap, not true physical contact. It
+// guides sparse versus dense traversal selection without establishing
+// precision.
+result.coarsePairFraction=possible?double(near)/double(possible):1.0;
  // Both update strategies are measured per broad-phase query while active.
  const double sample=broadMilliseconds/double(queryCount);
  double& ewma=hierarchical_?hierTimeEwma_:flatTimeEwma_;
@@ -123,7 +143,10 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
  // invalidation and unbounded topology thrashing.
  constexpr int window=6;
  constexpr int editCooldown=12;
- if(frame%window==0){
+ // Only reconsider partition shape every six frames, and require repeated
+// hot/quiet windows plus cooldown. This avoids oscillating between costly
+// split/merge states.
+if(frame%window==0){
   for(auto& p:patches_){
    const bool contactRich=p.contactsEwma>.30||p.candidatesEwma>14.;
    const double threshold=p.span>=12?260.:160.;
@@ -187,7 +210,10 @@ OnlineUpdate OnlinePartitioner::observe(int frame,
   // Policy selection is reaction to CURRENT region occupancy + measured
   // broad-phase time. A hysteresis band prevents mode flapping. This is
   // not a fair, same-state dual-policy timing oracle; it is feedback control.
-  if(frame-lastModeSwitchFrame_>=18){
+  // Compare flat/hierarchy timing EWMAs after a longer cooldown. Modes were
+// observed at different runtime states, so the feedback is not a same-state
+// algorithm benchmark.
+if(frame-lastModeSwitchFrame_>=18){
    const bool sparse=guards.size()>=12&&result.coarsePairFraction<.42;
    bool proposed=sparse;
    if(flatSamples_>=6&&hierSamples_>=6){
