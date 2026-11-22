@@ -96,7 +96,7 @@ int main(int argc,char** argv){
                      <<field.nodal_energy_density[i]<<','
                      <<field.nodal_von_mises_pa[i]<<'\n';
             }
-            metrics<<frame<<','<<d.time_seconds<<','<<d.kinetic_j<<','
+            metrics<<frame<<','<<d.time_seconds<<','<<d.kinetic_joule<<','
                    <<d.elastic_joule<<','<<d.gravity_joule<<','
                    <<(d.kinetic_joule+d.elastic_joule+d.gravity_joule)<<','
                    <<d.min_jacobian<<','<<d.max_von_mises_pa<<','
