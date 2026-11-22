@@ -10,7 +10,7 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Native CI test on Ubuntu and macOS, Debug and Release.
 - [x] Cubic Bezier triangle control-hull enclosure with analytical midpoint contact counterexample and 350 randomized motion cases.
 - [ ] Directed-rounding interval arithmetic / independent floating-point proof across all supported FP modes.
-- [ ] Stable triangular feature topology/adjacency contract.
+- [x] Stage-3 stable VF/EE feature IDs and explicit incident/topology contract, with 140 randomized meshes + 140 reorderings.
 - [x] Stage-2 interval-de-Casteljau enclosure (restricted IEEE FP model), independent broad-phase parity and randomized constructive contacts.
 - [ ] Independently certify finite-precision handling across all supported FP modes.
 - [ ] Official independent continuous CCD oracle and tunnelling attacks.
@@ -20,8 +20,9 @@ running. Gate status must be evidenced by native outputs or CI links.
 ## Baselines, algorithm, instrumentation
 
 - [x] Independently verify and pin official IPC Toolkit stable v1.6.1 source API and release SHA.
-- [ ] Build and run official LBVH adapter on matched vertex/edge/face feature semantics.
-- [ ] Compare exhaustive, fixed SAP and official LBVH with identical data.
+- [x] Build and run actual pinned official IPC Toolkit v1.6.1 LBVH with matched vertex/edge/face feature semantics.
+- [x] Exact oracle/SAP/IPC parity on 13 native 3D fixtures: 36,799 pairs, zero extras/misses (not performance).
+- [ ] Run fair paid IPC LBVH timings on realistic independent solver trajectories.
 - [ ] Implement complete dual-tree SCA frontier and safe cache invalidation.
 - [x] Measure total paid geometry-to-candidate time in synthetic Stage-2; retain negative depth-zero comparison.
 - [ ] Measure real whole-contact-detection/solver time with zero unreported costs.
@@ -42,14 +43,19 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Stage-1 typed native CSV trace, candidate audit and JSON manifest (kinematic test only; hashes pending).
 - [x] Stage-1 3D trajectory, spacetime, time-position and analytical contour plots; offline interactive 3D.
 - [x] Stage-1 121-frame ParaView VTK exporter (CI artifact validation pending).
+- [x] Stage-3 stable typed VF/EE IDs, 420-vertex/836-face connected 3D kinematic scene, 61 frames and source CSV/VKT exports.
 - [ ] Common solver-grade typed trace/scene schema with original state hashes.
 - [x] Stage-2 analytic 3D contact-candidate graph and 3D time-slab field visualization (NOT a physical solver).
 - [x] Stage-2 six scientific data figures, stand-alone interactive 3D observatory, 120-row native CSV with CI archive.
+- [x] Stage-3 source-backed interactive 3D shell/cage mesh, candidate links, displacement field, timeline and volumetric candidate-density visualization.
+- [x] Native-source ParaView time series for Stage-3 geometry (61 frames).
 - [ ] Interactive *actual solver-scene* playback with synchronized contact graph.
-- [ ] Real strain/displacement contour and isoline field render.
+- [x] Kinematic vertex displacement scalar field on connected 3D geometry (not stress or strain).
+- [ ] Real solver-derived strain/stress field, contours and volume slices.
 - [ ] Instrumented hierarchy / frontier / invalidation 3D overlay.
 - [ ] Native SDL3 + Metal renderer and multi-camera replay recording.
-- [ ] ParaView VTK field exports and Blender film pipeline.
+- [x] ParaView VTK scalar-field export and optional source-based VTK studio renderer.
+- [ ] Blender or Metal film pipeline from actual solver, not synthetic kinematics.
 - [ ] 12+ original figures with accessible color maps and data tables.
 
 ## Skeptical research audit
