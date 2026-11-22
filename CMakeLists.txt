@@ -11,6 +11,12 @@ else()
  target_compile_options(kyoto_contact INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 enable_testing()
+
+# Pass 5: actual 3D tetrahedral neo-Hookean volumetric dynamics,
+# native rigid halfspace contact. This core does NOT depend on IPC.
+add_executable(kyoto_solid_tests tests/solid_dynamics_tests.cpp)
+target_link_libraries(kyoto_solid_tests PRIVATE kyoto_contact)
+add_test(NAME three_dimensional_hyperelastic_fem_physics COMMAND kyoto_solid_tests)
 add_executable(kyoto_contact_tests tests/contact_candidates_tests.cpp)
 target_link_libraries(kyoto_contact_tests PRIVATE kyoto_contact)
 add_test(NAME exact_swept_aabb_candidate_parity COMMAND kyoto_contact_tests)
