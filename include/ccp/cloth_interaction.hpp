@@ -32,6 +32,10 @@ struct Hit {
  std::array<double,3> barycentric{};
 };
 // Consistent with the native viewer's perspective(.70f,...), look(eye,target,z).
+// Convert GLFW *window* cursor coordinates (top-left origin) into a
+// right-handed perspective ray. The NDC Y sign is inverted and the horizontal
+// scale includes viewport aspect ratio; using retina framebuffer dimensions
+// for cursor values skews picking.
 inline Ray cameraRay(double pixelX,double pixelY,double viewportWidth,double viewportHeight,
                      Vec3 eye,Vec3 target,double verticalFovRadians=.70) {
  if(!(std::isfinite(pixelX)&&std::isfinite(pixelY)&&std::isfinite(viewportWidth)&&
@@ -53,6 +57,10 @@ inline Ray cameraRay(double pixelX,double pixelY,double viewportWidth,double vie
 // Moller-Trumbore, two-sided. Front and back cloth faces are selectable.
 // The nearest positive intersection wins so a back sheet cannot be grabbed
 // accidentally through an overlapping front sheet.
+// Test each current cloth triangle using two-sided Moller-Trumbore and keep
+// the nearest positive ray intersection. Barycentric weights identify the
+// exact picked surface point used by MultiCloth::beginGrab; a hit is not
+// itself a contact.
 inline std::optional<Hit> pickTriangleRay(const Ray& ray,
   const std::vector<Vec3>& positions,const std::vector<std::array<int,3>>& faces){
  std::optional<Hit> nearest;
@@ -78,6 +86,9 @@ inline std::optional<Hit> pickTriangleRay(const Ray& ray,
 }
 // Keep the grab in a camera-facing plane through the original picked point,
 // rather than projecting onto the floor (which makes vertical folds impossible).
+// Intersect a later mouse ray with the camera-facing plane through the
+// original hit. This permits vertical lifting of cloth; parallel rays,
+// nonfinite geometry or intersections behind the camera return no target.
 inline std::optional<Vec3> intersectDragPlane(Ray ray,Vec3 point,Vec3 normal){
  if(!(std::isfinite(ray.origin.x)&&std::isfinite(ray.origin.y)&&std::isfinite(ray.origin.z)&&
       std::isfinite(ray.direction.x)&&std::isfinite(ray.direction.y)&&std::isfinite(ray.direction.z)&&
