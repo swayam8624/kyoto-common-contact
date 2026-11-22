@@ -20,6 +20,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <compare>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
