@@ -49,6 +49,8 @@ ctest --test-dir build --output-on-failure
 
 The meeting script also produces seven-policy coupled comparisons for 1/2/3 cloths, an online-versus-SAP time series, patch-size ablations, and a nine-method isolated AABB comparison including actual Bullet DBVT. **Isolated query time and complete simulation-step time answer different questions.** Do not rank them in the same chart. Coupled multi-cloth timings include periodic exhaustive coverage audits; the run metadata must identify that overhead. The historical single-cloth figures in `output/native/benchmark-summary.txt` are not current results.
 
+**Open-source use and provenance:** [MIT license for original project-owned code and documentation](LICENSE) · [Third-party and research asset notices](THIRD_PARTY_NOTICES.md). External Bullet, GLFW, platform libraries and third-party evidence remain under their own terms.
+
 ## Source-level teaching curriculum
 
 Start with the [file-by-file linked source reading order](docs/SOURCE_READING_ORDER.md) and [worked broad-phase → candidate oracle → physical contact laboratory](docs/BROADPHASE_TO_CONTACT_TEACHING_LAB.md). These follow actual C++ functions through time-coherent AABB guards, online split/merge feedback, cloth picking and solver-side contact correction. The guides distinguish broad-phase pair completeness from physical correctness, continuous collision avoidance and full-step performance.
