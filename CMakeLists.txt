@@ -21,3 +21,10 @@ target_link_libraries(kyoto_motion_tests PRIVATE kyoto_contact)
 add_test(NAME conservative_cubic_path_enclosure COMMAND kyoto_motion_tests)
 add_executable(kyoto_motion_export apps/motion_lab_export.cpp)
 target_link_libraries(kyoto_motion_export PRIVATE kyoto_contact)
+
+# Stage-2 exact per-slab and selective pair-level temporal refinement.
+add_executable(kyoto_temporal_tests tests/temporal_refinement_tests.cpp)
+target_link_libraries(kyoto_temporal_tests PRIVATE kyoto_contact)
+add_test(NAME certified_time_slab_candidate_safety COMMAND kyoto_temporal_tests)
+add_executable(kyoto_temporal_experiment apps/temporal_experiment.cpp)
+target_link_libraries(kyoto_temporal_experiment PRIVATE kyoto_contact)
