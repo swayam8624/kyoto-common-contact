@@ -1,0 +1,19 @@
+name: Kyoto Stage-0 correctness
+on:
+  push:
+    branches:
+      - research/spacetime-contact-atlas
+  pull_request:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        type: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.type }}
+      - run: cmake --build build --parallel 4
+      - run: ctest --test-dir build --output-on-failure

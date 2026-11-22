@@ -1,66 +1,14 @@
 /build/
-/.presentation-build/
-# Historical tracked evidence is intentionally preserved. These rules prevent
-# *new* local dependencies, caches and raw framebuffer captures being added.
-**/node_modules/
-**/node_modules
+/out/
+/results/
+/captures/
 **/__pycache__/
 **/*.pyc
-**/*.dylib
-**/*.so
 **/.DS_Store
-.presentation-rebuild/pydeps/
-output/native/*.ppm
-output/native/*_trace.csv
-output/native/native_trace.csv
-output/native/live_benchmark-postfix.csv
-output/native/benchmark-postfix*
-output/research3d/video_frames/
+**/node_modules/
+*.gif
+*.mp4
+*.vtu
+*.vtp
+*.parquet
 *.blend1
-output/native/supporting-offline-replay.html
-output/native/broadphase-leaderboard.csv
-output/native/broadphase-leaderboard.svg
-docs/BROADPHASE_RESULTS.md
-output/native/cascade.svg
-output/native/multicloth-real.csv
-output/native/multicloth-real.svg
-docs/MULTICLOTH_RESULTS.md
-
-output/native/patch-sweep.csv
-output/native/patch-sweep.svg
-docs/PATCH_CALIBRATION.md
-
-output/native/online-controller-trace.csv
-output/native/online-controller-trace.svg
-docs/ONLINE_CONTROLLER_RESULTS.md
-
-# Dated research deliveries: keep source, final decks and review evidence,
-# but leave disposable presentation exports and raw framebuffers local.
-/.presentation-review-2026-11-02/*.pptx
-/.presentation-review-2026-11-02/*.inspect.ndjson
-/.presentation-review-2026-11-02/*.log
-/.presentation-review-2026-11-02/contact-*.png
-/.presentation-review-2026-11-02/renders/
-/.presentation-review-2026-11-02/final-renders*/
-/.presentation-refine-2026-11-02/*.pptx
-/.presentation-refine-2026-11-02/*.inspect.ndjson
-/.presentation-refine-2026-11-02/*.log
-/.presentation-refine-2026-11-02/contact-*.png
-/.presentation-refine-2026-11-02/renders/
-/.presentation-refine-2026-11-02/final-renders*/
-/output/review-2026-11-02/**/*.ppm
-
-# Clean release branch: legacy copies were removed in commit 24c8c640.
-# The original release and experiment branches still contain the historical
-# presentations and intermediate assets. Prevent accidental recommits.
-/.presentation-*/
-/.render3d/
-/output/**
-**/.venv/
-**/venv/
-**/pydeps/
-**/.pytest_cache/
-**/.mypy_cache/
-**/*.gif
-**/*.mp4
-**/*.kmcb
