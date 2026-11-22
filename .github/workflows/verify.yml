@@ -89,6 +89,37 @@ jobs:
           assert (p/"visuals"/"STAGE3_MESH_FEATURE_ATLAS.png").stat().st_size>100000
           print("PASS: 3D topological mesh scene, 61 states, canonical typed candidates, 5 scientific figures, interactive replay and VTK")
           PY
+      - name: Export actual integrated volumetric FEM collision dynamics
+        run: ./build/kyoto_solid_simulation results/solid-fem
+      - name: Render scientific real-physics atlas and 3D volumetric series
+        run: python scripts/render_solid_fem.py --input results/solid-fem --output results/solid-fem/visuals
+      - name: Audit Stage-5 actual physical integration and output
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import csv, json
+          root=Path("results/solid-fem")
+          m=json.loads((root/"solid_manifest.json").read_text())
+          assert m["rendered_states_are_solver_generated"]
+          assert not m["general_mesh_ccd"] and not m["upstream_IPC_integration_for_solver"]
+          assert (m["vertices"],m["tetrahedra"],m["frames"])==(180,480,181)
+          assert m["impact_events"]>0 and m["minimum_tetra_jacobian"]>0
+          rows=list(csv.DictReader((root/"solid_metrics.csv").open()))
+          assert len(rows)==181
+          assert all(float(x["min_height_m"])>=-1e-11 for x in rows)
+          assert all(float(x["min_tetra_jacobian"])>0 for x in rows)
+          assert len(list((root/"visuals").glob("[0-9][0-9]_*.png")))==6
+          assert len(list((root/"visuals"/"vtk_tetrahedra").glob("*.vtk")))==181
+          assert (root/"visuals"/"STAGE5_ACTUAL_PHYSICS_ATLAS.png").stat().st_size>100000
+          assert (root/"visuals"/"07_interactive_physically_integrated_solid.html").stat().st_size>100000
+          print("PASS: 900-step actual 3D elastic FEM, 181 original states, real impact events, 6 figures, 181 volumetric tetra snapshots")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage5-real-elastic-FEM-physics
+          path: results/solid-fem/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage3-3d-mesh-feature-evidence
