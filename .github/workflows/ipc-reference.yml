@@ -1,0 +1,37 @@
+name: Kyoto official IPC Toolkit v1.6.1 reference
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'CMakeLists.txt'
+      - 'tests/ipc_lbvh_parity_tests.cpp'
+      - '.github/workflows/ipc-reference.yml'
+  workflow_dispatch:
+jobs:
+  official-ipc-lbvh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake pkg-config libtbb-dev
+      - name: Configure pinned official IPC Toolkit
+        run: |
+          cmake -S . -B build-ipc -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DKYOTO_WITH_OFFICIAL_IPC=ON \
+            -DIPC_TOOLKIT_WITH_SIMD=OFF \
+            -DIPC_TOOLKIT_WITH_MESHFEM_SPARSE=OFF
+      - name: Build real external LBVH comparison
+        run: cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests --parallel 4
+      - name: Execute official LBVH conservative-pair coverage oracle
+        run: ctest --test-dir build-ipc -R '^pinned_official_ipc_lbvh_feature_coverage$' --output-on-failure -V | tee ipc-lbvh-coverage.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kyoto-official-ipc-v1-6-1-build-evidence
+          path: ipc-lbvh-coverage.log
+          if-no-files-found: ignore
+          retention-days: 30
