@@ -32,11 +32,14 @@ running. Gate status must be evidenced by native outputs or CI links.
 
 ## Physics scenes and adapters
 
-- [ ] First validated self-contact-rich free deforming solver mesh (prior source 3D shell/cage is only kinematic).
+- [x] First actual freely deforming 3D volumetric hyperelastic solid against flat plane (not yet a self-contact-rich or IPC-constrained solver).
+- [ ] Validated self-contact-rich free-deforming 3D solver.
 - [ ] Rigid-deformable articulated gripper and shaped object.
 - [ ] Net / ring / packaging / tube complex scenes.
 - [ ] Independent solver second integration and a named external dataset.
-- [ ] Physical and continuous penetration audit on native trajectories.
+- [x] Real 3D solver-generated tetrahedral hyperelastic torus, gravity and exact flat-plane unilateral contact impulse law: 900 steps, cross-platform mathematical invariants.
+- [x] Verified no floor penetration and positive tet J on all 900 accepted steps.
+- [ ] Independent general mesh-to-mesh physical contact/penetration audit on the native trajectories (official IPC sampling authored; see latest CI evidence).
 - [ ] Optional granular/particle adapter with clear separate evidence.
 
 ## Scientific visualization and film
@@ -50,9 +53,12 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Stage-2 six scientific data figures, stand-alone interactive 3D observatory, 120-row native CSV with CI archive.
 - [x] Stage-3 source-backed interactive 3D shell/cage mesh, candidate links, displacement field, timeline and volumetric candidate-density visualization.
 - [x] Native-source ParaView time series for Stage-3 geometry (61 frames).
-- [ ] Interactive *actual solver-scene* playback with synchronized contact graph.
+- [x] Interactive *actual solver-scene* stress-field playback with the real floor-impulse markers.
+- [ ] Actual IPC-derived self/cross-contact graph synchronized to entire solver time series.
 - [x] Kinematic vertex displacement scalar field on connected 3D geometry (not stress or strain).
-- [ ] Real solver-derived strain/stress field, contours and volume slices.
+- [x] True solver-derived Cauchy von Mises stress and energy fields, 181 volumetric ParaView states and 3D FEM stress visualization.
+- [x] Actual solver-generated high-fidelity VTK cutaway and animated impact loop, verified in its dedicated Linux rendering CI.
+- [ ] Strain tensor contour/isosurface and general mesh-collision impulses from a validated solver.
 - [ ] Instrumented hierarchy / frontier / invalidation 3D overlay.
 - [ ] Native SDL3 + Metal renderer and multi-camera replay recording.
 - [x] ParaView VTK scalar-field export and optional source-based VTK studio renderer.
