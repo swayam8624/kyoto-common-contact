@@ -1,0 +1,64 @@
+name: Kyoto true FEM volumetric VTK studio
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/solid_dynamics.hpp'
+      - 'apps/solid_simulation_export.cpp'
+      - 'scripts/render_solid_vtk_studio.py'
+      - '.github/workflows/fem-vtk-studio.yml'
+  workflow_dispatch:
+jobs:
+  actual-physics-vtk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offscreen renderer prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 xvfb
+      - name: Build true native C++ physics and test mathematical invariants
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target kyoto_solid_simulation kyoto_solid_tests --parallel 4
+          ctest --test-dir build -R three_dimensional_hyperelastic_fem_physics --output-on-failure
+      - name: Generate real FEM physical traces
+        run: ./build/kyoto_solid_simulation results/solid-fem
+      - name: Install deterministic VTK science render environment
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 pillow==12.0.0 vtk==9.6.2
+      - name: Render actual hyperelastic stress, tetra cutaway and motion loop
+        run: |
+          xvfb-run -a python scripts/render_solid_vtk_studio.py \
+            --input results/solid-fem \
+            --output results/solid-fem/studio \
+            --gif
+      - name: Validate native-source visual artifact and provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+          p=Path("results/solid-fem")
+          m=json.loads((p/"solid_manifest.json").read_text())
+          assert m["rendered_states_are_solver_generated"]
+          assert not m["general_mesh_ccd"]
+          q=p/"studio"
+          frames=list(q.glob("studio_*.png"))
+          assert len(frames)==4,frames
+          assert all(Image.open(path).size==(1500,960) for path in frames)
+          assert len(list(q.glob("*_section.png")))==1
+          assert (q/"STAGE5_CINEMATIC_FEM_ATLAS.png").stat().st_size>100000
+          gif=q/"FEM_REAL_PHYSICS_MOTION.gif"
+          assert gif.stat().st_size>100000
+          with Image.open(gif) as im:
+              assert im.n_frames>=30, im.n_frames
+          print("PASS: actual-source VTK 4 hero frames + interior tet cutaway + 31-frame integrated physics GIF")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass5-real-fem-cinematic-VTK-motion
+          path: results/solid-fem/studio/
+          if-no-files-found: error
+          retention-days: 30
