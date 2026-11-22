@@ -34,3 +34,7 @@ target_link_libraries(kyoto_temporal_experiment PRIVATE kyoto_contact)
 add_executable(kyoto_feature_tests tests/feature_broadphase_tests.cpp)
 target_link_libraries(kyoto_feature_tests PRIVATE kyoto_contact)
 add_test(NAME typed_mesh_feature_candidate_parity COMMAND kyoto_feature_tests)
+
+# Independent 3D kinematic scene export (not solver integration).
+add_executable(kyoto_feature_scene apps/feature_scene_export.cpp)
+target_link_libraries(kyoto_feature_scene PRIVATE kyoto_contact)
