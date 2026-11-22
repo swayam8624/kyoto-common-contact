@@ -63,4 +63,9 @@ if(KYOTO_WITH_OFFICIAL_IPC)
   add_executable(kyoto_official_ipc_lbvh_tests tests/ipc_lbvh_parity_tests.cpp)
   target_link_libraries(kyoto_official_ipc_lbvh_tests PRIVATE kyoto_contact ipc::toolkit)
   add_test(NAME pinned_official_ipc_lbvh_feature_coverage COMMAND kyoto_official_ipc_lbvh_tests)
+  # Stage 4: real upstream continuous CCD, not merely LBVH candidate parity.
+  add_executable(kyoto_official_ipc_ccd_tests tests/ipc_continuous_ccd_tests.cpp)
+  target_link_libraries(kyoto_official_ipc_ccd_tests PRIVATE kyoto_contact ipc::toolkit)
+  add_test(NAME pinned_official_ipc_continuous_CCD_coverage COMMAND kyoto_official_ipc_ccd_tests)
+
 endif()
