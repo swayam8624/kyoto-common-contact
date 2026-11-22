@@ -1,8 +1,6 @@
 # Pass 4 — Actual continuous collision detection: geometry and falsification
 
-**Status (23 November 2026):** The implementation and external CI gate are
-authored. Consult the latest GitHub Actions receipt for actual test status.
-Do not treat an unverified source commit as a passing numerical experiment.
+**Status (23 November 2026):** Compiled and VERIFIED against actual IPC Toolkit v1.6.1 in Ubuntu CI. External receipt: https://github.com/swayam8624/kyoto-common-contact/actions/runs/45070906756 . This checks event coverage, not full-solver correctness or independent numerical CCD mathematics.
 
 ## Candidate generation versus collision events
 
@@ -153,3 +151,7 @@ claim speedup from simplified count parity or synthetic trajectories.
 - https://github.com/ipc-sim/ipc-toolkit/blob/v1.6.1/src/ipc/candidates/face_vertex.hpp
 - https://github.com/ipc-sim/ipc-toolkit/blob/v1.6.1/src/ipc/candidates/edge_edge.hpp
 - https://github.com/ipc-sim/ipc-toolkit/blob/v1.6.1/src/ipc/candidates/candidates.hpp
+
+## Actual verified results (GitHub Actions 45070906756)
+
+The real pinned IPC library compiled successfully. The test evaluated **35** 3D linear-motion cases, found **19** feature-level CCD events, and reported **zero missing events** when comparing LBVH-filtered CCD to independently enumerated feature pairs run through the *same* upstream numerical CCD routine. Both constructed VF/EE midpoint collisions returned conservative TOI approximately **0.49995** instead of exact mathematical **0.5**. The geometric VF near miss and different-time EE alias each produced a broad-phase candidate but no CCD event. The original full log and native CSVs are archived as artifact `kyoto-real-ipc-v161-continuous-ccd-evidence`, ID **14773422485**. These are finite tested results, not a proof of all continuous inputs.
