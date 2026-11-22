@@ -1,7 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: STAGE 0. No claimed speedup, no full solver, no continuous
-collision detection implementation, and no novelty assertion.**
+**Status: STAGE 2. Analytical swept-boundary and temporal-refinement studies; no full solver, independent general CCD, published LBVH comparison, SCA hierarchy, or novelty claim.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -58,6 +57,40 @@ docs/03_VISUALS.md for the full gallery;
 docs/07_TASK_MATRIX.md for incomplete solver/research work.
 
 
+
+## Stage 2 — synchronized interval certificates and selective pair refinement
+
+The C++23 temporal_refinement.hpp supports conservatively bounded
+cubic paths split into synchronized slabs using interval de Casteljau.
+It tests both a global time-slab sweep and a selective per-candidate
+refinement against independent exhaustive pair enumeration.
+
+The local synthetic study has 120 measured method-condition rows, 96
+randomized constructive continuous-contact test scenes and two
+analytical false-positive families.
+
+**Critical negative:** selective is around 3x faster than global
+at 16 slabs in the local 2,048-target example, but the one-slab
+baseline remains far faster. This does NOT establish acceleration
+of a real collision solver or superiority to official IPC LBVH.
+
+    ./build/kyoto_temporal_experiment results/temporal-study
+    python3 -m pip install numpy matplotlib pandas plotly pillow
+    python3 scripts/render_temporal_study.py \
+      --input results/temporal-study \
+      --output results/temporal-study/visuals
+
+The produced scientific atlas includes six figures, measured 3D
+cost surfaces, a 3D candidate network and a standalone offline 3D
+observatory. Every chart is traceable to the native experiment CSV.
+For theory and exact constraints read docs/09_CERTIFIED_TEMPORAL_REFINEMENT.md.
+
+Official IPC Toolkit stable tag pinned for the NEXT adapter: v1.6.1
+(19bcab7e1f5a0d2addfcd28513422ff248ea504e). Its vertex-face and
+edge-edge candidate API must not be confused with this experimental
+triangle-triangle pair contract.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -66,6 +99,8 @@ Read the docs in numbered order:
 - docs/05_PRIOR_ART.md
 - docs/06_METHOD_BLUEPRINT.md
 - docs/07_TASK_MATRIX.md
+- docs/08_CERTIFIED_MOTION_LAB.md
+- docs/09_CERTIFIED_TEMPORAL_REFINEMENT.md
 - AGENTS.md
 
 The next gate is a pinned IPC Toolkit LBVH plus independent CCD adapter.
