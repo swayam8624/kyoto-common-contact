@@ -6,6 +6,8 @@ on:
       - 'CMakeLists.txt'
       - 'tests/ipc_lbvh_parity_tests.cpp'
       - 'tests/ipc_continuous_ccd_tests.cpp'
+      - 'tests/ipc_solid_trajectory_audit.cpp'
+      - 'include/kyoto/solid_dynamics.hpp'
       - 'scripts/render_real_ccd_lab.py'
       - '.github/workflows/ipc-reference.yml'
   workflow_dispatch:
@@ -27,7 +29,7 @@ jobs:
             -DIPC_TOOLKIT_WITH_SIMD=OFF \
             -DIPC_TOOLKIT_WITH_MESHFEM_SPARSE=OFF
       - name: Build real external LBVH and CCD tests
-        run: cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests kyoto_official_ipc_ccd_tests --parallel 4
+        run: cmake --build build-ipc --target kyoto_official_ipc_lbvh_tests kyoto_official_ipc_ccd_tests kyoto_official_ipc_solid_audit --parallel 4
       - name: Execute official LBVH conservative-pair coverage oracle
         run: |
           set -o pipefail
@@ -54,6 +56,26 @@ jobs:
           assert (p/"linear_vertex_paths.csv").is_file()
           print("PASS: actual upstream narrow-phase CCD, analytic fixtures, exhaustive feature enumeration")
           PY
+      - name: Audit true solver-derived 3D hyperelastic trajectories with IPC
+        run: |
+          set -o pipefail
+          ./build-ipc/kyoto_official_ipc_solid_audit results/ipc-solid-audit | tee ipc-solid-audit.log
+      - name: Verify external solver-motion audit provenance
+        run: |
+          python - <<'PY'
+          import pathlib, json, csv, math
+          root=pathlib.Path("results/ipc-solid-audit")
+          m=json.loads((root/"manifest.json").read_text())
+          assert m["external_reference"]=="ACTUAL_PINNED_IPC_TOOLKIT_1.6.1"
+          assert m["total_solver_steps"]==900 and m["sampled_steps"]>=50
+          assert not m["all_900_steps_independently_CCD_audited"]
+          assert not m["self_contact_is_resolved_by_solver"]
+          data=list(csv.DictReader((root/"official_ipc_on_real_fem.csv").open()))
+          assert len(data)==m["sampled_steps"]
+          assert all(float(x["analytic_min_height_m"])>=-1e-12 for x in data)
+          assert all(math.isfinite(float(x["ipc_build_query_ms"])) for x in data)
+          print("PASS: actual IPC Toolkit audited physically integrated 3D FEM, self-contact explicitly disclosed")
+          PY
       - name: Install visualization dependencies for real CCD evidence
         run: python -m pip install numpy==2.2.6 matplotlib==3.10.7
       - name: Render real-upstream CCD geometry and proof atlas
@@ -74,6 +96,8 @@ jobs:
           name: kyoto-real-ipc-v161-continuous-ccd-evidence
           path: |
             results/ccd-gate/
+            results/ipc-solid-audit/
+            ipc-solid-audit.log
             ipc-ccd-gate.log
             ipc-lbvh-coverage.log
           if-no-files-found: ignore
