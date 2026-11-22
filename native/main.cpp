@@ -1,3 +1,11 @@
+// TEACHING ENTRYPOINT: GLFW/OpenGL viewer and research telemetry consumer.
+ // MultiCloth in research_multicloth.cpp owns solver time, geometry and
+ // candidate/contact calculations; this file creates an OpenGL context,
+ // forwards keyboard/mouse input, draws mesh/bounds/contact overlays and
+ // surfaces measured Metrics. Screenshots are not evidence of oracle coverage.
+ // For window-unit ray construction and barycentric grabbing read
+ // include/ccp/cloth_interaction.hpp. On Retina displays GLFW window
+ // coordinates and framebuffer pixels are distinct measurements.
 #define GL_SILENCE_DEPRECATION
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -96,6 +104,9 @@ void pushInspectorEvent(App& a,const std::string& event) {
 }
 // Read only real benchmark measurements generated on THIS checkout.
 // If no CSV exists the UI prints "NO VERIFIED LOCAL DATA", not mock timings.
+// Load previously generated benchmarking/validation artifacts for a *display*
+// panel; the viewer does not retroactively rerun the experiment or certify any
+// cited timing.
 void loadEvidence(App& a) {
  const std::filesystem::path base(CCP_OUTPUT_DIR);
  a.broadphaseResults.clear();
@@ -288,6 +299,9 @@ void logEvent(App&a,const std::string&event){
    std::to_string(a.multiMode?a.multi.frame():a.sim.stats().frame));
 }
 std::string number(double d,int precision);
+// Advance either current MultiCloth or historical single-cloth simulation, read
+// its measured Metrics and append bounded debug events. Physical state
+// originates in the solver libraries, not the renderer.
 void stepSimulation(App&a){
  if(a.multiMode){
   a.multi.step();
@@ -372,6 +386,10 @@ void stepSimulation(App&a){
   pushInspectorEvent(a,ids.str());
  }
  if(s.oracleMisses){a.paused=true;logEvent(a,"ORACLE_FAILURE");}}
+// GLFW keyboard callback maps controls to physics policy, pause/single-step,
+// scene reset and visualization toggles. A policy switch must trigger
+// solver-side candidate-cache invalidation rather than merely changing a HUD
+// string.
 void key(GLFWwindow*w,int key,int,int action,int){
  if(action!=GLFW_PRESS)return;
  auto&a=*static_cast<App*>(glfwGetWindowUserPointer(w));
@@ -457,6 +475,9 @@ ccp::interaction::Ray rayForCursor(const App& a,GLFWwindow* w,double x,double y)
    a.distance*std::sin(a.pitch)});
  return ccp::interaction::cameraRay(x,y,viewport,height,eye,a.target,.70);
 }
+// Click handling distinguishes cloth triangle picking/drag initiation from
+// camera orbit. The picked triangle and barycentric weights come from
+// cloth_interaction.hpp, then enter MultiCloth::beginGrab.
 void mouse(GLFWwindow*w,int button,int action,int mods){
  auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  glfwGetCursorPos(w,&a.lastX,&a.lastY);
@@ -492,6 +513,9 @@ void mouse(GLFWwindow*w,int button,int action,int mods){
     " TRIANGLE "+std::to_string(hit->triangle));
  }else {a.drag=true;logEvent(a,"MOUSE_MISS cursor="+std::to_string(a.lastX)+","+std::to_string(a.lastY));} // empty background still rotates the camera
 }
+// On pointer move, drag rays update a camera-facing plane constraint; otherwise
+// camera input controls orbit. Keep cursor-window coordinates consistent with
+// cameraRay's viewport dimensions.
 void cursor(GLFWwindow*w,double x,double y){
  auto& a=*static_cast<App*>(glfwGetWindowUserPointer(w));
  if(a.clothMouseGrab){
@@ -803,6 +827,9 @@ void drawEvidencePane(const App& a,float viewport,float panel,float scale,int wi
  glDisable(GL_BLEND);
  glDisable(GL_SCISSOR_TEST);
 }
+// Construct GLFW native window, GL resources and simulation App, then run
+// input/presentation loop. OpenGL only displays already computed cloth state;
+// benchmark stepMs excludes its render work.
 int main(int argc,char**argv){try{
  const auto runtimeDir=std::filesystem::temp_directory_path()/"ccp-native-lab";std::filesystem::create_directories(runtimeDir);
  int captureSteps=-1,clothCount=3,sphereCount=2;std::string capturePath,tracePath=(runtimeDir/"native_trace.csv").string(),multiPolicy="regional",selfCollisionOption="on";bool closeCapture=false,multiRequested=false,captureStepsProvided=false,baselineRequested=false,policyExplicit=false;App a;
