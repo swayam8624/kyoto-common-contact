@@ -32,7 +32,7 @@ jobs:
       - name: Export exact native kinematic trace
         run: ./build/kyoto_motion_export results/motion-lab
       - name: Install scientific figure dependencies
-        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 plotly==6.3.1
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 plotly==6.3.1 pandas==2.3.3 pillow==12.0.0
       - name: Build science figures and offline interactive 3D
         run: |
           python scripts/render_motion_lab.py --data results/motion-lab --output results/motion-lab/visuals
@@ -50,6 +50,29 @@ jobs:
           assert (root/"visuals"/"05_interactive_motion_lab.html").stat().st_size > 100000
           print("PASS: native trajectory, 4 scientific figures, interactive 3D, 121 VTK frames")
           PY
+      - name: Run analytical Stage-2 contact experiment
+        run: ./build/kyoto_temporal_experiment results/temporal-study
+      - name: Generate Stage-2 scientific figures and interactive 3D
+        run: python scripts/render_temporal_study.py --input results/temporal-study --output results/temporal-study/visuals
+      - name: Validate Stage-2 evidence and image count
+        run: |
+          python - <<'PY'
+          import csv, pathlib, json
+          p=pathlib.Path("results/temporal-study")
+          rows=list(csv.DictReader((p/"temporal_analytical_study.csv").open()))
+          assert len(rows)==120
+          assert all(int(x["missed_true"])==0 for x in rows)
+          assert len(list((p/"visuals").glob("[0-9][0-9]_*.png")))==6
+          assert (p/"visuals"/"STAGE2_SCIENTIFIC_ATLAS.png").stat().st_size>100000
+          assert (p/"visuals"/"07_interactive_spacetime_observatory.html").stat().st_size>100000
+          print("PASS: full native experiment, 120 rows, 6 figures, interactive observatory")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage2-temporal-certificate-evidence
+          path: results/temporal-study/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-motion-lab-native-data-and-visuals
