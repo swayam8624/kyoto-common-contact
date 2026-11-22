@@ -1,4 +1,4 @@
-name: Kyoto Stage-0 correctness
+name: Kyoto contact geometry and visual evidence
 on:
   push:
     branches:
@@ -17,3 +17,42 @@ jobs:
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.type }}
       - run: cmake --build build --parallel 4
       - run: ctest --test-dir build --output-on-failure
+  visual-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile native C++ trace exporter
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 4
+          ctest --test-dir build --output-on-failure
+      - name: Export exact native kinematic trace
+        run: ./build/kyoto_motion_export results/motion-lab
+      - name: Install scientific figure dependencies
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 plotly==6.3.1
+      - name: Build science figures and offline interactive 3D
+        run: |
+          python scripts/render_motion_lab.py --data results/motion-lab --output results/motion-lab/visuals
+          python scripts/export_paraview_motion.py --data results/motion-lab --output results/motion-lab/vtk
+      - name: Independent deliverable sanity check
+        run: |
+          python - <<'PY'
+          import csv, pathlib, json
+          root = pathlib.Path("results/motion-lab")
+          d = json.loads((root/"manifest.json").read_text())
+          assert d["frames"] == 121 and d["independent_sap_parity"]
+          assert len(list(csv.DictReader((root/"trajectory.csv").open()))) == 726
+          assert len(list((root/"vtk").glob("*.vtk"))) == 121
+          assert len(list((root/"visuals").glob("*.png"))) == 4
+          assert (root/"visuals"/"05_interactive_motion_lab.html").stat().st_size > 100000
+          print("PASS: native trajectory, 4 scientific figures, interactive 3D, 121 VTK frames")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-motion-lab-native-data-and-visuals
+          path: results/motion-lab/
+          if-no-files-found: error
+          retention-days: 30
