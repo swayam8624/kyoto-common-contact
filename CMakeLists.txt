@@ -38,3 +38,29 @@ add_test(NAME typed_mesh_feature_candidate_parity COMMAND kyoto_feature_tests)
 # Independent 3D kinematic scene export (not solver integration).
 add_executable(kyoto_feature_scene apps/feature_scene_export.cpp)
 target_link_libraries(kyoto_feature_scene PRIVATE kyoto_contact)
+
+# Opt-in real external IPC Toolkit LBVH; default build stays lightweight.
+# The official source is pinned by commit SHA (release v1.6.1).
+# IMPORTANT: the actual external CMake dependency has heavy transitive
+# requirements. It is NOT a stand-in written inside this repository.
+option(KYOTO_WITH_OFFICIAL_IPC "Build and validate pinned IPC Toolkit LBVH" OFF)
+if(KYOTO_WITH_OFFICIAL_IPC)
+  if(CMAKE_VERSION VERSION_LESS 3.24)
+    message(FATAL_ERROR "Official IPC Toolkit integration needs CMake 3.24+")
+  endif()
+  include(FetchContent)
+  set(IPC_TOOLKIT_BUILD_TESTS OFF CACHE BOOL "Disable upstream test build" FORCE)
+  set(IPC_TOOLKIT_BUILD_PYTHON OFF CACHE BOOL "Disable upstream Python" FORCE)
+  set(IPC_TOOLKIT_WITH_CUDA OFF CACHE BOOL "CPU baseline for fairness" FORCE)
+  set(IPC_TOOLKIT_WITH_MESHFEM_SPARSE OFF CACHE BOOL "No solver Hessians needed" FORCE)
+  FetchContent_Declare(
+    kyoto_official_ipc_toolkit
+    GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
+    GIT_TAG 19bcab7e1f5a0d2addfcd28513422ff248ea504e
+    GIT_SHALLOW FALSE
+  )
+  FetchContent_MakeAvailable(kyoto_official_ipc_toolkit)
+  add_executable(kyoto_official_ipc_lbvh_tests tests/ipc_lbvh_parity_tests.cpp)
+  target_link_libraries(kyoto_official_ipc_lbvh_tests PRIVATE kyoto_contact ipc::toolkit)
+  add_test(NAME pinned_official_ipc_lbvh_feature_coverage COMMAND kyoto_official_ipc_lbvh_tests)
+endif()
