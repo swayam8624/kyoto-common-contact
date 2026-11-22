@@ -9,6 +9,7 @@ on:
       - 'tests/ipc_solid_trajectory_audit.cpp'
       - 'include/kyoto/solid_dynamics.hpp'
       - 'scripts/render_real_ccd_lab.py'
+      - 'scripts/render_ipc_solid_audit.py'
       - '.github/workflows/ipc-reference.yml'
   workflow_dispatch:
 jobs:
@@ -77,7 +78,19 @@ jobs:
           print("PASS: actual IPC Toolkit audited physically integrated 3D FEM, self-contact explicitly disclosed")
           PY
       - name: Install visualization dependencies for real CCD evidence
-        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 pandas==2.3.3
+      - name: Plot actual upstream CCD over physically integrated FEM
+        run: python scripts/render_ipc_solid_audit.py --input results/ipc-solid-audit --output results/ipc-solid-audit/visuals
+      - name: Validate physics audit scientific figure provenance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          d=Path("results/ipc-solid-audit/visuals")
+          charts=list(d.glob("[0-9][0-9]_*.png"))
+          assert len(charts)==5,charts
+          assert (d/"AUDIT_SUMMARY.md").stat().st_size>100
+          print("PASS: five actual-IPC-to-real-FEM science figures and explicit self-contact disclosure")
+          PY
       - name: Render real-upstream CCD geometry and proof atlas
         run: python scripts/render_real_ccd_lab.py --input results/ccd-gate --output results/ccd-gate/visuals
       - name: Check visualization completeness
