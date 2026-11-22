@@ -81,7 +81,7 @@ if(KYOTO_WITH_OFFICIAL_IPC)
   add_executable(kyoto_official_ipc_solid_audit tests/ipc_solid_trajectory_audit.cpp)
   target_link_libraries(kyoto_official_ipc_solid_audit PRIVATE kyoto_contact ipc::toolkit)
   add_test(NAME real_hyperelastic_solver_ipc_geometry_audit
-           COMMAND kyoto_official_ipc_solid_audit \${CMAKE_CURRENT_BINARY_DIR}/ipc-solid-audit)
+           COMMAND kyoto_official_ipc_solid_audit ${CMAKE_CURRENT_BINARY_DIR}/ipc-solid-audit)
 
 
 endif()
