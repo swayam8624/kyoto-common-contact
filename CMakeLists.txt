@@ -28,3 +28,9 @@ target_link_libraries(kyoto_temporal_tests PRIVATE kyoto_contact)
 add_test(NAME certified_time_slab_candidate_safety COMMAND kyoto_temporal_tests)
 add_executable(kyoto_temporal_experiment apps/temporal_experiment.cpp)
 target_link_libraries(kyoto_temporal_experiment PRIVATE kyoto_contact)
+
+# Pass 3: mesh-aware IPC-style typed feature broad phase. The two independent
+# paths must exactly agree before any solver or external adapter is enabled.
+add_executable(kyoto_feature_tests tests/feature_broadphase_tests.cpp)
+target_link_libraries(kyoto_feature_tests PRIVATE kyoto_contact)
+add_test(NAME typed_mesh_feature_candidate_parity COMMAND kyoto_feature_tests)
