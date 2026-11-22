@@ -157,10 +157,16 @@ std::optional<SegmentFaceHit> segmentFace(Vec3 p0,Vec3 p1,Vec3 a,Vec3 b,Vec3 c){
  return SegmentFaceHit{q,{1.-v1-v2,v1,v2},t};
 }
 }
+// Clear region envelopes, cached candidate blocks, and topology/request
+// signatures. Primitive order, region IDs or query margin change the validity
+// of the cache.
 void RegionalCandidates::reset(){
  regions_.clear();cachedRegionPairs_.clear();output_.clear();
  knownIds_.clear();knownRegions_.clear();previousMargin_=-1;
 }
+// Return a conservative set of candidate pairs from stable primitive IDs,
+// finite AABBs and collision masks. Reuse blocks only while current padded
+// bounds remain inside stored guard envelopes.
 const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>& items,
  double margin,bool adaptive,Metrics& metrics,bool hierarchicalRegionSweep,
  bool collectFeedback){
@@ -187,7 +193,9 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   ids.push_back(b.id);groupIds.push_back(items[i].region);
   partition[items[i].region].push_back(static_cast<int>(i));
  }
- if(ids!=knownIds_||groupIds!=knownRegions_||margin!=previousMargin_){
+ // An identity, region-membership or request change invalidates every cached
+// block; identical numeric indices cannot be trusted after a topology edit.
+if(ids!=knownIds_||groupIds!=knownRegions_||margin!=previousMargin_){
   reset();knownIds_=ids;knownRegions_=groupIds;previousMargin_=margin;
   for(const auto& [group,members]:partition){
    Region region;region.id=group;region.itemIndices=members;regions_.push_back(std::move(region));
@@ -216,7 +224,9 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   region.dirty=region.envelopes.size()!=region.itemIndices.size();
   if(!region.dirty){
    for(std::size_t j=0;j<region.itemIndices.size();++j)
-    if(!contains(region.envelopes[j],current[region.itemIndices[j]])){
+    // A region becomes dirty as soon as a current padded AABB escapes its previous
+// guard; rebuild rather than claiming temporal coherence from stale geometry.
+if(!contains(region.envelopes[j],current[region.itemIndices[j]])){
      region.dirty=true;break;
     }
   }
@@ -325,7 +335,10 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
   auto& a=regions_[i];auto& b=regions_[j];
   const auto key=pairKey(i,j);
   auto it=cachedRegionPairs_.find(key);
-  const bool rebuild=a.dirty||b.dirty||it==cachedRegionPairs_.end();
+  // Recompute a block if either source region is dirty or the block is absent.
+// Otherwise the old guarded pairs are a superset until current-bound
+// revalidation.
+const bool rebuild=a.dirty||b.dirty||it==cachedRegionPairs_.end();
   const auto checksBefore=metrics.broadAabbTests;
   if(rebuild){
    std::vector<Pair> list;
@@ -354,7 +367,10 @@ const std::vector<Pair>& RegionalCandidates::query(const std::vector<Primitive>&
    const auto& ca=current[static_cast<std::size_t>(ia->second)];
    const auto& cb=current[static_cast<std::size_t>(ib->second)];
    ++metrics.broadAabbTests;
-   if(overlap(ca,cb)&&eligible(ca,cb)){
+   // Even a reused guard block is filtered by CURRENT padded AABB overlap and
+// collision categories before narrow-phase response, preventing stale pairs
+// injecting corrections.
+if(overlap(ca,cb)&&eligible(ca,cb)){
     output_.push_back(p);++kept;
    } else ++rejected;
   }
@@ -518,6 +534,9 @@ void MultiCloth::setSelfCollisions(bool enabled){
 // Same-cloth triangles in the same cell or neighboring mesh cells share
 // an edge, vertex or structural one-ring neighborhood. Excluding them
 // prevents the cloth from repelling its own resting local mesh.
+// Filter topologically adjacent cloth cells that naturally share resting
+// geometry. Nearby local mesh triangles must not repel each other as if they
+// were independent cloth sheets.
 bool MultiCloth::nonlocalSelfPair(int first,int second) const{
  if(first==second||first<0||second<0 ||
     first>=static_cast<int>(triangles_.size())||
@@ -529,6 +548,9 @@ bool MultiCloth::nonlocalSelfPair(int first,int second) const{
  const int bx=cb%(kSide-1),by=cb/(kSide-1);
  return std::abs(ax-bx)>1||std::abs(ay-by)>1;
 }
+// Validate triangle, barycentric coordinates, finite picked position and
+// nonzero inverse mass before enabling an interaction. The GLFW viewer provides
+// this picked attachment, not collision solver geometry.
 bool MultiCloth::beginGrab(int ti,std::array<double,3> bary,Vec3 pickedPoint){
  if(ti<0||ti>=static_cast<int>(triangles_.size()))return false;
  for(double x:bary)if(!std::isfinite(x)||x<0||x>1)return false;
@@ -561,6 +583,9 @@ Vec3 MultiCloth::grabPoint() const{
  for(int j=0;j<3;++j)point=add(point,mul(positions_[tri[j]],grab_.bary[j]));
  return point;
 }
+// Apply a bounded XPBD-style barycentric target correction weighted by inverse
+// mass; track imposed correction separately to prevent it becoming artificial
+// velocity on the next Verlet step.
 void MultiCloth::projectGrab(std::vector<Vec3>& nonphysical){
  if(!grab_.active)return;
  const auto tri=triangles_[static_cast<std::size_t>(grab_.triangle)];
@@ -602,6 +627,9 @@ void MultiCloth::updateSpheres(double t){
  if(balls_==2)spheres_.push_back({
   {-.53+.35*std::cos(1.40*t),.36+.36*std::sin(.81*t),1.31+.11*std::cos(.65*t)},.43});
 }
+// Construct stable triangle/sphere IDs, current geometry AABBs, collision
+// category masks and region IDs. This is the shared input for regional, flat
+// SAP and global guarded policies.
 std::vector<Primitive> MultiCloth::makePrimitives()const{
  std::vector<Primitive> out;out.reserve(triangles_.size()+spheres_.size());
  const std::uint32_t clothMask=(1u<<sheets_)-1u,sphereCat=1u<<3;
@@ -626,6 +654,9 @@ std::vector<Primitive> MultiCloth::makePrimitives()const{
  }
  return out;
 }
+// Narrow phase checks triangle-sphere, nonlocal triangle-triangle and edge-face
+// features, then projects bounded inverse-mass-weighted corrections. The solver
+// is discrete, not continuous collision detection.
 void MultiCloth::projectContacts(const std::vector<Pair>& pairs,
                                  const std::vector<Bounds>& rawBounds){
  // Multiple triangle pairs share the SAME vertices. Without a per-vertex
@@ -836,6 +867,9 @@ std::size_t MultiCloth::runContactPassForTest(){
  projectContacts(pairs,raw);
  return metrics_.selfContacts;
 }
+// Advance one fixed solver step: Verlet integration, structural projection,
+// current-AABB candidate query, optional exact oracle audit, feature contacts,
+// and velocity correction. The OpenGL viewer merely consumes the result.
 void MultiCloth::step(){
  const auto start=Clock::now();
  ++frame_;
@@ -920,7 +954,10 @@ void MultiCloth::step(){
   for(const auto& primitive:primitives)bounds.push_back(primitive.box);
   const auto queryStart=Clock::now();
   std::vector<Pair> pairs;
-  if(policy_==Policy::RegionalCertified||policy_==Policy::OnlineContactAware){
+  // Dispatch the broad-phase policy while preserving the same contact solver and
+// constraints. Coupled total-step runtime includes broad search, narrow
+// response and any enabled audit work.
+if(policy_==Policy::RegionalCertified||policy_==Policy::OnlineContactAware){
    pairs=regional_.query(primitives,kMargin,adaptive_,metrics_,hierarchicalRegions_,
      policy_==Policy::OnlineContactAware);
   }else if(policy_==Policy::GlobalGuard){
@@ -942,7 +979,10 @@ void MultiCloth::step(){
    ++metrics_.queryCount;metrics_.pairs=pairs.size();
   }
   metrics_.candidatePairs=pairs;
-  if(auditing_&&(iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)){
+  // Audit only sampled frames/iterations: require candidate pairs to include all
+// brute-force current AABB oracle pairs. A periodic inclusion check is
+// evidence, not proof for unsampled steps.
+if(auditing_&&(iter==0||iter==kIterations-1)&&(frame_%15==0||frame_==1)){
    std::vector<Bounds> exact;
    exact.reserve(bounds.size());
    for(auto b:bounds)exact.push_back(expand(b,kMargin*.5));
