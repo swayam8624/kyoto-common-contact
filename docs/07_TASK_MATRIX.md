@@ -11,17 +11,20 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Cubic Bezier triangle control-hull enclosure with analytical midpoint contact counterexample and 350 randomized motion cases.
 - [ ] Directed-rounding interval arithmetic / independent floating-point proof across all supported FP modes.
 - [ ] Stable triangular feature topology/adjacency contract.
-- [ ] Outward conservative finite-precision swept envelope validation.
+- [x] Stage-2 interval-de-Casteljau enclosure (restricted IEEE FP model), independent broad-phase parity and randomized constructive contacts.
+- [ ] Independently certify finite-precision handling across all supported FP modes.
 - [ ] Official independent continuous CCD oracle and tunnelling attacks.
 - [ ] Solver-specific invalidation/version safety audit.
 - [ ] ASan/UBSan/fuzz across malformed and extreme cases.
 
 ## Baselines, algorithm, instrumentation
 
-- [ ] Pin official IPC Toolkit release and LBVH adapter.
+- [x] Independently verify and pin official IPC Toolkit stable v1.6.1 source API and release SHA.
+- [ ] Build and run official LBVH adapter on matched vertex/edge/face feature semantics.
 - [ ] Compare exhaustive, fixed SAP and official LBVH with identical data.
 - [ ] Implement complete dual-tree SCA frontier and safe cache invalidation.
-- [ ] Measure real full paid time with zero unreported costs.
+- [x] Measure total paid geometry-to-candidate time in synthetic Stage-2; retain negative depth-zero comparison.
+- [ ] Measure real whole-contact-detection/solver time with zero unreported costs.
 - [ ] Ablate maintained frontier / local refit / subtree rebuild / fallback.
 - [ ] Verify tail cost and static / dense / high-motion negative regimes.
 
@@ -40,7 +43,9 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Stage-1 3D trajectory, spacetime, time-position and analytical contour plots; offline interactive 3D.
 - [x] Stage-1 121-frame ParaView VTK exporter (CI artifact validation pending).
 - [ ] Common solver-grade typed trace/scene schema with original state hashes.
-- [ ] Interactive scene playback with synchronized contact graph.
+- [x] Stage-2 analytic 3D contact-candidate graph and 3D time-slab field visualization (NOT a physical solver).
+- [x] Stage-2 six scientific data figures, stand-alone interactive 3D observatory, 120-row native CSV with CI archive.
+- [ ] Interactive *actual solver-scene* playback with synchronized contact graph.
 - [ ] Real strain/displacement contour and isoline field render.
 - [ ] Instrumented hierarchy / frontier / invalidation 3D overlay.
 - [ ] Native SDL3 + Metal renderer and multi-camera replay recording.
