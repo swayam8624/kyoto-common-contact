@@ -14,3 +14,10 @@ enable_testing()
 add_executable(kyoto_contact_tests tests/contact_candidates_tests.cpp)
 target_link_libraries(kyoto_contact_tests PRIVATE kyoto_contact)
 add_test(NAME exact_swept_aabb_candidate_parity COMMAND kyoto_contact_tests)
+
+# New mathematically distinct Stage-1 motion boundary and exporter.
+add_executable(kyoto_motion_tests tests/motion_envelopes_tests.cpp)
+target_link_libraries(kyoto_motion_tests PRIVATE kyoto_contact)
+add_test(NAME conservative_cubic_path_enclosure COMMAND kyoto_motion_tests)
+add_executable(kyoto_motion_export apps/motion_lab_export.cpp)
+target_link_libraries(kyoto_motion_export PRIVATE kyoto_contact)
