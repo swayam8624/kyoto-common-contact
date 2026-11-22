@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: STAGE 3. Typed C++23 moving-mesh broad phase and real official IPC Toolkit v1.6.1 candidate parity verified; no full physics solver, general CCD oracle, paid LBVH performance comparison, novel hierarchy or novelty claim.**
+**Status: PASS 4 implementation — official continuous CCD gate committed; upstream build/test results must be checked in Actions. True deformable solver, independently developed CCD oracle, full paid solver benchmark and novel SCA hierarchy remain open.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -149,6 +149,47 @@ See docs/10_MESH_FEATURE_BROADPHASE.md,
 docs/11_OFFICIAL_IPC_PARITY.md and docs/12_VTK_STUDIO.md.
 
 
+
+## Pass 4 — actual upstream 3D linear-motion CCD
+
+The experimental broad phase has advanced beyond candidate-set parity.
+tests/ipc_continuous_ccd_tests.cpp exercises the actual pinned
+IPC Toolkit vertex-face and edge-edge narrow-phase CCD implementation.
+Across 35 deterministic linearly moving 3D mesh cases, it compares
+the complete set of true upstream CCD events obtained through official
+LBVH candidate filtering against exhaustive independent enumeration
+of all topologically admissible feature stencils.
+
+Controlled analytical cases include vertex-face and edge-edge
+mid-step collisions, crossings of the infinite triangle plane
+outside a finite triangle, noncrossing motion and time-alias
+broad-phase false positives. The other 28 seeded random scenes
+are checked by full enumeration but do not have independent
+analytical event-time labels. Output includes real conservative
+CCD time-of-impact and measured stage timings.
+
+    cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release \
+      -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+    cmake --build build-ipc --target kyoto_official_ipc_ccd_tests --parallel 4
+    ctest --test-dir build-ipc -R pinned_official_ipc_continuous_CCD_coverage \
+      --output-on-failure
+    ./build-ipc/kyoto_official_ipc_ccd_tests results/ccd-gate
+    python3 -m pip install numpy matplotlib
+    python3 scripts/render_real_ccd_lab.py \
+      --input results/ccd-gate \
+      --output results/ccd-gate/visuals
+
+The five new figures are generated from the same C++ / actual upstream
+CCD audit. Their source is scientific kinematic geometry, not
+simulated contact-response forces. All underlying CCD paths are
+LINEAR in each step; cubic Bezier swept envelopes cannot be
+handed directly to the linear narrow phase.
+
+See docs/13_REAL_CONTINUOUS_CCD.md for the mathematical and
+methodological limitations. Verification: consult the latest
+github.com Actions run; a source commit alone is not test evidence.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -162,9 +203,10 @@ Read the docs in numbered order:
 - docs/10_MESH_FEATURE_BROADPHASE.md
 - docs/11_OFFICIAL_IPC_PARITY.md
 - docs/12_VTK_STUDIO.md
+- docs/13_REAL_CONTINUOUS_CCD.md
 - AGENTS.md
 
-The NEXT gate is true independent feature-level CCD and a deformable solver
-with physically valid contact-rich trajectories, then a matched paid
-performance study versus the now-integrated official IPC LBVH.
+The NEXT gate after real upstream CCD verification is solver-integrated
+3D deformable trajectories and independently calibrated contact response,
+then a matched paid performance study versus official IPC LBVH.
 Do not substitute candidate parity for actual continuous collision proof.
