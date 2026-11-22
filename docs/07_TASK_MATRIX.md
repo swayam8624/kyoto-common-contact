@@ -8,6 +8,8 @@ running. Gate status must be evidenced by native outputs or CI links.
 
 - [x] Stage-0 exhaustive candidate oracle / fixed SAP parity test source.
 - [x] Native CI test on Ubuntu and macOS, Debug and Release.
+- [x] Cubic Bezier triangle control-hull enclosure with analytical midpoint contact counterexample and 350 randomized motion cases.
+- [ ] Directed-rounding interval arithmetic / independent floating-point proof across all supported FP modes.
 - [ ] Stable triangular feature topology/adjacency contract.
 - [ ] Outward conservative finite-precision swept envelope validation.
 - [ ] Official independent continuous CCD oracle and tunnelling attacks.
