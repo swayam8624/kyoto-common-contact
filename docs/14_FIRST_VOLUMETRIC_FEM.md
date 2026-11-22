@@ -2,8 +2,7 @@
 
 **Research objective:** replace scripted kinematic test surfaces with a true
 3D continuum-mechanics trajectory and trustworthy actual physical fields.
-This is a **reference implementation**, not a production implicit FEM or a
-new collision algorithm. CI receipts must be checked before claiming pass.
+This is a **reference implementation**, not production implicit FEM or a new collision algorithm. Its full native physics + science visualization workflow passed on macOS and Ubuntu in Debug and Release, plus the Ubuntu source-artifact job: https://github.com/swayam8624/kyoto-common-contact/actions/runs/45072204086
 
 ## 1. Physical specimen and topology
 
@@ -234,3 +233,46 @@ commit and raw logs together with benchmark data.
 
 The value of Stage 5 is the existence of actual generated
 physical trajectories and fields, not yet a claimed novel solver.
+
+
+## 9. Verified first native physics receipt (actual GitHub runner)
+
+Raw artifact: kyoto-stage5-real-elastic-FEM-physics, ID 14772749894,
+from successful cross-platform run 45072204086. Generated artifacts
+include CSV evidence, 6 analytical science figures, an offline
+interactive physically integrated 3D volume surface, and 181
+ParaView **volumetric tetrahedral** time-series states.
+
+The actual original C++ native manifest and CSVs report:
+
+| Metric | Result |
+|---|---:|
+| Native integration steps | 900 |
+| Physical duration | 0.675 s |
+| Full 3D FEM vertices / tetrahedra | 180 / 480 |
+| Boundary triangles | 320 |
+| Reference volume | 0.5606804346 m^3 |
+| Conserved lumped mass | 201.8449565 kg |
+| Distinct exported physical states | 181 |
+| First floor impulse | approximately 0.2685 s |
+| Vertex-step ground impulse events | 10,380 |
+| Export intervals containing impulses | 46 |
+| Maximum observed von Mises stress | 7,017.9286 Pa |
+| Minimum observed det(F) | 0.7402905 |
+| Initial mechanical energy | 1,029.6515 J |
+| Mechanical energy at t=0.675 s | 498.5716 J |
+
+Each "vertex-step ground impulse event" is a single vertex receiving a
+normal impulse on one accepted integration step. It is **not** a
+distinct macroscopic collision episode. The repeated count includes
+persistent grounded nodes under a unilateral contact law.
+
+The energy decline includes the configured viscous damping, restitution
+loss and tangential friction; it does not establish high-order energy
+conservation or physical calibration. The stress scalar derives from
+the **Cauchy tensor** of the implemented neo-Hookean model and is
+reported in Pa, not an arbitrarily colored kinematic proxy.
+
+The native exporter, figure generator and test suite succeeded in the
+verified CI run; the separate VTK cinematic renderer has its own
+independent Actions verification workflow.
