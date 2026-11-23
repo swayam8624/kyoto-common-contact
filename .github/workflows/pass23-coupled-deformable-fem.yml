@@ -1,0 +1,47 @@
+name: Kyoto Pass 23 physically coupled two-deformable FEM
+
+on:
+  push:
+    branches: [research/pass23-coupled-deformable-contact]
+    paths:
+      - "include/kyoto/coupled_deformable_fem_contact.hpp"
+      - "include/kyoto/moving_triangle_pair_certificate.hpp"
+      - "tests/coupled_deformable_fem_contact_tests.cpp"
+      - "tests/moving_moving_triangle_certificate_tests.cpp"
+      - ".github/workflows/pass23-coupled-deformable-fem.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+jobs:
+  independent-coupled-physics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build truly coupled source and independent moving-moving contact guard
+        run: |
+          cmake -S . -B build-coupled -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-coupled --parallel 4 \
+            --target kyoto_coupled_deformable_fem_contact_tests \
+                     kyoto_moving_moving_triangle_certificate_tests
+      - name: Physically check impulse momentum kinetic energy clock and no contact penetration
+        run: |
+          mkdir -p results/pass23
+          ctest --test-dir build-coupled \
+            -R 'actual_two_body_coupled_FEM_impulse_momentum_clock_and_CCD_gate|conservative_moving_moving_finite_triangle_time_guard' \
+            --output-on-failure | tee results/pass23/ctest.txt
+          ./build-coupled/kyoto_coupled_deformable_fem_contact_tests \
+            | tee results/pass23/native_physical_coupling.txt
+          git rev-parse HEAD > results/pass23/commit.txt
+          uname -a > results/pass23/host.txt
+      - name: Retain native source physics checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass23-physical-deformable-coupling-${{ matrix.os }}
+          path: results/pass23/
+          if-no-files-found: warn
