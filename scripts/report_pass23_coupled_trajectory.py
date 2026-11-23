@@ -66,8 +66,8 @@ def load_native(path:Path)->list[dict]:
         actual_energy=(numeric["kinetic_energy_j"]+
                        numeric["volumetric_elastic_energy_j"]+
                        numeric["gravity_potential_j"])
-        if abs(actual_energy-numeric["combined_mechanical_energy_j"])>
-               1e-9*max(1.,abs(actual_energy)):
+        if (abs(actual_energy-numeric["combined_mechanical_energy_j"]) >
+                1e-9*max(1.,abs(actual_energy))):
             raise ValueError(f"mechanical-energy source columns conflict at {n}")
     if previous<=0:
         raise ValueError("no elapsed physical source clock")
