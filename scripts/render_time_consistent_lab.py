@@ -183,6 +183,57 @@ def spatial(m,vertices,faces,out):
       "All mesh vertices, sphere geometry, and stress scalars are original native C++ physics data.",
       "Colors show actual Cauchy von Mises stress; geometry is physical FEM, not scripted animation.")
     save(fig,out/"05_true_3d_contact_states.png")
+def interactive_native_states(manifest,vertices,faces,out):
+    """Offline Plotly 3D: four actual native physical FEM states only."""
+    import plotly.graph_objects as go
+    tri=faces[["a","b","c"]].to_numpy(dtype=int)
+    names=["initial","legacy_global_clip","adaptive_full_elapsed_time",
+           "fine_256_same_model"]
+    labels=["Initial source 3D body","Old: clipped physical motion",
+            "Adaptive: complete elapsed dt","Numerical reference: same model /256"]
+    ymax=max(1.,float(vertices.von_mises_pa.max()))
+    fig=go.Figure()
+    for j,name in enumerate(names):
+        df=vertices.loc[vertices.algorithm==name].sort_values("vertex_id")
+        fig.add_trace(go.Mesh3d(
+            x=df.x,y=df.y,z=df.z,
+            i=tri[:,0],j=tri[:,1],k=tri[:,2],
+            intensity=df.von_mises_pa,intensitymode="vertex",
+            cmin=0,cmax=ymax,colorscale="Viridis",
+            colorbar=dict(title="Cauchy von Mises / Pa"),
+            opacity=.98,flatshading=False,
+            lighting=dict(ambient=.45,diffuse=.73,specular=.45,
+                          roughness=.55,fresnel=.24),
+            name=labels[j],visible=j==0))
+    c=np.asarray(manifest["sphere_center_xyz_m"],dtype=float)
+    r=float(manifest["fast_sphere_radius_m"])
+    xx,yy,zz=sphere(c,r)
+    fig.add_trace(go.Surface(x=xx,y=yy,z=zz,
+        surfacecolor=np.zeros_like(xx),colorscale=[[0,GOLD],[1,GOLD]],
+        showscale=False,opacity=.3,name="Original static rigid sphere"))
+    buttons=[]
+    for i,label in enumerate(labels):
+        shown=[j==i for j in range(4)]+[True]
+        buttons.append(dict(label=label,method="update",
+            args=[dict(visible=shown),
+                  dict(title=("KYOTO / FAST IMPACT — "+label+
+                        "<br><sup>Original FEM state, true Cauchy stress, "
+                        "actual rigid sphere; numerical fine version is same model</sup>"))]))
+    fig.update_layout(
+        title="KYOTO / SOURCE-BACKED 3D FEM COLLISION COMPARISON",
+        paper_bgcolor=BG,plot_bgcolor=BG,font=dict(color=INK),
+        height=850,margin=dict(l=12,r=12,t=110,b=20),
+        updatemenus=[dict(type="dropdown",showactive=True,
+                          x=.02,y=1.08,buttons=buttons)],
+        scene=dict(bgcolor=BG,aspectmode="manual",
+            aspectratio=dict(x=1,y=1,z=.91),
+            xaxis=dict(range=[-1.4,1.4],title="X (m)",gridcolor=GRID),
+            yaxis=dict(range=[-1.4,1.4],title="Y (m)",gridcolor=GRID),
+            zaxis=dict(range=[-1.4,1.15],title="Z (m)",gridcolor=GRID),
+            camera=dict(eye=dict(x=1.65,y=-1.9,z=1.2))))
+    fig.write_html(out/"06_interactive_real_FEM_fast_event.html",
+                   full_html=True,include_plotlyjs=True)
+
 def atlas(out):
     # 4 full-size scientific figures followed by a genuinely wide
     # 4-state 3D comparison. This avoids shrinking the 3D evidence
@@ -225,6 +276,7 @@ def main():
     fine_model(compare,a.output)
     energy(history,a.output)
     spatial(m,vertices,faces,a.output)
+    interactive_native_states(m,vertices,faces,a.output)
     atlas(a.output)
     print("PASS: 900-step native FEM time-replay, five actual physics figures, original 3D solver geometry")
 if __name__=="__main__":main()
