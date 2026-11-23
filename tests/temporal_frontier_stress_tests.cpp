@@ -47,6 +47,16 @@ static void check(RefitHierarchy& frontier,RefitHierarchy& plain,
     if(found!=truth||baseline!=truth)
         throw std::runtime_error(std::string(label)+
             ": temporal frontier lost or added admissible candidate");
+    // The bounded frontier cannot do expensive complete-cut construction
+    // and only afterward throw the memory away: its actual retained size
+    // and even attempted cut must remain beneath the advertised limit.
+    const std::size_t limit=std::max(std::size_t{64},
+        std::size_t{4}*(mesh.vertices.size()+mesh.edges.size()+
+                        mesh.faces.size()));
+    if(frontier.pair_cut_size()>limit ||
+       frontier.last_pair_cut_attempted_size()>limit)
+        throw std::runtime_error(std::string(label)+
+            ": frontier violated preemptive memory cap");
 }
 int main() {
  try{
@@ -82,6 +92,8 @@ int main() {
     }
     need(frontier.pair_cut_reuses()>0,
          "frontier was never reused in a localized regime");
+    need(frontier.pair_cut_skipped_frames()>0,
+         "dense fallback must charge actual coarse-region traversal");
 
     m.faces[0].mask=0; // Same epoch, different collision policy
     check(frontier,plain,m,"mask change");
