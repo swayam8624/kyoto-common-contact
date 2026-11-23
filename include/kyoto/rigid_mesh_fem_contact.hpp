@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <iterator>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -65,6 +66,14 @@ struct MeshPhysicalLeaf{
     std::size_t active_face_pairs{},face_impulse_updates{},
         continuous_pair_tests{},interval_nodes{};
     unsigned subdivision_depth{};
+};
+// Original accepted FEM start/end states are stored only when a caller
+// explicitly requests this verification trace. Every record corresponds
+// to an actually integrated leaf, never a rejected trial or fabricated
+// interpolation between separate solver macro-steps.
+struct MeshAcceptedTransition{
+    Body before{}, after{};
+    MeshPhysicalLeaf receipt{};
 };
 struct MeshStepResult{
     bool accepted{};
@@ -250,7 +259,8 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
 inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     Body& body,const StaticTriangleMesh& rigid,double dt,
     const RigidMeshContactSettings& cfg={},
-    std::vector<MeshPhysicalLeaf>* receipts=nullptr){
+    std::vector<MeshPhysicalLeaf>* receipts=nullptr,
+    std::vector<MeshAcceptedTransition>* accepted_transitions=nullptr){
     validate(rigid);validate(cfg);
     if(!(std::isfinite(dt)&&dt>=cfg.minimum_dt_s))
         throw std::invalid_argument("invalid mesh FEM timestep");
@@ -261,6 +271,7 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     MeshAdaptiveStats result;
     result.start_s=initial_clock;
     std::vector<MeshPhysicalLeaf> local;
+    std::vector<MeshAcceptedTransition> local_transitions;
     // Nodal impulses are accumulated across ACTUAL accepted physical
     // leaves. Rejected proposals do not contribute. Without this,
     // a macro-step's scalar impulse total would include all leaves
@@ -305,6 +316,10 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
                          r.normal_impulse_ns,r.external_contact_impulse,
                          r.active_face_pairs,r.face_impulse_updates,
                          r.continuous_pair_tests,r.interval_nodes,depth});
+        // Write snapshots to a PRIVATE staging vector. If any later leaf
+        // fails, the caller receives no partial successful trajectory.
+        if(accepted_transitions)
+            local_transitions.push_back({staged,trial,local.back()});
         for(std::size_t i=0;i<trial.nodes.size();i++)
             accumulated_nodal_impulse[i]+=
                 trial.nodes[i].last_normal_impulse;
@@ -336,6 +351,10 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     body=std::move(staged);
     if(receipts)receipts->insert(receipts->end(),
                                 local.begin(),local.end());
+    if(accepted_transitions)
+        accepted_transitions->insert(accepted_transitions->end(),
+            std::make_move_iterator(local_transitions.begin()),
+            std::make_move_iterator(local_transitions.end()));
     return result;
 }
 
