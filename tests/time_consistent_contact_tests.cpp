@@ -84,9 +84,19 @@ int main(){
     // new method must accept only fully integrated safe substeps.
     {
         Body seed=toroidal_solid();
-        for(auto& node:seed.nodes)node.v={0,0,-900};
+        // Bring the rigid surface to 15 mm of its original rest mesh.
+        // Then even a moderate 50m/s incoming velocity produces a
+        // genuine continuous-time contact inside a 0.75ms trial,
+        // without the unphysical 900m/s shock that inverts elements.
+        RigidSphere sphere{};
+        const double original_gap=
+            audit_surface_sphere(seed,sphere).minimum_surface_clearance_m;
+        sphere.radius+=original_gap-0.015;
+        must(near(audit_surface_sphere(seed,sphere)
+                 .minimum_surface_clearance_m,.015,1e-10),
+             "near-contact analytic fixture incorrectly positioned");
+        for(auto& node:seed.nodes)node.v={0,0,-50};
         Body legacy=seed;
-        const RigidSphere sphere{};
         const auto old=step_whole_face_sphere(legacy,sphere,.00075);
         must(old.time_clipped&&old.accepted_global_fraction<1,
              "fast fixture did not activate original unsafe clock shortcut");
@@ -128,7 +138,10 @@ int main(){
     // physical state nor preexisting receipts may change.
     {
         Body b=toroidal_solid();
-        for(auto& n:b.nodes)n.v={0,0,-900};
+        RigidSphere sphere{};
+        sphere.radius+=audit_surface_sphere(b,sphere)
+                         .minimum_surface_clearance_m-.015;
+        for(auto& n:b.nodes)n.v={0,0,-50};
         const Body original=b;
         TimeConsistentSettings policy;
         policy.maximum_bisection_depth=0;
@@ -136,7 +149,7 @@ int main(){
         bool failed=false;
         try{
             (void)step_time_consistent_whole_face_sphere(
-                b,RigidSphere{},.00075,policy,&receipts);
+                b,sphere,.00075,policy,&receipts);
         }catch(const std::runtime_error&){failed=true;}
         must(failed,"insufficient temporal budget silently accepted");
         same_body(b,original,0);
