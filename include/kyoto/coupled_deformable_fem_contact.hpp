@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <utility>
