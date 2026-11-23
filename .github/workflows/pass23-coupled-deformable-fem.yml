@@ -7,6 +7,7 @@ on:
       - "include/kyoto/coupled_deformable_fem_contact.hpp"
       - "include/kyoto/moving_triangle_pair_certificate.hpp"
       - "tests/coupled_deformable_fem_contact_tests.cpp"
+      - "apps/pass23_coupled_trajectory.cpp"
       - "tests/moving_moving_triangle_certificate_tests.cpp"
       - ".github/workflows/pass23-coupled-deformable-fem.yml"
       - "CMakeLists.txt"
@@ -27,7 +28,8 @@ jobs:
           cmake -S . -B build-coupled -DCMAKE_BUILD_TYPE=Release
           cmake --build build-coupled --parallel 4 \
             --target kyoto_coupled_deformable_fem_contact_tests \
-                     kyoto_moving_moving_triangle_certificate_tests
+                     kyoto_moving_moving_triangle_certificate_tests \
+                     kyoto_pass23_coupled_trajectory
       - name: Physically check impulse momentum kinetic energy clock and no contact penetration
         run: |
           mkdir -p results/pass23
@@ -38,6 +40,12 @@ jobs:
             | tee results/pass23/native_physical_coupling.txt
           git rev-parse HEAD > results/pass23/commit.txt
           uname -a > results/pass23/host.txt
+      - name: Integrate sustained TRUE deformable-deformable physical collision
+        run: |
+          mkdir -p results/pass23/trajectory
+          ./build-coupled/kyoto_pass23_coupled_trajectory \
+            results/pass23/trajectory \
+            | tee results/pass23/trajectory/console.txt
       - name: Retain native source physics checks
         if: always()
         uses: actions/upload-artifact@v4
