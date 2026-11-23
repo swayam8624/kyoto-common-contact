@@ -366,6 +366,7 @@ jobs:
           visuals=p/"visuals"
           assert len(list(visuals.glob("[0-9][0-9]_*.png")))==7
           assert (visuals/"STAGE10_ROUNDED_CONTACT_AND_FEM_PHYSICS_ATLAS.png").stat().st_size>100000
+          assert (visuals/"08_interactive_3D_stress_and_rounded_clearance.html").stat().st_size>100000
           print("PASS: outward IEEE interval sweep",
                 n["ordinary_strictly_proven"],"of",n["ordinary_face_intervals"],
                 "routine and",n["fast_strictly_proven"],"of",
