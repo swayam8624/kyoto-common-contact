@@ -212,8 +212,8 @@ def science_3d(m,face_receipts,physical_vertices,topology,out):
     stress=vertices.von_mises_pa.to_numpy()
     s=sphere_geometry(m["fast_sphere_center_xyz_m"],
                         m["fast_sphere_radius_m"])
-    fig=plt.figure(figsize=(13.7,7.4))
-    fig.subplots_adjust(left=.01,right=.98,bottom=.05,top=.78,wspace=.02)
+    fig=plt.figure(figsize=(18.5,7.9))
+    fig.subplots_adjust(left=.01,right=.99,bottom=.07,top=.81,wspace=.01)
     for side in range(2):
         ax=fig.add_subplot(1,2,side+1,projection="3d")
         if side==0:
@@ -245,30 +245,41 @@ def science_3d(m,face_receipts,physical_vertices,topology,out):
     save(fig,out/"07_independent_3d_swept_proof_map.png")
 
 def atlas(out):
-    sources=[f"{i:02d}_{name}.png" for i,name in [
+    # Six metric figures in three 2-column rows, followed by a
+    # full-width 3D scientific proof image of the source FEM geometry.
+    # This prevents the critical 3D evidence from being reduced to a
+    # tiny quarter-sized diagram while the opposite half stays empty.
+    first=[f"{i:02d}_{name}.png" for i,name in [
         (1,"independent_swept_certificate_coverage"),
         (2,"independent_proof_computation"),
         (3,"independent_voronoi_distance_difference"),
         (4,"impulse_kinetic_work_identity"),
         (5,"local_momentum_angular_residuals"),
-        (6,"contact_local_energy_dissipation"),
-        (7,"independent_3d_swept_proof_map")]]
-    canvas=Image.new("RGB",(1950,2840),BG)
-    for i,source in enumerate(sources):
-        image=Image.open(out/source).convert("RGB")
-        image.thumbnail((970,660))
-        x=i%2*975+(975-image.width)//2
-        y=135+(i//2)*660+(660-image.height)//2
-        canvas.paste(image,(x,y));image.close()
-    painter=ImageDraw.Draw(canvas)
+        (6,"contact_local_energy_dissipation")]]
+    canvas=Image.new("RGB",(1960,3170),BG)
+    for i,name in enumerate(first):
+        pic=Image.open(out/name).convert("RGB")
+        pic.thumbnail((965,610))
+        x=i%2*980+(980-pic.width)//2
+        y=142+(i//2)*655+(655-pic.height)//2
+        canvas.paste(pic,(x,y))
+        pic.close()
+    last=Image.open(out/"07_independent_3d_swept_proof_map.png").convert("RGB")
+    last.thumbnail((1900,870))
+    canvas.paste(last,((1960-last.width)//2,2140))
+    last.close()
+    draw=ImageDraw.Draw(canvas)
     try:
         font=ImageFont.truetype(
-          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",38)
+          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",40)
     except OSError:font=ImageFont.load_default()
-    painter.text((35,27),"KYOTO / PASS 09 — INDEPENDENT VALIDATION",
-                 fill=INK,font=font)
-    painter.text((35,81),
-       "3D continuous geometry · independent distance oracle · physical impulse balances · actual FEM",
+    draw.text((43,31),"KYOTO / PASS 09 — INDEPENDENT VALIDATION",
+              fill=INK,font=font)
+    draw.text((43,91),
+       "Continuous 3D geometry | second distance oracle | impulse work and momentum | real FEM",
+       fill=MUTED)
+    draw.text((43,3124),
+       "Theorems: exact arithmetic. Computation: binary64 with a conservative guard; no general IPC mesh solver or speedup claim.",
        fill=MUTED)
     canvas.save(out/"STAGE9_INDEPENDENT_CONTACT_SCIENCE_ATLAS.png")
 
