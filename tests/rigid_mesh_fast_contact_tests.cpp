@@ -63,8 +63,9 @@ int main(int argc,char**argv) {
     must(body.time_seconds==0&&copy.time_seconds==0,
          "rejected mesh full trial advanced public physical time");
     std::vector<MeshPhysicalLeaf> leaves;
+    std::vector<MeshAcceptedTransition> transitions;
     const auto accepted=step_time_consistent_rigid_triangle_mesh(
-        body,rigid,dt,s,&leaves);
+        body,rigid,dt,s,&leaves,&transitions);
     must(accepted.rejected_geom_trials>0&&accepted.accepted_leaves>1,
          "true finite-mesh fast impact was not time-subdivided");
     must(std::abs(accepted.integrated_dt_s-dt)<1e-12&&
@@ -72,6 +73,22 @@ int main(int argc,char**argv) {
          "finite mesh adaptive collision lost physical elapsed time");
     must(leaves.size()==accepted.accepted_leaves,
          "source physical substep receipts incomplete");
+    must(transitions.size()==leaves.size(),
+         "every accepted physical leaf must have original FEM endpoints");
+    for(std::size_t i=0;i<transitions.size();++i){
+        const auto& record=transitions[i];
+        must(std::abs(record.before.time_seconds-leaves[i].start_time_s)<1e-12&&
+             std::abs(record.after.time_seconds-leaves[i].end_time_s)<1e-12,
+             "original source motion endpoints not tied to accepted physical leaf");
+        must(record.before.nodes.size()==record.after.nodes.size(),
+             "source FEM physical leaf topology changed");
+        if(i>0){
+            for(std::size_t j=0;j<record.before.nodes.size();++j)
+                must(norm(record.before.nodes[j].x-
+                          transitions[i-1].after.nodes[j].x)<1e-12,
+                     "adjacent actual accepted FEM leaves have a geometry gap");
+        }
+    }
     double accounted=0,minimum_gap=1e10,minJ=1e10;
     for(std::size_t i=0;i<leaves.size();i++){
         const auto& r=leaves[i];
