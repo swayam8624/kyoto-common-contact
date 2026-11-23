@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <string>
 #include <random>
 #include <stdexcept>
 #include <utility>
@@ -11,7 +12,10 @@
 namespace f=kyoto::contact::features;
 using kyoto::contact::Vec3;
 static f::Vertex vertex(std::uint64_t id,Vec3 p){
-    return {id,{{{p,p,p,p}}}};
+    f::Vertex v;
+    v.id=id;
+    v.path.control={p,p,p,p};
+    return v;
 }
 static void verify(kyoto::contact::atlas::RefitHierarchy& h,
                    const f::Mesh& mesh,const char* label){
