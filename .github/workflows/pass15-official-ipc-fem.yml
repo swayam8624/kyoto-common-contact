@@ -6,6 +6,8 @@ on:
     paths:
       - "apps/pass15_official_ipc_fem_benchmark.cpp"
       - "include/kyoto/fem_feature_snapshots.hpp"
+      - "include/kyoto/rigid_mesh_fem_contact.hpp"
+      - "tests/rigid_mesh_fast_contact_tests.cpp"
       - "tests/fem_feature_snapshots_tests.cpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
@@ -33,11 +35,12 @@ jobs:
             --target kyoto_pass15_official_ipc_fem_benchmark \
                      kyoto_official_ipc_lbvh_tests \
                      kyoto_refit_feature_hierarchy_tests \
-                     kyoto_fem_feature_snapshots_tests
+                     kyoto_fem_feature_snapshots_tests \
+                     kyoto_fast_mesh_impact_tests
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision' \
             --output-on-failure
       - name: Generate verified original-solver matched source receipts
         run: |
