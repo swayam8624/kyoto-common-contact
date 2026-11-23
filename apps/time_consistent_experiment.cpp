@@ -177,7 +177,7 @@ int main(int argc,char**argv){
     const auto comparison_file=dir/"fast_original_vs_adaptive_vs_fine.csv";
     std::ofstream comp(comparison_file);
     comp<<std::setprecision(17);
-    comp<<"algorithm,end_time_s,total_physical_time_integrated_s,"
+    comp<<"algorithm,end_time_s,verified_integrated_elapsed_time_s_or_nan,"
            "accepted_full_substeps,clipped_fraction_of_old_trial,"
            "mean_position_difference_from_fine_m,"
            "mean_velocity_difference_from_fine_m_per_s,"
@@ -199,7 +199,7 @@ int main(int argc,char**argv){
     };
     // The first row preserves the physical shortcut, rather than
     // falsely calling clipped displacement a complete integrated dt.
-    report("legacy_global_clip",old,old_result.accepted_global_fraction*dt,
+    report("legacy_global_clip",old,std::numeric_limits<double>::quiet_NaN(),
            1,old_result.accepted_global_fraction,
            old_result.total_normal_impulse_ns);
     report("adaptive_full_elapsed_time",adaptive,
@@ -209,6 +209,39 @@ int main(int argc,char**argv){
     report("fine_256_same_model",fine,dt,int(fine_substeps),1.,
            fine_normal_impulse);
     comp.close();
+
+
+    // Preserve the ORIGINAL physical 3D vertices and material stress
+    // at each solver outcome. A renderer can show the actual
+    // divergent contact trajectories without inventing positions.
+    std::ofstream state_csv(dir/"fast_event_true_3d_states.csv");
+    state_csv<<std::setprecision(17);
+    state_csv<<"algorithm,vertex_id,rest_x,rest_y,rest_z,"
+               "x,y,z,vx,vy,vz,von_mises_pa,displacement_m\n";
+    const auto store_state=[&](const char* name,const Body& b){
+        const auto fields=b.evaluate();
+        for(std::size_t i=0;i<b.nodes.size();i++){
+            const auto& n=b.nodes[i];
+            state_csv<<name<<','<<i<<','<<n.rest.x<<','<<n.rest.y
+                     <<','<<n.rest.z<<','<<n.x.x<<','<<n.x.y<<','
+                     <<n.x.z<<','<<n.v.x<<','<<n.v.y<<','<<n.v.z
+                     <<','<<fields.nodal_von_mises_pa[i]<<','
+                     <<norm(n.x-n.rest)<<'\n';
+        }
+    };
+    store_state("initial",initial);
+    store_state("legacy_global_clip",old);
+    store_state("adaptive_full_elapsed_time",adaptive);
+    store_state("fine_256_same_model",fine);
+    state_csv.close();
+
+    std::ofstream topology_csv(dir/"fast_event_surface_faces.csv");
+    topology_csv<<"face_id,a,b,c\n";
+    for(std::size_t i=0;i<initial.surface_faces.size();i++){
+        const auto f=initial.surface_faces[i];
+        topology_csv<<i<<','<<f[0]<<','<<f[1]<<','<<f[2]<<'\n';
+    }
+    topology_csv.close();
 
     std::ofstream manifest(dir/"manifest.json");
     manifest<<std::setprecision(17);
@@ -247,14 +280,14 @@ int main(int argc,char**argv){
             <<" \"adaptive_mean_velocity_error_against_fine_mps\":"<<mean_velocity_separation(adaptive,fine)<<"\n"
             <<"}\n";
     if(!manifest.good()||!regular_csv.good()||!comp.good()||
-       !receipt_csv.good())
+       !receipt_csv.good()||!state_csv.good()||!topology_csv.good())
         throw std::runtime_error("failed writing original C++ timestep evidence");
     std::cout<<"PASS: real FEM adaptive elapsed-time integration"
              <<" regular_steps=900 regular_time="<<regular.time_seconds
              <<" fast_rejected_clipped="<<result.rejected_clipped_trials
              <<" fast_rejected_inverted="<<result.rejected_inverted_trials
              <<" fast_accepted_substeps="<<result.accepted_substeps
-             <<" old_actual_displacement_time_s="
+             <<" old_nominal_motion_fraction_times_dt_s="
              <<old_result.accepted_global_fraction*dt
              <<" adaptive_integrated_time_s="<<result.actually_integrated_dt_s
              <<" old_pos_difference_from_fine_m="<<mean_position_separation(old,fine)
