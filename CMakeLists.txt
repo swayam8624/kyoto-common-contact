@@ -101,6 +101,13 @@ add_executable(kyoto_rigid_mesh_fem_tests tests/rigid_mesh_fem_contact_tests.cpp
 target_link_libraries(kyoto_rigid_mesh_fem_tests PRIVATE kyoto_contact)
 add_test(NAME real_nonplanar_finite_rigid_mesh_FEM_contact
          COMMAND kyoto_rigid_mesh_fem_tests)
+# Pass 11C: actual time-reintegrated fast physical collision with 72
+# finite nonplanar rigid triangles, NOT merely a rollback negative test.
+add_executable(kyoto_fast_mesh_impact_tests tests/rigid_mesh_fast_contact_tests.cpp)
+target_link_libraries(kyoto_fast_mesh_impact_tests PRIVATE kyoto_contact)
+add_test(NAME actual_adaptive_fast_finite_rigid_mesh_FEM_collision
+         COMMAND kyoto_fast_mesh_impact_tests)
+
 
 
 
