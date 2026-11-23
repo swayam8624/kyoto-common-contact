@@ -228,3 +228,11 @@ add_executable(kyoto_fem_feature_snapshots_tests
 target_link_libraries(kyoto_fem_feature_snapshots_tests PRIVATE kyoto_contact)
 add_test(NAME identical_real_FEM_feature_source_and_refit_contract
          COMMAND kyoto_fem_feature_snapshots_tests)
+
+# Pass 17: stress the actual persisted VF/EE node-pair cut against
+# independent exhaustive enumeration in dense and rapidly changing 3D.
+add_executable(kyoto_temporal_frontier_stress_tests
+               tests/temporal_frontier_stress_tests.cpp)
+target_link_libraries(kyoto_temporal_frontier_stress_tests PRIVATE kyoto_contact)
+add_test(NAME retained_spacetime_pair_frontier_dense_sparse_oracle
+         COMMAND kyoto_temporal_frontier_stress_tests)
