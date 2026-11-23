@@ -5,7 +5,7 @@
 // All feature boxes are rebuilt each frame; tree node bounding volumes
 // refit bottom-up. Topology/signature changes rebuild the hierarchy.
 // Broadphase candidates are NOT CCD events. No speedup is claimed.
-#include "kyoto/feature_broadphase.hpp"
+#include "kyoto/cached_feature_boxes.hpp"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -89,6 +89,7 @@ class RefitHierarchy {
     };
 
     Tree vertices_,faces_,edges_;
+    CachedFeatureBoxes swept_boxes_;
     std::vector<std::uint64_t> key_;
     bool initialized_{};
     std::size_t rebuilds_{},refits_{};
@@ -168,9 +169,12 @@ public:
     f::Result query(const f::Mesh& mesh) {
         // Include all source mesh validation, box construction and
         // topology signature work in the benchmark timer.
-        const auto built=f::build(mesh);
         const auto next=signature(mesh);
-        if(!initialized_||next!=key_){
+        const bool topology_changed=(!initialized_||next!=key_);
+        // Both methods pay current signature validation and fresh swept
+        // conservative boxes. Warm calls reuse validated vertex indices.
+        const auto& built=swept_boxes_.update(mesh,topology_changed);
+        if(topology_changed){
             vertices_.build(built.vertices);
             edges_.build(built.edges);
             faces_.build(built.faces);
