@@ -268,7 +268,7 @@ int main(int argc,char**argv){
             <<" \"sphere_center_xyz_m\":["<<near_sphere.center.x<<','
                  <<near_sphere.center.y<<','<<near_sphere.center.z<<"],\n"
             <<" \"old_global_accepted_fraction\":"<<old_result.accepted_global_fraction<<",\n"
-            <<" \"old_displacement_time_s\":"<<old_result.accepted_global_fraction*dt<<",\n"
+            <<" \"old_motion_fraction_times_dt_s_not_physically_integrated\":"<<old_result.accepted_global_fraction*dt<<",\n"
             <<" \"old_charged_clock_time_s\":"<<old.time_seconds<<",\n"
             <<" \"adaptive_rejected_clipped_proposals\":"<<result.rejected_clipped_trials<<",\n"
             <<" \"adaptive_rejected_inverted_proposals\":"<<result.rejected_inverted_trials<<",\n"
