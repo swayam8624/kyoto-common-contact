@@ -41,7 +41,11 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Apply globally synchronized whole-face safe-prefix to actual 3D FEM and distribute effective-mass barycentric normal/tangential contact impulses; zero face overlap on all 901 accepted states.
 - [x] Preserve old vertex-only failed 901-state control and run independent 900-step A/B physical-energy/trajectory comparison: 458 versus 0 penetrating states.
 - [x] Adversarial extreme 900 m/s whole-face continuous-tunnelling regression: global accepted fraction strictly below one with no accepted face overlap.
-- [ ] Correctly re-integrate remaining fractional TOI time, without global motion clipping changing the physical integrator's clock; quantify solver accuracy.
+- [x] Pass 8 finite-test **actual elapsed-time adaptive replay**: reject full-face-clipped or tet-inverting trial, halve real dt, recompute FEM forces/impulses, accept only fully certified substeps, and verify exact consumed physical duration.
+- [x] Cross-platform Debug/Release tests: 40-step free-flight equivalence, 900-step actual FEM surface-safe impact, 50 m/s 15-mm-gap adaptive collision, and all-or-nothing failed-step rollback.
+- [x] Native original time-partition/impulse/energy/3D physical stress evidence and 256-finer-step SAME-model numerical reference (not an independent physics solver).
+- [ ] An exact contact-time coupled solver that reintegrates event-relative remaining time with global inequality constraints and systematic independent accuracy/convergence bounds.
+- [ ] Support the physically violent 900 m/s inversion/budget failure rather than pretending to solve it.
 - [x] Verify no static triangle/sphere overlap on ALL 901 accepted whole-face FEM states, with positive tetrahedral Jacobians and finite energy.
 - [ ] Independent machine-certified continuous full-face interval checks, physical energy/momentum accuracy and FP boundary robustness.
 - [ ] General triangle-mesh rigid/deformable response and self-contact with official IPC CCD, beyond a smooth static analytic sphere.
