@@ -374,6 +374,69 @@ jobs:
                 n["ordinary_unresolved"]+n["fast_unresolved"],
                 "; full momentum and angular ledger over",len(balance),"physical substeps")
           PY
+      - name: Pass 11 finite rigid triangle mesh true VF EE and piercing negative control
+        run: ./build/kyoto_triangle_mesh_tests results/pass11-mesh
+      - name: Pass 11 real nonplanar indexed rigid triangle contact neo-Hookean FEM
+        run: ./build/kyoto_rigid_mesh_fem_tests results/pass11-mesh
+      - name: Pass 11 scientific original FEM 3D, contact impulse and GIF visual atlas
+        run: |
+          python scripts/render_pass11_real_triangle_fem.py \
+            --input results/pass11-mesh \
+            --output results/pass11-mesh/visuals
+      - name: Inspect complete actual 3D finite-mesh rigid collision evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,csv,math
+          root=Path("results/pass11-mesh")
+          m=json.loads((root/"rigid_mesh_manifest.json").read_text())
+          assert m["actual_rigid_triangle_contact_response"]
+          assert not m["sphere_used_to_resolve_mesh_contact"]
+          assert not m["rounding_formally_certified"]
+          assert not m["self_contact_solved"]
+          assert not m["implicit_KKT_or_IPC_barrier_physics"]
+          assert m["physical_steps"]==900
+          assert abs(m["final_physical_time_s"]-.675)<1e-9
+          assert m["deformable_vertices"]==180
+          assert m["deformable_tetrahedra"]==480
+          assert m["deformable_surface_triangles"]==320
+          assert m["rigid_vertices"]==49 and m["rigid_triangles"]==72
+          assert m["first_contact_time_s"]>0
+          assert m["actual_contact_steps"]>0
+          assert m["face_impulse_updates"]>0
+          assert m["accepted_actual_physical_leaves"]>=900
+          assert m["smallest_full_face_mesh_clearance_m"]>0
+          assert m["smallest_tetra_jacobian"]>1e-6
+          states=list(csv.DictReader((root/"rigid_triangle_physics_900.csv").open()))
+          verts=list(csv.DictReader((root/"rigid_triangle_physical_vertices.csv").open()))
+          negative=list(csv.DictReader((root/"real_FEM_against_nonresponding_rigid_mesh.csv").open()))
+          assert len(states)==901 and len(verts)==91*180
+          assert len(negative)==181
+          assert all(float(x["finite_triangle_min_distance_m"])>0 for x in states)
+          assert all(float(x["min_tetra_j"])>1e-6 for x in states)
+          assert sum(int(x["face_impulse_updates"]) for x in states)==m["face_impulse_updates"]
+          assert len(list(csv.DictReader((root/"deformable_surface_triangles.csv").open())))==320
+          assert len(list(csv.DictReader((root/"rigid_patch_original_triangles.csv").open())))==72
+          assert len(list(csv.DictReader((root/"rigid_patch_original_vertices.csv").open())))==49
+          v=root/"visuals"
+          assert len(list(v.glob("[0-9][0-9]_*.png")))==7
+          assert (v/"STAGE11_TRUE_TRIANGULAR_MESH_CONTACT_SCIENCE_ATLAS.png").stat().st_size>100000
+          assert (v/"08_interactive_real_rigid_mesh_contact.html").stat().st_size>100000
+          assert (v/"REAL_FINITE_TRIANGLE_FEM_MOTION.gif").stat().st_size>100000
+          n=sum(int(x["intersecting_face_pairs"])>0 for x in negative)
+          print("PASS: finite triangle mesh actual FEM response",m["physical_steps"],
+                "steps",m["face_impulse_updates"],"impulses",
+                m["smallest_full_face_mesh_clearance_m"],"minimum clearance",
+                m["smallest_tetra_jacobian"],"min J; nonresponding sphere-only",
+                "negative-control intersecting sampled states",n,
+                "with physically distinct collider, not a speed comparison")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage11-real-rigid-triangle-mesh-FEM-contact-evidence
+          path: results/pass11-mesh/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage10-IEEE-outward-CCD-and-full-FEM-momentum-evidence
