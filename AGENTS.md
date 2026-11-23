@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/20 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/21 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -60,6 +60,26 @@ contact. Physics correctness comes first, not beautiful animation.
   to FROZEN-POSITION face impulses. Do not assert total conservation
   of kinetic+elastic+gravitational energy in the damping/friction
   and finite-dt neo-Hookean integrator.
+- Pass 10's IEEE interval verifier uses explicit outward bounds on
+  all endpoint dot/norm operations, plus exact-dyadic interval
+  positions from ORIGINAL physical vertex endpoints. It is strict
+  only under stated IEC559/nearest/subnormal/no-fast-math semantics;
+  do NOT claim formal universal hardware/compilation proof.
+- Pass 10 verified all 288,000+1,600 accepted physical moving
+  triangle/sphere face paths in its supported arithmetic model,
+  0 unresolved on those particular source trajectories. This is
+  NOT general deformable triangle-mesh / triangle-mesh CCD.
+- Whole-body discrete P/L accounting now measures actual external
+  3D contact vector impulses plus elastic forces, gravity, damping
+  and Euler angular position-transport. It is NOT full physical
+  energy conservation or calibration. Preserve original routine
+  -459.624 J and fast -14545.237 J energy results and scientific
+  concern about extreme dissipative contact.
+- The CENTRAL thesis is still a correctly maintained, fully paid
+  SCA broadphase competing against official IPC Toolkit LBVH.
+  Stronger contact validation does not itself establish a speedup,
+  a new incremental hierarchy, self-contact or paper novelty.
+
 - The independent geometry audit must NOT change physical positions,
   velocities, momentum or stress; it only reads/replays accepted
   original FEM substeps and records proof statuses.
