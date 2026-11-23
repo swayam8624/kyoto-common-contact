@@ -1,0 +1,56 @@
+name: Kyoto Pass 20 controlled synthetic motion sparsity
+
+# Feature-only 3D stress experiment. Never label these motion paths as
+# original FEM physics or compare times across different runner hardware.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - "apps/pass20_synthetic_motion_sparsity.cpp"
+      - "scripts/report_pass20_sparsity.py"
+      - "include/kyoto/**"
+      - ".github/workflows/pass20-synthetic-sparsity.yml"
+  workflow_dispatch:
+
+jobs:
+  independent-feature-crossover:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile standalone C++23 original feature oracle stress
+        run: |
+          mkdir -p build-pass20 results/pass20/native
+          c++ --version | head -n 1 > results/pass20/native/toolchain.txt
+          git rev-parse HEAD >> results/pass20/native/toolchain.txt
+          c++ -std=c++23 -O3 -DNDEBUG -Iinclude \
+            -o build-pass20/synthetic_sparsity \
+            apps/pass20_synthetic_motion_sparsity.cpp
+      - name: Measure controlled 3D synthetic feature-only motion sparsity
+        run: |
+          ./build-pass20/synthetic_sparsity results/pass20/native \
+            | tee results/pass20/native/console.txt
+      - name: Validate original measurements and generate evidence plot
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass20_sparsity.py \
+            --input results/pass20/native/synthetic_feature_motion_sparsity.csv \
+            --output results/pass20/science
+      - name: Preserve per-platform raw receipts and source plots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass20-feature-sparsity-${{ matrix.os }}
+          path: results/pass20/
+          if-no-files-found: warn
