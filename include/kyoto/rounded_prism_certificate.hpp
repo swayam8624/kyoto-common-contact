@@ -160,7 +160,14 @@ inline RoundedWitness verify_plane(
         // Divide by upper ||n|| only for a reported lower margin.
         // The strict *boolean* proof requires only dot LOWER > rhs UPPER.
         if(!std::isfinite(lower)||lower<=0)return result;
-        smallest=std::min(smallest,lower/len.hi);
+        // The reported metric must ALSO be a genuine lower bound:
+        // a round-to-nearest division might otherwise exaggerate
+        // the clearance by a final ULP, even though the proof bool
+        // itself was already one-sided and conservative.
+        const double normalized_lower=down(lower/len.hi);
+        if(!(std::isfinite(normalized_lower)&&normalized_lower>0))
+            return result;
+        smallest=std::min(smallest,normalized_lower);
     }
     result.proven=true;
     result.strictly_positive_lower_margin_m=smallest;
