@@ -30,6 +30,18 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [ ] Ablate maintained frontier / local refit / subtree rebuild / fallback.
 - [ ] Verify tail cost and static / dense / high-motion negative regimes.
 
+## Pass-6 curved contact and full-face mathematical gate
+
+- [x] Real 900-step tetrahedral neo-Hookean torus vs curved rigid sphere (actual physical motion, analytic swept vertex sphere CCD and impulses).
+- [x] Independent static full-surface audit of **all 901 accepted states**: zero vertex penetrations, **458 states with penetrating faces**, minimum face clearance -21.10 mm — genuine negative result.
+- [x] Six source-backed figures, 181 actual volumetric ParaView frames, interactive curved impact replay and original native CSVs in verified CI artifact.
+- [x] Exact-arithmetic theorem and C++23 implementation for conservative moving-triangle/sphere time-interval separation using Lipschitz midpoint lower bound.
+- [x] Controlled interior face tunnelling cases, 640 seeded randomized 3D triangle paths and 128,640 sampled path checks; detect original solver's first offending face transition.
+- [ ] Machine-certified directed-rounding implementation for continuous whole-face interval bounds.
+- [ ] **Apply synchronized whole-face safe-prefix/TOI to the actual physical solver**, distribute contact impulse through nearest-face barycentric participation and integrate the remaining time.
+- [ ] Independently verify no triangle/rigid-body penetration on EVERY accepted state AND every accepted linear interval; verify momentum/energy and mesh inversion under contact.
+- [ ] General triangle-mesh rigid/deformable response and self-contact with official IPC CCD, beyond a smooth static analytic sphere.
+
 ## Physics scenes and adapters
 
 - [x] First actual freely deforming 3D volumetric hyperelastic solid against flat plane (not yet a self-contact-rich or IPC-constrained solver).
