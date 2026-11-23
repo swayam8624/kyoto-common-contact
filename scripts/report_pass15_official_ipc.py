@@ -35,6 +35,8 @@ REQUIRED = (
     "compact_frontier_cut_size","compact_vf_merges",
     "adaptive_paid_total_ns","adaptive_pairs","adaptive_used_frontier",
     "adaptive_switches","adaptive_probes",
+    "budget1x_frontier_ns","budget1x_frontier_pairs",
+    "budget1x_frontier_cut_size","budget1x_coarse_regions",
 )
 
 
@@ -70,6 +72,8 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["budget1x_frontier_pairs"])!=int(row["reference_pairs"]):
+            raise ValueError(f"1x frontier candidate parity failed at {key}")
         if int(row["adaptive_pairs"])!=int(row["reference_pairs"]):
             raise ValueError(f"adaptive algorithm candidate parity failed at {key}")
         if int(row["adaptive_used_frontier"]) not in (0,1):
@@ -98,6 +102,8 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         if int(row["aa_first_hierarchy_ns"])<=0 or int(row["aa_second_hierarchy_ns"])<=0:
             raise ValueError(f"invalid independent identical-algorithm A/A timing {key}")
+        if int(row["budget1x_frontier_ns"])<=0:
+            raise ValueError(f"invalid 1x budget frontier clock at {key}")
         if int(row["adaptive_paid_total_ns"])<=0:
             raise ValueError(f"invalid online policy paid clock at {key}")
         if int(row["compact_frontier_total_ns"])<=0:
@@ -138,6 +144,7 @@ def summarize(rows: list[dict]):
     frontier_totals=[r["frontier_paid_ns"] for r in rows]
     compact=[int(row["compact_frontier_total_ns"]) for row in rows]
     adaptive=[int(row["adaptive_paid_total_ns"]) for row in rows]
+    low_budget=[int(row["budget1x_frontier_ns"]) for row in rows]
     aa_a=[int(row["aa_first_hierarchy_ns"]) for row in rows]
     aa_b=[int(row["aa_second_hierarchy_ns"]) for row in rows]
     aa_ratios=[a/b for a,b in zip(aa_a,aa_b)]
@@ -170,6 +177,9 @@ def summarize(rows: list[dict]):
             "cached_input_ipc_over_frontier":paidStrong/paidF,
             "cached_over_frontier":paidC/paidF,
             "adaptive_paid_total_ns":paidAdaptive,
+            "budget1x_frontier_total_ns":sum(int(r["budget1x_frontier_ns"]) for r in subset),
+            "cached_input_ipc_over_budget1x":paidStrong/
+                sum(int(r["budget1x_frontier_ns"]) for r in subset),
             "compacted_frontier_paid_total_ns":paidCompact,
             "cached_input_ipc_over_adaptive":paidStrong/paidAdaptive,
             "cached_input_ipc_over_compacted":paidStrong/paidCompact,
@@ -241,6 +251,15 @@ def summarize(rows: list[dict]):
         "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "frontier_memory_budget_ablation":{
+            "1x_total_paid_ns":sum(low_budget),
+            "4x_total_paid_ns":sum(frontier_totals),
+            "4x_over_1x_paid_ratio":sum(frontier_totals)/sum(low_budget),
+            "cached_input_ipc_over_1x_paid_ratio":sum(cached_ipc)/sum(low_budget),
+            "1x_max_cut_size":max(int(r["budget1x_frontier_cut_size"]) for r in rows),
+            "4x_max_cut_size":max(int(r["frontier_cut_size"]) for r in rows),
+            "scope":"fully charged real FEM candidate generation with identical independent oracle checks"
+        },
         "adaptive_policy_ablation":{
             "paid_total_ns":sum(adaptive),
             "cached_input_ipc_over_policy":sum(cached_ipc)/sum(adaptive),
