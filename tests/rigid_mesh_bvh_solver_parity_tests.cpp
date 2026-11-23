@@ -106,7 +106,7 @@ int main(int argc,char**argv){
         trace<<"repeat,method,elapsed_wall_ns,accepted_leaves,rejected_geom,"
                 "rejected_tetra,actual_integrated_dt_s,face_impulse_updates,"
                 "full_mesh_CCD_narrowphase_pairs,triangle_box_tests,"
-                "BVH_node_tests,minimum_real_triangle_gap_m,min_tetra_j\\n";
+                "BVH_node_tests,minimum_real_triangle_gap_m,min_tetra_j\n";
     }
     constexpr int repeats=4;
     for(int rep=0;rep<repeats;++rep){
@@ -143,7 +143,7 @@ int main(int argc,char**argv){
                      <<x.rejected_tetra_trials<<','<<x.integrated_dt_s<<','
                      <<x.face_impulse_updates<<','<<x.continuous_pair_tests<<','
                      <<x.broadphase_box_tests<<','<<x.broadphase_node_tests<<','
-                     <<x.min_clearance_m<<','<<x.min_tetra_j<<'\\n';
+                     <<x.min_clearance_m<<','<<x.min_tetra_j<<'\n';
             };
             write("original_complete_FEM",old_ns,a);
             write("opt_in_static_BVH_complete_FEM",new_ns,b);
@@ -152,9 +152,9 @@ int main(int argc,char**argv){
     must(!trace.is_open()||trace.good(),"original full solver audit write failed");
     std::cout<<"PASS20 exact native 20m/s FEM adaptive contact solver parity "
              <<"across four counterbalanced full physics repetitions; "
-             <<"accepted leaves/CCD pairs/impulses/clock/positions match.\\n";
+             <<"accepted leaves/CCD pairs/impulses/clock/positions match.\n";
     return 0;
  }catch(const std::exception& e){
-    std::cerr<<"PASS20 FAIL "<<e.what()<<'\\n';return 1;
+    std::cerr<<"PASS20 FAIL "<<e.what()<<'\n';return 1;
  }
 }
