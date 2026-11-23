@@ -89,7 +89,7 @@ int main(int argc,char**argv){
         auto s=certify_moving_triangle_rigid_triangle(
             tunnel,rigid,0.,11);
         expect(!s.entirely_separated&&s.safe_prefix<1 &&
-               s.sampled_piercings>0,
+               s.sampled_possible_contacts>0,
                "finite triangle continuous interior tunnelling missed");
         // Stationary and arbitrarily rotated finite surfaces.
         const LinearTriangleMotion safe{
@@ -183,6 +183,7 @@ int main(int argc,char**argv){
                  <<" smallest_rigid_mesh_distance_m="
                  <<min_distance<<'\n';
     }
+    expect(random_cert==850,"random separated mesh test incomplete");
     std::cout<<"PASS: finite 3D triangle/triangle VF, EE, interior "
                 "piercing, continuous separation, 850 random motions "
                 "and true nonresponding FEM/rigid-mesh audit\n";
