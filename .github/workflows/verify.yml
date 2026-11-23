@@ -253,6 +253,64 @@ jobs:
           assert (v/"06_interactive_real_FEM_fast_event.html").stat().st_size>100000
           print("PASS: actual full physical dt, 900 steps, split event, 256-step numerical control, no full-face penetration and five scientific plots")
           PY
+      - name: Pass 9 independent six-endpoint continuous geometry and Voronoi proof
+        run: ./build/kyoto_independent_contact_tests results/pass9-independent
+      - name: Pass 9 independent 3D local kinetic, linear and angular impulse balances
+        run: ./build/kyoto_impulse_balance_tests results/pass9-independent
+      - name: Pass 9 seven actual-source geometry/impulse/3D scientific figures
+        run: |
+          python scripts/render_pass9_independent_audit.py \
+            --input results/pass9-independent \
+            --physics results/time-consistent-fem \
+            --output results/pass9-independent/visuals
+      - name: Validate every independent Pass 9 receipt and figure
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import csv,json,math
+          p=Path("results/pass9-independent")
+          a=json.loads((p/"independent_manifest.json").read_text())
+          b=json.loads((p/"impulse_manifest.json").read_text())
+          assert a["independent_of_midpoint_lipschitz_narrowphase"]
+          assert not a["machine_directed_rounding_proven"]
+          assert a["ordinary_physical_macro_steps"]==900
+          assert a["ordinary_accepted_substeps"]>=900
+          assert a["ordinary_face_intervals"]==a["ordinary_certified_intervals"]+a["ordinary_unresolved_intervals"]
+          assert a["fast_face_intervals"]==a["fast_certified_intervals"]+a["fast_unresolved_intervals"]
+          assert a["ordinary_min_static_clearance_m"]>0
+          assert a["fast_min_static_clearance_m"]>0
+          assert a["ordinary_min_tetra_jacobian"]>0
+          assert a["ordinary_max_static_oracle_distance_disagreement_m"]<1e-8
+          assert b["sample_count"]==1200
+          assert not b["full_FEM_mechanical_energy_conservation_claim"]
+          assert b["max_positive_kinetic_change_j"]<1e-5
+          assert b["max_energy_work_residual_j"]<1e-5
+          assert b["max_linear_momentum_residual_ns"]<1e-5
+          assert b["max_angular_momentum_residual_nsm"]<1e-5
+          ordinary=list(csv.DictReader((p/"real_fem_independent_sweeps.csv").open()))
+          fast=list(csv.DictReader((p/"fast_impact_independent_sweeps.csv").open()))
+          face=list(csv.DictReader((p/"fast_impact_face_witnesses.csv").open()))
+          impulses=list(csv.DictReader((p/"impulse_balance_cases.csv").open()))
+          assert len(ordinary)==900
+          assert len(fast)==a["fast_accepted_physical_substeps"]
+          assert len(face)==320*len(fast)
+          assert len(impulses)==1200
+          assert all(float(x["independent_min_static_clearance_m"])>=0 for x in ordinary)
+          assert all(float(x["measured_delta_kinetic_j"])<=1e-5 for x in impulses)
+          v=p/"visuals"
+          assert len(list(v.glob("[0-9][0-9]_*.png")))==7
+          assert (v/"STAGE9_INDEPENDENT_CONTACT_SCIENCE_ATLAS.png").stat().st_size>100000
+          print("PASS: independent geometric audit",a["ordinary_face_intervals"],
+                "routine swept faces with",a["ordinary_unresolved_intervals"],
+                "undecided, and",a["fast_face_intervals"],"fast swept faces with",
+                a["fast_unresolved_intervals"],"undecided; 1200 impulse law identities")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage9-independent-swept-CCD-and-contact-impulse-audit
+          path: results/pass9-independent/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage8-time-consistent-real-FEM-evidence
