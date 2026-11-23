@@ -1,0 +1,47 @@
+name: Kyoto Pass 12 real finite-mesh energy accounting
+
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - "scripts/audit_pass12_mesh_energy.py"
+      - "scripts/render_pass12_mesh_energy.py"
+      - "tests/test_pass12_energy_audit.py"
+      - ".github/workflows/pass12-energy-audit.yml"
+      - "tests/rigid_mesh_fem_contact_tests.cpp"
+      - "include/kyoto/**"
+  workflow_dispatch:
+
+jobs:
+  original-native-physics-energy-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python accounting controls
+        run: python3 -m unittest discover -s tests -p test_pass12_energy_audit.py -v
+      - name: Build actual native FEM source exporter
+        run: |
+          cmake -S . -B build-pass12 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass12 --target kyoto_rigid_mesh_fem_tests --parallel 4
+      - name: Export and verify original 900-step physical source evidence
+        run: |
+          ./build-pass12/kyoto_rigid_mesh_fem_tests results/pass12/source
+          python3 scripts/audit_pass12_mesh_energy.py \
+            --input results/pass12/source/rigid_triangle_physics_900.csv \
+            --output results/pass12/energy
+      - name: Draw science figures from original source rows only
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/render_pass12_mesh_energy.py \
+            --audit results/pass12/energy \
+            --output results/pass12/visuals
+      - name: Archive reproducible original evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass12-source-energy-science
+          path: results/pass12/
+          if-no-files-found: error
