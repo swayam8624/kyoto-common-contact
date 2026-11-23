@@ -637,7 +637,9 @@ Reproduce the new source-based laboratory:
 
 GitHub CI archives all original trace tables and seven measured
 scientific charts, including the SAME native 3D FEM geometry
-colored by computed stress and strict lower proof margin.
+colored by computed stress and strict lower proof margin, plus
+a fully offline interactive rotatable 3D viewer that switches
+between both native scalar fields.
 
 Verified cross-platform run:
 https://github.com/swayam8624/kyoto-common-contact/actions/runs/45153954633
