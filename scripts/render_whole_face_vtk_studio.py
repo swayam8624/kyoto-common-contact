@@ -19,7 +19,8 @@ from matplotlib import colormaps
 BG="#071421";INK="#e7f1fa";MUTED="#9eb4c7"
 def load(root):
     manifest=json.loads((root/"curved_manifest.json").read_text())
-    if not manifest["whole_triangle_lipschitz_CCD"] and manifest["accepted_static_surface_no_penetration_verified"]:
+    if not (manifest["whole_triangle_lipschitz_CCD"] and
+            manifest["accepted_static_surface_no_penetration_verified"]):
         raise ValueError("will not render unverified kinematic source as physics")
     frames=defaultdict(dict)
     with (root/"curved_solid_states.csv").open(newline="") as file:
