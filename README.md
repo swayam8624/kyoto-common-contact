@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 7A — native C++23 3D neo-Hookean FEM with globally synchronized whole-triangle clearance and barycentric effective-mass impulses. On the tested 900-step rigid-sphere trajectory, independent audit reports zero penetrating triangles across 901 states, versus 458/901 for the preserved vertex-only reference. No general IPC mesh contact, self-contact response, directed-rounded proof, fully time-consistent TOI integration, or SCA speedup is claimed.**
+**Status: PASS 8 — physically time-accounted adaptive full-face FEM replay. Unsafe globally clipped or tetra-inverting step proposals are rejected and bisected; only fully integrated, surface-safe physical substeps are committed, with transactional rollback. The ordinary 900-step sphere simulation and a tuned 50 m/s fast-contact event pass native tests on Ubuntu/macOS Debug/Release. Full scientific source-artifact CI is a separate gate. General mesh contact, machine-certified CCD, fully implicit energy-consistent dynamics, self-contact and SCA speedup remain open.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -392,6 +392,77 @@ whole-face-vtk-studio.yml reproducibility job.
 See docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md.
 
 
+
+## Pass 8 — actually re-integrated elapsed physical time
+
+The Pass-7 whole-triangle-safe solver has been extended with
+a transactional, adaptive time-replay integrator:
+include/kyoto/time_consistent_contact.hpp.
+
+An earlier solver could accept only fraction alpha<1 of a trial
+displacement while keeping the velocity predicted for the full dt
+and charging the ENTIRE dt to the physical clock. This was a
+scientifically important defect, even though the usual 900-step
+impact had alpha=1 at every step.
+
+**Pass 8 refuses to commit those clipped trials.** Instead it
+splits the physical timestep in two and computes fresh stresses,
+accelerations, contact impulses and conservative full-triangle
+certificates for EACH half in sequence. Only accepted FULL
+substeps contribute to elapsed time; their sum must equal
+the original requested dt.
+
+A trial that would invert a tetrahedron is rejected and retried
+at smaller dt; no invalid state is committed. Exhausting
+the configured temporal budget fails loudly and rolls back
+the ENTIRE original macroscopic step, preserving external
+raw receipts as well.
+
+The native C++ tests cover:
+- 40 free-flight steps matching the previous uncut integrator;
+- the full 900-step real 3D hyperelastic impact, with no
+  penetrating entire surface triangles and correct .675 s clock;
+- a specially constructed 50 m/s close-sphere impact with an
+  initial full-triangle clearance of 15 mm, requiring genuine
+  physical subdivision across the *complete* requested .75 ms;
+- transactional rollback on an intentionally insufficient budget.
+
+The original unphysical 900 m/s impact exhibited inverted
+element proposals and exhausted the temporal limit; it remains
+a documented negative extreme-stability case, NOT silently
+reclassified as solved.
+
+New native evidence app:
+apps/time_consistent_experiment.cpp produces 901 routine state
+receipts, every accepted physical fraction at the fast
+collision, original vs adaptive vs 256-finer-step SAME-model
+results, and source 3D stress/vertex states.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
+    ./build/kyoto_time_consistent_experiment results/time-consistent-fem
+
+    python3 -m pip install numpy pandas matplotlib pillow
+    python3 scripts/render_time_consistent_lab.py \
+      --input results/time-consistent-fem \
+      --output results/time-consistent-fem/visuals
+
+The five scientific plots expose actual time accounting,
+event contact impulses, independent full-triangle clearance,
+routine 900-step elastic energies and the original native
+3D mesh geometry at four different numerical outcomes.
+
+A 256-small-step result is a *finer version of the SAME
+numerical solver*, not an independent physical ground truth.
+The sequential contact law and finite clearance skin still
+limit contact fidelity; the exact-arithmetic Lipschitz argument
+is not yet certified under directed-rounded binary64.
+
+See docs/19_TIME_CONSISTENT_REPLAY.md for proofs, sources,
+negative outcomes and the exact remaining acceptance gates.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -411,10 +482,11 @@ Read the docs in numbered order:
 - docs/16_CURVED_SPHERE_FEM.md
 - docs/17_TRIANGLE_SWEEP_CERTIFICATE.md
 - docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md
+- docs/19_TIME_CONSISTENT_REPLAY.md
 - AGENTS.md
 
-The NEXT gate is time-consistent coupled contact integration with remaining
-TOI fraction and independent machine-safe continuous CCD, arbitrary
-rigid mesh contact/self-contact, then fair SCA vs official IPC LBVH
-full-paid performance validation.
+The NEXT gate is independently verified physical accuracy with coupled
+contact and directed-rounded continuous CCD, arbitrary deforming rigid
+meshes and self-contact, then fully-paid SCA vs official IPC LBVH
+contact-detection/solver benchmarking.
 Do not substitute candidate parity for actual continuous collision proof.
