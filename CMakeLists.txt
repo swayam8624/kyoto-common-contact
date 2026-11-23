@@ -17,6 +17,12 @@ enable_testing()
 add_executable(kyoto_solid_tests tests/solid_dynamics_tests.cpp)
 target_link_libraries(kyoto_solid_tests PRIVATE kyoto_contact)
 add_test(NAME three_dimensional_hyperelastic_fem_physics COMMAND kyoto_solid_tests)
+
+# Pass 6: nonplanar analytic rigid-sphere swept vertex CCD + true FEM.
+add_executable(kyoto_curved_contact_tests tests/curved_contact_tests.cpp)
+target_link_libraries(kyoto_curved_contact_tests PRIVATE kyoto_contact)
+add_test(NAME nonplanar_curved_sphere_contact_physics COMMAND kyoto_curved_contact_tests)
+
 add_executable(kyoto_solid_simulation apps/solid_simulation_export.cpp)
 target_link_libraries(kyoto_solid_simulation PRIVATE kyoto_contact)
 add_executable(kyoto_contact_tests tests/contact_candidates_tests.cpp)
