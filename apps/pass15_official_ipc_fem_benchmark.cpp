@@ -10,6 +10,7 @@
 #include <ipc/candidates/face_vertex.hpp>
 #include <Eigen/Core>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -39,6 +40,7 @@ struct Source {
     f::Mesh mesh;
     std::string regime;
     int physical_leaf_id{-1};
+    int scene_id{};
 };
 struct IPCPrepared {
     ipc::AABBs vertex_boxes;
@@ -123,25 +125,46 @@ static PaidIPC official(const f::Mesh& mesh){
     const auto d=Clock::now();
     return {std::move(pairs),ns(a,b),ns(b,c),ns(c,d)};
 }
-static std::vector<Source> generate(int sample_stride){
-    s::Body body=s::toroidal_solid();
+// A source workload has genuinely different element topology or material;
+// this is *not* a second solver and not a scripted mesh animation.
+struct SceneSpec{
+    unsigned major{};
+    double young{};
+    double vx{},vy{};
+};
+static std::vector<Source> generate(int sample_stride,int scene_count){
+    constexpr std::array<SceneSpec,3> scenes{{
+        {20u,22000.0, 0.0, 0.0},       // frozen original baseline
+        {12u,17500.0, 0.12,-0.05},     // coarser softer material, shear
+        {24u,20500.0,-0.11, 0.09}      // denser mesh, reverse drift
+    }};
     const auto rigid=s::corrugated_contact_patch();
     std::vector<Source> data;
-    data.reserve(std::size_t(360/sample_stride+8));
-    for(int step=1;step<=360;++step){
-        const s::Body previous=body;
-        const auto result=s::step_time_consistent_rigid_triangle_mesh(
-            body,rigid,.00075);
-        if(result.accepted_leaves<1)
-            throw std::runtime_error("unaccepted physical macro-step");
-        if(step%sample_stride!=0)continue;
-        data.push_back({step,body.time_seconds,
-            result.face_impulse_updates,result.accepted_leaves,
-            fem::feature_snapshot(previous,body,rigid),
-            "routine", -1});
+    data.reserve(std::size_t(scene_count*(360/sample_stride)+8));
+    for(int scenario=0;scenario<scene_count;++scenario){
+        const auto& spec=scenes[std::size_t(scenario)];
+        s::Material material;
+        material.young=spec.young;
+        s::Body body=s::toroidal_solid(spec.major,3,3,material);
+        for(auto& node:body.nodes)
+            node.v={spec.vx,spec.vy,0.0};
+        for(int step=1;step<=360;++step){
+            const s::Body before=body;
+            const auto receipt=s::step_time_consistent_rigid_triangle_mesh(
+                body,rigid,.00075);
+            if(receipt.accepted_leaves<1)
+                throw std::runtime_error("unaccepted original FEM physical step "+
+                    std::to_string(step)+" scene="+std::to_string(scenario));
+            if(step%sample_stride!=0)continue;
+            auto snapshot=fem::feature_snapshot(before,body,rigid);
+            snapshot.topology_epoch=std::uint64_t(1+scenario);
+            data.push_back({scenario*1000+step,body.time_seconds,
+                receipt.face_impulse_updates,receipt.accepted_leaves,
+                std::move(snapshot),"routine",-1,scenario});
+        }
     }
-    if(data.size()!=std::size_t(360/sample_stride))
-        throw std::runtime_error("native FEM routine snapshot count mismatch");
+    if(data.size()!=std::size_t(scene_count*(360/sample_stride)))
+        throw std::runtime_error("native multi-scene FEM snapshot mismatch");
 
     // Actual fast finite-triangle impact, recorded as the *accepted*
     // solver-generated physical leaves. This is a separate regime of
@@ -164,10 +187,10 @@ static std::vector<Source> generate(int sample_stride){
              leaf.after.time_seconds>leaf.before.time_seconds))
             throw std::runtime_error("invalid accepted physical leaf time");
         auto features=fem::feature_snapshot(leaf.before,leaf.after,raised);
-        features.topology_epoch=2; // Different scene/obstacle: pay rebuild
-        data.push_back({361+static_cast<int>(j),leaf.after.time_seconds,
+        features.topology_epoch=100; // Different scene/obstacle: pay rebuild
+        data.push_back({4001+static_cast<int>(j),leaf.after.time_seconds,
             leaf.receipt.face_impulse_updates,1,std::move(features),
-            "fast_adaptive",static_cast<int>(j)});
+            "fast_adaptive",static_cast<int>(j),3});
     }
     return data;
 }
