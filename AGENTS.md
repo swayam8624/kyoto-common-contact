@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/21 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/22 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -75,6 +75,34 @@ contact. Physics correctness comes first, not beautiful animation.
   energy conservation or calibration. Preserve original routine
   -459.624 J and fast -14545.237 J energy results and scientific
   concern about extreme dissipative contact.
+- Pass 11 has true, nonanalytical, finite triangulated rigid
+  contact (49 static rigid vertices/72 OPEN two-sided finite faces)
+  with original 180-node/480-tet source FEM. In the source 900-step
+  reference, 517 physical steps carried real contact and 11,731
+  original barycentric face impulse updates; accepted full-surface
+  gap stayed positive, min tet J 0.72287. Routine did NOT require
+  temporal subdivision.
+- The ACTUAL separate 20 m/s close impact REQUIRES rejected unsafe
+  finite-triangle proposals. Evidence: two rejected, THREE
+  physical time substeps accepted, the whole .750ms integrated.
+  Verify the raw manifest and leaf receipts on every refactor.
+- Earlier sphere-only dynamics do not respond to the finite rigid
+  patch; when audited against the SAME 72 triangles they actually
+  intersect in 95/181 sampled source states. This is a negative
+  geometry/physics control, not a matched runtime comparison.
+- Pass11's moving finite triangle vs static finite triangle
+  Lipschitz proof is exact-arithmetic; its binary64 guard is NOT
+  a directed-rounded general IPC VF/EE predicate. The static
+  patch is open/two-sided, not a closed obstacle, moving rigid
+  response, self-contact, or implicit KKT solver.
+- Pass11 original 3D visualizations depict physical FEM frames,
+  computed stress and 72 original finite rigid faces. Never
+  fabricate geometry or portray sphere-only and finite-patch
+  trajectories as equal-physics competing algorithms.
+- The central SCA/official IPC LBVH paid performance and
+  originality gate STILL has no demonstrated positive result.
+  Detecting physical impacts is not measuring broadphase speed.
+
 - The CENTRAL thesis is still a correctly maintained, fully paid
   SCA broadphase competing against official IPC Toolkit LBVH.
   Stronger contact validation does not itself establish a speedup,
