@@ -33,10 +33,15 @@ prove a calibrated dissipation law. The native export CI is in
 Pass 13 advances the *same true 3D FEM solver* to 360 physical macro-steps,
 including contact-bearing frames, and records 30 source geometry snapshots.
 The native C++ benchmark compares independently checked exhaustive,
-rebuilt SAP and persistent-order SAP candidate pipelines and charges each
-method's preprocessing, query, and normalization. Persistent-order SAP
+rebuilt SAP, persistent-order SAP, and a genuinely maintained refittable
+binary feature hierarchy with dual-tree VF / self-tree EE traversal. Each
+method pays its own preprocessing, query, and normalization. Persistent-order SAP
 conservatively checks topology/signature changes and rebuilds live swept
 bounds; it is **not** the proposed dual-tree Spacetime Contact Atlas.
+Pass 14 adds explicit topology/mask invalidation, 180 randomized cubic
+motion candidate-oracle regression cases, paid hierarchy refit/rebuild
+counters and Mac/Linux CI checks. See
+`docs/25_PASS14_REFITTABLE_HIERARCHY.md`.
 The scientific plots must be generated from measured CSVs, not guessed
 performance. See `docs/24_PASS13_REAL_FEM_REFERENCE_BENCHMARK.md` and
 `.github/workflows/pass13-fem-reference.yml`.
