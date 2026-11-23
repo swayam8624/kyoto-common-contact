@@ -122,7 +122,7 @@ int main(int argc,char**argv){
            <<physical.face_impulse_updates<<','
            <<physical.accepted_leaves<<'\n';
     }
-    std::cout<<"PASS13_REFERENCE_FEM only: "<<steps
+    // A mask/topology mutation must invalidate the retained ordering.\n    // The oracle re-evaluates the exact same modified scene, proving no\n    // candidate from the previous topology is silently reused.\n    const auto changed_before=body;\n    auto changed_mesh=scene(changed_before,body,patch);\n    changed_mesh.topology_epoch=2;\n    changed_mesh.faces.back().mask=0;\n    const auto invalidated=persistent.query(changed_mesh);\n    if(invalidated.pairs!=f::exhaustive(changed_mesh).pairs ||\n       persistent.invalidations()!=1)\n        throw std::runtime_error("topology/mask invalidation failed oracle parity");\n    std::cout<<"PASS13_REFERENCE_FEM only: "<<steps
              <<" physically integrated macro-steps, "<<contact_steps
              <<" contact-bearing steps; exhaustive/rebuilt SAP/persistent-order SAP parity. "
              <<"No official IPC timings. No maintained SCA timings.\n";
