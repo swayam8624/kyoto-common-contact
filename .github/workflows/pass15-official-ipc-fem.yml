@@ -77,6 +77,15 @@ jobs:
           python3 scripts/report_pass15_official_ipc.py \
             --input results/pass15/full-trajectory/official_ipc_fem_paired.csv \
             --output results/pass15/full-trajectory/science
+      - name: Heterogeneous genuine FEM topology material and shear comparison
+        run: |
+          mkdir -p results/pass15/multi-physics
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/multi-physics 12 4 3 \
+            | tee results/pass15/multi-physics/native_console.txt
+          python3 scripts/report_pass15_official_ipc.py \
+            --input results/pass15/multi-physics/official_ipc_fem_paired.csv \
+            --output results/pass15/multi-physics/science
       - name: Preserve original measurements and figures
         if: always()
         uses: actions/upload-artifact@v4
