@@ -45,7 +45,7 @@ int main(){
     }
     {
         Body b;
-        b.nodes={{{a,a}},{{b,b}},{{c,c}}};
+        b.nodes={{a,a,{},0,0},{b,b,{},0,0},{c,c,{},0,0}};
         b.surface_faces={{0,1,2}};
         const RigidSphere s{{0,0,0},1,.1,.2};
         const auto audit=audit_surface_sphere(b,s);
