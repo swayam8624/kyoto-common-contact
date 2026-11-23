@@ -578,7 +578,7 @@ and tests/rounded_prism_certificate_tests.cpp.
 | Strictly proven separated under stated IEEE model | **288,000** | **1,600** |
 | Unresolved | **0** | **0** |
 | Candidate separating planes paid | 1,939,204 | 11,874 |
-| Outward-enclosed endpoint dot checks paid | 3,536,502 | 21,495 |
+| Outward-enclosed endpoint dot checks paid | 3,536,445 | 21,438 |
 | Smallest positive lower plane margin | 2.069 micrometres | 98.242 micrometres |
 
 This is true source-based per-operation proof work, **not**
