@@ -5,6 +5,7 @@
 // and their own query work. State generation is excluded and identified.
 #include "kyoto/feature_broadphase.hpp"
 #include "kyoto/persistent_feature_sap.hpp"
+#include "kyoto/refit_feature_hierarchy.hpp"
 #include "kyoto/rigid_mesh_fem_contact.hpp"
 #include <algorithm>
 #include <chrono>
@@ -76,11 +77,13 @@ int main(int argc,char**argv){
     std::filesystem::create_directories(out);
     std::ofstream csv(out/"native_fem_reference_broadphase.csv");
     kyoto::contact::persistent::OrderedSweep persistent;
+    kyoto::contact::atlas::RefitHierarchy hierarchy;
     if(!csv)throw std::runtime_error("cannot write reference experiment CSV");
     csv<<"step,time_s,vertices,edges,faces,exact_pairs,sap_pairs,"
           "reference_candidate_aabb_tests,sap_candidate_aabb_tests,"
           "reference_build_ns,reference_query_ns,sap_build_ns,sap_query_ns,"
           "persistent_total_ns,persistent_warm_frames,persistent_invalidations,"
+          "hierarchy_total_ns,hierarchy_rebuilds,hierarchy_refits,"
           "source_face_impulse_updates,source_accepted_leaves\n";
     csv<<std::setprecision(17);
     s::Body body=s::toroidal_solid();
@@ -105,6 +108,10 @@ int main(int argc,char**argv){
         const auto t4=Clock::now();
         const auto maintained=persistent.query(mesh);
         const auto t5=Clock::now();
+        const auto hierarchical=hierarchy.query(mesh);
+        const auto t6=Clock::now();
+        if(truth.pairs!=hierarchical.pairs)
+            throw std::runtime_error("maintained hierarchy candidate parity failure at physical step "+std::to_string(i));
         if(truth.pairs!=maintained.pairs)
             throw std::runtime_error("persistent sweep candidate parity failure at physical step "+std::to_string(i));
         if(truth.pairs!=sap.pairs)
@@ -119,6 +126,8 @@ int main(int argc,char**argv){
            <<nanos(t2,t3)<<','<<nanos(t3,t4)<<','
            <<nanos(t4,t5)<<','<<persistent.warm_frames()<<','
            <<persistent.invalidations()<<','
+           <<nanos(t5,t6)<<','<<hierarchy.rebuilds()<<','
+           <<hierarchy.refits()<<','
            <<physical.face_impulse_updates<<','
            <<physical.accepted_leaves<<'\n';
     }
@@ -131,6 +140,10 @@ int main(int argc,char**argv){
     if(invalidated.pairs!=f::exhaustive(changed_mesh).pairs ||
        persistent.invalidations()!=1)
         throw std::runtime_error("topology/mask invalidation failed oracle parity");
+    const auto new_hierarchy=hierarchy.query(changed_mesh);
+    if(new_hierarchy.pairs!=f::exhaustive(changed_mesh).pairs ||
+       hierarchy.rebuilds()!=2)
+        throw std::runtime_error("maintained hierarchy invalidation failed");
     std::cout<<"PASS13_REFERENCE_FEM only: "<<steps
              <<" physically integrated macro-steps, "<<contact_steps
              <<" contact-bearing steps; exhaustive/rebuilt SAP/persistent-order SAP parity. "
