@@ -36,6 +36,13 @@ target_link_libraries(kyoto_triangle_sweep_tests PRIVATE kyoto_contact)
 add_test(NAME continuous_whole_triangle_sphere_sweep_certificate
          COMMAND kyoto_triangle_sweep_tests)
 
+# Pass 7A: globally synchronized whole-face safe advancement with
+# barycentric effective-mass velocity impulses (not general IPC solver).
+add_executable(kyoto_whole_face_tests tests/whole_face_contact_tests.cpp)
+target_link_libraries(kyoto_whole_face_tests PRIVATE kyoto_contact)
+add_test(NAME whole_face_synchronized_fem_contact COMMAND kyoto_whole_face_tests)
+
+
 
 add_executable(kyoto_curved_fem_export apps/curved_fem_export.cpp)
 target_link_libraries(kyoto_curved_fem_export PRIVATE kyoto_contact)
