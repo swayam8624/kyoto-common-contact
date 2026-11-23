@@ -16,7 +16,9 @@ from collections import defaultdict
 from pathlib import Path
 
 REQUIRED = (
-    "repeat", "step", "regime", "physical_time_s", "source_face_impulse_updates",
+    "repeat", "step", "regime", "scene_id",
+    "source_vertices","source_edges","source_faces","source_tetrahedra",
+    "physical_time_s", "source_face_impulse_updates",
     "reference_pairs", "official_ipc_pairs", "maintained_hierarchy_pairs",
     "official_extra", "official_missing", "official_conversion_ns",
     "official_build_ns", "official_query_ns", "maintained_paid_total_ns",
@@ -103,6 +105,28 @@ def summarize(rows: list[dict]):
     frontier_totals=[r["frontier_paid_ns"] for r in rows]
     per_repeat={}
     per_regime={}
+    per_scene={}
+    for sid in sorted({int(r["scene_id"]) for r in rows}):
+        subset=[r for r in rows if int(r["scene_id"])==sid]
+        keys=("source_vertices","source_edges","source_faces","source_tetrahedra")
+        topology={k:sorted({int(r[k]) for r in subset}) for k in keys}
+        if any(len(values)!=1 or values[0]<=0 for values in topology.values()):
+            raise ValueError(f"inconsistent original FEM topology within scene {sid}")
+        paidI=sum(r["official_paid_ns"] for r in subset)
+        paidC=sum(r["hierarchy_paid_ns"] for r in subset)
+        paidF=sum(r["frontier_paid_ns"] for r in subset)
+        per_scene[sid]={
+            "physics_regime":subset[0]["regime"],
+            "physical_intervals":len({int(r["step"]) for r in subset}),
+            "repeated_paired_rows":len(subset),
+            "topology":{k:values[0] for k,values in topology.items()},
+            "contact_bearing_rows":sum(int(r["source_face_impulse_updates"])>0 for r in subset),
+            "ipc_total_ns":paidI,
+            "cached_total_ns":paidC,
+            "bounded_frontier_total_ns":paidF,
+            "ipc_over_frontier":paidI/paidF,
+            "cached_over_frontier":paidC/paidF,
+        }
     for kind in ("routine","fast_adaptive"):
         subset=[r for r in rows if r["regime"]==kind]
         if not subset:
@@ -158,6 +182,8 @@ def summarize(rows: list[dict]):
         "samples":len(rows),
         "per_repeat_totals":per_repeat,
         "per_source_physics_regime":per_regime,
+        "per_source_scene":per_scene,
+        "physical_scene_count":len(per_scene),
         "uncached_hierarchy_paid_total_ns":sum(old_totals),
         "frontier_hierarchy_paid_total_ns":sum(frontier_totals),
         "ratio_of_paid_totals_ipc_over_frontier":sum(paid_ipc)/sum(frontier_totals),
@@ -190,8 +216,8 @@ def summarize(rows: list[dict]):
         "warnings": [
             "This is NOT continuous narrowphase CCD parity, solver-step timing, or robust physical contact proof",
             "Routine macro-step endpoints may approximate intermediate motion; fast-impact regime contains exact accepted physical-leaf start/end state pairs",
-            "Snapshot correlation and only three repeats preclude independent uncertainty inference",
-            "Twelve repeats with counterbalanced order provide provisional descriptive timings, not independent scenes or A/A controls",
+            "Snapshots and repeated timings are correlated; no independence or significance claim is made",
+            "Repeated counterbalanced timings are descriptive; independent A/A controls and independent solver replication are still required",
             "No measured speedup or winning regime may be claimed until CI passes on native source artifacts",
         ],
     }
