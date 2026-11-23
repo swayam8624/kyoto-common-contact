@@ -1,0 +1,68 @@
+name: Kyoto whole-face-safe real FEM cinematic VTK
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/whole_face_contact_dynamics.hpp'
+      - 'apps/whole_face_fem_export.cpp'
+      - 'scripts/render_whole_face_vtk_studio.py'
+      - '.github/workflows/whole-face-vtk-studio.yml'
+  workflow_dispatch:
+jobs:
+  actual-whole-face-physics-studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offscreen OpenGL renderer prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 xvfb
+      - name: Compile and verify real whole-face C++23 FEM
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target kyoto_whole_face_fem_export kyoto_whole_face_tests --parallel 4
+          ctest --test-dir build -R whole_face_synchronized_fem_contact --output-on-failure
+      - name: Re-simulate native full-triangle-safe curved-impact physics
+        run: ./build/kyoto_whole_face_fem_export results/whole-face-fem
+      - name: Install VTK scientific visualization dependencies
+        run: python -m pip install numpy==2.2.6 matplotlib==3.10.7 pillow==12.0.0 vtk==9.6.2
+      - name: Render hero frames, tetrahedral cutaway and genuine-physics GIF
+        run: |
+          xvfb-run -a python scripts/render_whole_face_vtk_studio.py \
+            --input results/whole-face-fem \
+            --output results/whole-face-fem/studio \
+            --gif
+      - name: Verify visual provenance and entire-surface contact audit
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          from PIL import Image
+          p=Path("results/whole-face-fem")
+          m=json.loads((p/"curved_manifest.json").read_text())
+          assert m["physical_motion"] and m["whole_triangle_lipschitz_CCD"]
+          assert m["states_with_static_triangle_sphere_overlap"]==0
+          assert m["surface_audit_states"]==901
+          source=list(csv.DictReader((p/"surface_sphere_clearance.csv").open()))
+          assert len(source)==901
+          assert all(int(x["penetrating_triangles"])==0 for x in source)
+          d=p/"studio"
+          frames=list(d.glob("studio_*.png"))
+          assert len(frames)==4,frames
+          assert all(Image.open(x).size==(1500,960) for x in frames)
+          assert len(list(d.glob("*_section.png")))==1
+          assert (d/"STAGE7_WHOLE_FACE_CINEMATIC_ATLAS.png").stat().st_size>100000
+          gif=d/"WHOLE_FACE_FEM_MOTION.gif"
+          assert gif.stat().st_size>100000
+          with Image.open(gif) as im:
+              assert im.n_frames>=30
+          print("PASS: source-generated 3D whole-face FEM, zero penetrating triangle states, 4 cinematic heroes, volumetric cutaway, 31-frame actual-solver motion")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage7-source-backed-whole-face-cinematic-and-gif
+          path: results/whole-face-fem/studio/
+          if-no-files-found: error
+          retention-days: 30
