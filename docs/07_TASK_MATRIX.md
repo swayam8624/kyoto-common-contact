@@ -14,7 +14,12 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Stage-2 interval-de-Casteljau enclosure (restricted IEEE FP model), independent broad-phase parity and randomized constructive contacts.
 - [ ] Independently certify finite-precision handling across all supported FP modes.
 - [x] Actual upstream IPC Toolkit linear VF/EE CCD gate authored; full feature-enumeration coverage and analytic tunnelling/near-miss cases (see latest CI for passing status).
-- [ ] Independently developed CCD mathematical oracle and numerical robustness audit.
+- [x] Pass 9 independent exact-arithmetic *triangle/sphere* continuous separation theorem and C++ witness algorithm via six-endpoint swept convex hull (distinct from solver midpoint-Lipschitz certificate).
+- [x] Pass 9 independent 7-Voronoi-region finite-triangle distance implementation, including degenerate fallback and actual-FEM second-oracle agreement.
+- [x] Reproduce and certify all **288,000** accepted routine moving face intervals and **1,600** fast-impact physical-leaf face intervals: zero unresolved, source-CI artifact preserved.
+- [x] Independently audit 1,200 rotated/transformed unequal-mass 3D local barycentric impacts against exact kinetic-work, linear-impulse and angular-impulse identities.
+- [ ] Fully independent *general VF/EE mesh-mesh* continuous CCD mathematical oracle and numerical robustness audit (sphere-only Pass 9 is not general IPC).
+
 - [ ] Solver-specific invalidation/version safety audit.
 - [ ] ASan/UBSan/fuzz across malformed and extreme cases.
 
@@ -47,7 +52,9 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [ ] An exact contact-time coupled solver that reintegrates event-relative remaining time with global inequality constraints and systematic independent accuracy/convergence bounds.
 - [ ] Support the physically violent 900 m/s inversion/budget failure rather than pretending to solve it.
 - [x] Verify no static triangle/sphere overlap on ALL 901 accepted whole-face FEM states, with positive tetrahedral Jacobians and finite energy.
-- [ ] Independent machine-certified continuous full-face interval checks, physical energy/momentum accuracy and FP boundary robustness.
+- [x] Exact-arithmetic six-endpoint separating-plane cross-check on **every** accepted moving triangle of two source-generated FEM scenarios; max static distance-oracle residual 2.22e-16 m.
+- [x] Exact local instantaneous face-contact momentum/energy identities numerically tested across 1,200 rotated 3D impulse fixtures; source receipts record residuals.
+- [ ] Machine-certified directed-rounding continuous checks, global FEM energy/momentum accounting, independent physical calibration and FP boundary robustness.
 - [ ] General triangle-mesh rigid/deformable response and self-contact with official IPC CCD, beyond a smooth static analytic sphere.
 
 ## Physics scenes and adapters
