@@ -69,6 +69,13 @@ add_test(NAME independent_barycentric_impulse_energy_and_momentum
 # This check is independent of the production physics integrator.
 add_executable(kyoto_rounded_prism_tests tests/rounded_prism_certificate_tests.cpp)
 target_link_libraries(kyoto_rounded_prism_tests PRIVATE kyoto_contact)
+# Preserve distinct, outward-bounded elementary arithmetic operations.
+# Uncontrolled fused reassociation could invalidate nextafter enclosures.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_rounded_prism_tests
+                         PRIVATE -ffp-contract=off -fno-fast-math)
+endif()
+
 add_test(NAME outward_IEEE754_interval_swept_sphere_certificate
          COMMAND kyoto_rounded_prism_tests)
 # Pass 10: WHOLE 3D FEM discrete momentum ledger: gravity, damping,
