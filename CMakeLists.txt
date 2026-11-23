@@ -71,6 +71,14 @@ add_executable(kyoto_rounded_prism_tests tests/rounded_prism_certificate_tests.c
 target_link_libraries(kyoto_rounded_prism_tests PRIVATE kyoto_contact)
 add_test(NAME outward_IEEE754_interval_swept_sphere_certificate
          COMMAND kyoto_rounded_prism_tests)
+# Pass 10: WHOLE 3D FEM discrete momentum ledger: gravity, damping,
+# internal hyperelastic forces, true contact vectors and angular
+# transport are independently accounted on every accepted substep.
+add_executable(kyoto_whole_fem_balance_tests tests/whole_fem_balance_tests.cpp)
+target_link_libraries(kyoto_whole_fem_balance_tests PRIVATE kyoto_contact)
+add_test(NAME full_FEM_gravity_damping_contact_momentum_ledger
+         COMMAND kyoto_whole_fem_balance_tests)
+
 
 
 
