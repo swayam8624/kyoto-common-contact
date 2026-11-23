@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/19 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/20 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -46,8 +46,23 @@ contact. Physics correctness comes first, not beautiful animation.
 - Explicitly audit full triangle interiors against curved rigid obstacles:
   zero penetrating vertices does NOT imply safe triangle surfaces.
   Pass 6 found 458/901 penetrating-face states despite zero vertex failures.
-- A conservative whole-face separation certificate is currently DETECTION
-  only. Do not describe it as integrated physical collision response.
+- Pass 7 and Pass 8 apply the midpoint-Lipschitz whole-face
+  certificate to restrict accepted physical motion. Contact RESPONSE
+  is a distinct, local barycentric impulse approximation; do not
+  conflate geometric detection with globally coupled IPC physics.
+- Pass 9 independently validates ALL 288,000 routine and 1,600
+  fast-impact moving triangle/sphere intervals using a SIX-ENDPOINT
+  swept-hull separating-plane witness, not the original solver
+  midpoint-distance certificate. The 0 unresolved result is true
+  ONLY for those finite source trajectories; not machine-directed
+  rounding or arbitrary mesh-mesh CCD.
+- Pass 9's 1,200 3D local impulse energy/momentum identities refer
+  to FROZEN-POSITION face impulses. Do not assert total conservation
+  of kinetic+elastic+gravitational energy in the damping/friction
+  and finite-dt neo-Hookean integrator.
+- The independent geometry audit must NOT change physical positions,
+  velocities, momentum or stress; it only reads/replays accepted
+  original FEM substeps and records proof statuses.
 - Charts quote original immutable CSV/JSON traces; every visual reports
   units, scalar source, scene ID, frame, seed, SHA and data limitations.
 - Any source edits require relevant tests, builds, diff check and exact
