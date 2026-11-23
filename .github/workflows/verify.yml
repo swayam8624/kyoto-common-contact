@@ -114,6 +114,42 @@ jobs:
           assert (root/"visuals"/"07_interactive_physically_integrated_solid.html").stat().st_size>100000
           print("PASS: 900-step actual 3D elastic FEM, 181 original states, real impact events, 6 figures, 181 volumetric tetra snapshots")
           PY
+      - name: Export real curved-obstacle 3D elastic FEM
+        run: ./build/kyoto_curved_fem_export results/curved-fem
+      - name: Derive curved-FEM scientific atlas and 3D volumetric playback
+        run: python scripts/render_curved_fem.py --input results/curved-fem --output results/curved-fem/visuals
+      - name: Audit full triangle-sphere safety results and evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import csv,json,math
+          root=Path("results/curved-fem")
+          m=json.loads((root/"curved_manifest.json").read_text())
+          assert m["physical_motion"]
+          assert not m["full_triangle_sphere_safety"]
+          assert not m["general_mesh_mesh_IPC_response"]
+          assert (m["vertices"],m["tetrahedra"],m["frames"])==(180,480,181)
+          assert m["normal_impulse_vertex_steps"]>0
+          assert m["surface_audit_states"]==901
+          assert m["states_with_vertex_inside_sphere"]==0
+          records=list(csv.DictReader((root/"surface_sphere_clearance.csv").open()))
+          assert len(records)==901
+          assert all(int(x["tested_triangles"])==m["surface_triangles"] for x in records)
+          assert all(float(x["minimum_vertex_clearance_m"])>=-2e-9 for x in records)
+          assert sum(int(x["penetrating_triangles"])>0 for x in records)==m["states_with_static_triangle_sphere_overlap"]
+          visual=root/"visuals"
+          assert len(list(visual.glob("[0-9][0-9]_*.png")))==6
+          assert len(list((visual/"vtk_volumetric").glob("curved_*.vtk")))==181
+          assert (visual/"07_interactive_curved_fem.html").stat().st_size>100000
+          assert (visual/"STAGE6_CURVED_FEM_SCIENCE_ATLAS.png").stat().st_size>100000
+          print("PASS: actual 900-step curved 3D FEM with 901 independent triangle/vertex safety audit states; full-surface overlap count =",m["states_with_static_triangle_sphere_overlap"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage6-real-curved-FEM-and-surface-safety-audit
+          path: results/curved-fem/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage5-real-elastic-FEM-physics
