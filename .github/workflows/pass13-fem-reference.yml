@@ -11,6 +11,7 @@ on:
       - "apps/pass13_reference_fem_benchmark.cpp"
       - "tests/refit_feature_hierarchy_tests.cpp"
       - "tests/selective_refit_tests.cpp"
+      - "tests/uncoupled_multibody_fem_tests.cpp"
       - "tests/fem_feature_snapshots_tests.cpp"
       - "tests/maintained_broadphase_fuzz_tests.cpp"
       - "scripts/report_pass13_fem_baselines.py"
@@ -35,8 +36,8 @@ jobs:
       - name: Build native physically integrated FEM benchmark
         run: |
           cmake -S . -B build-pass13 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-pass13 --target kyoto_pass13_reference_fem_benchmark kyoto_refit_feature_hierarchy_tests kyoto_fem_feature_snapshots_tests kyoto_maintained_broadphase_fuzz_tests kyoto_selective_refit_tests --parallel 4
-          ctest --test-dir build-pass13 -R "maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|independent_seeded_3D_feature_broadphase_fuzz|selective_3D_feature_refit_exhaustive_oracle_and_rollback" --output-on-failure
+          cmake --build build-pass13 --target kyoto_pass13_reference_fem_benchmark kyoto_refit_feature_hierarchy_tests kyoto_fem_feature_snapshots_tests kyoto_maintained_broadphase_fuzz_tests kyoto_selective_refit_tests kyoto_uncoupled_multibody_fem_tests --parallel 4
+          ctest --test-dir build-pass13 -R "maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|independent_seeded_3D_feature_broadphase_fuzz|selective_3D_feature_refit_exhaustive_oracle_and_rollback|real_two_body_FEM_uncoupled_shared_feature_oracle" --output-on-failure
       - name: Check solver-derived exhaustive and sweep parity and archive original timings
         run: |
           ./build-pass13/kyoto_pass13_reference_fem_benchmark results/pass13/native
