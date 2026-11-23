@@ -205,3 +205,11 @@ target_link_libraries(kyoto_pass13_reference_fem_benchmark PRIVATE kyoto_contact
 add_test(NAME genuine_FEM_rebuilt_SAP_vs_exhaustive_parity
          COMMAND kyoto_pass13_reference_fem_benchmark
                  ${CMAKE_CURRENT_BINARY_DIR}/pass13-fem-reference)
+
+# Pass 14: actual maintained/refittable node hierarchy with dual-tree VF
+# and self-tree EE traversal. This is broadphase candidate parity only.
+add_executable(kyoto_refit_feature_hierarchy_tests
+               tests/refit_feature_hierarchy_tests.cpp)
+target_link_libraries(kyoto_refit_feature_hierarchy_tests PRIVATE kyoto_contact)
+add_test(NAME maintained_refit_hierarchy_VF_EE_oracle_and_invalidation
+         COMMAND kyoto_refit_feature_hierarchy_tests)
