@@ -23,6 +23,8 @@ REQUIRED = (
     "hierarchy_rebuilds", "hierarchy_refits", "first_method",
     "uncached_hierarchy_paid_ns", "uncached_hierarchy_pairs",
     "first_internal_hierarchy_method",
+    "frontier_paid_total_ns","frontier_pairs","frontier_cut_size",
+    "frontier_fallbacks","frontier_reused_node_pairs",
 )
 
 
@@ -43,7 +45,7 @@ def read_data(path: Path) -> list[dict]:
                     raise ValueError(f"unrecognized source physics regime at row {i}")
                 continue
             if k in ("first_method","first_internal_hierarchy_method"):
-                allowed=("ipc","hierarchy") if k=="first_method" else ("cached","uncached")
+                allowed=("ipc","hierarchy") if k=="first_method" else ("cached","uncached","frontier")
                 if row[k] not in allowed:
                     raise ValueError(f"invalid measured ordering at row {i}")
                 continue
@@ -56,6 +58,8 @@ def read_data(path: Path) -> list[dict]:
         seen.add(key)
         if int(row["official_missing"]) != 0:
             raise ValueError(f"official IPC misses reference pairs at {key}")
+        if int(row["frontier_pairs"]) != int(row["reference_pairs"]):
+            raise ValueError(f"temporal frontier candidate parity failed at {key}")
         if int(row["uncached_hierarchy_pairs"]) != int(row["reference_pairs"]):
             raise ValueError(f"uncached hierarchy candidate parity failed at {key}")
         if int(row["maintained_hierarchy_pairs"]) != int(row["reference_pairs"]):
@@ -70,6 +74,9 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         row["official_paid_ns"] = official
         row["hierarchy_paid_ns"] = maintained
+        row["frontier_paid_ns"]=int(row["frontier_paid_total_ns"])
+        if row["frontier_paid_ns"]<=0:
+            raise ValueError(f"invalid temporal frontier clock at {key}")
         row["uncached_paid_ns"] = int(row["uncached_hierarchy_paid_ns"])
         if row["uncached_paid_ns"]<=0:
             raise ValueError(f"invalid uncached clock observation at {key}")
@@ -93,6 +100,7 @@ def summarize(rows: list[dict]):
     paid_atlas = [r["hierarchy_paid_ns"] for r in rows]
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
     old_totals=[r["uncached_paid_ns"] for r in rows]
+    frontier_totals=[r["frontier_paid_ns"] for r in rows]
     per_repeat={}
     per_regime={}
     for kind in ("routine","fast_adaptive"):
@@ -105,13 +113,17 @@ def summarize(rows: list[dict]):
             "ipc_total_ns":sum(r["official_paid_ns"] for r in subset),
             "cached_hierarchy_total_ns":sum(r["hierarchy_paid_ns"] for r in subset),
             "uncached_hierarchy_total_ns":sum(r["uncached_paid_ns"] for r in subset),
+            "frontier_hierarchy_total_ns":sum(r["frontier_paid_ns"] for r in subset),
             "contact_bearing_rows":sum(
                 int(r["source_face_impulse_updates"])>0 for r in subset)
         }
         per_regime[kind]["ipc_over_cached"]=(
             per_regime[kind]["ipc_total_ns"]/
             per_regime[kind]["cached_hierarchy_total_ns"])
-        per_regime[kind]["uncached_over_cached"]=(
+        per_regime[kind]["ipc_over_frontier"]=(
+            per_regime[kind]["ipc_total_ns"]/
+            per_regime[kind]["frontier_hierarchy_total_ns"])
+        per_regime[kind]["uncached_over_cached"]=( 
             per_regime[kind]["uncached_hierarchy_total_ns"]/
             per_regime[kind]["cached_hierarchy_total_ns"])
     for rep in sorted({int(r["repeat"]) for r in rows}):
@@ -120,10 +132,13 @@ def summarize(rows: list[dict]):
             "ipc_paid_ns":sum(r["official_paid_ns"] for r in batch),
             "cached_paid_ns":sum(r["hierarchy_paid_ns"] for r in batch),
             "uncached_paid_ns":sum(r["uncached_paid_ns"] for r in batch),
+            "frontier_paid_ns":sum(r["frontier_paid_ns"] for r in batch),
         }
         per_repeat[rep]["ipc_over_cached"]=(
             per_repeat[rep]["ipc_paid_ns"]/per_repeat[rep]["cached_paid_ns"])
-        per_repeat[rep]["uncached_over_cached"]=(
+        per_repeat[rep]["ipc_over_frontier"]=(
+            per_repeat[rep]["ipc_paid_ns"]/per_repeat[rep]["frontier_paid_ns"])
+        per_repeat[rep]["uncached_over_cached"]=( 
             per_repeat[rep]["uncached_paid_ns"]/per_repeat[rep]["cached_paid_ns"])
     warm = [r for r in rows if int(r["hierarchy_refits"]) > 0]
     cold = [r for r in rows if int(r["hierarchy_refits"]) == 0]
@@ -133,7 +148,8 @@ def summarize(rows: list[dict]):
         "ipc_build_ns":sum(int(r["official_build_ns"]) for r in rows),
         "ipc_query_ns":sum(int(r["official_query_ns"]) for r in rows),
         "maintained_all_paid_ns":sum(paid_atlas),
-        "uncached_hierarchy_all_paid_ns":sum(old_totals)
+        "uncached_hierarchy_all_paid_ns":sum(old_totals),
+        "frontier_hierarchy_all_paid_ns":sum(frontier_totals)
     }
     return {
         "experiment": "Actual pinned official IPC Toolkit LBVH vs refittable feature hierarchy",
@@ -143,6 +159,14 @@ def summarize(rows: list[dict]):
         "per_repeat_totals":per_repeat,
         "per_source_physics_regime":per_regime,
         "uncached_hierarchy_paid_total_ns":sum(old_totals),
+        "frontier_hierarchy_paid_total_ns":sum(frontier_totals),
+        "ratio_of_paid_totals_ipc_over_frontier":sum(paid_ipc)/sum(frontier_totals),
+        "ratio_of_paid_totals_cached_over_frontier":sum(paid_atlas)/sum(frontier_totals),
+        "total_source_frontier_budget_fallbacks":sum(
+            int(r["frontier_fallbacks"]) for r in rows
+            if int(r["step"])==max(
+                int(t["step"]) for t in rows
+                if t["repeat"]==r["repeat"])),
         "ratio_of_paid_totals_uncached_over_cached":sum(old_totals)/sum(paid_atlas),
         "median_per_repeat_uncached_over_cached":statistics.median(
             v["uncached_over_cached"] for v in per_repeat.values()),
@@ -198,6 +222,8 @@ def main():
                alpha=.5,s=22,label="Maintained cached hierarchy total paid (ms)")
     ax.scatter(x,[r["uncached_paid_ns"]/1e6 for r in rows],
                alpha=.4,s=10,label="Maintained uncached hierarchy control (ms)")
+    ax.scatter(x,[r["frontier_paid_ns"]/1e6 for r in rows],
+               alpha=.4,s=14,label="Retained node frontier total (ms)")
     ax.set(xlabel="Actual source FEM physical time (s)",ylabel="Paid candidate generation (ms)",
            title="Feature candidate generation only: pinned IPC vs refittable hierarchy")
     ax.grid(alpha=.25);ax.legend();fig.tight_layout()
