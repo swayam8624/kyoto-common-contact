@@ -287,7 +287,9 @@ int main(int argc,char**argv){
           "frontier_attempted_cut_size,cached_ipc_conversion_ns,"
           "cached_ipc_build_ns,cached_ipc_query_ns,cached_ipc_pairs,"
           "aa_first_hierarchy_ns,aa_second_hierarchy_ns,"
-          "aa_first_method,aa_exact_candidate_parity\n";
+          "aa_first_method,aa_exact_candidate_parity,"
+          "compact_frontier_total_ns,compact_frontier_pairs,"
+          "compact_frontier_cut_size,compact_vf_merges\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
@@ -299,6 +301,7 @@ int main(int argc,char**argv){
         // consume identical source states. Order is counterbalanced.
         kyoto::contact::atlas::RefitHierarchy control_a(true,true);
         kyoto::contact::atlas::RefitHierarchy control_b(true,true);
+        kyoto::contact::atlas::RefitHierarchy compacted_frontier(true,true,true);
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
@@ -306,7 +309,8 @@ int main(int argc,char**argv){
             f::Result ours,uncached,frontier_pairs;
             std::int64_t ours_ns=0,uncached_ns=0,frontier_ns=0;
             std::int64_t aa_a_ns=0,aa_b_ns=0;
-            f::Result aa_a,aa_b;
+            f::Result aa_a,aa_b,compacted_result;
+            std::int64_t compacted_ns=0;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -362,6 +366,13 @@ int main(int argc,char**argv){
                 throw std::runtime_error(
                     "A/A identical-implementation candidate parity failure at step "+
                     std::to_string(source.step));
+            const auto compact_begin=Clock::now();
+            compacted_result=compacted_frontier.query(source.mesh);
+            compacted_ns=ns(compact_begin,Clock::now());
+            if(compacted_result.pairs!=oracle)
+                throw std::runtime_error(
+                    "COMPACTED FRONTIER CANDIDATE PARITY FAILURE at step "+
+                    std::to_string(source.step));
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
@@ -412,7 +423,10 @@ int main(int argc,char**argv){
                <<optimized_upstream.query_ns<<','
                <<optimized_upstream.pairs.size()<<','
                <<aa_a_ns<<','<<aa_b_ns<<','
-               <<(aa_a_first?"A":"B")<<",1\n";
+               <<(aa_a_first?"A":"B")<<",1,"
+               <<compacted_ns<<','<<compacted_result.pairs.size()<<','
+               <<compacted_frontier.pair_cut_size()<<','
+               <<compacted_frontier.compacted_vf_merges()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
