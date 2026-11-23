@@ -6,6 +6,7 @@
 // refit bottom-up. Topology/signature changes rebuild the hierarchy.
 // Broadphase candidates are NOT CCD events. No speedup is claimed.
 #include "kyoto/cached_feature_boxes.hpp"
+#include "kyoto/selective_feature_boxes.hpp"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -29,6 +30,7 @@ class RefitHierarchy {
     struct Tree {
         std::vector<Node> nodes;
         std::vector<std::size_t> indices;
+        std::vector<int> leaf_of_record;
         int root{-1};
 
         static double centroid(const Aabb& a,int axis){
@@ -49,6 +51,7 @@ class RefitHierarchy {
             if(end-first==1) {
                 nodes[here].record=indices[first];
                 nodes[here].bounds=records[indices[first]].bounds;
+                leaf_of_record[indices[first]]=here;
                 return here;
             }
             Aabb bound=records[indices[first]].bounds;
@@ -73,6 +76,7 @@ class RefitHierarchy {
         }
         void build(const std::vector<f::Record>& records){
             nodes.clear();
+            leaf_of_record.assign(records.size(),-1);
             indices.resize(records.size());
             std::iota(indices.begin(),indices.end(),std::size_t{0});
             if(records.empty()){root=-1;return;}
@@ -89,10 +93,48 @@ class RefitHierarchy {
         void refit(const std::vector<f::Record>& records){
             if(root>=0)refit_at(root,records);
         }
+        // Nodes are stored in depth-first preorder: a parent index is
+        // smaller than both children. Updating affected ancestors in
+        // DESCENDING index order therefore always sees fully updated
+        // descendants. Never reuse a topology-incompatible leaf index.
+        void refit_changed(const std::vector<f::Record>& records,
+                           const std::vector<std::size_t>& dirty) {
+            if(root<0||dirty.empty())return;
+            if(dirty.size()*4>=records.size()){
+                refit(records);
+                return;
+            }
+            std::vector<int> ancestors;
+            for(const auto index:dirty) {
+                if(index>=leaf_of_record.size())
+                    throw std::out_of_range("selective tree record index");
+                int at=leaf_of_record[index];
+                if(at<0)throw std::logic_error("missing selective BVH leaf");
+                nodes[at].bounds=records[index].bounds;
+                while(nodes[at].parent>=0){
+                    at=nodes[at].parent;
+                    ancestors.push_back(at);
+                }
+            }
+            std::sort(ancestors.begin(),ancestors.end(),
+                [](int a,int b){return a>b;});
+            ancestors.erase(std::unique(ancestors.begin(),ancestors.end()),
+                            ancestors.end());
+            for(const auto at:ancestors){
+                const auto& n=nodes[at];
+                if(n.leaf())throw std::logic_error(
+                    "selective ancestor unexpectedly leaf");
+                nodes[at].bounds=f::unite(
+                    nodes[n.left].bounds,nodes[n.right].bounds);
+            }
+        }
     };
 
     Tree vertices_,faces_,edges_;
     CachedFeatureBoxes swept_boxes_;
+    SelectiveFeatureBoxes selective_boxes_;
+    bool selective_motion_{false};
+    std::size_t partial_refits_{},unchanged_refits_{};
     // Persistent *pair frontier*: a disjoint cut of the BVH product.
     // Each stored node pair covers its Cartesian leaf product, which is
     // either certified separated at this frame or a single leaf pair.
@@ -339,16 +381,26 @@ public:
     explicit RefitHierarchy(bool retain_feature_lookup=true,
                             bool maintain_pair_cut=false,
                             bool compact_separated_vf=false,
-                            std::size_t frontier_budget_factor=4)
+                            std::size_t frontier_budget_factor=4,
+                            bool selective_motion=false)
         :retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
          compact_separated_vf_(compact_separated_vf),
-         frontier_budget_factor_(frontier_budget_factor){
+         frontier_budget_factor_(frontier_budget_factor),
+         selective_motion_(selective_motion){
         if(frontier_budget_factor_<1||frontier_budget_factor_>8)
             throw std::invalid_argument("frontier budget factor must be 1..8");
+        if(selective_motion_&&!retain_feature_lookup_)
+            throw std::invalid_argument(
+                "selective motion tracking requires feature topology cache");
     }
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
+    std::size_t partial_refits()const{return partial_refits_;}
+    std::size_t unchanged_refits()const{return unchanged_refits_;}
+    std::size_t dirty_vertex_count()const{
+        return selective_motion_?selective_boxes_.dirty_vertices().size():0;
+    }
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
     std::size_t compacted_vf_merges()const{return compacted_vf_merges_;}
     // Count coarse region traversals, not discarded full-size cuts.
@@ -369,7 +421,9 @@ public:
         // conservative boxes. Warm calls reuse validated vertex indices.
         f::Built uncached;
         const f::Built* source=nullptr;
-        if(retain_feature_lookup_) {
+        if(selective_motion_) {
+            source=&selective_boxes_.update(mesh,topology_changed);
+        }else if(retain_feature_lookup_) {
             source=&swept_boxes_.update(mesh,topology_changed);
         }else {
             // A/B control: same spatial tree and same candidate traversal,
@@ -385,9 +439,20 @@ public:
             key_=next;initialized_=true;++rebuilds_;
             pair_cut_ready_=false;vf_cut_.clear();ee_cut_.clear();
         }else{
-            vertices_.refit(built.vertices);
-            edges_.refit(built.edges);
-            faces_.refit(built.faces);
+            if(selective_motion_){
+                const auto& v=selective_boxes_.dirty_vertices();
+                const auto& e=selective_boxes_.dirty_edges();
+                const auto& f=selective_boxes_.dirty_faces();
+                vertices_.refit_changed(built.vertices,v);
+                edges_.refit_changed(built.edges,e);
+                faces_.refit_changed(built.faces,f);
+                if(v.empty()&&e.empty()&&f.empty())++unchanged_refits_;
+                else ++partial_refits_;
+            }else{
+                vertices_.refit(built.vertices);
+                edges_.refit(built.edges);
+                faces_.refit(built.faces);
+            }
             ++refits_;
         }
         f::Result out;
