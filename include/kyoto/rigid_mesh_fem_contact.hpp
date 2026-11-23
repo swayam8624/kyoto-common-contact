@@ -22,11 +22,14 @@
 // continuous face intervals are NEVER silently accepted.
 
 #include "kyoto/triangle_mesh_contact.hpp"
+#include "kyoto/static_rigid_mesh_bvh.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
 #include <iterator>
+#include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -80,7 +83,8 @@ struct MeshStepResult{
     bool was_rejected_by_continuous_geometry{};
     bool was_rejected_by_tetrahedron{};
     std::size_t face_impulse_updates{},active_face_pairs{};
-    std::size_t broadphase_box_tests{},continuous_pair_tests{},
+    std::size_t broadphase_box_tests{},broadphase_node_tests{},
+                continuous_pair_tests{},
                 interval_nodes{};
     double normal_impulse_ns{},tangential_impulse_ns{};
     V3 external_contact_impulse{};
@@ -90,7 +94,8 @@ struct MeshStepResult{
 struct MeshAdaptiveStats{
     double start_s{},end_s{},integrated_dt_s{};
     std::size_t accepted_leaves{},rejected_geom_trials{},
-                rejected_tetra_trials{},continuous_pair_tests{},
+                rejected_tetra_trials{},broadphase_node_tests{},
+                broadphase_box_tests{},continuous_pair_tests{},
                 interval_nodes{},face_impulse_updates{},
                 active_face_pairs{};
     double min_clearance_m{std::numeric_limits<double>::infinity()};
@@ -109,14 +114,30 @@ inline void apply_rigid_mesh_impulses(
     const std::vector<TriangleBox>& rigid_boxes,
     const std::vector<V3>& positions,std::vector<V3>& velocity,
     std::vector<double>& nodal_normal_impulses,
-    const RigidMeshContactSettings& cfg,MeshStepResult& metrics){
+    const RigidMeshContactSettings& cfg,MeshStepResult& metrics,
+    const StaticRigidMeshBVH* static_bvh=nullptr){
     const double activation=cfg.clearance_skin_m+cfg.activation_width_m;
+    // Unaccelerated baseline is exactly the original face-index order.
+    std::vector<std::size_t> all_faces;
+    if(!static_bvh){
+        all_faces.resize(rigid.faces.size());
+        std::iota(all_faces.begin(),all_faces.end(),std::size_t{0});
+    }
     for(unsigned iter=0;iter<cfg.impulse_iterations;iter++){
         for(const auto& face:body.surface_faces){
             const Triangle3 a={positions[face[0]],positions[face[1]],
                                positions[face[2]]};
             const auto aabb=bounding(a);
-            for(std::size_t j=0;j<rigid.faces.size();j++){
+            std::vector<std::size_t> narrowed;
+            if(static_bvh){
+                std::size_t nodes=0;
+                narrowed=static_bvh->query(aabb,activation,&nodes);
+                metrics.broadphase_node_tests+=nodes;
+            }
+            // Query returns original ascending rigid triangle IDs;
+            // preserve sequential impulse accumulation deterministically.
+            const auto& ids=static_bvh?narrowed:all_faces;
+            for(const auto j:ids){
                 ++metrics.broadphase_box_tests;
                 if(!maybe_near(aabb,rigid_boxes[j],activation))
                     continue;
@@ -167,7 +188,8 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     const std::vector<Triangle3>& rigid_triangles,
     const std::vector<TriangleBox>& rigid_boxes,
     double dt,const RigidMeshContactSettings& cfg,
-    std::vector<V3>* trial_proposal_positions=nullptr) {
+    std::vector<V3>* trial_proposal_positions=nullptr,
+    const StaticRigidMeshBVH* static_bvh=nullptr) {
     MeshStepResult out;
     if(!(std::isfinite(dt)&&dt>0))
         throw std::invalid_argument("invalid rigid mesh physical trial dt");
@@ -192,7 +214,7 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     // Apply velocity reaction before the trial; otherwise a common
     // gravitating near-contact state repeatedly clips and loses time.
     apply_rigid_mesh_impulses(body,rigid,rigid_triangles,rigid_boxes,
-                             x,v,nodal_impulses,cfg,out);
+                             x,v,nodal_impulses,cfg,out,static_bvh);
     for(std::size_t i=0;i<x.size();i++)
         predicted.push_back(x[i]+v[i]*dt);
     // Optional source-only inspection: THESE are the native solver's
@@ -201,13 +223,25 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     // Default nullptr preserves all existing numerical solver behavior.
     if(trial_proposal_positions)
         *trial_proposal_positions=predicted;
+    std::vector<std::size_t> all_ccd_faces;
+    if(!static_bvh){
+        all_ccd_faces.resize(rigid.faces.size());
+        std::iota(all_ccd_faces.begin(),all_ccd_faces.end(),std::size_t{0});
+    }
     for(const auto& face:body.surface_faces){
         const LinearTriangleMotion trajectory{
             {x[face[0]],x[face[1]],x[face[2]]},
             {predicted[face[0]],predicted[face[1]],
              predicted[face[2]]}};
         const auto box=swept_bounding(trajectory);
-        for(std::size_t j=0;j<rigid.faces.size();j++){
+        std::vector<std::size_t> narrowed;
+        if(static_bvh){
+            std::size_t nodes=0;
+            narrowed=static_bvh->query(box,cfg.clearance_skin_m,&nodes);
+            out.broadphase_node_tests+=nodes;
+        }
+        const auto& ids=static_bvh?narrowed:all_ccd_faces;
+        for(const auto j:ids){
             ++out.broadphase_box_tests;
             if(!maybe_near(box,rigid_boxes[j],cfg.clearance_skin_m))
                 continue;
@@ -238,7 +272,7 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     }
     // Only now is post-displacement impulse response permitted.
     apply_rigid_mesh_impulses(body,rigid,rigid_triangles,rigid_boxes,
-                             predicted,v,nodal_impulses,cfg,out);
+                             predicted,v,nodal_impulses,cfg,out,static_bvh);
     Body candidate=body;
     for(std::size_t i=0;i<candidate.nodes.size();i++){
         candidate.nodes[i].x=predicted[i];
@@ -267,7 +301,8 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     Body& body,const StaticTriangleMesh& rigid,double dt,
     const RigidMeshContactSettings& cfg={},
     std::vector<MeshPhysicalLeaf>* receipts=nullptr,
-    std::vector<MeshAcceptedTransition>* accepted_transitions=nullptr){
+    std::vector<MeshAcceptedTransition>* accepted_transitions=nullptr,
+    bool use_static_rigid_bvh=false){
     validate(rigid);validate(cfg);
     if(!(std::isfinite(dt)&&dt>=cfg.minimum_dt_s))
         throw std::invalid_argument("invalid mesh FEM timestep");
@@ -292,6 +327,9 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
         triangles.push_back(tri);
         boxes.push_back(bounding(tri));
     }
+    std::optional<StaticRigidMeshBVH> acceleration;
+    if(use_static_rigid_bvh) acceleration.emplace(boxes);
+    const auto* tree=acceleration? &(*acceleration):nullptr;
     const auto subdivide=[&](auto&& self,double h,
                              unsigned depth)->void {
         if(result.accepted_leaves>=cfg.maximum_accepted_leaves)
@@ -302,7 +340,9 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
                 "mesh contact cannot certify minimum physical timestep");
         Body trial=staged;
         const auto r=try_rigid_mesh_fem_full_step(
-            trial,rigid,triangles,boxes,h,cfg);
+            trial,rigid,triangles,boxes,h,cfg,nullptr,tree);
+        result.broadphase_node_tests+=r.broadphase_node_tests;
+        result.broadphase_box_tests+=r.broadphase_box_tests;
         result.continuous_pair_tests+=r.continuous_pair_tests;
         result.interval_nodes+=r.interval_nodes;
         if(!r.accepted){
