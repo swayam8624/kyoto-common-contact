@@ -144,6 +144,12 @@ int main(int argc,char**argv){
         if(step>0){
             metric=step_time_consistent_rigid_triangle_mesh(
                 body,patch,.00075);
+            double nodal_sum=0;
+            for(const auto& node:body.nodes)
+                nodal_sum+=node.last_normal_impulse;
+            need(std::abs(nodal_sum-metric.normal_impulse_ns)<
+                 1e-8*std::max(1.,metric.normal_impulse_ns),
+                 "routine mesh contact nodal impulses disagree with accepted macro-step total");
             accepted+=metric.accepted_leaves;
             rejected_geometry+=metric.rejected_geom_trials;
             rejected_tetra+=metric.rejected_tetra_trials;
