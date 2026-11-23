@@ -86,6 +86,15 @@ target_link_libraries(kyoto_whole_fem_balance_tests PRIVATE kyoto_contact)
 add_test(NAME full_FEM_gravity_damping_contact_momentum_ledger
          COMMAND kyoto_whole_fem_balance_tests)
 
+# Pass 11A: actual indexed finite triangle meshes with true 3D VF/EE
+# AND segment-triangle interior piercing detection; moving continuous
+# triangle/triangle clearance, plus real source FEM negative control.
+add_executable(kyoto_triangle_mesh_tests tests/triangle_mesh_contact_tests.cpp)
+target_link_libraries(kyoto_triangle_mesh_tests PRIVATE kyoto_contact)
+add_test(NAME finite_triangle_mesh_VF_EE_piercing_and_continuous_contact
+         COMMAND kyoto_triangle_mesh_tests)
+
+
 
 
 
