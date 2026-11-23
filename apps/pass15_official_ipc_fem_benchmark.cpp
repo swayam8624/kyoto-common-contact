@@ -285,7 +285,9 @@ int main(int argc,char**argv){
           "frontier_pairs,frontier_cut_size,frontier_fallbacks,"
           "frontier_reused_node_pairs,frontier_skipped_frames,"
           "frontier_attempted_cut_size,cached_ipc_conversion_ns,"
-          "cached_ipc_build_ns,cached_ipc_query_ns,cached_ipc_pairs\n";
+          "cached_ipc_build_ns,cached_ipc_query_ns,cached_ipc_pairs,"
+          "aa_first_hierarchy_ns,aa_second_hierarchy_ns,"
+          "aa_first_method,aa_exact_candidate_parity\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
@@ -293,12 +295,18 @@ int main(int argc,char**argv){
         kyoto::contact::atlas::RefitHierarchy uncached_hierarchy(false);
         kyoto::contact::atlas::RefitHierarchy maintained_frontier(true,true);
         CachedIPCInput optimized_converter;
+        // Same-algorithm A/A control: two independent maintained BVHs
+        // consume identical source states. Order is counterbalanced.
+        kyoto::contact::atlas::RefitHierarchy control_a(true,true);
+        kyoto::contact::atlas::RefitHierarchy control_b(true,true);
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
             PaidIPC upstream,optimized_upstream;
             f::Result ours,uncached,frontier_pairs;
             std::int64_t ours_ns=0,uncached_ns=0,frontier_ns=0;
+            std::int64_t aa_a_ns=0,aa_b_ns=0;
+            f::Result aa_a,aa_b;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -337,6 +345,23 @@ int main(int argc,char**argv){
             };
             if(ipc_first){ipc_runs();local_runs();}
             else{local_runs();ipc_runs();}
+            const bool aa_a_first=((i+std::size_t(trial))%2==0);
+            auto run_aa_a=[&](){
+                const auto start=Clock::now();
+                aa_a=control_a.query(source.mesh);
+                aa_a_ns=ns(start,Clock::now());
+            };
+            auto run_aa_b=[&](){
+                const auto start=Clock::now();
+                aa_b=control_b.query(source.mesh);
+                aa_b_ns=ns(start,Clock::now());
+            };
+            if(aa_a_first){run_aa_a();run_aa_b();}
+            else{run_aa_b();run_aa_a();}
+            if(aa_a.pairs!=oracle||aa_b.pairs!=oracle)
+                throw std::runtime_error(
+                    "A/A identical-implementation candidate parity failure at step "+
+                    std::to_string(source.step));
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
@@ -385,7 +410,9 @@ int main(int argc,char**argv){
                <<optimized_upstream.conversion_ns<<','
                <<optimized_upstream.build_ns<<','
                <<optimized_upstream.query_ns<<','
-               <<optimized_upstream.pairs.size()<<'\n';
+               <<optimized_upstream.pairs.size()<<','
+               <<aa_a_ns<<','<<aa_b_ns<<','
+               <<(aa_a_first?"A":"B")<<",1\n";
             ++rows;
             if(source.impulses)++with_contact;
         }
