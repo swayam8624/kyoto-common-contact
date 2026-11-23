@@ -193,6 +193,16 @@ if(KYOTO_WITH_OFFICIAL_IPC)
                  apps/pass15_official_ipc_fem_benchmark.cpp)
   target_link_libraries(kyoto_pass15_official_ipc_fem_benchmark
                         PRIVATE kyoto_contact ipc::toolkit)
+  # Pass 18: exhaustive real upstream CCD over EVERY cross-object
+  # VF/EE stencil on original accepted fast finite-mesh FEM leaves.
+  add_executable(kyoto_pass18_real_leaf_ccd_audit
+                 apps/pass18_real_leaf_ccd_audit.cpp)
+  target_link_libraries(kyoto_pass18_real_leaf_ccd_audit
+                        PRIVATE kyoto_contact ipc::toolkit)
+  add_test(NAME pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events
+           COMMAND kyoto_pass18_real_leaf_ccd_audit
+                   ${CMAKE_CURRENT_BINARY_DIR}/pass18-leaf-ccd)
+
   # Pass 5: official upstream CCD on genuine solver-integrated
   # tetrahedral trajectories, reporting unresolved self-contact.
   add_executable(kyoto_official_ipc_solid_audit tests/ipc_solid_trajectory_audit.cpp)
