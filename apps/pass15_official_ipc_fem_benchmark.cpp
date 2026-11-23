@@ -3,6 +3,7 @@
 // Candidate coverage is mandatory. Timings are C++ native paid pipeline
 // timings only, not full solver or continuous narrow-phase CCD.
 #include "kyoto/fem_feature_snapshots.hpp"
+#include "kyoto/multi_body_fem_snapshots.hpp"
 #include "kyoto/refit_feature_hierarchy.hpp"
 #include "kyoto/adaptive_candidate_policy.hpp"
 #include <ipc/broad_phase/lbvh.hpp>
@@ -207,7 +208,7 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
     const auto rigid=s::corrugated_contact_patch();
     std::vector<Source> data;
     data.reserve(std::size_t(scene_count*(360/sample_stride)+8));
-    for(int scenario=0;scenario<scene_count;++scenario){
+    for(int scenario=0;scenario<std::min(scene_count,3);++scenario){
         const auto& spec=scenes[std::size_t(scenario)];
         s::Material material;
         material.young=spec.young;
@@ -227,6 +228,61 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
             data.push_back({scenario*1000+step,body.time_seconds,
                 receipt.face_impulse_updates,receipt.accepted_leaves,
                 std::move(snapshot),"routine",-1,scenario,before.tets.size()});
+        }
+    }
+    if(scene_count==4) {
+        // Two independently integrated, physically deformable FEM bodies
+        // with different resolution, modulus and initial drift. Both
+        // react against the SAME finite static triangle obstacle.
+        // Body-body contact response is NOT implemented; a positive
+        // independent finite-face separation audit is enforced.
+        s::Material a_material,b_material;
+        a_material.young=18000.;
+        b_material.young=26000.;
+        s::Body a=s::toroidal_solid(12,3,3,a_material);
+        s::Body b=s::toroidal_solid(16,3,3,b_material);
+        for(auto& node:a.nodes){
+            node.x.x-=1.30;node.rest.x-=1.30;
+            node.v={.035,.025,0.};
+        }
+        for(auto& node:b.nodes){
+            node.x.x+=1.30;node.rest.x+=1.30;
+            node.v={-.035,-.025,0.};
+        }
+        for(int step=1;step<=360;++step){
+            const s::Body before_a=a,before_b=b;
+            const auto x=s::step_time_consistent_rigid_triangle_mesh(
+                a,rigid,.00075);
+            const auto y=s::step_time_consistent_rigid_triangle_mesh(
+                b,rigid,.00075);
+            if(x.accepted_leaves<1||y.accepted_leaves<1||
+               std::abs(a.time_seconds-b.time_seconds)>1e-10)
+                throw std::runtime_error(
+                    "uncoupled multibody native FEM physical step failed");
+            if(step%sample_stride!=0)continue;
+            double gap=std::numeric_limits<double>::infinity();
+            for(const auto& fa:a.surface_faces){
+                const s::Triangle3 ta={a.nodes[fa[0]].x,
+                    a.nodes[fa[1]].x,a.nodes[fa[2]].x};
+                for(const auto& fb:b.surface_faces){
+                    const s::Triangle3 tb={b.nodes[fb[0]].x,
+                        b.nodes[fb[1]].x,b.nodes[fb[2]].x};
+                    const auto lower=s::triangle_triangle_closest(ta,tb);
+                    gap=std::min(gap,lower.distance);
+                }
+            }
+            if(!(std::isfinite(gap)&&gap>.001))
+                throw std::runtime_error(
+                    "uncoupled multibody fixture entered unsupported "
+                    "deformable/deformable contact");
+            auto snapshot=fem::uncoupled_two_body_feature_snapshot(
+                before_a,a,before_b,b,rigid);
+            snapshot.topology_epoch=4;
+            data.push_back({5000+step,a.time_seconds,
+                x.face_impulse_updates+y.face_impulse_updates,
+                x.accepted_leaves+y.accepted_leaves,
+                std::move(snapshot),"uncoupled_multibody",-1,4,
+                before_a.tets.size()+before_b.tets.size()});
         }
     }
     if(data.size()!=std::size_t(scene_count*(360/sample_stride)))
@@ -264,13 +320,14 @@ int main(int argc,char**argv){
  try{
     if(argc<2||argc>5)throw std::invalid_argument(
         "usage: kyoto_pass15_official_ipc_fem_benchmark OUTPUT_FOLDER "
-        "[sample_stride=12] [repeats=12] [scene_count=1]");
+        "[sample_stride=12] [repeats=12] [scene_count=1..4] "
+        "(4 includes two independent FEM bodies, NOT coupled contact)");
     const int stride=argc>=3?std::stoi(argv[2]):12;
     const int repeats=argc>=4?std::stoi(argv[3]):12;
     const int scene_count=argc>=5?std::stoi(argv[4]):1;
     if(stride<1||stride>360||360%stride!=0||
-       repeats<2||repeats>24||scene_count<1||scene_count>3)
-        throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24; 1 <= scene_count <= 3");
+       repeats<2||repeats>24||scene_count<1||scene_count>4)
+        throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24; 1 <= scene_count <= 4");
     const auto directory=std::filesystem::path(argv[1]);
     std::filesystem::create_directories(directory);
     const auto data=generate(stride,scene_count); // Excluded from both methods' costs.
