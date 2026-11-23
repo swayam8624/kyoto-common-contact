@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/pass15_official_ipc_fem_benchmark.cpp"
       - "include/kyoto/fem_feature_snapshots.hpp"
+      - "tests/fem_feature_snapshots_tests.cpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "scripts/report_pass15_official_ipc.py"
       - ".github/workflows/pass15-official-ipc-fem.yml"
@@ -30,11 +31,12 @@ jobs:
           cmake --build build-pass15 --parallel 2 \
             --target kyoto_pass15_official_ipc_fem_benchmark \
                      kyoto_official_ipc_lbvh_tests \
-                     kyoto_refit_feature_hierarchy_tests
+                     kyoto_refit_feature_hierarchy_tests \
+                     kyoto_fem_feature_snapshots_tests
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|pinned_official_ipc_lbvh_feature_coverage' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage' \
             --output-on-failure
       - name: Generate verified original-solver matched source receipts
         run: |
