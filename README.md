@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 10 — independent outward-enclosed IEEE-754 swept-triangle/sphere separation with exact-dyadic time interval enclosures derived from ORIGINAL vertex endpoints, and a full 3D FEM gravity/elastic/damping/contact discrete momentum ledger. All 288,000 routine and 1,600 fast accepted moving triangle intervals were strictly verified with 0 undecided in the two tested trajectories; every one of 905 source FEM leaves passed the full P/L accounting gate. Five cross-platform/visual CI jobs verified. General IPC mesh-mesh CCD, formal hardware/compiler numerical proof, calibrated physical energy fidelity, self-contact and the central SCA speedup hypothesis remain OPEN.**
+**Status: PASS 11 — the first REAL 3D neo-Hookean FEM contact response against 72 indexed finite nonplanar rigid triangular faces. The verified 900-step 180-node/480-tet original solver produced 11,731 actual face contact impulse updates across 517 physical steps, with no accepted rigid/deformable face intersection, minimum face separation 1.736 mm and tetra J >= 0.72287. The old sphere-only physics, audited against the SAME rigid patch but not reacting to it, intersected it in 95/181 sampled states. Explicit local mesh contact is implemented; full formal floating-point general VF/EE CCD, closed moving rigid obstacles, self-contact, material calibration, implicit IPC physics and demonstrated SCA speedup remain OPEN.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -655,6 +655,126 @@ fully implicit contact and a demonstrated SCA
 performance improvement remain unmet gates.
 
 
+
+## Pass 11 — actual rigid finite triangular obstacles and physical response
+
+The research now has an original fully deforming 3D tetrahedral
+**neo-Hookean** solid colliding with a real connected, sloped, nonplanar
+triangular rigid patch. This is no longer a sphere or infinite
+plane disguised as a polygon mesh: the original rigid collider
+contains 49 source vertices joined into **72 finite triangles**.
+All contact response normals and barycentric feature locations
+are derived from these genuine rigid triangle coordinates.
+
+The physics body remains the 180-node, 480-tetrahedron
+material with 320 connected deforming surface triangles.
+
+New C++23 components:
+
+    include/kyoto/triangle_mesh_contact.hpp
+    include/kyoto/rigid_mesh_fem_contact.hpp
+    tests/triangle_mesh_contact_tests.cpp
+    tests/rigid_mesh_fem_contact_tests.cpp
+    tests/rigid_mesh_fast_contact_tests.cpp
+    scripts/render_pass11_real_triangle_fem.py
+
+The rigid mesh kernel evaluates actual vertex/face,
+edge/edge and crucial segment/triangle INTERIOR
+piercing features. Its continuous check bounds the
+distance from every moving finite deformable triangle
+to every potentially relevant finite rigid triangle,
+under the source's piecewise-linear vertex motion.
+Unresolved intervals are NOT accepted as safe.
+
+The new physical integrator evaluates original
+neo-Hookean stresses, gravity and velocity damping,
+applies local mass-weighted barycentric normal and
+frictional impulses against the true finite rigid
+features, certifies whole-face continuous motion,
+requires positive tetrahedral orientation, and only
+commits a fully integrated and fully geometrically
+safe physical step.
+
+Any unsafe trial is rejected and genuinely re-integrated
+over smaller physical time intervals; if the configured
+budget is exhausted, the entire input Body and original
+external time receipts are rolled back.
+
+**Verified original 900-step reference results:**
+
+| Actually measured C++ physics | Original native result |
+| --- | ---: |
+| Real elapsed physical time | 0.675 s |
+| First TRUE finite rigid-face impact | 0.21975 s |
+| Physical steps carrying mesh impulses | **517 / 900** |
+| Actual face impulse updates | **11,731** |
+| Accepted full physical time leaves | 900 |
+| Rejected routine geometric/tet proposals | 0 / 0 |
+| Minimum complete finite rigid/deformable face gap | **1.73623 mm** |
+| Minimum positive neo-Hookean tetra J | **0.72287** |
+| Peak actual von Mises stress | **8.988 kPa** |
+
+The new response never queries the previous
+analytical sphere. The exact same rigid patch was
+used in a deliberately BLIND sphere-only solver
+counterexample: **95 of 181** sampled physical states
+intersected the rigid triangle patch, totaling
+11,465 penetrating/contacting source face pairs.
+
+This shows why sphere-only response cannot simply be
+called a general finite triangle-mesh solver.
+It is NOT a fair performance comparison of otherwise
+equal contact mechanics, and does not establish any
+new SCA broadphase speedup.
+
+A separate source impact test uses a fast **20 m/s**
+approach toward the original finite triangles with
+roughly 12 mm of initial clearance. It requires the
+unsafe full .75 ms motion to be rejected and the
+entire physical time to be consumed by certified
+substeps, never partial displacement with phantom time.
+That gate is separately tested and archived; the
+ordinary 900-step reference itself never needed
+adaptive splitting because contact impulses maintained
+a safe gap.
+
+Original scientific visual outputs contain eight
+data-grounded charts including the actual fast
+physical-time receipts, a combined atlas, a fully
+offline rotatable 3D source-frame animation, and
+a GIF of selected originally integrated FEM frames.
+
+To reproduce the source native data and visualizations:
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
+    ./build/kyoto_triangle_mesh_tests results/pass11-mesh
+    ./build/kyoto_rigid_mesh_fem_tests results/pass11-mesh
+    ./build/kyoto_fast_mesh_impact_tests results/pass11-mesh
+
+    python3 scripts/render_pass11_real_triangle_fem.py \
+       --input results/pass11-mesh \
+       --output results/pass11-mesh/visuals
+
+Everything is actual C++23 simulated source FEM; Python
+visualizes but does NOT create a synthetic contact trajectory.
+
+The mathematical derivations, physical explanation, negative
+control and explicit unproved claims are documented in:
+
+    docs/22_REAL_FINITE_TRIANGLE_MESH_CONTACT.md
+
+**Remaining scientific limitations:** the rigid patch is
+static, open and two-sided. This is not general moving
+closed rigid mesh collision, robust directed-rounded
+finite VF/EE predicates, full self-contact, a coupled
+implicit IPC barrier model or independent material
+calibration. A maintained whole-cost SCA hierarchy with
+controlled paid timings against official pinned IPC
+Toolkit LBVH also remains unimplemented/undemonstrated.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -677,10 +797,12 @@ Read the docs in numbered order:
 - docs/19_TIME_CONSISTENT_REPLAY.md
 - docs/20_INDEPENDENT_CONTINUOUS_CONTACT_AUDIT.md
 - docs/21_ROUNDED_PRISM_AND_WHOLE_FEM_BALANCE.md
+- docs/22_REAL_FINITE_TRIANGLE_MESH_CONTACT.md
 - AGENTS.md
 
-The NEXT gate is general triangle/triangle rigid/deformable contact and
-self-contact with robust feature-level CCD, independent physical energy/
-convergence validation, and a truly maintained whole-cost SCA hierarchy
-versus the pinned official IPC Toolkit LBVH on held-out 3D solver paths.
+The NEXT gate is robust machine-enclosed feature-level CCD against
+moving/closed rigid meshes, broad and adjacent topology-correct deformable
+self-contact and independent physical convergence, then a genuine maintained
+whole-cost SCA hierarchy versus pinned official IPC Toolkit LBVH on held-out
+contact-rich 3D physical solver trajectories.
 Do not substitute candidate parity for actual continuous collision proof.
