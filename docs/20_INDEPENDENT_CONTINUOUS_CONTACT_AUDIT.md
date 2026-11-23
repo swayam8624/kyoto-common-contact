@@ -300,7 +300,76 @@ must exist; unresolved intervals and numerical residuals must be
 inspected from that archive before any claim of full continuous
 coverage.
 
-## 7. Remaining important work
+## 7. Actual original verified experimental receipts
+
+The source-backed independent audit from 23 November 2026 is a
+completed, five-job GitHub Actions success on Ubuntu/macOS in
+Debug/Release, including original visualization/provenance checks:
+
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45144892694
+
+Native measured results from the artifact's own manifests:
+
+| Native independent evidence | Verified result |
+| --- | ---: |
+| Routine FEM physical macro-steps | 900 |
+| Routine complete swept face paths | 288,000 |
+| Independently certified routine paths | 288,000 |
+| Routine unresolved paths | **0** |
+| Independent support-plane evaluations (routine) | 4,916,586 |
+| Fast true physical substeps | 5 |
+| Fast complete swept face paths | 1,600 |
+| Independently certified fast paths | 1,600 |
+| Fast unresolved paths | **0** |
+| Minimum routine endpoint full-triangle clearance | 1.127650231 mm |
+| Minimum fast endpoint full-triangle clearance | 0.868559517 mm |
+| Maximum static distance-oracle disagreement (native FEM) | 2.220446049e-16 m |
+| Rotated/transformed contact impulses independently tested | 1,200 |
+| Maximum local kinetic-energy work residual | 6.366462912e-12 J |
+| Maximum linear-momentum impulse residual | 1.705302566e-13 N·s |
+| Maximum angular-momentum impulse residual | 9.374856803e-13 N·m·s |
+| Maximum observed local positive kinetic increment | 5.456968211e-12 J |
+
+The strict separating-plane check succeeded on the ORIGINAL six-point
+hull of every routine interval: 288,000 routine time nodes for
+288,000 moving triangles. Recursive temporal splitting was not
+needed in this specific set of real solver trajectories.
+The **4,916,586** support-plane projections are actual paid
+computation but NOT measured milliseconds or comparative SCA speedup.
+
+The two finite-triangle oracles were implemented using DIFFERENT
+numerical constructions (Voronoi regions versus exhaustive edges
+and orthogonal projection), providing stronger finite test evidence
+than running the same implementation under a different function name.
+
+The test suite also independently rejected actual triangle/sphere
+penetration at temporal midpoints despite safe endpoints, huge
+triangle interior penetrations despite safe vertices, and nearly
+machine-tangent geometries. A "not separated" result is always
+UNRESOLVED, not silently interpreted as a safe interval.
+
+The complete original sources are preserved as:
+
+    kyoto-stage9-independent-swept-CCD-and-contact-impulse-audit
+
+including independent_manifest.json, impulse_manifest.json,
+real_fem_independent_sweeps.csv (900 rows),
+fast_impact_independent_sweeps.csv (5 physical leaves),
+fast_impact_face_witnesses.csv (1,600 face proof statuses),
+impulse_balance_cases.csv (1,200 actual impulse law cases),
+all seven data-grounded figures, and their combined research atlas.
+
+**Absolutely do not generalize the zero-unresolved outcome to every
+floating-point input.** Neither the support-plane tests nor the
+production midpoint certificate use formally directed rounding.
+The convex-hull and impulse identities are exact in real
+arithmetic; their floating-point implementation has only finite
+validated coverage. The full damped/FEM mechanical-energy
+conservation claim remains explicitly false.
+
+## 8. Remaining important work
+
+
 
 - Directed-rounded exact conservative interval arithmetic for both
   accepted and externally audited continuous geometry.
