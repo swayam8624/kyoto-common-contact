@@ -94,6 +94,15 @@ target_link_libraries(kyoto_triangle_mesh_tests PRIVATE kyoto_contact)
 add_test(NAME finite_triangle_mesh_VF_EE_piercing_and_continuous_contact
          COMMAND kyoto_triangle_mesh_tests)
 
+# Pass 11B: TRUE physical FEM contact response on a finite indexed
+# nonplanar triangular rigid obstacle, including full continuous
+# triangle/triangle motion safety and adaptive real-time reintegration.
+add_executable(kyoto_rigid_mesh_fem_tests tests/rigid_mesh_fem_contact_tests.cpp)
+target_link_libraries(kyoto_rigid_mesh_fem_tests PRIVATE kyoto_contact)
+add_test(NAME real_nonplanar_finite_rigid_mesh_FEM_contact
+         COMMAND kyoto_rigid_mesh_fem_tests)
+
+
 
 
 
