@@ -280,3 +280,13 @@ add_executable(kyoto_moving_moving_triangle_certificate_tests
 target_link_libraries(kyoto_moving_moving_triangle_certificate_tests PRIVATE kyoto_contact)
 add_test(NAME conservative_moving_moving_finite_triangle_time_guard
          COMMAND kyoto_moving_moving_triangle_certificate_tests)
+
+# Experimental Pass23: two TRUE physically integrated finite-mass
+# neo-Hookean solids exchange equal and opposite contact impulses.
+# Source moving/moving geometric guard must reject unresolved paths.
+# This is separate from the stable statically contacted FEM source.
+add_executable(kyoto_coupled_deformable_fem_contact_tests
+               tests/coupled_deformable_fem_contact_tests.cpp)
+target_link_libraries(kyoto_coupled_deformable_fem_contact_tests PRIVATE kyoto_contact)
+add_test(NAME actual_two_body_coupled_FEM_impulse_momentum_clock_and_CCD_gate
+         COMMAND kyoto_coupled_deformable_fem_contact_tests)
