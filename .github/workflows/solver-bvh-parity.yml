@@ -1,0 +1,34 @@
+name: Kyoto native solver triangle BVH source parity
+on:
+  push:
+    branches: [research/solver-rigid-bvh-parity]
+    paths:
+      - "include/kyoto/static_rigid_mesh_bvh.hpp"
+      - "include/kyoto/rigid_mesh_fem_contact.hpp"
+      - "tests/static_rigid_mesh_bvh_tests.cpp"
+      - "tests/rigid_mesh_bvh_solver_parity_tests.cpp"
+      - "CMakeLists.txt"
+      - ".github/workflows/solver-bvh-parity.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-physics-parity:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build independent native FEM solver acceleration controls
+        run: |
+          cmake -S . -B build-bvh -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-bvh --parallel 4 --target kyoto_static_rigid_mesh_bvh_tests
+      - name: Validate genuine 3D rigid triangle feature candidates
+        run: |
+          ctest --test-dir build-bvh \
+            -R 'rigid_static_mesh_BVH_9000_source_candidate_parity' \
+            --output-on-failure
