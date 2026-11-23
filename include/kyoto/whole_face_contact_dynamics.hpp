@@ -89,7 +89,8 @@ inline double apply_face_velocity_impulses(
             V3 vcontact{};
             double invmass=0;
             for(int k=0;k<3;k++){
-                const auto id=face[k],w=close.barycentric[k];
+                const auto id=face[k];
+                const double w=close.barycentric[k];
                 vcontact+=velocities[id]*w;
                 invmass+=w*w/body.nodes[id].mass;
             }
@@ -105,7 +106,8 @@ inline double apply_face_velocity_impulses(
             const V3 full_impulse=n*Jn-
                 (speed>1e-15?tangent*(Jt/speed):V3{});
             for(int k=0;k<3;k++){
-                const auto id=face[k],w=close.barycentric[k];
+                const auto id=face[k];
+                const double w=close.barycentric[k];
                 velocities[id]+=full_impulse*(w/body.nodes[id].mass);
                 vertex_impulses[id]+=Jn*w;
             }
