@@ -52,6 +52,8 @@ def load(root):
     rigid=pd.read_csv(root/"rigid_patch_original_vertices.csv")
     rigidfaces=pd.read_csv(root/"rigid_patch_original_triangles.csv")
     negative=pd.read_csv(root/"real_FEM_against_nonresponding_rigid_mesh.csv")
+    fast_manifest=json.loads((root/"fast_mesh_manifest.json").read_text())
+    fast_leaves=pd.read_csv(root/"fast_finite_mesh_physical_leaves.csv")
     assert m["actual_rigid_triangle_contact_response"]
     assert m["sphere_used_to_resolve_mesh_contact"] is False
     assert not m["rounding_formally_certified"]
@@ -76,7 +78,15 @@ def load(root):
     assert m["first_contact_time_s"]>0
     assert m["smallest_full_face_mesh_clearance_m"]>0
     assert m["smallest_tetra_jacobian"]>0
-    return m,history,verts,bodyfaces,rigid,rigidfaces,negative
+    assert fast_manifest["true_nonplanar_rigid_triangle_collision"]
+    assert fast_manifest["unsafe_full_step_rejected"]
+    assert fast_manifest["geometrically_rejected_proposals"]>0
+    assert fast_manifest["accepted_physical_substeps"]>1
+    assert len(fast_leaves)==fast_manifest["accepted_physical_substeps"]
+    assert abs(fast_leaves.actual_dt_s.sum()-.00075)<1e-12
+    assert (fast_leaves.min_full_triangle_gap_m>0).all()
+    assert fast_manifest["minimum_accepted_tet_jacobian"]>1e-6
+    return m,history,verts,bodyfaces,rigid,rigidfaces,negative,fast_manifest,fast_leaves
 
 def clearance(history,out):
     fig,ax=plt.subplots(figsize=(12.8,6.7))
@@ -232,6 +242,46 @@ def draw3d(ax,positions,indices,rigidP,rigidI,scalar,
     ax.tick_params(labelsize=7)
     ax.set_title(colorbar_title,color=INK,pad=5,fontsize=10)
 
+def fast_physical_replay(manifest,leaves,out):
+    """Read the actual C++ replay receipts, never reconstruct fake motion."""
+    fig,axes=plt.subplots(1,2,figsize=(18.8,7.4))
+    fig.subplots_adjust(left=.105,right=.95,bottom=.18,top=.79,wspace=.30)
+    a,b=axes
+    first=np.arange(len(leaves))
+    starts=1000*leaves.start_time_s.to_numpy()
+    duration=1000*leaves.actual_dt_s.to_numpy()
+    bisection=leaves.bisection_depth.to_numpy()
+    a.barh(first,width=duration,left=starts,height=.65,
+           color=cm.viridis(np.clip(bisection/10,0,1)),
+           edgecolor=BG,linewidth=.6)
+    a.set(xlabel="Actual accepted physical time (ms)",
+          ylabel="Accepted complete FEM substep",
+          xlim=(0,.00075*1000*1.08),yticks=first)
+    a.invert_yaxis()
+    a.grid(axis="x")
+    ends=1000*leaves.end_time_s.to_numpy()
+    b.plot(ends,1000*leaves.min_full_triangle_gap_m,
+           marker="o",color=GREEN,lw=2,
+           label="Certified full rigid triangle clearance")
+    b.axhline(0,color=RED,ls="--",lw=1.2)
+    impulse=b.twinx()
+    impulses=impulse.bar(ends,leaves.normal_impulse_ns,
+                        width=np.maximum(duration*.64,.004),
+                        color=GOLD,alpha=.55,
+                        label="Real local normal impulses")
+    b.set(xlabel="Physical collision time (ms)",
+          ylabel="Min finite-face clearance / mm")
+    impulse.set_ylabel("Accepted leaf normal impulse / N·s",color=GOLD)
+    impulse.tick_params(axis="y",colors=GOLD)
+    b.grid(True)
+    b.legend(handles=[b.lines[0],impulses.patches[0]],
+             frameon=False,labelcolor=INK,fontsize=9)
+    lab(fig,"08 / THIS FAST MESH IMPACT REALLY RE-INTEGRATES TIME",
+       f"20 m/s into a genuine triangular patch. {manifest['geometrically_rejected_proposals']} unsafe trials rejected, "
+       f"{manifest['accepted_physical_substeps']} complete physical substeps accepted; exactly 0.750 ms integrated.",
+       "Colors on the left show true bisection depth; source impulses, gaps and timestamps are original C++ receipts.")
+    save(fig,out/"08_fast_finite_triangle_actual_time_partition.png")
+
 def source3d(history,verts,faces,rigid,rigidfaces,out):
     ids=faces[["a","b","c"]].to_numpy(int)
     RP=rigid[["x","y","z"]].to_numpy(float)
@@ -356,7 +406,7 @@ def atlas(out):
            "04_real_mesh_FEM_energy_budget.png",
            "05_source_FEM_center_of_mass.png",
            "06_sphere_only_negative_geometry_control.png"]
-    poster=Image.new("RGB",(1950,3010),BG)
+    poster=Image.new("RGB",(1950,3820),BG)
     for k,file in enumerate(files):
         p=Image.open(out/file).convert("RGB")
         p.thumbnail((945,615))
@@ -368,6 +418,10 @@ def atlas(out):
     hero.thumbnail((1910,810))
     poster.paste(hero,((1950-hero.width)//2,2120))
     hero.close()
+    fast=Image.open(out/"08_fast_finite_triangle_actual_time_partition.png").convert("RGB")
+    fast.thumbnail((1900,800))
+    poster.paste(fast,((1950-fast.width)//2,2975))
+    fast.close()
     d=ImageDraw.Draw(poster)
     try:
         f=ImageFont.truetype(
@@ -384,12 +438,13 @@ def main():
     p.add_argument("--input",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
-    m,h,vertices,faces,rigid,rigidfaces,negative=load(a.input)
+    m,h,vertices,faces,rigid,rigidfaces,negative,fastm,fastleaves=load(a.input)
     theme()
     clearance(h,a.output);impulse(h,a.output)
     stress(h,a.output);energy(h,a.output)
     center(h,a.output);negative_control(h,negative,a.output)
     source3d(h,vertices,faces,rigid,rigidfaces,a.output)
+    fast_physical_replay(fastm,fastleaves,a.output)
     interactive(vertices,faces,rigid,rigidfaces,a.output)
     contact_gif(vertices,faces,rigid,rigidfaces,a.output)
     atlas(a.output)
@@ -397,6 +452,6 @@ def main():
           f"({m['physical_steps']} physical steps, {m['face_impulse_updates']} "
           f"actual local face impulses, minimum gap "
           f"{m['smallest_full_face_mesh_clearance_m']:.7g} m); "
-          "7 true source plots, offline interactive 3D and original-frame GIF")
+          "8 original source plots, genuine adaptive fast event, offline interactive 3D and physical GIF")
 if __name__=="__main__":
     main()
