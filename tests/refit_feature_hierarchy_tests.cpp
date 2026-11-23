@@ -27,6 +27,7 @@ static void verify(kyoto::contact::atlas::RefitHierarchy& h,
 int main(){
  try{
     kyoto::contact::atlas::RefitHierarchy h;
+    kyoto::contact::atlas::RefitHierarchy uncached(false);
     f::Mesh mesh;
     mesh.thickness=.0005;
     mesh.vertices={vertex(0,{0,0,0}),vertex(1,{1,0,0}),
@@ -36,6 +37,7 @@ int main(){
     mesh.edges={{0,{0,1}},{1,{1,2}},{2,{2,0}},
                 {3,{3,4}},{4,{4,5}},{5,{5,3}}};
     verify(h,mesh,"initial");
+    verify(uncached,mesh,"uncached initial");
     if(h.rebuilds()!=1||h.refits()!=0)
         throw std::runtime_error("incorrect cold build statistics");
     std::mt19937_64 rng(20261123);
@@ -49,28 +51,37 @@ int main(){
                 {q.x,q.y,q.z-.35},q};
         }
         verify(h,mesh,"randomized warm refit");
+        verify(uncached,mesh,"uncached randomized parity");
     }
     if(h.rebuilds()!=1||h.refits()!=180)
         throw std::runtime_error("cached tree unexpectedly rebuilt on motion");
 
     mesh.faces.back().mask=0; // Same epoch but changed policy.
     verify(h,mesh,"mask invalidation");
+    verify(uncached,mesh,"uncached mask invalidation");
     if(h.rebuilds()!=2)
         throw std::runtime_error("mask invalidation did not rebuild");
     mesh.topology_epoch=2;
     verify(h,mesh,"epoch invalidation");
+    verify(uncached,mesh,"uncached epoch invalidation");
     if(h.rebuilds()!=3)
         throw std::runtime_error("epoch invalidation did not rebuild");
     // Empty topological families must not access a nonexistent tree.
     mesh.faces.clear();
     mesh.edges.clear();
     verify(h,mesh,"empty features");
+    verify(uncached,mesh,"uncached empty features");
     if(h.rebuilds()!=4)
         throw std::runtime_error("feature deletion did not invalidate");
+    // The same topology may change its physical collision thickness
+    // without an epoch bump; both pipelines must regenerate every box.
+    mesh.thickness=.025;
+    verify(h,mesh,"skin radius recomputed");
+    verify(uncached,mesh,"uncached skin radius");
     // Robustness gate for shared-vertex adjacency vs nonlocal pairs.
     std::cout<<"PASS14 hierarchy: 180 randomized warm refits, "
         "all exhaustive VF/EE candidate sets equal; "
-        "mask/epoch/feature-deletion rebuilds correct\n";
+        "cached/uncached oracle parity and mask/epoch/skin rebuild safety\n";
     return 0;
  }catch(const std::exception& e){
     std::cerr<<"PASS14 FAIL: "<<e.what()<<'\n';
