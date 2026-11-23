@@ -37,6 +37,8 @@ struct Source {
     double time{};
     std::size_t impulses{},leaves{};
     f::Mesh mesh;
+    std::string regime;
+    int physical_leaf_id{-1};
 };
 struct IPCPrepared {
     ipc::AABBs vertex_boxes;
@@ -125,7 +127,7 @@ static std::vector<Source> generate(){
     s::Body body=s::toroidal_solid();
     const auto rigid=s::corrugated_contact_patch();
     std::vector<Source> data;
-    data.reserve(30);
+    data.reserve(36);
     for(int step=1;step<=360;++step){
         const s::Body previous=body;
         const auto result=s::step_time_consistent_rigid_triangle_mesh(
@@ -135,10 +137,38 @@ static std::vector<Source> generate(){
         if(step%12!=0)continue;
         data.push_back({step,body.time_seconds,
             result.face_impulse_updates,result.accepted_leaves,
-            fem::feature_snapshot(previous,body,rigid)});
+            fem::feature_snapshot(previous,body,rigid),
+            "routine", -1});
     }
     if(data.size()!=30)
-        throw std::runtime_error("native FEM snapshot count mismatch");
+        throw std::runtime_error("native FEM routine snapshot count mismatch");
+
+    // Actual fast finite-triangle impact, recorded as the *accepted*
+    // solver-generated physical leaves. This is a separate regime of
+    // the same real 3D hyperelastic solver, not an independent solver.
+    s::Body fast=s::toroidal_solid();
+    auto raised=s::corrugated_contact_patch();
+    const auto original_gap=s::audit_deformable_rigid_mesh(fast,raised,0.);
+    const double shift=original_gap.minimum_distance_m-.012;
+    for(auto& vertex:raised.vertices)vertex.z+=shift;
+    for(auto& node:fast.nodes)node.v={0,0,-20.0};
+    std::vector<s::MeshAcceptedTransition> physical_leaves;
+    const auto impact=s::step_time_consistent_rigid_triangle_mesh(
+        fast,raised,.00075,{},nullptr,&physical_leaves);
+    if(impact.accepted_leaves<=1 || impact.rejected_geom_trials==0 ||
+       physical_leaves.size()!=impact.accepted_leaves)
+        throw std::runtime_error("fast FEM source was not adaptively subdivided");
+    for(std::size_t j=0;j<physical_leaves.size();++j){
+        const auto& leaf=physical_leaves[j];
+        if(!(leaf.receipt.dt_s>0 &&
+             leaf.after.time_seconds>leaf.before.time_seconds))
+            throw std::runtime_error("invalid accepted physical leaf time");
+        auto features=fem::feature_snapshot(leaf.before,leaf.after,raised);
+        features.topology_epoch=2; // Different scene/obstacle: pay rebuild
+        data.push_back({361+static_cast<int>(j),leaf.after.time_seconds,
+            leaf.receipt.face_impulse_updates,1,std::move(features),
+            "fast_adaptive",static_cast<int>(j)});
+    }
     return data;
 }
 int main(int argc,char**argv){
@@ -150,7 +180,7 @@ int main(int argc,char**argv){
     const auto data=generate(); // Excluded from both methods' costs.
     std::ofstream csv(directory/"official_ipc_fem_paired.csv");
     if(!csv)throw std::runtime_error("failed to create original receipt");
-    csv<<"repeat,step,physical_time_s,source_face_impulse_updates,"
+    csv<<"repeat,step,regime,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
           "accepted_physical_leaves,reference_pairs,official_ipc_pairs,"
           "maintained_hierarchy_pairs,official_extra,official_missing,"
           "official_conversion_ns,official_build_ns,official_query_ns,"
@@ -208,7 +238,8 @@ int main(int argc,char**argv){
                     std::to_string(source.step)+" missing="+
                     std::to_string(missing.size()));
             const auto extra=upstream.pairs.size()-oracle.size();
-            csv<<trial<<','<<source.step<<','<<source.time<<','
+            csv<<trial<<','<<source.step<<','<<source.regime<<','
+               <<source.physical_leaf_id<<','<<source.time<<','
                <<source.impulses<<','<<source.leaves<<','<<oracle.size()<<','
                <<upstream.pairs.size()<<','<<ours.pairs.size()<<','
                <<extra<<",0,"<<upstream.conversion_ns<<','
@@ -222,7 +253,8 @@ int main(int argc,char**argv){
             if(source.impulses)++with_contact;
         }
     }
-    std::cout<<"PASS15: pinned upstream IPC Toolkit LBVH; "
+    std::cout<<"PASS15: pinned upstream IPC Toolkit LBVH on routine real FEM "
+             <<"plus actual fast impact adaptive physical leaves; "
              <<rows<<" matched repeated solver-FEM snapshot rows; "
              <<with_contact<<" contact-bearing repeated snapshots; "
              <<"independent oracle candidate coverage and "
