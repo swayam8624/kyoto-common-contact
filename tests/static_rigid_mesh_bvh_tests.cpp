@@ -57,10 +57,10 @@ int main(){
                "actual native FEM face box candidate omission");
     }
     std::cout<<"PASS20 9000 independent AABB queries plus original 3D "
-             <<"FEM/rigid-face candidate coverage and original face order\\n";
+             <<"FEM/rigid-face candidate coverage and original face order\n";
     return 0;
  }catch(const std::exception& e){
-    std::cerr<<"FAIL20 "<<e.what()<<'\\n';
+    std::cerr<<"FAIL20 "<<e.what()<<'\n';
     return 1;
  }
 }
