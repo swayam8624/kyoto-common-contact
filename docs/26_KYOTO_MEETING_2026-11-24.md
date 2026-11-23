@@ -6,6 +6,22 @@
 **Scientific posture:** show executed evidence only; explicitly preserve negative results.
 **Purpose:** request agreement on the next credible research hypothesis and validation protocol.
 
+## Quickest reproducible Mac/Linux preflight
+
+```bash
+cd ~/Desktop/Programming/kyoto-common-contact
+git switch research/spacetime-contact-atlas
+git pull --ff-only origin research/spacetime-contact-atlas
+bash scripts/run_kyoto_meeting_preflight.sh core
+# Only if upstream IPC Toolkit dependencies are available:
+bash scripts/run_kyoto_meeting_preflight.sh ipc
+```
+
+The script stops on C++ build, oracle, source-physics or CSV validation
+failure, records hardware/commit provenance, and saves all measured
+receipts to `results/kyoto-meeting-2026-11-24/`. Do not present a failed
+preflight as a completed experiment.
+
 ## Opening (about 45 seconds)
 
 > After our earlier feedback about insufficiently varied and overly simple
