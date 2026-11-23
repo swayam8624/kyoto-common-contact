@@ -345,6 +345,11 @@ int main(int argc,char**argv){
                 <<" \"ordinary_max_static_oracle_distance_disagreement_m\":"<<total.largest_static_distance_disagreement<<",\n"
                 <<" \"ordinary_min_tetra_jacobian\":"<<min_j<<",\n"
                 <<" \"fast_accepted_physical_substeps\":"<<fast_receipts.size()<<",\n"
+                <<" \"fast_sphere_radius_m\":"<<fast_sphere.radius<<",\n"
+                <<" \"fast_sphere_center_xyz_m\":["
+                     <<fast_sphere.center.x<<','
+                     <<fast_sphere.center.y<<','
+                     <<fast_sphere.center.z<<"],\n"
                 <<" \"fast_face_intervals\":"<<(total_fast.certified+total_fast.unresolved)<<",\n"
                 <<" \"fast_certified_intervals\":"<<total_fast.certified<<",\n"
                 <<" \"fast_unresolved_intervals\":"<<total_fast.unresolved<<",\n"
