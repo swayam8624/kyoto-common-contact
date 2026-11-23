@@ -51,6 +51,20 @@ int main(){
              "one original physical FEM source body did not integrate");
         need(std::abs(a.time_seconds-b.time_seconds)<1e-12,
              "two physical source FEM bodies lost synchronized time");
+        need(moved_a.accepted_leaves==1 && moved_b.accepted_leaves==1,
+             "source must expose one true accepted linear physical leaf each");
+        const double gap=fem::uncoupled_two_body_swept_x_gap(
+            before_a,a,before_b,b);
+        need(std::isfinite(gap)&&gap>.002,
+             "physical cross-body swept motion is not disjoint");
+        // Negative safety control: a geometrically overlapping body
+        // cannot use the uncoupled evidence protocol.
+        auto intruding_before_b=before_b,intruding_after_b=b;
+        for(auto& n:intruding_before_b.nodes)n.x.x-=2.5;
+        for(auto& n:intruding_after_b.nodes)n.x.x-=2.5;
+        need(fem::uncoupled_two_body_swept_x_gap(
+                 before_a,a,intruding_before_b,intruding_after_b)<=0,
+             "unsupported mutual collision escaped sufficient x-axis gate");
         const auto mesh=fem::uncoupled_two_body_feature_snapshot(
             before_a,a,before_b,b,rigid);
         const auto va=a.nodes.size(),vb=b.nodes.size();
