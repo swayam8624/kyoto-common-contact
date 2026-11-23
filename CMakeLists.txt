@@ -42,6 +42,10 @@ add_executable(kyoto_whole_face_tests tests/whole_face_contact_tests.cpp)
 target_link_libraries(kyoto_whole_face_tests PRIVATE kyoto_contact)
 add_test(NAME whole_face_synchronized_fem_contact COMMAND kyoto_whole_face_tests)
 
+add_executable(kyoto_whole_face_fem_export apps/whole_face_fem_export.cpp)
+target_link_libraries(kyoto_whole_face_fem_export PRIVATE kyoto_contact)
+
+
 
 
 add_executable(kyoto_curved_fem_export apps/curved_fem_export.cpp)
