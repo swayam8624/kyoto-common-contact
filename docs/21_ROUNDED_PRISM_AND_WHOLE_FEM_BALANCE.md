@@ -432,7 +432,126 @@ Do not call this pass complete before the exact
 commit's native Ubuntu/macOS Debug/Release and
 source-visualization jobs succeed.
 
-## G. Gates still OPEN
+## G. Original measured and reproducible results
+
+The raw source archive from the verified
+23 November 2026 native CI run is preserved
+under:
+
+    kyoto-stage10-IEEE-outward-CCD-and-full-FEM-momentum-evidence
+
+Original successfully completed five-job workflow:
+
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45153954633
+
+This run was executed with the verifier
+compiled using disabled contraction and
+unsafe fast-math flags (the explicit
+CMake numerical safety options).
+
+All of the following values are taken from
+rounded_manifest.json or
+whole_fem_balance_manifest.json created
+by the ORIGINAL native C++23 test code.
+
+### Independent outward-enclosed continuous geometry
+
+| Source-native measurement | Routine 900-step FEM | Fast adaptive impact |
+| --- | ---: | ---: |
+| Original accepted complete moving triangle intervals | 288,000 | 1,600 |
+| Strictly separated by outward-enclosed support planes | 288,000 | 1,600 |
+| Not independently resolved | **0** | **0** |
+| Paid proposed plane directions | 1,939,204 | 11,874 |
+| Paid outward endpoint interval dot checks | 3,536,502 | 21,495 |
+| Minimum *strict* positive support margin | 0.000002069048889 m | 0.000098242344215 m |
+
+These positive lower margins are conservative
+**plane-support** distances, not the nearest
+point-to-triangle clearance. Do not confuse
+them with the larger native static nearest-
+point gaps measured in earlier passes.
+
+A further 500 seeded clearly separated random
+3D linear triangle motions were certified,
+while constructed true tunnelling and exact
+tangent cases were rejected or left unresolved.
+An FE_UPWARD run was deliberately rejected.
+
+The routine had 900 original physical macro
+steps; the fast case used exactly five physically
+integrated accepted substeps. Every connected
+surface face in every accepted source interval
+was checked, not merely the sampled display
+frames or vertex trajectories.
+
+**These two tested paths have no unresolved
+intervals under the stated arithmetic model.
+This is NOT a universal formal IEEE/hardware
+proof or evidence of general triangle/triangle
+CCD coverage.**
+
+### Entire neo-Hookean FEM momentum and energy
+
+| Source-native measurement | Routine 900 leaves | Fast 5 leaves |
+| --- | ---: | ---: |
+| Maximum absolute full linear momentum ledger residual | 6.82121e-13 N·s | 1.63709e-11 N·s |
+| Maximum absolute angular momentum ledger residual | 1.79047e-13 N·m·s | 1.96836e-12 N·m·s |
+| Maximum *relative* linear momentum residual | 1.83880e-15 | 1.74824e-15 |
+| Maximum *relative* angular momentum residual | 1.39945e-13 | 1.10480e-12 |
+| Maximum relative summed internal elastic-force imbalance | 2.56766e-16 | 2.63976e-17 |
+| Maximum relative summed internal elastic-torque imbalance | 1.80464e-16 | 4.21792e-17 |
+| Total signed change in physical mechanical energy | −459.62438 J | −14,545.23685 J |
+
+The routine trajectory included **443 accepted
+physical steps carrying contact impulses**.
+
+The large negative energy change in the
+short fast-impact case is a critical signal
+that substantial contact dissipation and/or
+numerical effects still need independent
+material calibration; it is not proof that
+the real world would lose that amount.
+The study therefore does NOT assert
+energy-preserving whole-step dynamics.
+The exact values are retained as original
+negative/limiting evidence.
+
+### Evidence files and original scientific visualization
+
+- rounded_routine_900.csv — all 900 source
+  step-level certified counts, strict lower
+  gaps and actual paid interval operations.
+- rounded_fast_substeps.csv — all five
+  physically accepted collision leaves.
+- rounded_fast_1600_faces.csv — full
+  per-face proof outcome and margin for
+  each of 1,600 actual face paths.
+- whole_FEM_accepted_substep_balance.csv —
+  905 original physical substep impulse,
+  force, angular and energy ledger rows.
+- rounded_manifest.json — explicit IEEE
+  numerical assumptions, all coverage
+  results, and formal-coverage=false.
+- whole_fem_balance_manifest.json —
+  complete source-based physical residual
+  maxima, total energy changes and
+  physical-calibration=false.
+- Seven measured scientific figures and
+  STAGE10_ROUNDED_CONTACT_AND_FEM_PHYSICS_ATLAS.png —
+  independent interval geometry, true
+  whole-FEM momentum, mechanical energy,
+  source 3D stress and per-face lower proof
+  margins. All data are derived from the
+  original C++ source receipts.
+
+These outputs were compiled and reproduced
+on macOS and Ubuntu in Release and Debug,
+with the scientific render job separately
+reproducing and auditing both manifests.
+
+## H. Gates still OPEN
+
+
 
 1. Formal directed-rounded/exact predicate and
    robust corner cases across all supported
