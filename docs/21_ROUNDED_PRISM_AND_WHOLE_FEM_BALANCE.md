@@ -462,7 +462,7 @@ by the ORIGINAL native C++23 test code.
 | Strictly separated by outward-enclosed support planes | 288,000 | 1,600 |
 | Not independently resolved | **0** | **0** |
 | Paid proposed plane directions | 1,939,204 | 11,874 |
-| Paid outward endpoint interval dot checks | 3,536,502 | 21,495 |
+| Paid outward endpoint interval dot checks | 3,536,445 | 21,438 |
 | Minimum *strict* positive support margin | 0.000002069048889 m | 0.000098242344215 m |
 
 These positive lower margins are conservative
