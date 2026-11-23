@@ -250,6 +250,7 @@ jobs:
           v=root/"visuals"
           assert len(list(v.glob("[0-9][0-9]_*.png")))==5
           assert (v/"STAGE8_ADAPTIVE_TIME_REPLAY_ATLAS.png").stat().st_size>100000
+          assert (v/"06_interactive_real_FEM_fast_event.html").stat().st_size>100000
           print("PASS: actual full physical dt, 900 steps, split event, 256-step numerical control, no full-face penetration and five scientific plots")
           PY
       - uses: actions/upload-artifact@v4
