@@ -41,11 +41,13 @@ struct AuditedPath {
 // its proposed path is clear; native states supply ONLY the true motion.
 static AuditedPath audit_native_leaf(
     const Body& from,const Body& to,const RigidSphere& sphere,
-    unsigned max_depth=12) {
+    unsigned max_depth=12,std::ostream* face_receipts=nullptr,
+    std::size_t leaf_index=0) {
     must(from.surface_faces.size()==to.surface_faces.size() &&
          from.nodes.size()==to.nodes.size(),"inconsistent geometry topology");
     AuditedPath r;
-    for(const auto& face:from.surface_faces){
+    for(std::size_t face_id=0;face_id<from.surface_faces.size();face_id++){
+        const auto& face=from.surface_faces[face_id];
         LinearTriangleMotion motion;
         for(int i=0;i<3;i++){
             motion.start[i]=from.nodes[face[i]].x;
@@ -74,6 +76,17 @@ static AuditedPath audit_native_leaf(
             motion,sphere,max_depth);
         r.support_tests+=prism.support_planes_tested;
         r.time_nodes+=prism.time_nodes;
+        if(face_receipts){
+            const V3 center=(motion.end[0]+motion.end[1]+motion.end[2])/3.;
+            const auto observed=independent_triangle_distance(
+                sphere.center,motion.end[0],motion.end[1],motion.end[2]);
+            (*face_receipts)<<leaf_index<<','<<face_id<<','
+                <<center.x<<','<<center.y<<','<<center.z<<','
+                <<(observed.distance-sphere.radius)<<','
+                <<int(prism.separated)<<','
+                <<prism.support_planes_tested<<','
+                <<prism.time_nodes<<'\n';
+        }
         if(prism.separated)r.certified++;
         else {
             r.unresolved++;
@@ -110,10 +123,17 @@ int main(int argc,char**argv){
         "usage: kyoto_independent_contact_tests [optional evidence directory]");
     std::ofstream stream;
     std::ofstream fast;
+    std::ofstream face_csv;
     if(argc==2) {
         std::filesystem::create_directories(argv[1]);
         stream.open(std::filesystem::path(argv[1])/"real_fem_independent_sweeps.csv");
         fast.open(std::filesystem::path(argv[1])/"fast_impact_independent_sweeps.csv");
+        face_csv.open(std::filesystem::path(argv[1])/
+                      "fast_impact_face_witnesses.csv");
+        face_csv<<std::setprecision(17);
+        face_csv<<"leaf_id,face_id,center_x,center_y,center_z,"
+                  "independent_end_clearance_m,continuously_certified,"
+                  "support_plane_tests,temporal_nodes\n";
         stream<<std::setprecision(17);
         fast<<std::setprecision(17);
         stream<<"macro_step,time_s,accepted_physical_leaves,"
@@ -282,7 +302,8 @@ int main(int argc,char**argv){
             next,fast_sphere,fast_receipts[k].dt_s);
         must(!r.time_clipped,"fast accepted physical leaf clipped");
         const auto audit=audit_native_leaf(
-            fast_replay,next,fast_sphere,15);
+            fast_replay,next,fast_sphere,15,
+            face_csv.is_open()?&face_csv:nullptr,k);
         total_fast.certified+=audit.certified;
         total_fast.unresolved+=audit.unresolved;
         total_fast.support_tests+=audit.support_tests;
