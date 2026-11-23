@@ -292,7 +292,9 @@ int main(int argc,char**argv){
           "compact_frontier_total_ns,compact_frontier_pairs,"
           "compact_frontier_cut_size,compact_vf_merges,"
           "adaptive_paid_total_ns,adaptive_pairs,adaptive_used_frontier,"
-          "adaptive_switches,adaptive_probes\n";
+          "adaptive_switches,adaptive_probes,"
+          "budget1x_frontier_ns,budget1x_frontier_pairs,"
+          "budget1x_frontier_cut_size,budget1x_coarse_regions\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
@@ -306,6 +308,7 @@ int main(int argc,char**argv){
         kyoto::contact::atlas::RefitHierarchy control_b(true,true);
         kyoto::contact::atlas::RefitHierarchy compacted_frontier(true,true,true);
         kyoto::contact::atlas::AdaptiveCandidatePolicy adaptive;
+        kyoto::contact::atlas::RefitHierarchy low_budget(true,true,false,1);
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
@@ -315,7 +318,8 @@ int main(int argc,char**argv){
             std::int64_t aa_a_ns=0,aa_b_ns=0;
             f::Result aa_a,aa_b,compacted_result;
             std::int64_t compacted_ns=0,adaptive_ns=0;
-            f::Result adaptive_result;
+            f::Result adaptive_result,low_budget_result;
+            std::int64_t low_budget_ns=0;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -385,6 +389,13 @@ int main(int argc,char**argv){
                 throw std::runtime_error(
                     "ONLINE ADAPTIVE POLICY CANDIDATE PARITY FAILURE at step "+
                     std::to_string(source.step));
+            const auto low_begin=Clock::now();
+            low_budget_result=low_budget.query(source.mesh);
+            low_budget_ns=ns(low_begin,Clock::now());
+            if(low_budget_result.pairs!=oracle)
+                throw std::runtime_error(
+                    "LOW-BUDGET FRONTIER CANDIDATE PARITY FAILURE at step "+
+                    std::to_string(source.step));
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
@@ -441,7 +452,10 @@ int main(int argc,char**argv){
                <<compacted_frontier.compacted_vf_merges()<<','
                <<adaptive_ns<<','<<adaptive_result.pairs.size()<<','
                <<(adaptive.last_used_frontier()?1:0)<<','
-               <<adaptive.switches()<<','<<adaptive.probes()<<'\n';
+               <<adaptive.switches()<<','<<adaptive.probes()<<','
+               <<low_budget_ns<<','<<low_budget_result.pairs.size()<<','
+               <<low_budget.pair_cut_size()<<','
+               <<low_budget.pair_cut_fallbacks()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
