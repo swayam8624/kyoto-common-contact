@@ -144,6 +144,47 @@ jobs:
           assert (visual/"STAGE6_CURVED_FEM_SCIENCE_ATLAS.png").stat().st_size>100000
           print("PASS: actual 900-step curved 3D FEM with 901 independent triangle/vertex safety audit states; full-surface overlap count =",m["states_with_static_triangle_sphere_overlap"])
           PY
+      - name: Export physically integrated whole-face-safe elastic 3D solid
+        run: ./build/kyoto_whole_face_fem_export results/whole-face-fem
+      - name: Render measured whole-face stress, impulse, continuous safety and 3D volumes
+        run: python scripts/render_whole_face_fem.py --input results/whole-face-fem --output results/whole-face-fem/visuals
+      - name: Independent complete audit of Stage-7 whole-face physical evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,csv,math
+          p=Path("results/whole-face-fem")
+          manifest=json.loads((p/"curved_manifest.json").read_text())
+          assert manifest["physical_motion"]
+          assert manifest["whole_triangle_lipschitz_CCD"]
+          assert not manifest["general_mesh_mesh_IPC_response"]
+          assert not manifest["machine_certified_rounded_intervals"]
+          assert manifest["surface_audit_states"]==901
+          assert manifest["states_with_vertex_inside_sphere"]==0
+          assert manifest["states_with_static_triangle_sphere_overlap"]==0
+          assert manifest["normal_impulse_vertex_steps"]>0
+          assert manifest["minimum_element_jacobian"]>0
+          a=list(csv.DictReader((p/"surface_sphere_clearance.csv").open()))
+          assert len(a)==901
+          assert all(int(x["penetrating_triangles"])==0 for x in a)
+          assert all(float(x["minimum_triangle_clearance_m"])>=0 for x in a)
+          fractions=list(csv.DictReader((p/"whole_face_contact_step_diagnostics.csv").open()))
+          assert len(fractions)==900
+          assert all(0<=float(x["accepted_global_fraction"])<=1 for x in fractions)
+          assert sum(int(x["time_clipped"]) for x in fractions)==manifest["time_clipped_steps"]
+          visuals=p/"visuals"
+          assert len(list(visuals.glob("[0-9][0-9]_*.png")))==7
+          assert len(list((visuals/"vtk_volumetric").glob("curved_*.vtk")))==181
+          assert (visuals/"STAGE7_WHOLE_FACE_FEM_SCIENCE_ATLAS.png").stat().st_size>100000
+          assert (visuals/"07_interactive_curved_fem.html").stat().st_size>100000
+          print("PASS: full-face 0-penetration FEM, 901 source states, 900 paid contact traces, seven 3D/physics charts, 181 volumes")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage7-synchronized-whole-face-fem-evidence
+          path: results/whole-face-fem/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage6-real-curved-FEM-and-surface-safety-audit
