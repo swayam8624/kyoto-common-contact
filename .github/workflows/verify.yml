@@ -378,6 +378,8 @@ jobs:
         run: ./build/kyoto_triangle_mesh_tests results/pass11-mesh
       - name: Pass 11 real nonplanar indexed rigid triangle contact neo-Hookean FEM
         run: ./build/kyoto_rigid_mesh_fem_tests results/pass11-mesh
+      - name: Pass 11C real adaptive FAST impact against nonplanar rigid triangle mesh
+        run: ./build/kyoto_fast_mesh_impact_tests results/pass11-mesh
       - name: Pass 11 scientific original FEM 3D, contact impulse and GIF visual atlas
         run: |
           python scripts/render_pass11_real_triangle_fem.py \
@@ -410,6 +412,21 @@ jobs:
           states=list(csv.DictReader((root/"rigid_triangle_physics_900.csv").open()))
           verts=list(csv.DictReader((root/"rigid_triangle_physical_vertices.csv").open()))
           negative=list(csv.DictReader((root/"real_FEM_against_nonresponding_rigid_mesh.csv").open()))
+          fast=json.loads((root/"fast_mesh_manifest.json").read_text())
+          assert fast["true_nonplanar_rigid_triangle_collision"]
+          assert fast["unsafe_full_step_rejected"]
+          assert not fast["old_sphere_contact_used"]
+          assert not fast["universal_stability_proven"]
+          assert fast["geometrically_rejected_proposals"]>0
+          assert fast["accepted_physical_substeps"]>1
+          assert abs(fast["actual_accepted_physical_time_s"]-.00075)<1e-12
+          assert fast["minimum_accepted_mesh_triangle_gap_m"]>0
+          assert fast["minimum_accepted_tet_jacobian"]>1e-6
+          leaves=list(csv.DictReader((root/"fast_finite_mesh_physical_leaves.csv").open()))
+          assert len(leaves)==fast["accepted_physical_substeps"]
+          assert abs(sum(float(x["actual_dt_s"]) for x in leaves)-.00075)<1e-12
+          assert all(float(x["min_full_triangle_gap_m"])>0 for x in leaves)
+
           assert len(states)==901 and len(verts)==91*180
           assert len(negative)==181
           assert all(float(x["finite_triangle_min_distance_m"])>0 for x in states)
