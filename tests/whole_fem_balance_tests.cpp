@@ -133,10 +133,8 @@ static void audit_integrated_leaf(
                          after.elastic_joule+after.gravity_joule;
     const double delta=energy1-energy0;
     need(std::isfinite(delta),"nonfinite entire FEM energy change");
-    const auto geometry=audit_surface_sphere(next,RigidSphere{});
-    // The rigid sphere for fast contact has modified radius, so
-    // independent safety is checked at call-site with its real collider.
-    (void)geometry;
+    // Geometric safety is independently checked at the call site
+    // against the correct (possibly tuned) rigid obstacle.
     stats.leaves++;
     stats.with_contact+=contact.normal_impulses>0;
     stats.max_absolute_momentum_residual_ns=std::max(
