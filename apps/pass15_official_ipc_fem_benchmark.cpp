@@ -188,7 +188,8 @@ int main(int argc,char**argv){
           "first_method,uncached_hierarchy_paid_ns,uncached_hierarchy_pairs,"
           "first_internal_hierarchy_method,frontier_paid_total_ns,"
           "frontier_pairs,frontier_cut_size,frontier_fallbacks,"
-          "frontier_reused_node_pairs\n";
+          "frontier_reused_node_pairs,frontier_skipped_frames,"
+          "frontier_attempted_cut_size\n";
     csv<<std::setprecision(17);
     constexpr int repeats=12;
     std::size_t rows=0,with_contact=0;
@@ -264,7 +265,9 @@ int main(int argc,char**argv){
                <<frontier_ns<<','<<frontier_pairs.pairs.size()<<','
                <<maintained_frontier.pair_cut_size()<<','
                <<maintained_frontier.pair_cut_fallbacks()<<','
-               <<maintained_frontier.pair_cut_reuses()<<'\n';
+               <<maintained_frontier.pair_cut_reuses()<<','
+               <<maintained_frontier.pair_cut_skipped_frames()<<','
+               <<maintained_frontier.last_pair_cut_attempted_size()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
