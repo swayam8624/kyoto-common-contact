@@ -23,7 +23,8 @@ def main():
     required=("step","time_s","exact_pairs","sap_pairs",
               "reference_build_ns","reference_query_ns",
               "sap_build_ns","sap_query_ns","source_face_impulse_updates","persistent_total_ns",
-              "persistent_warm_frames","persistent_invalidations")
+              "persistent_warm_frames","persistent_invalidations",
+              "hierarchy_total_ns","hierarchy_rebuilds","hierarchy_refits")
     for i,row in enumerate(rows):
         for key in required:
             if key not in row:
@@ -38,7 +39,8 @@ def main():
     exact=[duration(r,"reference") for r in rows]
     sap=[duration(r,"sap") for r in rows]
     persistent=[int(r["persistent_total_ns"]) for r in rows]
-    if min(exact)<=0 or min(sap)<=0 or min(persistent)<=0:
+    hierarchy=[int(r["hierarchy_total_ns"]) for r in rows]
+    if min(exact)<=0 or min(sap)<=0 or min(persistent)<=0 or min(hierarchy)<=0:
         raise ValueError("nonpositive monotonic-clock timings")
     ratios=[x/y for x,y in zip(exact,sap)]
     summary={
@@ -50,6 +52,10 @@ def main():
         "exhaustive_paid_total_ns":sum(exact),
         "sap_paid_total_ns":sum(sap),
         "persistent_order_paid_total_ns":sum(persistent),
+        "maintained_hierarchy_paid_total_ns":sum(hierarchy),
+        "ratio_of_paid_totals_rebuilt_sap_over_hierarchy":sum(sap)/sum(hierarchy),
+        "hierarchy_rebuilds_during_source_snapshots":int(rows[-1]["hierarchy_rebuilds"]),
+        "hierarchy_refits_during_source_snapshots":int(rows[-1]["hierarchy_refits"]),
         "ratio_of_paid_totals_rebuilt_sap_over_persistent_order":sum(sap)/sum(persistent),
         "persistent_warm_frames":int(rows[-1]["persistent_warm_frames"]),
         "persistent_invalidations_during_source_snapshots":int(rows[-1]["persistent_invalidations"]),
@@ -57,7 +63,7 @@ def main():
         "median_paired_ratio_exhaustive_over_sap":statistics.median(ratios),
         "min_paired_ratio_exhaustive_over_sap":min(ratios),
         "max_paired_ratio_exhaustive_over_sap":max(ratios),
-        "warning":"Persistent-order SAP is not the proposed dual-tree SCA. Not SCA vs IPC. Not complete solver-step timing. One fixed-order pass; no counterbalancing, A/A, confidence interval, or independent replicate."
+        "warning":"The maintained hierarchy is a first full-feature refit experiment, not a locally updated contact frontier. Not a fair SCA vs IPC result or full solver-step timing. One fixed-order pass; no counterbalancing, A/A, confidence interval, or independent replicate."
     }
     a.output.mkdir(parents=True,exist_ok=True)
     (a.output/"pass13_reference_summary.json").write_text(
@@ -77,8 +83,10 @@ def main():
             label="Rebuilt SAP build + query (ms)")
     ax.plot(time,[v/1e6 for v in persistent],marker="x",
             label="Persistent-order SAP total (ms)")
+    ax.plot(time,[v/1e6 for v in hierarchy],marker="s",
+            label="Maintained hierarchy total (ms)")
     ax.set(xlabel="Physical FEM time (s)",ylabel="Measured paid time (ms)",
-           title="Paid native feature costs; no official IPC or dual-tree SCA")
+           title="Paid native feature costs; no official IPC or solver-integrated SCA")
     ax.grid(alpha=.25)
     ax.legend()
     fig.tight_layout()
