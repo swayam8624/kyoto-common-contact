@@ -1,6 +1,7 @@
 // Pass 14 hierarchy correctness, including broadphase mask/topology
 // invalidation and randomized deformation against independent O(E²+VF).
 #include "kyoto/refit_feature_hierarchy.hpp"
+#include "kyoto/adaptive_candidate_policy.hpp"
 #include <array>
 #include <cstdint>
 #include <iostream>
@@ -30,6 +31,7 @@ int main(){
     kyoto::contact::atlas::RefitHierarchy uncached(false);
     kyoto::contact::atlas::RefitHierarchy with_cut(true,true);
     kyoto::contact::atlas::RefitHierarchy with_compaction(true,true,true);
+    kyoto::contact::atlas::AdaptiveCandidatePolicy adaptive;
     f::Mesh mesh;
     mesh.thickness=.0005;
     mesh.vertices={vertex(0,{0,0,0}),vertex(1,{1,0,0}),
@@ -42,6 +44,8 @@ int main(){
     verify(uncached,mesh,"uncached initial");
     verify(with_cut,mesh,"frontier initial");
     verify(with_compaction,mesh,"compacted frontier initial");
+    if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+        throw std::runtime_error("adaptive policy initial candidate mismatch");
     if(h.rebuilds()!=1||h.refits()!=0)
         throw std::runtime_error("incorrect cold build statistics");
     std::mt19937_64 rng(20261123);
@@ -58,6 +62,8 @@ int main(){
         verify(uncached,mesh,"uncached randomized parity");
         verify(with_cut,mesh,"frontier randomized parity");
         verify(with_compaction,mesh,"compacted frontier randomized parity");
+        if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+            throw std::runtime_error("adaptive policy randomized candidate mismatch");
     }
     if(with_cut.pair_cut_reuses()==0)
         throw std::runtime_error("frontier never reused node-pair cut");
@@ -69,6 +75,8 @@ int main(){
     verify(uncached,mesh,"uncached mask invalidation");
     verify(with_cut,mesh,"frontier mask invalidation");
     verify(with_compaction,mesh,"compacted frontier mask invalidation");
+    if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+        throw std::runtime_error("adaptive policy mask invalidation failed");
     if(h.rebuilds()!=2)
         throw std::runtime_error("mask invalidation did not rebuild");
     mesh.topology_epoch=2;
@@ -76,6 +84,8 @@ int main(){
     verify(uncached,mesh,"uncached epoch invalidation");
     verify(with_cut,mesh,"frontier epoch invalidation");
     verify(with_compaction,mesh,"compacted frontier epoch invalidation");
+    if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+        throw std::runtime_error("adaptive policy epoch invalidation failed");
     if(h.rebuilds()!=3)
         throw std::runtime_error("epoch invalidation did not rebuild");
     // Empty topological families must not access a nonexistent tree.
@@ -85,6 +95,8 @@ int main(){
     verify(uncached,mesh,"uncached empty features");
     verify(with_cut,mesh,"frontier empty features");
     verify(with_compaction,mesh,"compacted frontier empty features");
+    if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+        throw std::runtime_error("adaptive policy empty features failed");
     if(h.rebuilds()!=4)
         throw std::runtime_error("feature deletion did not invalidate");
     // The same topology may change its physical collision thickness
@@ -94,6 +106,8 @@ int main(){
     verify(uncached,mesh,"uncached skin radius");
     verify(with_cut,mesh,"frontier skin radius");
     verify(with_compaction,mesh,"compacted frontier skin radius");
+    if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
+        throw std::runtime_error("adaptive policy changed skin coverage");
     // Deliberately adversarial but purely *feature-level* fixture:
     // 8 vertices/4 faces begin in one dense coincident AABB cluster.
     // After a topology-preserving move, two faces and four vertices
@@ -119,6 +133,8 @@ int main(){
     if(collapsing.compacted_vf_merges()==0)
         throw std::runtime_error(
             "topologically safe VF sibling coarsening never exercised");
+    if(adaptive.frames()!=185||adaptive.probes()==0)
+        throw std::runtime_error("adaptive policy never re-probed alternative");
     // Robustness gate for shared-vertex adjacency vs nonlocal pairs.
     std::cout<<"PASS14 hierarchy: 180 randomized warm refits, "
         "all exhaustive VF/EE candidate sets equal; "
