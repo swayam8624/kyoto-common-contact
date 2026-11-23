@@ -89,6 +89,55 @@ static IPCPrepared prepare(const f::Mesh& mesh){
                 indices.at(mesh.faces[i].vertices[j]);
     return out;
 }
+// Equally optimized upstream adapter: cache Eigen edge/face connectivity,
+// IDs and allocated AABB capacity across physical FEM frames. Recompute
+// every conservative swept vertex box, paying all actual conversion work.
+// IPC still rebuilds its official LBVH every frame; no private LBVH hack.
+class CachedIPCInput {
+    IPCPrepared input_;
+    std::vector<std::uint64_t> key_;
+    bool initialized_{};
+    static std::vector<std::uint64_t> signature(const f::Mesh& mesh){
+        std::vector<std::uint64_t> s;
+        s.reserve(4+4*mesh.vertices.size()+
+            5*mesh.edges.size()+6*mesh.faces.size());
+        s.insert(s.end(),{mesh.topology_epoch,
+            std::uint64_t(mesh.vertices.size()),
+            std::uint64_t(mesh.edges.size()),
+            std::uint64_t(mesh.faces.size())});
+        for(const auto& v:mesh.vertices)
+            s.insert(s.end(),{v.id,v.object,v.category,v.mask});
+        for(const auto& e:mesh.edges)
+            s.insert(s.end(),{e.id,e.vertices[0],e.vertices[1],
+                              e.category,e.mask});
+        for(const auto& face:mesh.faces)
+            s.insert(s.end(),{face.id,face.vertices[0],face.vertices[1],
+                              face.vertices[2],face.category,face.mask});
+        return s;
+    }
+public:
+    const IPCPrepared& update(const f::Mesh& mesh){
+        const auto next=signature(mesh);
+        if(!initialized_||key_!=next){
+            input_=prepare(mesh); // Full cold validation, paid.
+            key_=next;initialized_=true;
+        }else{
+            // Warm: reuse dense Eigen connectivity, but reconstruct all
+            // actual official IPC vertex AABBs with outward rounding.
+            input_.vertex_boxes.clear();
+            for(std::size_t i=0;i<mesh.vertices.size();++i){
+                const auto b=f::vertex_box(
+                    mesh.vertices[i].path,mesh.thickness);
+                ipc::AABB box(
+                    Eigen::Array3d(b.min.x,b.min.y,b.min.z),
+                    Eigen::Array3d(b.max.x,b.max.y,b.max.z));
+                box.vertex_ids={static_cast<ipc::index_t>(i),-1,-1};
+                input_.vertex_boxes.push_back(box);
+            }
+        }
+        return input_;
+    }
+};
 static std::vector<f::Candidate> collect(ipc::LBVH& b,
                                          const f::Mesh& mesh){
     std::vector<ipc::EdgeEdgeCandidate> ee;
@@ -126,6 +175,21 @@ static PaidIPC official(const f::Mesh& mesh){
     const auto d=Clock::now();
     return {std::move(pairs),ns(a,b),ns(b,c),ns(c,d)};
 }
+static PaidIPC official_with_cached_input(const f::Mesh& mesh,
+                                          CachedIPCInput& converter){
+    const auto a=Clock::now();
+    const auto& input=converter.update(mesh);
+    const auto b=Clock::now();
+    ipc::LBVH lbvh;
+    lbvh.can_vertices_collide=[](auto,auto){return true;};
+    lbvh.build(input.vertex_boxes,input.E,input.F,
+               static_cast<std::uint8_t>(3));
+    const auto c=Clock::now();
+    auto pairs=collect(lbvh,mesh);
+    const auto d=Clock::now();
+    return {std::move(pairs),ns(a,b),ns(b,c),ns(c,d)};
+}
+
 // A source workload has genuinely different element topology or material;
 // this is *not* a second solver and not a scripted mesh animation.
 struct SceneSpec{
