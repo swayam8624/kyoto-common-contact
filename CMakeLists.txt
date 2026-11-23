@@ -29,6 +29,14 @@ add_executable(kyoto_sphere_surface_tests tests/sphere_surface_audit_tests.cpp)
 target_link_libraries(kyoto_sphere_surface_tests PRIVATE kyoto_contact)
 add_test(NAME triangle_sphere_surface_clearance_audit COMMAND kyoto_sphere_surface_tests)
 
+# Conservative continuous whole-face/sphere prefix guard, independent
+# of (and currently not applied to) the physical response integrator.
+add_executable(kyoto_triangle_sweep_tests tests/triangle_sphere_sweep_tests.cpp)
+target_link_libraries(kyoto_triangle_sweep_tests PRIVATE kyoto_contact)
+add_test(NAME continuous_whole_triangle_sphere_sweep_certificate
+         COMMAND kyoto_triangle_sweep_tests)
+
+
 add_executable(kyoto_curved_fem_export apps/curved_fem_export.cpp)
 target_link_libraries(kyoto_curved_fem_export PRIVATE kyoto_contact)
 
