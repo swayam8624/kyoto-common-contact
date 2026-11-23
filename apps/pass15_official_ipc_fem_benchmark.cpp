@@ -41,6 +41,7 @@ struct Source {
     std::string regime;
     int physical_leaf_id{-1};
     int scene_id{};
+    std::size_t tetrahedra{};
 };
 struct IPCPrepared {
     ipc::AABBs vertex_boxes;
@@ -160,7 +161,7 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
             snapshot.topology_epoch=std::uint64_t(1+scenario);
             data.push_back({scenario*1000+step,body.time_seconds,
                 receipt.face_impulse_updates,receipt.accepted_leaves,
-                std::move(snapshot),"routine",-1,scenario});
+                std::move(snapshot),"routine",-1,scenario,before.tets.size()});
         }
     }
     if(data.size()!=std::size_t(scene_count*(360/sample_stride)))
@@ -190,7 +191,7 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
         features.topology_epoch=100; // Different scene/obstacle: pay rebuild
         data.push_back({4001+static_cast<int>(j),leaf.after.time_seconds,
             leaf.receipt.face_impulse_updates,1,std::move(features),
-            "fast_adaptive",static_cast<int>(j),3});
+            "fast_adaptive",static_cast<int>(j),3,leaf.before.tets.size()});
     }
     return data;
 }
@@ -210,7 +211,7 @@ int main(int argc,char**argv){
     const auto data=generate(stride,scene_count); // Excluded from both methods' costs.
     std::ofstream csv(directory/"official_ipc_fem_paired.csv");
     if(!csv)throw std::runtime_error("failed to create original receipt");
-    csv<<"repeat,step,regime,scene_id,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
+    csv<<"repeat,step,regime,scene_id,source_vertices,source_edges,source_faces,source_tetrahedra,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
           "accepted_physical_leaves,reference_pairs,official_ipc_pairs,"
           "maintained_hierarchy_pairs,official_extra,official_missing,"
           "official_conversion_ns,official_build_ns,official_query_ns,"
@@ -281,7 +282,9 @@ int main(int argc,char**argv){
                     std::to_string(missing.size()));
             const auto extra=upstream.pairs.size()-oracle.size();
             csv<<trial<<','<<source.step<<','<<source.regime<<','
-               <<source.scene_id<<','<<source.physical_leaf_id<<','<<source.time<<','
+               <<source.scene_id<<','<<source.mesh.vertices.size()<<','
+               <<source.mesh.edges.size()<<','<<source.mesh.faces.size()<<','
+               <<source.tetrahedra<<','<<source.physical_leaf_id<<','<<source.time<<','
                <<source.impulses<<','<<source.leaves<<','<<oracle.size()<<','
                <<upstream.pairs.size()<<','<<ours.pairs.size()<<','
                <<extra<<",0,"<<upstream.conversion_ns<<','
