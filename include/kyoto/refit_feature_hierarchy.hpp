@@ -90,6 +90,7 @@ class RefitHierarchy {
 
     Tree vertices_,faces_,edges_;
     CachedFeatureBoxes swept_boxes_;
+    bool retain_feature_lookup_{true};
     std::vector<std::uint64_t> key_;
     bool initialized_{};
     std::size_t rebuilds_{},refits_{};
@@ -163,6 +164,8 @@ class RefitHierarchy {
         }
     }
 public:
+    explicit RefitHierarchy(bool retain_feature_lookup=true)
+        :retain_feature_lookup_(retain_feature_lookup){}
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
 
@@ -173,7 +176,17 @@ public:
         const bool topology_changed=(!initialized_||next!=key_);
         // Both methods pay current signature validation and fresh swept
         // conservative boxes. Warm calls reuse validated vertex indices.
-        const auto& built=swept_boxes_.update(mesh,topology_changed);
+        f::Built uncached;
+        const f::Built* source=nullptr;
+        if(retain_feature_lookup_) {
+            source=&swept_boxes_.update(mesh,topology_changed);
+        }else {
+            // A/B control: same spatial tree and same candidate traversal,
+            // but fully pay f::build() every frame as in the old method.
+            uncached=f::build(mesh);
+            source=&uncached;
+        }
+        const auto& built=*source;
         if(topology_changed){
             vertices_.build(built.vertices);
             edges_.build(built.edges);
