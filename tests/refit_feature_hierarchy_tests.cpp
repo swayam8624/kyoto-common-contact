@@ -31,6 +31,7 @@ int main(){
     kyoto::contact::atlas::RefitHierarchy uncached(false);
     kyoto::contact::atlas::RefitHierarchy with_cut(true,true);
     kyoto::contact::atlas::RefitHierarchy with_compaction(true,true,true);
+    kyoto::contact::atlas::RefitHierarchy low_memory_cut(true,true,false,1);
     kyoto::contact::atlas::AdaptiveCandidatePolicy adaptive;
     f::Mesh mesh;
     mesh.thickness=.0005;
@@ -44,6 +45,7 @@ int main(){
     verify(uncached,mesh,"uncached initial");
     verify(with_cut,mesh,"frontier initial");
     verify(with_compaction,mesh,"compacted frontier initial");
+    verify(low_memory_cut,mesh,"1x budget initial");
     if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
         throw std::runtime_error("adaptive policy initial candidate mismatch");
     if(h.rebuilds()!=1||h.refits()!=0)
@@ -62,6 +64,7 @@ int main(){
         verify(uncached,mesh,"uncached randomized parity");
         verify(with_cut,mesh,"frontier randomized parity");
         verify(with_compaction,mesh,"compacted frontier randomized parity");
+        verify(low_memory_cut,mesh,"1x budget randomized cubic parity");
         if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
             throw std::runtime_error("adaptive policy randomized candidate mismatch");
     }
@@ -75,6 +78,7 @@ int main(){
     verify(uncached,mesh,"uncached mask invalidation");
     verify(with_cut,mesh,"frontier mask invalidation");
     verify(with_compaction,mesh,"compacted frontier mask invalidation");
+    verify(low_memory_cut,mesh,"1x budget mask invalidation");
     if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
         throw std::runtime_error("adaptive policy mask invalidation failed");
     if(h.rebuilds()!=2)
@@ -84,6 +88,7 @@ int main(){
     verify(uncached,mesh,"uncached epoch invalidation");
     verify(with_cut,mesh,"frontier epoch invalidation");
     verify(with_compaction,mesh,"compacted frontier epoch invalidation");
+    verify(low_memory_cut,mesh,"1x budget epoch invalidation");
     if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
         throw std::runtime_error("adaptive policy epoch invalidation failed");
     if(h.rebuilds()!=3)
@@ -95,6 +100,7 @@ int main(){
     verify(uncached,mesh,"uncached empty features");
     verify(with_cut,mesh,"frontier empty features");
     verify(with_compaction,mesh,"compacted frontier empty features");
+    verify(low_memory_cut,mesh,"1x budget deleted features");
     if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
         throw std::runtime_error("adaptive policy empty features failed");
     if(h.rebuilds()!=4)
@@ -106,6 +112,7 @@ int main(){
     verify(uncached,mesh,"uncached skin radius");
     verify(with_cut,mesh,"frontier skin radius");
     verify(with_compaction,mesh,"compacted frontier skin radius");
+    verify(low_memory_cut,mesh,"1x budget updated skin");
     if(adaptive.query(mesh).pairs!=f::exhaustive(mesh).pairs)
         throw std::runtime_error("adaptive policy changed skin coverage");
     // Deliberately adversarial but purely *feature-level* fixture:
