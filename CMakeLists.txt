@@ -48,6 +48,15 @@ add_executable(kyoto_time_consistent_tests tests/time_consistent_contact_tests.c
 target_link_libraries(kyoto_time_consistent_tests PRIVATE kyoto_contact)
 add_test(NAME time_consistent_whole_face_adaptive_fem
          COMMAND kyoto_time_consistent_tests)
+
+# Pass 9: mathematically independent six-endpoint swept-hull
+# separation and a second finite-triangle Voronoi distance implementation.
+# Unlike Pass 8, this audit is NEVER used to advance the solver.
+add_executable(kyoto_independent_contact_tests tests/independent_contact_audit_tests.cpp)
+target_link_libraries(kyoto_independent_contact_tests PRIVATE kyoto_contact)
+add_test(NAME independent_swept_prism_and_fem_contact_audit
+         COMMAND kyoto_independent_contact_tests)
+
 add_executable(kyoto_time_consistent_experiment apps/time_consistent_experiment.cpp)
 target_link_libraries(kyoto_time_consistent_experiment PRIVATE kyoto_contact)
 
