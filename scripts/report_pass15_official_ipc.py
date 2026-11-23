@@ -29,6 +29,8 @@ REQUIRED = (
     "frontier_fallbacks","frontier_reused_node_pairs",
     "cached_ipc_conversion_ns","cached_ipc_build_ns",
     "cached_ipc_query_ns","cached_ipc_pairs",
+    "aa_first_hierarchy_ns","aa_second_hierarchy_ns",
+    "aa_first_method","aa_exact_candidate_parity",
 )
 
 
@@ -44,6 +46,10 @@ def read_data(path: Path) -> list[dict]:
     seen = set()
     for i, row in enumerate(rows, 2):
         for k in REQUIRED:
+            if k=="aa_first_method":
+                if row[k] not in ("A","B"):
+                    raise ValueError(f"invalid A/A first method at row {i}")
+                continue
             if k=="regime":
                 if row[k] not in ("routine","fast_adaptive"):
                     raise ValueError(f"unrecognized source physics regime at row {i}")
@@ -60,6 +66,8 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["aa_exact_candidate_parity"])!=1:
+            raise ValueError(f"A/A correctness gate failed at {key}")
         if int(row["cached_ipc_pairs"]) != int(row["official_ipc_pairs"]):
             raise ValueError(f"official IPC cached-input adapter changed candidates at {key}")
         if int(row["official_missing"]) != 0:
@@ -78,6 +86,8 @@ def read_data(path: Path) -> list[dict]:
         maintained = int(row["maintained_paid_total_ns"])
         if official <= 0 or maintained <= 0:
             raise ValueError(f"invalid paid native clock observation at {key}")
+        if int(row["aa_first_hierarchy_ns"])<=0 or int(row["aa_second_hierarchy_ns"])<=0:
+            raise ValueError(f"invalid independent identical-algorithm A/A timing {key}")
         row["official_paid_ns"] = official
         row["cached_ipc_paid_ns"]=sum(int(row[f"cached_ipc_{stage}_ns"])
             for stage in ("conversion","build","query"))
@@ -112,6 +122,9 @@ def summarize(rows: list[dict]):
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
     old_totals=[r["uncached_paid_ns"] for r in rows]
     frontier_totals=[r["frontier_paid_ns"] for r in rows]
+    aa_a=[int(row["aa_first_hierarchy_ns"]) for row in rows]
+    aa_b=[int(row["aa_second_hierarchy_ns"]) for row in rows]
+    aa_ratios=[a/b for a,b in zip(aa_a,aa_b)]
     per_repeat={}
     per_regime={}
     per_scene={}
@@ -203,6 +216,18 @@ def summarize(rows: list[dict]):
         "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "aa_control": {
+            "same_algorithm_instances":"Two independent retained-frontier BVHs; same input, same candidate oracle",
+            "A_total_ns":sum(aa_a),
+            "B_total_ns":sum(aa_b),
+            "A_over_B_total_time":sum(aa_a)/sum(aa_b),
+            "median_paired_A_over_B":statistics.median(aa_ratios),
+            "p05_paired_A_over_B":sorted(aa_ratios)[max(0,math.ceil(.05*len(aa_ratios))-1)],
+            "p95_paired_A_over_B":percentile_nearest(aa_ratios,.95),
+            "first_A_rows":sum(row["aa_first_method"]=="A" for row in rows),
+            "first_B_rows":sum(row["aa_first_method"]=="B" for row in rows),
+            "warning":"A/A is a timing-noise/order control, not independent scene replication"
+        },
         "per_repeat_totals":per_repeat,
         "per_source_physics_regime":per_regime,
         "per_source_scene":per_scene,
@@ -245,7 +270,7 @@ def summarize(rows: list[dict]):
             "This is NOT continuous narrowphase CCD parity, solver-step timing, or robust physical contact proof",
             "Routine macro-step endpoints may approximate intermediate motion; fast-impact regime contains exact accepted physical-leaf start/end state pairs",
             "Snapshots and repeated timings are correlated; no independence or significance claim is made",
-            "Repeated counterbalanced timings are descriptive; independent A/A controls and independent solver replication are still required",
+            "Repeated counterbalanced timings and same-algorithm A/A controls are descriptive; independent solver replication is still required",
             "No measured speedup or winning regime may be claimed until CI passes on native source artifacts",
         ],
     }
