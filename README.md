@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 8 — physically time-accounted adaptive full-face FEM replay. Unsafe globally clipped or tetra-inverting step proposals are rejected and bisected; only fully integrated, surface-safe physical substeps are committed, with transactional rollback. The ordinary 900-step sphere simulation and a tuned 50 m/s fast-contact event pass native tests on Ubuntu/macOS Debug/Release. Full scientific source-artifact CI is a separate gate. General mesh contact, machine-certified CCD, fully implicit energy-consistent dynamics, self-contact and SCA speedup remain open.**
+**Status: PASS 9 — independently verified continuous full-triangle/sphere clearance across all 288,000 routine and 1,600 fast-impact accepted face intervals, using a NEW six-endpoint swept convex-hull/separating-plane method rather than the original midpoint-Lipschitz solver certificate. All 1,200 randomized 3D barycentric impulse cases meet independently derived kinetic-energy/linear/angular momentum identities. Five native/visual jobs passed. Exact-arithmetic theory and finite binary64 test evidence only: directed-rounded CCD, full mechanical-energy fidelity, arbitrary triangle-mesh contact, self-contact and SCA speedup remain open.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -463,6 +463,89 @@ See docs/19_TIME_CONSISTENT_REPLAY.md for proofs, sources,
 negative outcomes and the exact remaining acceptance gates.
 
 
+
+## Pass 9 — independent 3D continuous contact and impulse audit
+
+We now have two distinct mathematical arguments for separating
+**entire moving triangular faces** from the curved rigid sphere:
+
+- Original solver: midpoint finite-triangle distance plus a
+  Lipschitz motion bound with recursively subdivided time.
+- Independent research auditor: for linearly moving triangle
+  vertices, the entire swept surface lies inside the convex
+  hull of their **six start/end points**. A strict separating
+  plane placing all six points on one side of the rigid sphere
+  certifies continuous clearance without using the solver's
+  original distance routine.
+
+The second method proposed planes from coordinate directions,
+endpoint directions, triangle normals, and independent
+convex-hull support search. Each potential certificate is
+actually checked against all six 3D endpoints. Failure to
+find a separating plane remains UNRESOLVED, not "safe."
+
+Measured **original native FEM paths** (verified in a 5-job
+Ubuntu/macOS Debug/Release + scientific-visual CI run):
+
+| Independent continuous triangle/sphere evidence | Value |
+| --- | ---: |
+| Routine integrated physical time-steps | 900 |
+| Routine physical face paths independently certified | **288,000 / 288,000** |
+| Fast-impact accepted substeps | 5 |
+| Fast physical face paths independently certified | **1,600 / 1,600** |
+| Unresolved intervals in either experiment | **0** |
+| Actual routine independent separating-plane tests | **4,916,586** |
+| Maximum disagreement with separate Voronoi triangle distance oracle | **2.22e-16 m** |
+
+The original actual 3D contact law also passes an independently
+derived physics audit over **1,200 randomized rotated and
+translated non-axis-aligned contacts with unequal masses**.
+Maximum residuals: local impulse kinetic-energy identity
+6.37e-12 joules, linear impulse momentum 1.71e-13 N*s,
+and angular impulse momentum 9.37e-13 N*m*s.
+
+The precise local impulse theorem is:
+
+    k = sum(w_i*w_i/m_i)
+    delta_P = J
+    delta_L = q cross J
+    delta_K = u dot J + (k/2)*||J||^2
+
+with u=sum(w_i v_i) and contact point q=sum(w_i x_i).
+For 0<=restitution<=1 and bounded tangential friction, one
+such local frozen-position impulse does not create kinetic
+energy in exact arithmetic. This **does not** establish
+total energy conservation of the full damped, gravitating
+explicit neo-Hookean FEM solver.
+
+Reproduce the separate oracle and measured data:
+
+    ./build/kyoto_independent_contact_tests results/pass9-independent
+    ./build/kyoto_impulse_balance_tests results/pass9-independent
+    python3 scripts/render_pass9_independent_audit.py \
+       --input results/pass9-independent \
+       --physics results/time-consistent-fem \
+       --output results/pass9-independent/visuals
+
+The resulting research archive contains original independent
+900-step face-interval receipts, all five fast physical leaves,
+all 1,600 fast face-level source proof statuses, all 1,200
+separate impulse-law receipts, and seven original academic
+figures including a 3D physical FEM stress/clearance atlas.
+
+Verified original CI:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45144892694
+
+See docs/20_INDEPENDENT_CONTINUOUS_CONTACT_AUDIT.md for
+theorems, mathematical derivations, experiments and limitations.
+
+**Do not extrapolate "zero unresolved in the two tested
+trajectories" to machine-certified CCD over all possible
+floating-point inputs.** The real-arithmetic separation theorem
+is valid, but universal IEEE directed-rounded verification,
+arbitrary moving triangle meshes and self-contact are still open.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -483,10 +566,11 @@ Read the docs in numbered order:
 - docs/17_TRIANGLE_SWEEP_CERTIFICATE.md
 - docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md
 - docs/19_TIME_CONSISTENT_REPLAY.md
+- docs/20_INDEPENDENT_CONTINUOUS_CONTACT_AUDIT.md
 - AGENTS.md
 
-The NEXT gate is independently verified physical accuracy with coupled
-contact and directed-rounded continuous CCD, arbitrary deforming rigid
-meshes and self-contact, then fully-paid SCA vs official IPC LBVH
-contact-detection/solver benchmarking.
+The NEXT gate is directed-rounded contact bounds and independently
+measured whole-step energy/momentum fidelity across complex 3D
+obstacles, then arbitrary triangle meshes/self-contact, followed by
+fully-paid SCA vs official IPC Toolkit LBVH broad-phase benchmarking.
 Do not substitute candidate parity for actual continuous collision proof.
