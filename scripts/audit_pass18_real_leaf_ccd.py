@@ -86,12 +86,50 @@ def report(path: Path) -> dict:
         ),
     }
 
+def rejected_positive_control(path: Path) -> dict:
+    """True native *rejected* FEM step must contain positive upstream CCD hits.
+
+    Accepted leaves often contain zero CCD events, correctly, so a
+    separate native rejected source trial is the required control.
+    """
+    data=json.loads(path.read_text(encoding="utf-8"))
+    if data.get("source")!="native_solver_actual_rejected_FEM_proposal":
+        raise ValueError("non-native positive CCD source")
+    if data.get("is_accepted_physical_motion") is not False:
+        raise ValueError("rejected source mislabeled as accepted physical motion")
+    if data.get("native_full_trial_rejected_by_geometry") is not True:
+        raise ValueError("no original full-step geometric rejection")
+    if abs(float(data.get("requested_dt_s",0))-0.00075)>1e-11:
+        raise ValueError("incorrect positive-control physical duration")
+    hit_keys=("actual_official_IPC_CCD_vf_events",
+              "actual_official_IPC_CCD_ee_events")
+    count=0
+    for key in hit_keys:
+        value=data.get(key)
+        if type(value) is not int or value<0:
+            raise ValueError(f"invalid native positive event count: {key}")
+        count+=value
+    if count==0:
+        raise ValueError("positive native source has ZERO actual upstream CCD events")
+    for key in ("missed_by_exhaustive_AABB","missed_by_official_LBVH",
+                "missed_by_maintained_frontier"):
+        if data.get(key)!=0:
+            raise ValueError(f"true upstream CCD event missed: {key}")
+    toi=float(data.get("actual_upstream_earliest_toi_fraction",float("nan")))
+    if not math.isfinite(toi) or not (0<=toi<=1):
+        raise ValueError("invalid positive upstream CCD time-of-impact")
+    return data
+
+
 def main() -> None:
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--input", type=Path,required=True)
+    p.add_argument("--positive", type=Path,required=True,
+                   help="Actual unaccepted FEM solver trial with nonzero CCD events")
     p.add_argument("--output",type=Path,required=True)
     a=p.parse_args()
     result=report(a.input)
+    result["positive_rejected_native_proposal"]=rejected_positive_control(a.positive)
     a.output.mkdir(parents=True,exist_ok=True)
     (a.output/"pass18_actual_ccd_source_audit.json").write_text(
         json.dumps(result,indent=2,sort_keys=True)+"\n",encoding="utf-8")
