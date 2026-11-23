@@ -166,7 +166,8 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     Body& body,const StaticTriangleMesh& rigid,
     const std::vector<Triangle3>& rigid_triangles,
     const std::vector<TriangleBox>& rigid_boxes,
-    double dt,const RigidMeshContactSettings& cfg) {
+    double dt,const RigidMeshContactSettings& cfg,
+    std::vector<V3>* trial_proposal_positions=nullptr) {
     MeshStepResult out;
     if(!(std::isfinite(dt)&&dt>0))
         throw std::invalid_argument("invalid rigid mesh physical trial dt");
@@ -194,6 +195,12 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
                              x,v,nodal_impulses,cfg,out);
     for(std::size_t i=0;i<x.size();i++)
         predicted.push_back(x[i]+v[i]*dt);
+    // Optional source-only inspection: THESE are the native solver's
+    // actual proposed positions BEFORE conservative continuous rejection.
+    // They are not accepted physics and never modify Body transactionally.
+    // Default nullptr preserves all existing numerical solver behavior.
+    if(trial_proposal_positions)
+        *trial_proposal_positions=predicted;
     for(const auto& face:body.surface_faces){
         const LinearTriangleMotion trajectory{
             {x[face[0]],x[face[1]],x[face[2]]},
