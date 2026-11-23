@@ -27,6 +27,8 @@ REQUIRED = (
     "first_internal_hierarchy_method",
     "frontier_paid_total_ns","frontier_pairs","frontier_cut_size",
     "frontier_fallbacks","frontier_reused_node_pairs",
+    "cached_ipc_conversion_ns","cached_ipc_build_ns",
+    "cached_ipc_query_ns","cached_ipc_pairs",
 )
 
 
@@ -58,6 +60,8 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["cached_ipc_pairs"]) != int(row["official_ipc_pairs"]):
+            raise ValueError(f"official IPC cached-input adapter changed candidates at {key}")
         if int(row["official_missing"]) != 0:
             raise ValueError(f"official IPC misses reference pairs at {key}")
         if int(row["frontier_pairs"]) != int(row["reference_pairs"]):
@@ -75,6 +79,10 @@ def read_data(path: Path) -> list[dict]:
         if official <= 0 or maintained <= 0:
             raise ValueError(f"invalid paid native clock observation at {key}")
         row["official_paid_ns"] = official
+        row["cached_ipc_paid_ns"]=sum(int(row[f"cached_ipc_{stage}_ns"])
+            for stage in ("conversion","build","query"))
+        if row["cached_ipc_paid_ns"]<=0:
+            raise ValueError(f"invalid strong cached IPC timing at {key}")
         row["hierarchy_paid_ns"] = maintained
         row["frontier_paid_ns"]=int(row["frontier_paid_total_ns"])
         if row["frontier_paid_ns"]<=0:
@@ -99,6 +107,7 @@ def percentile_nearest(values, q):
 
 def summarize(rows: list[dict]):
     paid_ipc = [r["official_paid_ns"] for r in rows]
+    cached_ipc=[r["cached_ipc_paid_ns"] for r in rows]
     paid_atlas = [r["hierarchy_paid_ns"] for r in rows]
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
     old_totals=[r["uncached_paid_ns"] for r in rows]
@@ -113,6 +122,7 @@ def summarize(rows: list[dict]):
         if any(len(values)!=1 or values[0]<=0 for values in topology.values()):
             raise ValueError(f"inconsistent original FEM topology within scene {sid}")
         paidI=sum(r["official_paid_ns"] for r in subset)
+        paidStrong=sum(r["cached_ipc_paid_ns"] for r in subset)
         paidC=sum(r["hierarchy_paid_ns"] for r in subset)
         paidF=sum(r["frontier_paid_ns"] for r in subset)
         per_scene[sid]={
@@ -122,9 +132,11 @@ def summarize(rows: list[dict]):
             "topology":{k:values[0] for k,values in topology.items()},
             "contact_bearing_rows":sum(int(r["source_face_impulse_updates"])>0 for r in subset),
             "ipc_total_ns":paidI,
+            "cached_input_ipc_total_ns":paidStrong,
             "cached_total_ns":paidC,
             "bounded_frontier_total_ns":paidF,
             "ipc_over_frontier":paidI/paidF,
+            "cached_input_ipc_over_frontier":paidStrong/paidF,
             "cached_over_frontier":paidC/paidF,
         }
     for kind in ("routine","fast_adaptive"):
@@ -135,6 +147,7 @@ def summarize(rows: list[dict]):
             "rows":len(subset),
             "unique_source_intervals":len({int(r["step"]) for r in subset}),
             "ipc_total_ns":sum(r["official_paid_ns"] for r in subset),
+            "cached_input_ipc_total_ns":sum(r["cached_ipc_paid_ns"] for r in subset),
             "cached_hierarchy_total_ns":sum(r["hierarchy_paid_ns"] for r in subset),
             "uncached_hierarchy_total_ns":sum(r["uncached_paid_ns"] for r in subset),
             "frontier_hierarchy_total_ns":sum(r["frontier_paid_ns"] for r in subset),
@@ -144,6 +157,9 @@ def summarize(rows: list[dict]):
         per_regime[kind]["ipc_over_cached"]=(
             per_regime[kind]["ipc_total_ns"]/
             per_regime[kind]["cached_hierarchy_total_ns"])
+        per_regime[kind]["cached_input_ipc_over_frontier"]=(
+            per_regime[kind]["cached_input_ipc_total_ns"]/
+            per_regime[kind]["frontier_hierarchy_total_ns"])
         per_regime[kind]["ipc_over_frontier"]=(
             per_regime[kind]["ipc_total_ns"]/
             per_regime[kind]["frontier_hierarchy_total_ns"])
@@ -154,12 +170,16 @@ def summarize(rows: list[dict]):
         batch=[r for r in rows if int(r["repeat"])==rep]
         per_repeat[rep]={
             "ipc_paid_ns":sum(r["official_paid_ns"] for r in batch),
+            "cached_input_ipc_paid_ns":sum(r["cached_ipc_paid_ns"] for r in batch),
             "cached_paid_ns":sum(r["hierarchy_paid_ns"] for r in batch),
             "uncached_paid_ns":sum(r["uncached_paid_ns"] for r in batch),
             "frontier_paid_ns":sum(r["frontier_paid_ns"] for r in batch),
         }
         per_repeat[rep]["ipc_over_cached"]=(
             per_repeat[rep]["ipc_paid_ns"]/per_repeat[rep]["cached_paid_ns"])
+        per_repeat[rep]["cached_input_ipc_over_frontier"]=(
+            per_repeat[rep]["cached_input_ipc_paid_ns"]/
+            per_repeat[rep]["frontier_paid_ns"])
         per_repeat[rep]["ipc_over_frontier"]=(
             per_repeat[rep]["ipc_paid_ns"]/per_repeat[rep]["frontier_paid_ns"])
         per_repeat[rep]["uncached_over_cached"]=( 
@@ -169,6 +189,9 @@ def summarize(rows: list[dict]):
     contact = [r for r in rows if int(r["source_face_impulse_updates"]) > 0]
     stages = {
         "ipc_conversion_ns":sum(int(r["official_conversion_ns"]) for r in rows),
+        "cached_ipc_conversion_ns":sum(int(r["cached_ipc_conversion_ns"]) for r in rows),
+        "cached_ipc_build_ns":sum(int(r["cached_ipc_build_ns"]) for r in rows),
+        "cached_ipc_query_ns":sum(int(r["cached_ipc_query_ns"]) for r in rows),
         "ipc_build_ns":sum(int(r["official_build_ns"]) for r in rows),
         "ipc_query_ns":sum(int(r["official_query_ns"]) for r in rows),
         "maintained_all_paid_ns":sum(paid_atlas),
@@ -186,6 +209,11 @@ def summarize(rows: list[dict]):
         "physical_scene_count":len(per_scene),
         "uncached_hierarchy_paid_total_ns":sum(old_totals),
         "frontier_hierarchy_paid_total_ns":sum(frontier_totals),
+        "cached_input_official_ipc_paid_total_ns":sum(cached_ipc),
+        "ratio_of_paid_totals_cached_input_ipc_over_frontier":
+            sum(cached_ipc)/sum(frontier_totals),
+        "ratio_of_paid_totals_original_ipc_over_cached_input_ipc":
+            sum(paid_ipc)/sum(cached_ipc),
         "ratio_of_paid_totals_ipc_over_frontier":sum(paid_ipc)/sum(frontier_totals),
         "ratio_of_paid_totals_cached_over_frontier":sum(paid_atlas)/sum(frontier_totals),
         "total_source_frontier_budget_fallbacks":sum(
@@ -244,6 +272,8 @@ def main():
     fig,ax=plt.subplots(figsize=(10,5))
     ax.scatter(x,[r["official_paid_ns"]/1e6 for r in rows],
                alpha=.5,s=22,label="Official pinned IPC total paid (ms)")
+    ax.scatter(x,[r["cached_ipc_paid_ns"]/1e6 for r in rows],
+               alpha=.45,s=17,label="Pinned IPC with equally cached topology input (ms)")
     ax.scatter(x,[r["hierarchy_paid_ns"]/1e6 for r in rows],
                alpha=.5,s=22,label="Maintained cached hierarchy total paid (ms)")
     ax.scatter(x,[r["uncached_paid_ns"]/1e6 for r in rows],
