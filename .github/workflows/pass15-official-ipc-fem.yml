@@ -8,6 +8,7 @@ on:
       - "include/kyoto/fem_feature_snapshots.hpp"
       - "include/kyoto/rigid_mesh_fem_contact.hpp"
       - "tests/rigid_mesh_fast_contact_tests.cpp"
+      - "tests/temporal_frontier_stress_tests.cpp"
       - "tests/fem_feature_snapshots_tests.cpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
@@ -36,11 +37,12 @@ jobs:
                      kyoto_official_ipc_lbvh_tests \
                      kyoto_refit_feature_hierarchy_tests \
                      kyoto_fem_feature_snapshots_tests \
-                     kyoto_fast_mesh_impact_tests
+                     kyoto_fast_mesh_impact_tests \
+                     kyoto_temporal_frontier_stress_tests
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle' \
             --output-on-failure
       - name: Generate verified original-solver matched source receipts
         run: |
