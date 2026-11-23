@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/14 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/17 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -20,6 +20,11 @@ contact. Physics correctness comes first, not beautiful animation.
   narrow-phase adapter are required before positive research claims.
 - A mesh's deformation must be solver-generated. Equal candidate sets must
   not be depicted as different physical folds.
+- Explicitly audit full triangle interiors against curved rigid obstacles:
+  zero penetrating vertices does NOT imply safe triangle surfaces.
+  Pass 6 found 458/901 penetrating-face states despite zero vertex failures.
+- A conservative whole-face separation certificate is currently DETECTION
+  only. Do not describe it as integrated physical collision response.
 - Charts quote original immutable CSV/JSON traces; every visual reports
   units, scalar source, scene ID, frame, seed, SHA and data limitations.
 - Any source edits require relevant tests, builds, diff check and exact
