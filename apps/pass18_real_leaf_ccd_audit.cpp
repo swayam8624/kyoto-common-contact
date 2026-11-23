@@ -295,23 +295,23 @@ int main(int argc,char**argv) {
 
     std::ofstream positive(dir/"rejected_native_trial_positive_ccd.json");
     positive<<std::setprecision(17)
-        <<"{\\n"
-        <<" \\"source\\": \\"native_solver_actual_rejected_FEM_proposal\\",\\n"
-        <<" \\"is_accepted_physical_motion\\": false,\\n"
-        <<" \\"native_full_trial_rejected_by_geometry\\": true,\\n"
-        <<" \\"requested_dt_s\\": 0.00075,\\n"
-        <<" \\"actual_official_IPC_CCD_vf_events\\": "<<actual_vf<<",\\n"
-        <<" \\"actual_official_IPC_CCD_ee_events\\": "<<actual_ee<<",\\n"
-        <<" \\"actual_upstream_earliest_toi_fraction\\": "<<first_toi<<",\\n"
-        <<" \\"missed_by_exhaustive_AABB\\": "<<missing_truth<<",\\n"
-        <<" \\"missed_by_official_LBVH\\": "<<missing_ipc<<",\\n"
-        <<" \\"missed_by_maintained_frontier\\": "<<missing_tree<<"\\n"
-        <<"}\\n";
+        <<"{\n"
+        <<" \"source\": \"native_solver_actual_rejected_FEM_proposal\",\n"
+        <<" \"is_accepted_physical_motion\": false,\n"
+        <<" \"native_full_trial_rejected_by_geometry\": true,\n"
+        <<" \"requested_dt_s\": 0.00075,\n"
+        <<" \"actual_official_IPC_CCD_vf_events\": "<<actual_vf<<",\n"
+        <<" \"actual_official_IPC_CCD_ee_events\": "<<actual_ee<<",\n"
+        <<" \"actual_upstream_earliest_toi_fraction\": "<<first_toi<<",\n"
+        <<" \"missed_by_exhaustive_AABB\": "<<missing_truth<<",\n"
+        <<" \"missed_by_official_LBVH\": "<<missing_ipc<<",\n"
+        <<" \"missed_by_maintained_frontier\": "<<missing_tree<<"\n"
+        <<"}\n";
     require(positive.good(),"failed to write positive native CCD control");
     std::cout<<"PASS18 POSITIVE rejected native FEM collision proposal: VF="
              <<actual_vf<<" EE="<<actual_ee<<" earliest upstream TOI="
              <<first_toi<<" candidate misses="
-             <<missing_truth+missing_ipc+missing_tree<<'\\n';
+             <<missing_truth+missing_ipc+missing_tree<<'\n';
 
     require(trace.good(),"original CCD event CSV write failed");
     require(global_misses==0,
