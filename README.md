@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 9 — independently verified continuous full-triangle/sphere clearance across all 288,000 routine and 1,600 fast-impact accepted face intervals, using a NEW six-endpoint swept convex-hull/separating-plane method rather than the original midpoint-Lipschitz solver certificate. All 1,200 randomized 3D barycentric impulse cases meet independently derived kinetic-energy/linear/angular momentum identities. Five native/visual jobs passed. Exact-arithmetic theory and finite binary64 test evidence only: directed-rounded CCD, full mechanical-energy fidelity, arbitrary triangle-mesh contact, self-contact and SCA speedup remain open.**
+**Status: PASS 10 — independent outward-enclosed IEEE-754 swept-triangle/sphere separation with exact-dyadic time interval enclosures derived from ORIGINAL vertex endpoints, and a full 3D FEM gravity/elastic/damping/contact discrete momentum ledger. All 288,000 routine and 1,600 fast accepted moving triangle intervals were strictly verified with 0 undecided in the two tested trajectories; every one of 905 source FEM leaves passed the full P/L accounting gate. Five cross-platform/visual CI jobs verified. General IPC mesh-mesh CCD, formal hardware/compiler numerical proof, calibrated physical energy fidelity, self-contact and the central SCA speedup hypothesis remain OPEN.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -546,6 +546,113 @@ is valid, but universal IEEE directed-rounded verification,
 arbitrary moving triangle meshes and self-contact are still open.
 
 
+
+## Pass 10 — outward floating-point bounds and whole-FEM physics
+
+**The geometry breakthrough is a stronger NUMERICAL CHECK, not
+a new collision solver.** Rather than relying on nominal
+double-precision dot products or arbitrary relative epsilon,
+the independent Pass-9 six-endpoint separating-plane test
+now evaluates each subtraction, multiplication, addition,
+square and square root using conservative outward-enclosed
+binary64 intervals (under explicitly tested IEEE/FE_TONEAREST
+assumptions).
+
+A successful plane must have a strictly positive LOWER
+bound against the UPPER bound of sphere support in all
+six swept endpoint intervals.
+
+For temporal subdivision, the C++ verifier reconstructs
+position INTERVALS at exact dyadic fractions from the
+ORIGINAL vertices, not rounded midpoint positions that
+could create unintended gaps in the path.
+
+Source: include/kyoto/rounded_prism_certificate.hpp
+and tests/rounded_prism_certificate_tests.cpp.
+
+**Original source-backed FEM measurements:**
+
+| Outward interval continuous proof | Routine 900-step FEM | Fast 50m/s impact |
+| --- | ---: | ---: |
+| Full moving surface-face intervals | 288,000 | 1,600 |
+| Strictly proven separated under stated IEEE model | **288,000** | **1,600** |
+| Unresolved | **0** | **0** |
+| Candidate separating planes paid | 1,939,204 | 11,874 |
+| Outward-enclosed endpoint dot checks paid | 3,536,502 | 21,495 |
+| Smallest positive lower plane margin | 2.069 micrometres | 98.242 micrometres |
+
+This is true source-based per-operation proof work, **not**
+a wall-clock SCA versus IPC LBVH benchmark or general
+triangle/triangle continuous collision detector.
+
+**Entire physical 3D FEM momentum accounting:** the source
+contact law now exposes its actual 3D vector impulses and
+their torques. For every accepted physical substep, an
+independent full-volume ledger re-evaluates all elastic
+forces, gravity and damping; measures before/after nodal
+momentum, and includes the discrete angular transport
+term resulting from changing vertex positions:
+
+    Pnew = damp*(Pold + dt*sum(Felastic + m*g)) + Jcontact
+
+    Lnew = damp*(Lold + dt*sum(xold cross F))
+           + sum(xold cross J_contact)
+           + sum((xnew-xold) cross (m*vnew))
+
+All 900 routine leaves plus five fast physical substeps
+passed. Maximum relative residuals in the routine case:
+1.84e-15 linear momentum and 1.40e-13 angular momentum;
+fast case: 1.75e-15 and 1.10e-12.
+
+We also measure every real mechanical energy delta.
+The full 900-step scene lost **459.624 J** of combined
+kinetic, elastic and gravitational energy; the separate
+short fast collision lost **14,545.237 J** under its
+reference model. This is explicitly NOT a validated
+physical energy budget, because damping, friction and
+time discretization contribute. It reinforces the need
+for external solver comparisons and a convergence study.
+
+Native files:
+
+    include/kyoto/rounded_prism_certificate.hpp
+    include/kyoto/whole_face_contact_dynamics.hpp
+    include/kyoto/time_consistent_contact.hpp
+    tests/rounded_prism_certificate_tests.cpp
+    tests/whole_fem_balance_tests.cpp
+    scripts/render_pass10_numerical_audit.py
+
+Reproduce the new source-based laboratory:
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
+    ./build/kyoto_time_consistent_experiment results/time-consistent-fem
+    ./build/kyoto_rounded_prism_tests results/pass10-rounded
+    ./build/kyoto_whole_fem_balance_tests results/pass10-rounded
+    python3 scripts/render_pass10_numerical_audit.py \
+       --input results/pass10-rounded \
+       --physics results/time-consistent-fem \
+       --output results/pass10-rounded/visuals
+
+GitHub CI archives all original trace tables and seven measured
+scientific charts, including the SAME native 3D FEM geometry
+colored by computed stress and strict lower proof margin.
+
+Verified cross-platform run:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45153954633
+
+Complete mathematical derivations and numerical
+assumptions: docs/21_ROUNDED_PRISM_AND_WHOLE_FEM_BALANCE.md.
+
+A proof under declared IEEE assumptions is not
+universal hardware/compiler/exact-predicate
+certification. Self-contact, moving triangle-mesh
+rigid obstacles, external physical calibration,
+fully implicit contact and a demonstrated SCA
+performance improvement remain unmet gates.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -567,10 +674,11 @@ Read the docs in numbered order:
 - docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md
 - docs/19_TIME_CONSISTENT_REPLAY.md
 - docs/20_INDEPENDENT_CONTINUOUS_CONTACT_AUDIT.md
+- docs/21_ROUNDED_PRISM_AND_WHOLE_FEM_BALANCE.md
 - AGENTS.md
 
-The NEXT gate is directed-rounded contact bounds and independently
-measured whole-step energy/momentum fidelity across complex 3D
-obstacles, then arbitrary triangle meshes/self-contact, followed by
-fully-paid SCA vs official IPC Toolkit LBVH broad-phase benchmarking.
+The NEXT gate is general triangle/triangle rigid/deformable contact and
+self-contact with robust feature-level CCD, independent physical energy/
+convergence validation, and a truly maintained whole-cost SCA hierarchy
+versus the pinned official IPC Toolkit LBVH on held-out 3D solver paths.
 Do not substitute candidate parity for actual continuous collision proof.
