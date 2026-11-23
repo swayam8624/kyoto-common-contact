@@ -262,3 +262,12 @@ add_executable(kyoto_static_rigid_mesh_bvh_tests
 target_link_libraries(kyoto_static_rigid_mesh_bvh_tests PRIVATE kyoto_contact)
 add_test(NAME rigid_static_mesh_BVH_9000_source_candidate_parity
          COMMAND kyoto_static_rigid_mesh_bvh_tests)
+
+# Pass 20: complete original FEM adaptive impact solver parity and
+# fully paid wall-time instrumentation using an opt-in static BVH.
+add_executable(kyoto_rigid_mesh_bvh_solver_parity_tests
+               tests/rigid_mesh_bvh_solver_parity_tests.cpp)
+target_link_libraries(kyoto_rigid_mesh_bvh_solver_parity_tests PRIVATE kyoto_contact)
+add_test(NAME full_real_FEM_mesh_BVH_solver_state_and_impulse_parity
+         COMMAND kyoto_rigid_mesh_bvh_solver_parity_tests
+                 ${CMAKE_CURRENT_BINARY_DIR}/solver-bvh-evidence)
