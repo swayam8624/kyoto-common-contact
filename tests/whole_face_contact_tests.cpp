@@ -53,6 +53,37 @@ int main(){
                  "barycentric impulse distribution not correct");
     }
     {
+        // Falsification of "the impulse shell alone fixes everything":
+        // start with a wildly accelerated uniform translation.
+        // The old vertex-only solver or a mere endpoint triangle check
+        // could tunnel over a whole moving face. Our WHOLE-FACE sweep
+        // MUST activate and synchronize every vertex to a safe prefix.
+        auto extreme=toroidal_solid();
+        const RigidSphere sphere{};
+        for(auto& n:extreme.nodes)n.v={0,0,-900};
+        const auto start=audit_surface_sphere(extreme,sphere);
+        must(start.minimum_surface_clearance_m>.01,
+             "initial extreme fixture must be fully separated");
+        WholeFaceContactSettings cfg;
+        const auto guard=step_whole_face_sphere(extreme,sphere,.00075,cfg);
+        const auto result=audit_surface_sphere(extreme,sphere);
+        must(guard.time_clipped && guard.whole_face_unresolved>0,
+             "whole-face time interval certificate failed to trigger on massive physical trial");
+        must(guard.accepted_global_fraction>0&&
+             guard.accepted_global_fraction<1,
+             "whole-body synchronized prefix not respected");
+        must(result.penetrating_faces==0&&
+             result.minimum_surface_clearance_m>=cfg.clearance_skin_m*.5,
+             "adversarial moving whole-face path penetrated sphere");
+        must(extreme.diagnostics(-100).min_jacobian>0,
+             "synchronized high-velocity clamp inverted 3D tetrahedra");
+        std::cout<<"WHOLE_FACE_ADVERSARIAL_SWEEP_PASS"
+                 <<" unresolved="<<guard.whole_face_unresolved
+                 <<" certified_global_fraction="<<guard.accepted_global_fraction
+                 <<" surface_clearance_m="<<result.minimum_surface_clearance_m
+                 <<" face_impulse_updates="<<guard.normal_impulses<<'\n';
+    }
+    {
         auto body=toroidal_solid();
         const RigidSphere sphere{};
         const auto initial=body.diagnostics(-100);
