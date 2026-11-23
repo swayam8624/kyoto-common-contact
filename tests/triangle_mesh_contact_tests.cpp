@@ -4,6 +4,7 @@
 // response is claimed when the existing sphere solver hits this mesh.
 
 #include "kyoto/triangle_mesh_contact.hpp"
+#include "kyoto/rigid_mesh_fem_contact.hpp"
 #include "kyoto/time_consistent_contact.hpp"
 #include <algorithm>
 #include <cmath>
@@ -19,25 +20,6 @@ using namespace kyoto::solid;
 static void expect(bool b,const char* msg){if(!b)throw std::runtime_error(msg);}
 static bool nearly(double a,double b,double tol=1e-9){
     return std::abs(a-b)<=tol;
-}
-static StaticTriangleMesh corrugated_rigid_patch(){
-    // 7x7 connected vertices, 72 truly noncoplanar triangles,
-    // NOT a sphere and NOT an infinite analytic plane.
-    StaticTriangleMesh mesh;
-    constexpr int n=7;
-    for(int y=0;y<n;y++)for(int x=0;x<n;x++){
-        const double u=2.3*x/(n-1)-1.15;
-        const double v=2.3*y/(n-1)-1.15;
-        mesh.vertices.push_back({u,v,
-          -.23+.105*std::sin(3*u)*std::cos(2*v)+.035*u});
-    }
-    for(int y=0;y+1<n;y++)for(int x=0;x+1<n;x++){
-        const auto a=std::size_t(y*n+x);
-        const auto b=a+1,c=a+n,d=c+1;
-        mesh.faces.push_back({a,b,d});
-        mesh.faces.push_back({a,d,c});
-    }
-    validate(mesh);return mesh;
 }
 int main(int argc,char**argv){
  try{
@@ -133,7 +115,10 @@ int main(int argc,char**argv){
         random_cert++;
     }
     {
-        const StaticTriangleMesh mesh=corrugated_rigid_patch();
+        // The NEGATIVE control must use the EXACT same finite rigid
+        // obstacle as the new contact-response FEM experiment. The
+        // old sphere solver has NO access to these 72 triangles.
+        const StaticTriangleMesh mesh=corrugated_contact_patch();
         expect(mesh.vertices.size()==49&&mesh.faces.size()==72,
                "nonplanar obstacle topology invalid");
         // Auditing true physically integrated data from Pass 8
