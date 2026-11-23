@@ -33,6 +33,8 @@ REQUIRED = (
     "aa_first_method","aa_exact_candidate_parity",
     "compact_frontier_total_ns","compact_frontier_pairs",
     "compact_frontier_cut_size","compact_vf_merges",
+    "adaptive_paid_total_ns","adaptive_pairs","adaptive_used_frontier",
+    "adaptive_switches","adaptive_probes",
 )
 
 
@@ -68,6 +70,10 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["adaptive_pairs"])!=int(row["reference_pairs"]):
+            raise ValueError(f"adaptive algorithm candidate parity failed at {key}")
+        if int(row["adaptive_used_frontier"]) not in (0,1):
+            raise ValueError(f"invalid adaptive policy choice at {key}")
         if int(row["compact_frontier_pairs"])!=int(row["reference_pairs"]):
             raise ValueError(f"compacted frontier candidate parity failed at {key}")
         if int(row["aa_exact_candidate_parity"])!=1:
@@ -92,6 +98,8 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         if int(row["aa_first_hierarchy_ns"])<=0 or int(row["aa_second_hierarchy_ns"])<=0:
             raise ValueError(f"invalid independent identical-algorithm A/A timing {key}")
+        if int(row["adaptive_paid_total_ns"])<=0:
+            raise ValueError(f"invalid online policy paid clock at {key}")
         if int(row["compact_frontier_total_ns"])<=0:
             raise ValueError(f"invalid compacted frontier clock at {key}")
         row["official_paid_ns"] = official
@@ -129,6 +137,7 @@ def summarize(rows: list[dict]):
     old_totals=[r["uncached_paid_ns"] for r in rows]
     frontier_totals=[r["frontier_paid_ns"] for r in rows]
     compact=[int(row["compact_frontier_total_ns"]) for row in rows]
+    adaptive=[int(row["adaptive_paid_total_ns"]) for row in rows]
     aa_a=[int(row["aa_first_hierarchy_ns"]) for row in rows]
     aa_b=[int(row["aa_second_hierarchy_ns"]) for row in rows]
     aa_ratios=[a/b for a,b in zip(aa_a,aa_b)]
@@ -223,6 +232,22 @@ def summarize(rows: list[dict]):
         "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "adaptive_policy_ablation":{
+            "paid_total_ns":sum(adaptive),
+            "cached_input_ipc_over_policy":sum(cached_ipc)/sum(adaptive),
+            "plain_cached_over_policy":sum(paid_atlas)/sum(adaptive),
+            "compacted_frontier_over_policy":sum(compact)/sum(adaptive),
+            "frontier_selected_rows":sum(int(row["adaptive_used_frontier"]) for row in rows),
+            "total_source_switches":sum(
+                max(int(row["adaptive_switches"]) for row in rows
+                    if row["repeat"]==rep)
+                for rep in {row["repeat"] for row in rows}),
+            "total_source_probes":sum(
+                max(int(row["adaptive_probes"]) for row in rows
+                    if row["repeat"]==rep)
+                for rep in {row["repeat"] for row in rows}),
+            "warning":"Noise-reactive policy is not reinforcement learning; no superiority claimed without held-out workload and A/A gate"
+        },
         "compact_frontier_ablation":{
             "total_compacted_paid_ns":sum(compact),
             "total_uncompacted_paid_ns":sum(frontier_totals),
