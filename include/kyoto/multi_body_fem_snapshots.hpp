@@ -12,6 +12,7 @@
 // four endpoint/linearity controls reflect source solver states.
 #include "kyoto/fem_feature_snapshots.hpp"
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
