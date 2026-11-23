@@ -22,6 +22,37 @@
 
 namespace kyoto::contact::fem {
 
+// Conservative x-axis gap of two deformable bodies over one accepted
+// LINEAR physical leaf (the source solver must have accepted exactly
+// one leaf over this interval). If positive by more than the contact
+// clearance, the bodies cannot collide during that motion in 3D:
+// their x-coordinate convex hulls are disjoint at all t in [0,1].
+// This is a sufficient separation witness, not a general CCD solver.
+inline double uncoupled_two_body_swept_x_gap(
+    const solid::Body& before_a,const solid::Body& after_a,
+    const solid::Body& before_b,const solid::Body& after_b){
+    if(before_a.nodes.empty()||before_b.nodes.empty() ||
+       before_a.nodes.size()!=after_a.nodes.size() ||
+       before_b.nodes.size()!=after_b.nodes.size())
+        throw std::invalid_argument("invalid physical two-body swept time interval");
+    const double inf=std::numeric_limits<double>::infinity();
+    double max_a=-inf,min_b=inf;
+    for(std::size_t i=0;i<before_a.nodes.size();++i){
+        const auto p=before_a.nodes[i].x,q=after_a.nodes[i].x;
+        if(!solid::finite(p)||!solid::finite(q))
+            throw std::invalid_argument("nonfinite swept first physical body");
+        max_a=std::max({max_a,p.x,q.x});
+    }
+    for(std::size_t i=0;i<before_b.nodes.size();++i){
+        const auto p=before_b.nodes[i].x,q=after_b.nodes[i].x;
+        if(!solid::finite(p)||!solid::finite(q))
+            throw std::invalid_argument("nonfinite swept second physical body");
+        min_b=std::min({min_b,p.x,q.x});
+    }
+    // Round both extrema outward so the gap is not artificially enlarged.
+    return std::nextafter(min_b,-inf)-std::nextafter(max_a,inf);
+}
+
 inline features::Mesh uncoupled_two_body_feature_snapshot(
     const solid::Body& before_a,const solid::Body& after_a,
     const solid::Body& before_b,const solid::Body& after_b,
