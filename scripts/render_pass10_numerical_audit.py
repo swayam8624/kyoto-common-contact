@@ -271,6 +271,73 @@ def true_3d(numeric,face,geometry,topology,scene,out):
       "Red would flag unresolved. The curved sphere and 3D positions are the native source simulation; no scripted collision.")
     save(fig,out/"07_3D_FEM_rounded_witness_margin.png")
 
+def interactive_true_fem(face,geometry,topology,scene,out):
+    """Actual source topology and two DIFFERENT measured scalar fields."""
+    import plotly.graph_objects as go
+    last=face[face.leaf_id==face.leaf_id.max()].sort_values("face_id")
+    native=geometry.loc[
+        geometry.algorithm=="adaptive_full_elapsed_time"
+    ].sort_values("vertex_id")
+    P=native[["x","y","z"]].to_numpy(dtype=float)
+    I=topology[["a","b","c"]].to_numpy(dtype=int)
+    stress=native.von_mises_pa.to_numpy(dtype=float)
+    margins=last.strict_lower_margin_m.to_numpy(dtype=float)
+    certified=last.strictly_certified.to_numpy(dtype=int)
+    assert len(P)==180 and len(I)==len(margins)==320
+    assert (margins[certified==1]>0).all()
+    center=scene["sphere_center_xyz_m"]
+    radius=float(scene["fast_sphere_radius_m"])
+    x,y,z=sphere_xyz(center,radius)
+    fig=go.Figure()
+    common=dict(x=P[:,0],y=P[:,1],z=P[:,2],
+         i=I[:,0],j=I[:,1],k=I[:,2],
+         flatshading=False,opacity=0.97,
+         lighting=dict(ambient=.45,diffuse=.70,
+                       specular=.5,roughness=.55))
+    fig.add_trace(go.Mesh3d(
+        **common,intensity=stress,intensitymode="vertex",
+        colorscale="Viridis",cmin=0,cmax=max(1.,float(stress.max())),
+        colorbar=dict(title="Cauchy von Mises (Pa)"),
+        visible=True,name="Native FEM Cauchy stress"))
+    fig.add_trace(go.Mesh3d(
+        **common,
+        intensity=np.log10(np.maximum(margins,1e-15)),
+        intensitymode="cell",colorscale="Plasma",
+        colorbar=dict(title="log10(strict margin / m)"),
+        visible=False,name="Outward lower proof margin"))
+    fig.add_trace(go.Surface(x=x,y=y,z=z,
+        surfacecolor=np.zeros_like(x),
+        colorscale=[[0,GOLD],[1,GOLD]],
+        showscale=False,opacity=.32,
+        visible=True,name="Actual analytic rigid sphere"))
+    titles=["ACTUAL FEM COMPUTED STRESS",
+            "STRICT IEEE OUTWARD-INTERVAL LOWER PROOF MARGINS"]
+    buttons=[]
+    for i,name in enumerate(titles):
+        buttons.append(dict(label=name,method="update",
+            args=[{"visible":[i==0,i==1,True]},
+                  {"title":"KYOTO / PASS 10 — "+name+
+                   "<br><sup>Real 180-node/320-face FEM, source 3D rigid sphere."
+                   " Conditional IEEE arithmetic proof; no general IPC mesh CCD.</sup>"}]))
+    fig.update_layout(
+        title="KYOTO / PASS 10 — ACTUAL 3D FEM STRESS",
+        paper_bgcolor=BG,plot_bgcolor=BG,
+        font=dict(color=INK),height=820,
+        margin=dict(l=10,r=10,b=15,t=115),
+        updatemenus=[dict(type="dropdown",showactive=True,
+            x=.02,y=1.09,buttons=buttons)],
+        scene=dict(bgcolor=BG,aspectmode="manual",
+            aspectratio=dict(x=1,y=1,z=.92),
+            xaxis=dict(title="X (m)",range=[-1.35,1.35],
+                       gridcolor=GRID),
+            yaxis=dict(title="Y (m)",range=[-1.35,1.35],
+                       gridcolor=GRID),
+            zaxis=dict(title="Z (m)",range=[-1.4,1.0],
+                       gridcolor=GRID),
+            camera=dict(eye=dict(x=1.62,y=-1.87,z=1.27))))
+    fig.write_html(out/"08_interactive_3D_stress_and_rounded_clearance.html",
+                   full_html=True,include_plotlyjs=True)
+
 def atlas(out):
     items=["01_outward_interval_coverage.png",
            "02_rounded_proof_paid_work.png",
@@ -317,6 +384,7 @@ def main():
     transport(ledger,a.output)
     mechanical(ledger,a.output)
     true_3d(n,face,verts,topology,scene,a.output)
+    interactive_true_fem(face,verts,topology,scene,a.output)
     atlas(a.output)
     print(f"PASS: outward-enclosed sphere intervals "
           f"{n['ordinary_strictly_proven']}/{n['ordinary_face_intervals']} "
