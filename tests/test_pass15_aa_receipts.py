@@ -52,6 +52,12 @@ def fixture(path, *, bad_parity=False, bad_timing=False):
                     "budget1x_frontier_pairs":"5",
                     "budget1x_frontier_cut_size":"1",
                     "budget1x_coarse_regions":"0",
+                    "selective_refit_paid_ns":"100",
+                    "selective_refit_pairs":"5",
+                    "selective_changed_vertices":"1",
+                    "selective_partial_refits":"1",
+                    "selective_unchanged_refits":"0",
+                    "selective_first":str((trial+frame)%2),
                     "uncached_hierarchy_pairs":"5",
                     "official_ipc_pairs":"5",
                     "cached_ipc_pairs":"5",
@@ -78,6 +84,21 @@ class NativeAAReceiptTests(unittest.TestCase):
             path=pathlib.Path(directory)/"invalid.csv"
             fixture(path,bad_parity=True)
             with self.assertRaisesRegex(ValueError,"A/A correctness gate"):
+                module.read_data(path)
+
+    def test_selective_candidate_count_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=pathlib.Path(directory)/"bad_selective.csv"
+            fixture(path)
+            with path.open(encoding="utf-8",newline="") as source:
+                data=list(csv.DictReader(source))
+                fields=list(data[0])
+            data[0]["selective_refit_pairs"]="0"
+            with path.open("w",encoding="utf-8",newline="") as output:
+                writer=csv.DictWriter(output,fieldnames=fields)
+                writer.writeheader()
+                writer.writerows(data)
+            with self.assertRaisesRegex(ValueError,"selective hierarchy changed"):
                 module.read_data(path)
 
     def test_nonpositive_clock_rejects_csv(self):
