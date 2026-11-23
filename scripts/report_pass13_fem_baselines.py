@@ -22,7 +22,8 @@ def main():
         raise ValueError("insufficient original native benchmark rows")
     required=("step","time_s","exact_pairs","sap_pairs",
               "reference_build_ns","reference_query_ns",
-              "sap_build_ns","sap_query_ns","source_face_impulse_updates")
+              "sap_build_ns","sap_query_ns","source_face_impulse_updates","persistent_total_ns",
+              "persistent_warm_frames","persistent_invalidations")
     for i,row in enumerate(rows):
         for key in required:
             if key not in row:
@@ -36,7 +37,8 @@ def main():
         return int(row[f"{prefix}_build_ns"])+int(row[f"{prefix}_query_ns"])
     exact=[duration(r,"reference") for r in rows]
     sap=[duration(r,"sap") for r in rows]
-    if min(exact)<=0 or min(sap)<=0:
+    persistent=[int(r["persistent_total_ns"]) for r in rows]
+    if min(exact)<=0 or min(sap)<=0 or min(persistent)<=0:
         raise ValueError("nonpositive monotonic-clock timings")
     ratios=[x/y for x,y in zip(exact,sap)]
     summary={
@@ -47,11 +49,15 @@ def main():
         "sap_candidate_pairs":sum(int(r["sap_pairs"]) for r in rows),
         "exhaustive_paid_total_ns":sum(exact),
         "sap_paid_total_ns":sum(sap),
+        "persistent_order_paid_total_ns":sum(persistent),
+        "ratio_of_paid_totals_rebuilt_sap_over_persistent_order":sum(sap)/sum(persistent),
+        "persistent_warm_frames":int(rows[-1]["persistent_warm_frames"]),
+        "persistent_invalidations_during_source_snapshots":int(rows[-1]["persistent_invalidations"]),
         "ratio_of_paid_totals_exhaustive_over_sap":sum(exact)/sum(sap),
         "median_paired_ratio_exhaustive_over_sap":statistics.median(ratios),
         "min_paired_ratio_exhaustive_over_sap":min(ratios),
         "max_paired_ratio_exhaustive_over_sap":max(ratios),
-        "warning":"Not SCA vs IPC. Not a complete solver-step timing. One deterministic pass; no counterbalancing, A/A, confidence interval, or independent replicate."
+        "warning":"Persistent-order SAP is not the proposed dual-tree SCA. Not SCA vs IPC. Not complete solver-step timing. One fixed-order pass; no counterbalancing, A/A, confidence interval, or independent replicate."
     }
     a.output.mkdir(parents=True,exist_ok=True)
     (a.output/"pass13_reference_summary.json").write_text(
@@ -69,8 +75,10 @@ def main():
             label="Exhaustive build + query (ms)")
     ax.plot(time,[v/1e6 for v in sap],marker=".",
             label="Rebuilt SAP build + query (ms)")
+    ax.plot(time,[v/1e6 for v in persistent],marker="x",
+            label="Persistent-order SAP total (ms)")
     ax.set(xlabel="Physical FEM time (s)",ylabel="Measured paid time (ms)",
-           title="Source-matched baseline costs; no official IPC or maintained SCA")
+           title="Paid native feature costs; no official IPC or dual-tree SCA")
     ax.grid(alpha=.25)
     ax.legend()
     fig.tight_layout()
