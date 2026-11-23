@@ -5,6 +5,7 @@ on:
     branches: [research/spacetime-contact-atlas]
     paths:
       - "apps/pass15_official_ipc_fem_benchmark.cpp"
+      - "apps/pass18_real_leaf_ccd_audit.cpp"
       - "include/kyoto/fem_feature_snapshots.hpp"
       - "include/kyoto/rigid_mesh_fem_contact.hpp"
       - "tests/rigid_mesh_fast_contact_tests.cpp"
@@ -38,11 +39,12 @@ jobs:
                      kyoto_refit_feature_hierarchy_tests \
                      kyoto_fem_feature_snapshots_tests \
                      kyoto_fast_mesh_impact_tests \
-                     kyoto_temporal_frontier_stress_tests
+                     kyoto_temporal_frontier_stress_tests \
+                     kyoto_pass18_real_leaf_ccd_audit
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events' \
             --output-on-failure
       - name: Generate verified original-solver matched source receipts
         run: |
