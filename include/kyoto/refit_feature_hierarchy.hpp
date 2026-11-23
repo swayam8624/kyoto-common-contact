@@ -98,8 +98,7 @@ class RefitHierarchy {
     struct NodePair{int first{},second{};};
     std::vector<NodePair> vf_cut_,ee_cut_;
     bool maintain_pair_cut_{false},pair_cut_ready_{};
-    bool pair_cut_suspended_{};
-    std::size_t suspension_frames_{},pair_cut_skipped_frames_{};
+    std::size_t pair_cut_skipped_frames_{};
     std::size_t last_pair_cut_attempted_size_{};
     std::size_t pair_cut_fallbacks_{},pair_cut_reuses_{};
     bool retain_feature_lookup_{true};
@@ -175,69 +174,114 @@ class RefitHierarchy {
             self(tree,x.right,bi,records,out);
         }
     }
-    // Cut invariant for vertex-face: the union of stored node products
-    // exactly partitions all V x F leaf combinations. A separated node
-    // pair stays as one frontier element; any newly overlapping pair
-    // subdivides until its children are separated or both are leaves.
-    static void frontier_vf(const Tree& a,int ai,const Tree& b,int bi,
-                            const std::vector<f::Record>& va,
-                            const std::vector<f::Record>& fb,
-                            std::vector<NodePair>& next,f::Result& out){
-        const auto& x=a.nodes[ai],&y=b.nodes[bi];
-        if(!overlaps(x.bounds,y.bounds)){
-            next.push_back({ai,bi});return;
-        }
-        if(x.leaf()&&y.leaf()){
-            next.push_back({ai,bi});
-            const auto& v=va[x.record],&fce=fb[y.record];
-            if(f::valid_pair(v,fce,out))
-                out.pairs.push_back({f::Kind::VertexFace,v.id,fce.id});
-            return;
-        }
-        if(x.leaf()){
-            frontier_vf(a,ai,b,y.left,va,fb,next,out);
-            frontier_vf(a,ai,b,y.right,va,fb,next,out);
-        }else if(y.leaf()){
-            frontier_vf(a,x.left,b,bi,va,fb,next,out);
-            frontier_vf(a,x.right,b,bi,va,fb,next,out);
-        }else{
-            frontier_vf(a,x.left,b,y.left,va,fb,next,out);
-            frontier_vf(a,x.left,b,y.right,va,fb,next,out);
-            frontier_vf(a,x.right,b,y.left,va,fb,next,out);
-            frontier_vf(a,x.right,b,y.right,va,fb,next,out);
+    // A bounded cut partitions the entire product of two trees. A
+    // coarse retained node-pair is NOT a rejection certificate: on each
+    // new frame it must either be shown separated, refined, or traversed
+    // completely using the ordinary safe traversal for that region.
+    //
+    // Crucially the budget limits *construction*, rather than building a
+    // massive leaf-pair cut and throwing it away after paying its cost.
+    // The stack plus the finalized cut never exceeds the given budget.
+    static void bounded_vf(
+        const Tree& a,const Tree& b,
+        const std::vector<f::Record>& vertices,
+        const std::vector<f::Record>& faces,
+        const std::vector<NodePair>& previous,
+        std::vector<NodePair>& next,
+        f::Result& out,std::size_t budget,std::size_t& coarse_regions)
+    {
+        std::vector<NodePair> stack=previous;
+        while(!stack.empty()) {
+            const NodePair p=stack.back();stack.pop_back();
+            const auto& x=a.nodes[p.first],&y=b.nodes[p.second];
+            if(!overlaps(x.bounds,y.bounds)){
+                next.push_back(p);
+                continue;
+            }
+            if(x.leaf()&&y.leaf()) {
+                next.push_back(p);
+                const auto& v=vertices[x.record],&face=faces[y.record];
+                if(f::valid_pair(v,face,out))
+                    out.pairs.push_back({f::Kind::VertexFace,v.id,face.id});
+                continue;
+            }
+            // The split is an exact partition of the parent's product.
+            // Do not split if preserving all remaining work would exceed
+            // the memory bound; the parent is then *fully* queried.
+            const std::size_t children=x.leaf()||y.leaf()?2:4;
+            if(next.size()+stack.size()+children>budget) {
+                next.push_back(p);
+                cross(a,p.first,b,p.second,vertices,faces,out);
+                ++coarse_regions;
+                continue;
+            }
+            if(x.leaf()){
+                stack.push_back({p.first,y.left});
+                stack.push_back({p.first,y.right});
+            }else if(y.leaf()){
+                stack.push_back({x.left,p.second});
+                stack.push_back({x.right,p.second});
+            }else{
+                stack.push_back({x.left,y.left});
+                stack.push_back({x.left,y.right});
+                stack.push_back({x.right,y.left});
+                stack.push_back({x.right,y.right});
+            }
         }
     }
-    // The edge-edge self-tree cut partitions all unordered DIFFERENT
-    // leaf pairs. A diagonal node (a==b) splits into LL, LR and RR;
-    // an identical leaf is skipped because an edge cannot pair itself.
-    static void frontier_ee(const Tree& t,int ai,int bi,
-                            const std::vector<f::Record>& records,
-                            std::vector<NodePair>& next,f::Result& out){
-        const auto& x=t.nodes[ai],&y=t.nodes[bi];
-        if(ai==bi){
-            if(x.leaf())return;
-            frontier_ee(t,x.left,x.left,records,next,out);
-            frontier_ee(t,x.left,x.right,records,next,out);
-            frontier_ee(t,x.right,x.right,records,next,out);
-            return;
-        }
-        if(!overlaps(x.bounds,y.bounds)){
-            next.push_back({ai,bi});return;
-        }
-        if(x.leaf()&&y.leaf()){
-            next.push_back({ai,bi});
-            const auto& a=records[x.record],&b=records[y.record];
-            if(f::valid_pair(a,b,out))
-                out.pairs.push_back({f::Kind::EdgeEdge,
-                    std::min(a.id,b.id),std::max(a.id,b.id)});
-            return;
-        }
-        if(x.leaf()){
-            frontier_ee(t,ai,y.left,records,next,out);
-            frontier_ee(t,ai,y.right,records,next,out);
-        }else{
-            frontier_ee(t,x.left,bi,records,next,out);
-            frontier_ee(t,x.right,bi,records,next,out);
+
+    // For the unordered edge-edge self-product, the diagonal node
+    // partitions into LL, LR, RR. Each off-diagonal pair splits into
+    // disjoint child products. No pair is ever skipped on account of
+    // cache state, and a diagonal *leaf* has no admissible self-pair.
+    static void bounded_ee(
+        const Tree& tree,const std::vector<f::Record>& edges,
+        const std::vector<NodePair>& previous,
+        std::vector<NodePair>& next,
+        f::Result& out,std::size_t budget,std::size_t& coarse_regions)
+    {
+        std::vector<NodePair> stack=previous;
+        while(!stack.empty()){
+            const NodePair p=stack.back();stack.pop_back();
+            const auto& x=tree.nodes[p.first],&y=tree.nodes[p.second];
+            if(p.first==p.second){
+                if(x.leaf())continue;
+                if(next.size()+stack.size()+3>budget){
+                    next.push_back(p);
+                    self(tree,p.first,p.second,edges,out);
+                    ++coarse_regions;
+                }else{
+                    stack.push_back({x.left,x.left});
+                    stack.push_back({x.left,x.right});
+                    stack.push_back({x.right,x.right});
+                }
+                continue;
+            }
+            if(!overlaps(x.bounds,y.bounds)){
+                next.push_back(p);
+                continue;
+            }
+            if(x.leaf()&&y.leaf()){
+                next.push_back(p);
+                const auto& a=edges[x.record],&b=edges[y.record];
+                if(f::valid_pair(a,b,out))
+                    out.pairs.push_back({f::Kind::EdgeEdge,
+                        std::min(a.id,b.id),std::max(a.id,b.id)});
+                continue;
+            }
+            if(next.size()+stack.size()+2>budget){
+                next.push_back(p);
+                self(tree,p.first,p.second,edges,out);
+                ++coarse_regions;
+                continue;
+            }
+            if(x.leaf()){
+                stack.push_back({p.first,y.left});
+                stack.push_back({p.first,y.right});
+            }else{
+                stack.push_back({x.left,p.second});
+                stack.push_back({x.right,p.second});
+            }
         }
     }
 public:
@@ -248,8 +292,10 @@ public:
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
+    // Count coarse region traversals, not discarded full-size cuts.
     std::size_t pair_cut_fallbacks()const{return pair_cut_fallbacks_;}
     std::size_t pair_cut_size()const{return vf_cut_.size()+ee_cut_.size();}
+    // Historical metric name: frames with any coarse region traversed.
     std::size_t pair_cut_skipped_frames()const{return pair_cut_skipped_frames_;}
     std::size_t last_pair_cut_attempted_size()const{
         return last_pair_cut_attempted_size_;
@@ -279,7 +325,6 @@ public:
             faces_.build(built.faces);
             key_=next;initialized_=true;++rebuilds_;
             pair_cut_ready_=false;vf_cut_.clear();ee_cut_.clear();
-            pair_cut_suspended_=false;suspension_frames_=0;
         }else{
             vertices_.refit(built.vertices);
             edges_.refit(built.edges);
@@ -287,49 +332,42 @@ public:
             ++refits_;
         }
         f::Result out;
-        // An oversized frontier cannot be useful if rebuilding it
-        // costs more than the plain traversal. Disable futile attempts
-        // for several fully paid classic traversals, then retry once.
-        // 13 is intentionally not divisible by common frame cycles.
-        const bool skip_frontier=maintain_pair_cut_&&pair_cut_suspended_&&
-            ((++suspension_frames_)%13!=0);
-        if(maintain_pair_cut_&&!skip_frontier){
-            std::vector<NodePair> new_vf,new_ee;
+        if(maintain_pair_cut_){
+            std::vector<NodePair> next_vf,next_ee;
+            std::size_t coarse_regions=0;
+            // Two independent cuts have bounded memory even on dense
+            // AABB workloads. Budget is fully charged in query() timings.
+            const std::size_t max_cut=std::max(std::size_t{64},
+                std::size_t{4}*(built.vertices.size()+
+                    built.edges.size()+built.faces.size()));
+            const std::size_t vf_budget=max_cut/2;
+            const std::size_t ee_budget=max_cut-vf_budget;
             if(pair_cut_ready_){
                 pair_cut_reuses_+=vf_cut_.size()+ee_cut_.size();
-                for(const auto& p:vf_cut_)
-                    frontier_vf(vertices_,p.first,faces_,p.second,
-                                built.vertices,built.faces,new_vf,out);
-                for(const auto& p:ee_cut_)
-                    frontier_ee(edges_,p.first,p.second,built.edges,new_ee,out);
-            }else{
-                if(vertices_.root>=0&&faces_.root>=0)
-                    frontier_vf(vertices_,vertices_.root,faces_,faces_.root,
-                                built.vertices,built.faces,new_vf,out);
-                if(edges_.root>=0)
-                    frontier_ee(edges_,edges_.root,edges_.root,
-                                built.edges,new_ee,out);
             }
-            // Memory/degeneracy guard. If the retained cut grows too
-            // large for localization to be useful, discard it for next
-            // frame. THIS frame's exact candidate set remains valid.
-            // The next query does a fully paid cold root traversal.
-            const std::size_t max_cut=std::max(std::size_t{64},
-                std::size_t{12}*(built.vertices.size()+
-                    built.edges.size()+built.faces.size()));
-            last_pair_cut_attempted_size_=new_vf.size()+new_ee.size();
-            if(last_pair_cut_attempted_size_>max_cut){
-                pair_cut_ready_=false;
-                pair_cut_suspended_=true;suspension_frames_=0;
-                vf_cut_.clear();ee_cut_.clear();
-                ++pair_cut_fallbacks_;
-            }else{
-                vf_cut_.swap(new_vf);ee_cut_.swap(new_ee);
-                pair_cut_ready_=true;
-                pair_cut_suspended_=false;suspension_frames_=0;
+            if(vertices_.root>=0&&faces_.root>=0){
+                const std::vector<NodePair> root{{vertices_.root,faces_.root}};
+                bounded_vf(vertices_,faces_,built.vertices,built.faces,
+                           pair_cut_ready_?vf_cut_:root,next_vf,out,
+                           vf_budget,coarse_regions);
             }
+            if(edges_.root>=0){
+                const std::vector<NodePair> root{{edges_.root,edges_.root}};
+                bounded_ee(edges_,built.edges,
+                           pair_cut_ready_?ee_cut_:root,next_ee,out,
+                           ee_budget,coarse_regions);
+            }
+            if(coarse_regions){
+                pair_cut_fallbacks_+=coarse_regions;
+                ++pair_cut_skipped_frames_; // Frames with coarse traversal
+            }
+            last_pair_cut_attempted_size_=next_vf.size()+next_ee.size();
+            if(next_vf.size()>vf_budget||next_ee.size()>ee_budget)
+                throw std::logic_error("bounded frontier violated memory cap");
+            vf_cut_.swap(next_vf);
+            ee_cut_.swap(next_ee);
+            pair_cut_ready_=true;
         }else{
-            if(skip_frontier)++pair_cut_skipped_frames_;
             if(vertices_.root>=0&&faces_.root>=0)
                 cross(vertices_,vertices_.root,faces_,faces_.root,
                       built.vertices,built.faces,out);
