@@ -326,21 +326,133 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
     }
     return data;
 }
+
+// Pass 22B: isolated, fully paid ABBA comparator.
+//
+// A1/A2 are two independent retained, selective-refit hierarchies.
+// B1/B2 are two independent upstream pinned IPC Toolkit LBVH pipelines
+// with separately retained, topology-cached input adapters. Each instance
+// advances EXACTLY ONCE per original source interval and therefore gets
+// the same previous-frame state as its partner. Alternating ABBA/B A A B
+// and reversing instance order prevents a warmed second query being
+// mislabeled as a genuine alternative-algorithm speedup.
+//
+// The original physical FEM, source oracle, and logging happen OUTSIDE
+// all four measured wall-clock scopes. Every native candidate output is
+// still independently compared against the exact exhaustive VF/EE source.
+static int run_isolated_abba(const std::vector<Source>& data,
+                             const std::filesystem::path& directory,
+                             int repeats) {
+    std::ofstream csv(directory/"official_ipc_isolated_abba.csv");
+    if(!csv)throw std::runtime_error("cannot write native ABBA source CSV");
+    csv<<std::setprecision(17);
+    csv<<"trial,step,scene_id,regime,source_vertices,source_tetrahedra,"
+          "physical_time_s,source_contact_updates,oracle_candidates,"
+          "cold_scene_frame,order_code,"
+          "selective_A1_wall_ns,selective_A2_wall_ns,"
+          "ipc_B1_wall_ns,ipc_B2_wall_ns,"
+          "selective_A1_pairs,selective_A2_pairs,"
+          "ipc_B1_pairs,ipc_B2_pairs,oracle_parity\n";
+    std::size_t rows=0,cold_rows=0;
+    for(int trial=0;trial<repeats;++trial){
+        kyoto::contact::atlas::RefitHierarchy s1(true,false,false,4,true);
+        kyoto::contact::atlas::RefitHierarchy s2(true,false,false,4,true);
+        CachedIPCInput b1,b2;
+        for(std::size_t i=0;i<data.size();++i){
+            const auto& frame=data[i];
+            const auto truth=f::exhaustive(frame.mesh).pairs;
+            const bool cold=(i==0||data[i-1].scene_id!=frame.scene_id);
+            if(cold)++cold_rows;
+            const bool a_outer=((i+std::size_t(trial))%2==0);
+            const bool second_first=((trial/2)%2==1);
+            // Method A and B each occupy two positions in a
+            // counterbalanced palindromic four-query sequence.
+            std::array<int,4> order;
+            if(a_outer){
+                order=second_first?std::array<int,4>{1,3,2,0}:
+                                   std::array<int,4>{0,2,3,1};
+            }else{
+                order=second_first?std::array<int,4>{3,1,0,2}:
+                                   std::array<int,4>{2,0,1,3};
+            }
+            f::Result outputs_a[2];
+            PaidIPC outputs_b[2];
+            std::array<std::int64_t,4> paid{};
+            for(const auto which:order){
+                const auto begin=Clock::now();
+                switch(which){
+                case 0:outputs_a[0]=s1.query(frame.mesh);break;
+                case 1:outputs_a[1]=s2.query(frame.mesh);break;
+                case 2:outputs_b[0]=official_with_cached_input(
+                    frame.mesh,b1);break;
+                case 3:outputs_b[1]=official_with_cached_input(
+                    frame.mesh,b2);break;
+                default:throw std::logic_error("invalid source ABBA arm");
+                }
+                paid[std::size_t(which)]=ns(begin,Clock::now());
+                if(paid[std::size_t(which)]<=0)
+                    throw std::runtime_error("nonpositive fully paid ABBA wall clock");
+            }
+            if(outputs_a[0].pairs!=truth ||
+               outputs_a[1].pairs!=truth ||
+               outputs_b[0].pairs!=truth ||
+               outputs_b[1].pairs!=truth)
+                throw std::runtime_error(
+                    "source ABBA candidate parity failed scene="+
+                    std::to_string(frame.scene_id)+
+                    " step="+std::to_string(frame.step));
+            const auto label=[](int index)->const char*{
+                switch(index){
+                    case 0:return "A1";
+                    case 1:return "A2";
+                    case 2:return "B1";
+                    case 3:return "B2";
+                    default:throw std::logic_error("ABBA order");
+                }
+            };
+            const std::string order_text=
+                std::string(label(order[0]))+"-"+
+                label(order[1])+"-"+label(order[2])+"-"+label(order[3]);
+            csv<<trial<<','<<frame.step<<','<<frame.scene_id<<','
+               <<frame.regime<<','<<frame.mesh.vertices.size()<<','
+               <<frame.tetrahedra<<','<<frame.time<<','
+               <<frame.impulses<<','<<truth.size()<<','
+               <<(cold?1:0)<<','<<order_text<<','
+               <<paid[0]<<','<<paid[1]<<','<<paid[2]<<','<<paid[3]<<','
+               <<outputs_a[0].pairs.size()<<','
+               <<outputs_a[1].pairs.size()<<','
+               <<outputs_b[0].pairs.size()<<','
+               <<outputs_b[1].pairs.size()<<",1\n";
+            ++rows;
+        }
+    }
+    if(!csv.good())throw std::runtime_error("incomplete original ABBA CSV");
+    std::cout<<"PASS22B isolated paid ABBA candidate parity: "<<rows
+             <<" source intervals x two independent states per method; "
+             <<cold_rows<<" source epoch cold frames; real solver outside "
+             <<"both clocks; no end-to-end speedup claim.\n";
+    return 0;
+}
 int main(int argc,char**argv){
  try{
-    if(argc<2||argc>5)throw std::invalid_argument(
+    if(argc<2||argc>6)throw std::invalid_argument(
         "usage: kyoto_pass15_official_ipc_fem_benchmark OUTPUT_FOLDER "
-        "[sample_stride=12] [repeats=12] [scene_count=1..4] "
+        "[sample_stride=12] [repeats=12] [scene_count=1..4] [abba] "
         "(4 includes two independent FEM bodies, NOT coupled contact)");
     const int stride=argc>=3?std::stoi(argv[2]):12;
     const int repeats=argc>=4?std::stoi(argv[3]):12;
     const int scene_count=argc>=5?std::stoi(argv[4]):1;
+    const bool isolated_abba=(argc==6&&std::string(argv[5])=="abba");
+    if(argc==6&&!isolated_abba)
+        throw std::invalid_argument("unknown benchmark protocol; expected abba");
     if(stride<1||stride>360||360%stride!=0||
        repeats<2||repeats>24||scene_count<1||scene_count>4)
         throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24; 1 <= scene_count <= 4");
     const auto directory=std::filesystem::path(argv[1]);
     std::filesystem::create_directories(directory);
     const auto data=generate(stride,scene_count); // Excluded from both methods' costs.
+    if(isolated_abba)
+        return run_isolated_abba(data,directory,repeats);
     std::ofstream csv(directory/"official_ipc_fem_paired.csv");
     if(!csv)throw std::runtime_error("failed to create original receipt");
     csv<<"repeat,step,regime,scene_id,source_vertices,source_edges,source_faces,source_tetrahedra,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
