@@ -195,3 +195,13 @@ if(KYOTO_WITH_OFFICIAL_IPC)
 
 
 endif()
+
+# Pass 13: native physically integrated FEM trajectory benchmark.
+# Independent exhaustive and rebuilt sweep-and-prune reference only.
+# This is deliberately NOT labeled maintained SCA or official IPC speedup.
+add_executable(kyoto_pass13_reference_fem_benchmark
+               apps/pass13_reference_fem_benchmark.cpp)
+target_link_libraries(kyoto_pass13_reference_fem_benchmark PRIVATE kyoto_contact)
+add_test(NAME genuine_FEM_rebuilt_SAP_vs_exhaustive_parity
+         COMMAND kyoto_pass13_reference_fem_benchmark
+                 ${CMAKE_CURRENT_BINARY_DIR}/pass13-fem-reference)
