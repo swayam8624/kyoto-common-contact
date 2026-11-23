@@ -300,7 +300,11 @@ inline MeshSurfaceAudit audit_deformable_rigid_mesh(
             double dy=std::max({a.lo.y-b.hi.y,b.lo.y-a.hi.y,0.});
             double dz=std::max({a.lo.z-b.hi.z,b.lo.z-a.hi.z,0.});
             const double lower=std::sqrt(dx*dx+dy*dy+dz*dz);
-            if(lower>out.minimum_distance_m){
+            // A pair may exceed the CURRENT best minimum yet still
+            // count as overlapping the requested thickness. Preserve
+            // BOTH contracts: exact global nearest distance AND all
+            // genuine pairs within thickness.
+            if(lower>std::max(out.minimum_distance_m,thickness)){
                 out.broadphase_culled++;
                 continue;
             }
