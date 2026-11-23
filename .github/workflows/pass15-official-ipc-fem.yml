@@ -20,6 +20,7 @@ on:
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
       - "scripts/report_pass15_official_ipc.py"
+      - "tests/test_pass15_aa_receipts.py"
       - ".github/workflows/pass15-official-ipc-fem.yml"
       - "CMakeLists.txt"
   workflow_dispatch:
@@ -33,6 +34,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Reject malformed paid A/A benchmark receipts
+        run: python3 -m unittest discover -s tests -p "test_pass15_aa_receipts.py" -v
       - name: Configure REAL upstream IPC Toolkit v1.6.1 pinned by SHA
         run: |
           cmake -S . -B build-pass15 -DCMAKE_BUILD_TYPE=Release \
