@@ -4,6 +4,7 @@
 // Both methods pay feature envelope construction, candidate normalization,
 // and their own query work. State generation is excluded and identified.
 #include "kyoto/feature_broadphase.hpp"
+#include "kyoto/persistent_feature_sap.hpp"
 #include "kyoto/rigid_mesh_fem_contact.hpp"
 #include <algorithm>
 #include <chrono>
@@ -74,10 +75,12 @@ int main(int argc,char**argv){
     const std::filesystem::path out=argv[1];
     std::filesystem::create_directories(out);
     std::ofstream csv(out/"native_fem_reference_broadphase.csv");
+    kyoto::contact::persistent::OrderedSweep persistent;
     if(!csv)throw std::runtime_error("cannot write reference experiment CSV");
     csv<<"step,time_s,vertices,edges,faces,exact_pairs,sap_pairs,"
           "reference_candidate_aabb_tests,sap_candidate_aabb_tests,"
           "reference_build_ns,reference_query_ns,sap_build_ns,sap_query_ns,"
+          "persistent_total_ns,persistent_warm_frames,persistent_invalidations,"
           "source_face_impulse_updates,source_accepted_leaves\n";
     csv<<std::setprecision(17);
     s::Body body=s::toroidal_solid();
@@ -100,6 +103,10 @@ int main(int argc,char**argv){
         const auto t3=Clock::now();
         const auto sap=f::sweep_and_prune(sap_built);
         const auto t4=Clock::now();
+        const auto maintained=persistent.query(mesh);
+        const auto t5=Clock::now();
+        if(truth.pairs!=maintained.pairs)
+            throw std::runtime_error("persistent sweep candidate parity failure at physical step "+std::to_string(i));
         if(truth.pairs!=sap.pairs)
             throw std::runtime_error("candidate parity failure at physical step "+std::to_string(i));
         if(physical.accepted_leaves==0)
@@ -110,12 +117,14 @@ int main(int argc,char**argv){
            <<truth.candidate_aabb_tests<<','<<sap.candidate_aabb_tests<<','
            <<nanos(t0,t1)<<','<<nanos(t1,t2)<<','
            <<nanos(t2,t3)<<','<<nanos(t3,t4)<<','
+           <<nanos(t4,t5)<<','<<persistent.warm_frames()<<','
+           <<persistent.invalidations()<<','
            <<physical.face_impulse_updates<<','
            <<physical.accepted_leaves<<'\n';
     }
     std::cout<<"PASS13_REFERENCE_FEM only: "<<steps
              <<" physically integrated macro-steps, "<<contact_steps
-             <<" contact-bearing steps; exhaustive/SAP parity. "
+             <<" contact-bearing steps; exhaustive/rebuilt SAP/persistent-order SAP parity. "
              <<"No official IPC timings. No maintained SCA timings.\n";
     return 0;
   }catch(const std::exception& e){
