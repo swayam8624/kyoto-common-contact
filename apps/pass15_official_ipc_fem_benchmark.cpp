@@ -294,7 +294,10 @@ int main(int argc,char**argv){
           "adaptive_paid_total_ns,adaptive_pairs,adaptive_used_frontier,"
           "adaptive_switches,adaptive_probes,"
           "budget1x_frontier_ns,budget1x_frontier_pairs,"
-          "budget1x_frontier_cut_size,budget1x_coarse_regions\n";
+          "budget1x_frontier_cut_size,budget1x_coarse_regions,"
+          "selective_refit_paid_ns,selective_refit_pairs,"
+          "selective_changed_vertices,selective_partial_refits,"
+          "selective_unchanged_refits,selective_first\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
@@ -309,6 +312,9 @@ int main(int argc,char**argv){
         kyoto::contact::atlas::RefitHierarchy compacted_frontier(true,true,true);
         kyoto::contact::atlas::AdaptiveCandidatePolicy adaptive;
         kyoto::contact::atlas::RefitHierarchy low_budget(true,true,false,1);
+        // Pass 20 independent retained-tree implementation: only moving
+        // feature envelopes and their ancestors must be recalculated.
+        kyoto::contact::atlas::RefitHierarchy selective(true,false,false,4,true);
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
@@ -318,8 +324,8 @@ int main(int argc,char**argv){
             std::int64_t aa_a_ns=0,aa_b_ns=0;
             f::Result aa_a,aa_b,compacted_result;
             std::int64_t compacted_ns=0,adaptive_ns=0;
-            f::Result adaptive_result,low_budget_result;
-            std::int64_t low_budget_ns=0;
+            f::Result adaptive_result,low_budget_result,selective_result;
+            std::int64_t low_budget_ns=0,selective_ns=0;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -389,9 +395,25 @@ int main(int argc,char**argv){
                 throw std::runtime_error(
                     "ONLINE ADAPTIVE POLICY CANDIDATE PARITY FAILURE at step "+
                     std::to_string(source.step));
-            const auto low_begin=Clock::now();
-            low_budget_result=low_budget.query(source.mesh);
-            low_budget_ns=ns(low_begin,Clock::now());
+            // Counterbalance the new selective-refit candidate method
+            // against the previous 1x-budget approach on the same source.
+            const bool selective_first=((i+std::size_t(trial))%2==0);
+            auto run_low_budget=[&](){
+                const auto begin=Clock::now();
+                low_budget_result=low_budget.query(source.mesh);
+                low_budget_ns=ns(begin,Clock::now());
+            };
+            auto run_selective=[&](){
+                const auto begin=Clock::now();
+                selective_result=selective.query(source.mesh);
+                selective_ns=ns(begin,Clock::now());
+            };
+            if(selective_first){run_selective();run_low_budget();}
+            else{run_low_budget();run_selective();}
+            if(selective_result.pairs!=oracle)
+                throw std::runtime_error(
+                    "SELECTIVE DIRTY-FEATURE BVH MISSED OR EXTRAS at step "+
+                    std::to_string(source.step));
             if(low_budget_result.pairs!=oracle)
                 throw std::runtime_error(
                     "LOW-BUDGET FRONTIER CANDIDATE PARITY FAILURE at step "+
@@ -455,7 +477,12 @@ int main(int argc,char**argv){
                <<adaptive.switches()<<','<<adaptive.probes()<<','
                <<low_budget_ns<<','<<low_budget_result.pairs.size()<<','
                <<low_budget.pair_cut_size()<<','
-               <<low_budget.pair_cut_fallbacks()<<'\n';
+               <<low_budget.pair_cut_fallbacks()<<','
+               <<selective_ns<<','<<selective_result.pairs.size()<<','
+               <<selective.dirty_vertex_count()<<','
+               <<selective.partial_refits()<<','
+               <<selective.unchanged_refits()<<','
+               <<(selective_first?1:0)<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
