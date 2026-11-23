@@ -4,6 +4,7 @@
 // timings only, not full solver or continuous narrow-phase CCD.
 #include "kyoto/fem_feature_snapshots.hpp"
 #include "kyoto/refit_feature_hierarchy.hpp"
+#include "kyoto/adaptive_candidate_policy.hpp"
 #include <ipc/broad_phase/lbvh.hpp>
 #include <ipc/broad_phase/aabb.hpp>
 #include <ipc/candidates/edge_edge.hpp>
@@ -289,7 +290,9 @@ int main(int argc,char**argv){
           "aa_first_hierarchy_ns,aa_second_hierarchy_ns,"
           "aa_first_method,aa_exact_candidate_parity,"
           "compact_frontier_total_ns,compact_frontier_pairs,"
-          "compact_frontier_cut_size,compact_vf_merges\n";
+          "compact_frontier_cut_size,compact_vf_merges,"
+          "adaptive_paid_total_ns,adaptive_pairs,adaptive_used_frontier,"
+          "adaptive_switches,adaptive_probes\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
@@ -302,6 +305,7 @@ int main(int argc,char**argv){
         kyoto::contact::atlas::RefitHierarchy control_a(true,true);
         kyoto::contact::atlas::RefitHierarchy control_b(true,true);
         kyoto::contact::atlas::RefitHierarchy compacted_frontier(true,true,true);
+        kyoto::contact::atlas::AdaptiveCandidatePolicy adaptive;
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
@@ -310,7 +314,8 @@ int main(int argc,char**argv){
             std::int64_t ours_ns=0,uncached_ns=0,frontier_ns=0;
             std::int64_t aa_a_ns=0,aa_b_ns=0;
             f::Result aa_a,aa_b,compacted_result;
-            std::int64_t compacted_ns=0;
+            std::int64_t compacted_ns=0,adaptive_ns=0;
+            f::Result adaptive_result;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -373,6 +378,13 @@ int main(int argc,char**argv){
                 throw std::runtime_error(
                     "COMPACTED FRONTIER CANDIDATE PARITY FAILURE at step "+
                     std::to_string(source.step));
+            const auto adaptive_begin=Clock::now();
+            adaptive_result=adaptive.query(source.mesh);
+            adaptive_ns=ns(adaptive_begin,Clock::now());
+            if(adaptive_result.pairs!=oracle)
+                throw std::runtime_error(
+                    "ONLINE ADAPTIVE POLICY CANDIDATE PARITY FAILURE at step "+
+                    std::to_string(source.step));
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
@@ -426,7 +438,10 @@ int main(int argc,char**argv){
                <<(aa_a_first?"A":"B")<<",1,"
                <<compacted_ns<<','<<compacted_result.pairs.size()<<','
                <<compacted_frontier.pair_cut_size()<<','
-               <<compacted_frontier.compacted_vf_merges()<<'\n';
+               <<compacted_frontier.compacted_vf_merges()<<','
+               <<adaptive_ns<<','<<adaptive_result.pairs.size()<<','
+               <<(adaptive.last_used_frontier()?1:0)<<','
+               <<adaptive.switches()<<','<<adaptive.probes()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
