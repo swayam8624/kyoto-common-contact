@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 6B — verified 3D neo-Hookean FEM on a curved rigid sphere, independently measured full-face penetration and implemented a conservative whole-triangle time-interval clearance certificate. This is collision detection research, NOT a fully general contact-safe physical solver or an SCA speedup.**
+**Status: PASS 7A — native C++23 3D neo-Hookean FEM with globally synchronized whole-triangle clearance and barycentric effective-mass impulses. On the tested 900-step rigid-sphere trajectory, independent audit reports zero penetrating triangles across 901 states, versus 458/901 for the preserved vertex-only reference. No general IPC mesh contact, self-contact response, directed-rounded proof, fully time-consistent TOI integration, or SCA speedup is claimed.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -316,6 +316,82 @@ docs/16_CURVED_SPHERE_FEM.md and
 docs/17_TRIANGLE_SWEEP_CERTIFICATE.md.
 
 
+
+## Pass 7A — real full-face-safe nonplanar FEM reference
+
+**Verified original native evidence:**
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45138998647
+
+The core in include/kyoto/whole_face_contact_dynamics.hpp
+implements two distinct safeguards on the SAME physically integrated
+180-vertex, 480-tetrahedron, 320-face neo-Hookean torus:
+
+1. A barycentric mass-weighted contact impulse applied at a true
+   finite-triangle nearest point, with effective contact inverse
+   mass sum(w_i^2/m_i) and bounded tangential friction.
+2. The strict whole-triangle Lipschitz conservative time certificate
+   on EVERY proposed moving triangle. If any possible sphere
+   contact cannot be certified separated, ONE minimum prefix is
+   applied to ALL 3D vertices before committing a timestep.
+
+The earlier vertex-only solver remains the negative control and
+is never rewritten. Two independently run 900-step FEM exporters
+with identical reference topology, gravity and sphere give:
+
+| Measured condition | Original vertex-only | Whole-face response |
+| --- | ---: | ---: |
+| States with penetrating triangular faces | **458/901** | **0/901** |
+| Minimum finite-triangle clearance | **-21.0999 mm** | **+1.1277 mm** |
+| States with vertices inside sphere | 0 | 0 |
+| Physics timesteps | 900 | 900 |
+
+The new run includes 12,629 nonzero vertex-step impulse
+contributions from 10,049 face-level Gauss–Seidel impulse
+updates, and computes actual stress and energy. Its
+peak Cauchy von Mises is about 22.24 kPa; min det(F) 0.7649.
+
+**Causal caveat:** normal 900-step reference run clipped **zero**
+positions (global alpha=1 at every timestep); early face-aware
+velocity impulses maintained clearance. An independent extreme
+900 m/s one-step tunnelling case specifically tests that the
+global whole-face certificate DOES activate (alpha<1) and
+keeps the connected triangle surface safe.
+
+This is finite tested geometry, not universal machine-interval
+correctness. Global clipping, when invoked, can alter physical
+energy and displacement during a timestep because the remaining
+fraction is not re-integrated. The sequential contact response
+is not globally implicit. No arbitrary moving rigid meshes,
+self-contact or general IPC barrier solver yet.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
+
+    ./build/kyoto_whole_face_fem_export results/whole-face-fem
+    python3 scripts/render_whole_face_fem.py \
+      --input results/whole-face-fem \
+      --output results/whole-face-fem/visuals
+
+    ./build/kyoto_curved_fem_export results/curved-fem
+    python3 scripts/compare_curved_contact_solvers.py \
+      --old results/curved-fem \
+      --new results/whole-face-fem \
+      --output results/whole-face-comparison
+
+The original CI archives the independent trace sources,
+901-state comparisons, seven scientific charts, rotatable
+3D physically integrated mesh, 181 ParaView tetrahedral volume
+states, and a separate true-energy/trajectory-difference audit.
+
+The optional scripts/render_whole_face_vtk_studio.py generates
+source-backed cinematic VTK hero frames, a real tetrahedral
+cutaway and a short actual-solver GIF, with its own
+whole-face-vtk-studio.yml reproducibility job.
+
+See docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -334,9 +410,11 @@ Read the docs in numbered order:
 - docs/15_IPC_SOLVER_MOTION_AUDIT.md
 - docs/16_CURVED_SPHERE_FEM.md
 - docs/17_TRIANGLE_SWEEP_CERTIFICATE.md
+- docs/18_SYNCHRONIZED_WHOLE_FACE_CONTACT.md
 - AGENTS.md
 
-The NEXT gate is conservative whole-face safe advancement plus validated
-rigid/deformable mesh impulses and self-contact, before any matched
-full-paid SCA-vs-official IPC LBVH performance claim.
+The NEXT gate is time-consistent coupled contact integration with remaining
+TOI fraction and independent machine-safe continuous CCD, arbitrary
+rigid mesh contact/self-contact, then fair SCA vs official IPC LBVH
+full-paid performance validation.
 Do not substitute candidate parity for actual continuous collision proof.
