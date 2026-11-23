@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -59,6 +60,7 @@ struct TimeConsistentMetrics {
     double normal_impulse_ns{};
     double tangential_impulse_ns{};
     std::size_t rejected_clipped_trials{};
+    std::size_t rejected_inverted_trials{};
     std::size_t accepted_substeps{};
     std::size_t face_interval_tests{};
     std::size_t accepted_face_impulse_updates{};
@@ -104,12 +106,28 @@ inline TimeConsistentMetrics step_time_consistent_whole_face_sphere(
             throw std::runtime_error("adaptive FEM cannot certify minimum physical substep");
 
         Body proposal=staged;
-        const WholeFaceStepMetrics trial=step_whole_face_sphere(
-            proposal,sphere,proposed_dt,settings.contact);
+        WholeFaceStepMetrics trial;
+        bool invalid_trial_tetra=false;
+        try {
+            trial=step_whole_face_sphere(
+                proposal,sphere,proposed_dt,settings.contact);
+        } catch(const std::runtime_error& e) {
+            // A trial that inverts a tet is NEVER an accepted state.
+            // Only this specifically recognized step-size instability
+            // can trigger retry. Input errors, unexpected NaNs and
+            // other failed scientific invariants remain fatal.
+            if(std::string_view(e.what())==
+               "whole-face trial inverts a tetrahedron") {
+                invalid_trial_tetra=true;
+            } else {
+                throw;
+            }
+        }
         out.face_interval_tests+=trial.face_interval_tests;
 
-        if(trial.time_clipped) {
-            ++out.rejected_clipped_trials;
+        if(invalid_trial_tetra || trial.time_clipped) {
+            if(invalid_trial_tetra)++out.rejected_inverted_trials;
+            else ++out.rejected_clipped_trials;
             out.deepest_bisection=std::max(out.deepest_bisection,depth+1);
             // Never adopt the motion-clipped proposal, its impulses,
             // or its unjustified full-dt clock advance. Instead, halve
@@ -117,8 +135,8 @@ inline TimeConsistentMetrics step_time_consistent_whole_face_sphere(
             if(depth>=settings.maximum_bisection_depth||
                proposed_dt*.5<settings.minimum_substep_seconds)
                 throw std::runtime_error(
-                  "adaptive FEM cannot resolve continuous whole-face event "
-                  "within configured temporal budget");
+                  "adaptive FEM cannot resolve whole-face event or "
+                  "tet inversion within configured physical-time budget");
             const double half=proposed_dt*.5;
             self(self,half,depth+1);
             self(self,proposed_dt-half,depth+1);
