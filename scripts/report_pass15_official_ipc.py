@@ -60,7 +60,7 @@ def read_data(path: Path) -> list[dict]:
                     raise ValueError(f"invalid A/A first method at row {i}")
                 continue
             if k=="regime":
-                if row[k] not in ("routine","fast_adaptive"):
+                if row[k] not in ("routine","fast_adaptive","uncoupled_multibody"):
                     raise ValueError(f"unrecognized source physics regime at row {i}")
                 continue
             if k in ("first_method","first_internal_hierarchy_method"):
@@ -178,6 +178,11 @@ def summarize(rows: list[dict]):
         paidSelective=sum(int(r["selective_refit_paid_ns"]) for r in subset)
         per_scene[sid]={
             "physics_regime":subset[0]["regime"],
+            "body_body_response_note":(
+                "TWO separately integrated FEM solids, both contacting static finite "
+                "rigid triangles; no deformable/deformable mutual impulse or CCD "
+                "response is implemented; source separation is audited"
+                if subset[0]["regime"]=="uncoupled_multibody" else None),
             "physical_intervals":len({int(r["step"]) for r in subset}),
             "repeated_paired_rows":len(subset),
             "topology":{k:values[0] for k,values in topology.items()},
@@ -204,8 +209,10 @@ def summarize(rows: list[dict]):
             "cached_input_ipc_over_compacted":paidStrong/paidCompact,
             "adaptive_frontier_choices":sum(int(r["adaptive_used_frontier"]) for r in subset),
         }
-    for kind in ("routine","fast_adaptive"):
+    for kind in ("routine","fast_adaptive","uncoupled_multibody"):
         subset=[r for r in rows if r["regime"]==kind]
+        if not subset and kind=="uncoupled_multibody":
+            continue  # Older one-body scientific runs remain comparable.
         if not subset:
             raise ValueError(f"missing original {kind} solver evidence")
         per_regime[kind]={
