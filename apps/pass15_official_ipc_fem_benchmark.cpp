@@ -196,20 +196,21 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
 }
 int main(int argc,char**argv){
  try{
-    if(argc<2||argc>4)throw std::invalid_argument(
+    if(argc<2||argc>5)throw std::invalid_argument(
         "usage: kyoto_pass15_official_ipc_fem_benchmark OUTPUT_FOLDER "
-        "[sample_stride=12] [repeats=12]");
+        "[sample_stride=12] [repeats=12] [scene_count=1]");
     const int stride=argc>=3?std::stoi(argv[2]):12;
     const int repeats=argc>=4?std::stoi(argv[3]):12;
+    const int scene_count=argc>=5?std::stoi(argv[4]):1;
     if(stride<1||stride>360||360%stride!=0||
-       repeats<2||repeats>24)
-        throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24");
+       repeats<2||repeats>24||scene_count<1||scene_count>3)
+        throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24; 1 <= scene_count <= 3");
     const auto directory=std::filesystem::path(argv[1]);
     std::filesystem::create_directories(directory);
-    const auto data=generate(stride); // Excluded from both methods' costs.
+    const auto data=generate(stride,scene_count); // Excluded from both methods' costs.
     std::ofstream csv(directory/"official_ipc_fem_paired.csv");
     if(!csv)throw std::runtime_error("failed to create original receipt");
-    csv<<"repeat,step,regime,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
+    csv<<"repeat,step,regime,scene_id,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
           "accepted_physical_leaves,reference_pairs,official_ipc_pairs,"
           "maintained_hierarchy_pairs,official_extra,official_missing,"
           "official_conversion_ns,official_build_ns,official_query_ns,"
@@ -280,7 +281,7 @@ int main(int argc,char**argv){
                     std::to_string(missing.size()));
             const auto extra=upstream.pairs.size()-oracle.size();
             csv<<trial<<','<<source.step<<','<<source.regime<<','
-               <<source.physical_leaf_id<<','<<source.time<<','
+               <<source.scene_id<<','<<source.physical_leaf_id<<','<<source.time<<','
                <<source.impulses<<','<<source.leaves<<','<<oracle.size()<<','
                <<upstream.pairs.size()<<','<<ours.pairs.size()<<','
                <<extra<<",0,"<<upstream.conversion_ns<<','
@@ -306,7 +307,8 @@ int main(int argc,char**argv){
              <<with_contact<<" contact-bearing repeated snapshots; "
              <<"independent oracle candidate coverage and "
              <<repeats<<" repeated cached/uncached/frontier BVH controls "
-             <<"at native source stride="<<stride<<". "
+             <<"at native source stride="<<stride
+             <<" physics scenes="<<scene_count<<". "
              <<"No narrowphase CCD or solver-step speedup claim.\n";
     return 0;
  }catch(const std::exception& e){
