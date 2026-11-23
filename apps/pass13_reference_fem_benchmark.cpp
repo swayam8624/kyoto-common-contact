@@ -22,7 +22,7 @@ namespace s=kyoto::solid;
 using Clock=std::chrono::steady_clock;
 
 static kyoto::contact::Vec3 cv(s::V3 v){return {v.x,v.y,v.z};}
-static f::CubicVertex straight(s::V3 a,s::V3 b){
+static kyoto::contact::CubicVertex straight(s::V3 a,s::V3 b){
     // The cubic Bezier control points exactly represent a straight line.
     const auto p=cv(a),q=cv(b);
     return {{{p,kyoto::contact::affine(p,q,1./3.),
@@ -82,13 +82,14 @@ int main(int argc,char**argv){
     csv<<std::setprecision(17);
     s::Body body=s::toroidal_solid();
     const auto patch=s::corrugated_contact_patch();
-    constexpr int steps=60; // Actual integrated 3D FEM; fixed deterministic.
+    constexpr int steps=360; // Includes first source face contact near step 293.
     std::size_t contact_steps=0;
     for(int i=1;i<=steps;++i){
         s::Body before=body;
         const auto physical=s::step_time_consistent_rigid_triangle_mesh(
             body,patch,0.00075);
         if(physical.face_impulse_updates)++contact_steps;
+        if(i%12!=0 && i!=steps)continue; // independent deterministic snapshot cadence
         const auto mesh=scene(before,body,patch);
         const auto t0=Clock::now();
         const auto reference_built=f::build(mesh);
