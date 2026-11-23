@@ -186,6 +186,13 @@ if(KYOTO_WITH_OFFICIAL_IPC)
   target_link_libraries(kyoto_official_ipc_ccd_tests PRIVATE kyoto_contact ipc::toolkit)
   add_test(NAME pinned_official_ipc_continuous_CCD_coverage COMMAND kyoto_official_ipc_ccd_tests)
 
+  # Pass 15: matched original FEM feature snapshots against actual
+  # pinned official IPC Toolkit LBVH and a maintained refitted tree.
+  # Candidate coverage only; the solver itself remains independent.
+  add_executable(kyoto_pass15_official_ipc_fem_benchmark
+                 apps/pass15_official_ipc_fem_benchmark.cpp)
+  target_link_libraries(kyoto_pass15_official_ipc_fem_benchmark
+                        PRIVATE kyoto_contact ipc::toolkit)
   # Pass 5: official upstream CCD on genuine solver-integrated
   # tetrahedral trajectories, reporting unresolved self-contact.
   add_executable(kyoto_official_ipc_solid_audit tests/ipc_solid_trajectory_audit.cpp)
