@@ -290,3 +290,14 @@ add_executable(kyoto_coupled_deformable_fem_contact_tests
 target_link_libraries(kyoto_coupled_deformable_fem_contact_tests PRIVATE kyoto_contact)
 add_test(NAME actual_two_body_coupled_FEM_impulse_momentum_clock_and_CCD_gate
          COMMAND kyoto_coupled_deformable_fem_contact_tests)
+
+# Pass23B: original 120-step COUPLED finite-triangle collision
+# trajectory. This test must fail if mutual impulses never occur,
+# if a physical leaf violates continuous separation, if source
+# Jacobians invert, or if total physical momentum accounting drifts.
+add_executable(kyoto_pass23_coupled_trajectory
+               apps/pass23_coupled_trajectory.cpp)
+target_link_libraries(kyoto_pass23_coupled_trajectory PRIVATE kyoto_contact)
+add_test(NAME actual_coupled_two_deformable_120_step_physics
+         COMMAND kyoto_pass23_coupled_trajectory
+                 ${CMAKE_CURRENT_BINARY_DIR}/pass23-trajectory-evidence)
