@@ -1,5 +1,9 @@
 name: Kyoto Pass 15 matched official IPC LBVH on native FEM
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [research/spacetime-contact-atlas]
