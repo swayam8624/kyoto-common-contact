@@ -440,7 +440,66 @@ The source archive's exact measured results—not any
 claims in this document—remain authoritative if
 reproduction on other hardware yields differences.
 
-## 9. Remaining gates
+## 9. True adaptive fast finite-triangle impact — measured
+
+The **separate**, scientifically important fast-contact experiment
+uses the very same connected, nonplanar 72-face finite rigid patch
+shifted vertically to create an actual source nearest-surface
+separation of **0.0120034 m**. All original 180 FEM nodes begin
+with **20 m/s** downward velocity, giving a nominal full
+0.00075-second trial displacement of 15 mm. This exceeds the
+actual initial rigid/deformable face clearance.
+
+The original solver correctly rejected the first full-timestep
+continuous collision trial rather than moving through rigid
+faces or charging unintegrated time.
+
+The experiment returned these original C++ measurements:
+
+| Actual source experiment | Native measured result |
+| --- | ---: |
+| True initial triangle mesh separation | 12.0034 mm |
+| Initial vertical solid impact speed | 20 m/s |
+| Requested physical duration | 0.750 ms |
+| Rejected finite-triangle continuous motion proposals | **2** |
+| Rejected tetrahedral inversion proposals | **0** |
+| Fully accepted physical substeps | **3** |
+| Actual applied contact face impulse updates | **12** |
+| Sum of genuinely integrated accepted time | **0.750 ms** |
+| Minimum full-face finite rigid-mesh separation | **0.753194 mm** |
+| Minimum accepted tetrahedral Jacobian det(F) | **0.972742** |
+
+The exact accepted substep times and time-contiguous receipts
+are written in:
+
+    fast_finite_mesh_physical_leaves.csv
+    fast_mesh_manifest.json
+
+Each accepted physical leaf contains its own elapsed time,
+the minimum finite triangle/triangle clearance, positive
+volumetric Jacobian, true contact impulse magnitude,
+paid continuous candidate checks, interval time nodes
+and subdivision depth.
+
+This is the FIRST new finite nonplanar RIGID TRIANGLE
+obstacle scenario in which adaptive temporal subdivision
+was actually needed and successfully physically resolved.
+The ordinary 900-step finite-mesh experiment needed no
+temporal subdivision; that outcome is preserved separately.
+
+The same FAST source evidence has its own scientific
+figure, showing exact accepted durations and the real
+normal impulse/clearance of each physical leaf.
+
+This 20 m/s success is finite-test progress; it does NOT
+overturn the unrelated earlier 900 m/s extreme inversion/
+temporal-budget failure, establish independent real-world
+material accuracy, or formally certify floating-point
+triangle/triangle CCD.
+
+## 10. Remaining gates
+
+
 
 
 
