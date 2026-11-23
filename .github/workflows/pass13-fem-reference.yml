@@ -1,5 +1,9 @@
 name: Kyoto Pass 13 real FEM reference broadphase
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [research/spacetime-contact-atlas]
