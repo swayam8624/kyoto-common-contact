@@ -98,6 +98,9 @@ class RefitHierarchy {
     struct NodePair{int first{},second{};};
     std::vector<NodePair> vf_cut_,ee_cut_;
     bool maintain_pair_cut_{false},pair_cut_ready_{};
+    bool pair_cut_suspended_{};
+    std::size_t suspension_frames_{},pair_cut_skipped_frames_{};
+    std::size_t last_pair_cut_attempted_size_{};
     std::size_t pair_cut_fallbacks_{},pair_cut_reuses_{};
     bool retain_feature_lookup_{true};
     std::vector<std::uint64_t> key_;
@@ -247,6 +250,10 @@ public:
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
     std::size_t pair_cut_fallbacks()const{return pair_cut_fallbacks_;}
     std::size_t pair_cut_size()const{return vf_cut_.size()+ee_cut_.size();}
+    std::size_t pair_cut_skipped_frames()const{return pair_cut_skipped_frames_;}
+    std::size_t last_pair_cut_attempted_size()const{
+        return last_pair_cut_attempted_size_;
+    }
 
     f::Result query(const f::Mesh& mesh) {
         // Include all source mesh validation, box construction and
@@ -272,6 +279,7 @@ public:
             faces_.build(built.faces);
             key_=next;initialized_=true;++rebuilds_;
             pair_cut_ready_=false;vf_cut_.clear();ee_cut_.clear();
+            pair_cut_suspended_=false;suspension_frames_=0;
         }else{
             vertices_.refit(built.vertices);
             edges_.refit(built.edges);
@@ -279,7 +287,13 @@ public:
             ++refits_;
         }
         f::Result out;
-        if(maintain_pair_cut_){
+        // An oversized frontier cannot be useful if rebuilding it
+        // costs more than the plain traversal. Disable futile attempts
+        // for several fully paid classic traversals, then retry once.
+        // 13 is intentionally not divisible by common frame cycles.
+        const bool skip_frontier=maintain_pair_cut_&&pair_cut_suspended_&&
+            ((++suspension_frames_)%13!=0);
+        if(maintain_pair_cut_&&!skip_frontier){
             std::vector<NodePair> new_vf,new_ee;
             if(pair_cut_ready_){
                 pair_cut_reuses_+=vf_cut_.size()+ee_cut_.size();
@@ -303,15 +317,19 @@ public:
             const std::size_t max_cut=std::max(std::size_t{64},
                 std::size_t{12}*(built.vertices.size()+
                     built.edges.size()+built.faces.size()));
-            if(new_vf.size()+new_ee.size()>max_cut){
+            last_pair_cut_attempted_size_=new_vf.size()+new_ee.size();
+            if(last_pair_cut_attempted_size_>max_cut){
                 pair_cut_ready_=false;
+                pair_cut_suspended_=true;suspension_frames_=0;
                 vf_cut_.clear();ee_cut_.clear();
                 ++pair_cut_fallbacks_;
             }else{
                 vf_cut_.swap(new_vf);ee_cut_.swap(new_ee);
                 pair_cut_ready_=true;
+                pair_cut_suspended_=false;suspension_frames_=0;
             }
         }else{
+            if(skip_frontier)++pair_cut_skipped_frames_;
             if(vertices_.root>=0&&faces_.root>=0)
                 cross(vertices_,vertices_.root,faces_,faces_.root,
                       built.vertices,built.faces,out);
