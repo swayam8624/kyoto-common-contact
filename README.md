@@ -1,6 +1,6 @@
 # Kyoto: Spacetime Contact Atlas (research reset)
 
-**Status: PASS 5 — true 3D neo-Hookean tetrahedral reference FEM, 900-step impact physics, full-source stress/impulse/energy traces and real VTK visuals verified. The official IPC audit of solver trajectories is an additional distinct gate, not yet equivalent to a general mesh-contact solver.**
+**Status: PASS 6B — verified 3D neo-Hookean FEM on a curved rigid sphere, independently measured full-face penetration and implemented a conservative whole-triangle time-interval clearance certificate. This is collision detection research, NOT a fully general contact-safe physical solver or an SCA speedup.**
 
 Research question: Can a correctness-preserving locally maintained
 swept-contact hierarchy reduce total contact-detection and solver-step
@@ -249,6 +249,73 @@ Read docs/14_FIRST_VOLUMETRIC_FEM.md for the full derivation,
 numerical assumptions, source manifest and open science gates.
 
 
+
+## Pass 6 / 6B — curved rigid contact, truthful negative evidence,
+## and a mathematically conservative full-triangle sweep certificate
+
+Our native C++23 **real 3D hyperelastic toroidal solid** now falls
+onto a curved analytical rigid sphere. It integrates all 180 vertices,
+480 tetrahedra and physical material stress, velocity and gravity
+over 900 true steps (181 volume snapshots). It records swept
+vertex-sphere CCD, contact impulses and real neo-Hookean energy.
+
+Critically, an independent finite-triangle closest-point oracle
+checks **all 901 accepted states**, including the initial state:
+
+- **0** accepted states with a vertex inside the sphere;
+- **458/901** accepted states with penetrating *triangle interiors*;
+- **21.0999 millimetres** maximum measured triangle penetration;
+- first triangle overlap t=0.2265 s, before first vertex
+  contact impulse t=0.2295 s.
+
+This negative observation proves **vertex-safe is NOT face-safe**.
+It is independently audited and preserved in the signed native CSV
+rather than patched out of the visualization.
+
+Verified cross-platform CI:
+https://github.com/swayam8624/kyoto-common-contact/actions/runs/45133327667
+Native evidence artifact:
+kyoto-stage6-real-curved-FEM-and-surface-safety-audit
+(artifact ID 14798149536).
+
+The science renderer and 3D volume export are reproducible:
+
+    ./build/kyoto_curved_fem_export results/curved-fem
+    python3 scripts/render_curved_fem.py \
+      --input results/curved-fem \
+      --output results/curved-fem/visuals
+
+Outputs are six source-backed figures, a standalone rotatable
+3D solver playback, 181 true tetrahedral ParaView frames, a
+real normal-impulse trace, and the 901-step vertex-vs-face audit.
+
+**New Pass 6B source:** include/kyoto/triangle_sphere_sweep.hpp
+implements a conservative *moving triangle/sphere* separation
+certificate based on the Lipschitz inequality:
+
+    |distance(T(t),c)-distance(T(s),c)|
+        <= max_i ||p_i(t)-p_i(s)||.
+
+A synchronized time interval is certified separated when its
+midpoint triangle distance minus half its maximum vertex motion
+is greater than sphere radius. It bisects uncertain intervals
+and returns the first unverified interval as a safe time-prefix
+bound. The independent test uses analytic face tunnelling,
+640 randomized 3D swept triangles with 128,640 path samples,
+and the FIRST real FEM triangle-penetration transition.
+
+The certificate is **not yet used as a physical contact-response
+solver**; its exact-arithmetic theorem does not substitute for
+directed-rounded floating-point verification. The immediate next
+scientific gate is to integrate globally synchronized full-face
+safe advancement and physically correct contact impulses,
+then audit every accepted step and compare official IPC CCD.
+
+See:
+docs/16_CURVED_SPHERE_FEM.md and
+docs/17_TRIANGLE_SWEEP_CERTIFICATE.md.
+
+
 Read the docs in numbered order:
 - docs/01_PROBLEM.md
 - docs/02_STRATEGY.md
@@ -264,9 +331,12 @@ Read the docs in numbered order:
 - docs/12_VTK_STUDIO.md
 - docs/13_REAL_CONTINUOUS_CCD.md
 - docs/14_FIRST_VOLUMETRIC_FEM.md
+- docs/15_IPC_SOLVER_MOTION_AUDIT.md
+- docs/16_CURVED_SPHERE_FEM.md
+- docs/17_TRIANGLE_SWEEP_CERTIFICATE.md
 - AGENTS.md
 
-The NEXT gate is actual-solver mesh-mesh contact validation and
-solver-integrated official IPC constrained response on arbitrary connected
-obstacles, before a matched full-paid comparison versus official IPC LBVH.
+The NEXT gate is conservative whole-face safe advancement plus validated
+rigid/deformable mesh impulses and self-contact, before any matched
+full-paid SCA-vs-official IPC LBVH performance claim.
 Do not substitute candidate parity for actual continuous collision proof.
