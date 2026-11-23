@@ -284,17 +284,19 @@ int main(int argc,char**argv){
           "first_internal_hierarchy_method,frontier_paid_total_ns,"
           "frontier_pairs,frontier_cut_size,frontier_fallbacks,"
           "frontier_reused_node_pairs,frontier_skipped_frames,"
-          "frontier_attempted_cut_size\n";
+          "frontier_attempted_cut_size,cached_ipc_conversion_ns,"
+          "cached_ipc_build_ns,cached_ipc_query_ns,cached_ipc_pairs\n";
     csv<<std::setprecision(17);
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
         kyoto::contact::atlas::RefitHierarchy hierarchy;
         kyoto::contact::atlas::RefitHierarchy uncached_hierarchy(false);
         kyoto::contact::atlas::RefitHierarchy maintained_frontier(true,true);
+        CachedIPCInput optimized_converter;
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
-            PaidIPC upstream;
+            PaidIPC upstream,optimized_upstream;
             f::Result ours,uncached,frontier_pairs;
             std::int64_t ours_ns=0,uncached_ns=0,frontier_ns=0;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
@@ -321,8 +323,20 @@ int main(int argc,char**argv){
                 else if(rotation==1){uncached_run();frontier_run();our_run();}
                 else{frontier_run();our_run();uncached_run();}
             };
-            if(ipc_first){upstream=official(source.mesh);local_runs();}
-            else{local_runs();upstream=official(source.mesh);}
+            const bool cached_ipc_first=((i+std::size_t(trial/2))%2==0);
+            auto ipc_runs=[&](){
+                if(cached_ipc_first) {
+                    optimized_upstream=official_with_cached_input(
+                        source.mesh,optimized_converter);
+                    upstream=official(source.mesh);
+                }else{
+                    upstream=official(source.mesh);
+                    optimized_upstream=official_with_cached_input(
+                        source.mesh,optimized_converter);
+                }
+            };
+            if(ipc_first){ipc_runs();local_runs();}
+            else{local_runs();ipc_runs();}
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
@@ -344,6 +358,10 @@ int main(int argc,char**argv){
                     "OFFICIAL IPC FAILED MATCHED SEMANTICS COVERAGE at step "+
                     std::to_string(source.step)+" missing="+
                     std::to_string(missing.size()));
+            if(optimized_upstream.pairs!=upstream.pairs)
+                throw std::runtime_error(
+                    "cached official IPC adapter candidate mismatch at source step "+
+                    std::to_string(source.step));
             const auto extra=upstream.pairs.size()-oracle.size();
             csv<<trial<<','<<source.step<<','<<source.regime<<','
                <<source.scene_id<<','<<source.mesh.vertices.size()<<','
@@ -363,7 +381,11 @@ int main(int argc,char**argv){
                <<maintained_frontier.pair_cut_fallbacks()<<','
                <<maintained_frontier.pair_cut_reuses()<<','
                <<maintained_frontier.pair_cut_skipped_frames()<<','
-               <<maintained_frontier.last_pair_cut_attempted_size()<<'\n';
+               <<maintained_frontier.last_pair_cut_attempted_size()<<','
+               <<optimized_upstream.conversion_ns<<','
+               <<optimized_upstream.build_ns<<','
+               <<optimized_upstream.query_ns<<','
+               <<optimized_upstream.pairs.size()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
