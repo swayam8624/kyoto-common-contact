@@ -29,6 +29,7 @@ int main(){
     kyoto::contact::atlas::RefitHierarchy h;
     kyoto::contact::atlas::RefitHierarchy uncached(false);
     kyoto::contact::atlas::RefitHierarchy with_cut(true,true);
+    kyoto::contact::atlas::RefitHierarchy with_compaction(true,true,true);
     f::Mesh mesh;
     mesh.thickness=.0005;
     mesh.vertices={vertex(0,{0,0,0}),vertex(1,{1,0,0}),
@@ -40,6 +41,7 @@ int main(){
     verify(h,mesh,"initial");
     verify(uncached,mesh,"uncached initial");
     verify(with_cut,mesh,"frontier initial");
+    verify(with_compaction,mesh,"compacted frontier initial");
     if(h.rebuilds()!=1||h.refits()!=0)
         throw std::runtime_error("incorrect cold build statistics");
     std::mt19937_64 rng(20261123);
@@ -55,6 +57,7 @@ int main(){
         verify(h,mesh,"randomized warm refit");
         verify(uncached,mesh,"uncached randomized parity");
         verify(with_cut,mesh,"frontier randomized parity");
+        verify(with_compaction,mesh,"compacted frontier randomized parity");
     }
     if(with_cut.pair_cut_reuses()==0)
         throw std::runtime_error("frontier never reused node-pair cut");
@@ -65,12 +68,14 @@ int main(){
     verify(h,mesh,"mask invalidation");
     verify(uncached,mesh,"uncached mask invalidation");
     verify(with_cut,mesh,"frontier mask invalidation");
+    verify(with_compaction,mesh,"compacted frontier mask invalidation");
     if(h.rebuilds()!=2)
         throw std::runtime_error("mask invalidation did not rebuild");
     mesh.topology_epoch=2;
     verify(h,mesh,"epoch invalidation");
     verify(uncached,mesh,"uncached epoch invalidation");
     verify(with_cut,mesh,"frontier epoch invalidation");
+    verify(with_compaction,mesh,"compacted frontier epoch invalidation");
     if(h.rebuilds()!=3)
         throw std::runtime_error("epoch invalidation did not rebuild");
     // Empty topological families must not access a nonexistent tree.
@@ -79,6 +84,7 @@ int main(){
     verify(h,mesh,"empty features");
     verify(uncached,mesh,"uncached empty features");
     verify(with_cut,mesh,"frontier empty features");
+    verify(with_compaction,mesh,"compacted frontier empty features");
     if(h.rebuilds()!=4)
         throw std::runtime_error("feature deletion did not invalidate");
     // The same topology may change its physical collision thickness
@@ -87,6 +93,7 @@ int main(){
     verify(h,mesh,"skin radius recomputed");
     verify(uncached,mesh,"uncached skin radius");
     verify(with_cut,mesh,"frontier skin radius");
+    verify(with_compaction,mesh,"compacted frontier skin radius");
     // Robustness gate for shared-vertex adjacency vs nonlocal pairs.
     std::cout<<"PASS14 hierarchy: 180 randomized warm refits, "
         "all exhaustive VF/EE candidate sets equal; "
