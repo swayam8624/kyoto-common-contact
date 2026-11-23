@@ -102,6 +102,7 @@ class RefitHierarchy {
     std::vector<NodePair> vf_cut_,ee_cut_;
     bool maintain_pair_cut_{false},pair_cut_ready_{};
     bool compact_separated_vf_{false};
+    std::size_t frontier_budget_factor_{4};
     std::size_t compacted_vf_merges_{};
     std::size_t pair_cut_skipped_frames_{};
     std::size_t last_pair_cut_attempted_size_{};
@@ -337,10 +338,15 @@ class RefitHierarchy {
 public:
     explicit RefitHierarchy(bool retain_feature_lookup=true,
                             bool maintain_pair_cut=false,
-                            bool compact_separated_vf=false)
+                            bool compact_separated_vf=false,
+                            std::size_t frontier_budget_factor=4)
         :retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
-         compact_separated_vf_(compact_separated_vf){}
+         compact_separated_vf_(compact_separated_vf),
+         frontier_budget_factor_(frontier_budget_factor){
+        if(frontier_budget_factor_<1||frontier_budget_factor_>8)
+            throw std::invalid_argument("frontier budget factor must be 1..8");
+    }
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
@@ -391,7 +397,7 @@ public:
             // Two independent cuts have bounded memory even on dense
             // AABB workloads. Budget is fully charged in query() timings.
             const std::size_t max_cut=std::max(std::size_t{64},
-                std::size_t{4}*(built.vertices.size()+
+                frontier_budget_factor_*(built.vertices.size()+
                     built.edges.size()+built.faces.size()));
             const std::size_t vf_budget=max_cut/2;
             const std::size_t ee_budget=max_cut-vf_budget;
