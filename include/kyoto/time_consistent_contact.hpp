@@ -47,6 +47,9 @@ struct AcceptedPhysicalSubstep {
     std::size_t face_interval_tests{};
     std::size_t face_contact_updates{};
     unsigned bisection_depth{};
+    // True total external vector contact impulse from this accepted leaf.
+    V3 net_contact_impulse_vector{};
+    V3 net_contact_torque_at_application{};
 };
 struct TimeConsistentMetrics {
     double requested_dt_s{};
@@ -65,6 +68,8 @@ struct TimeConsistentMetrics {
     std::size_t face_interval_tests{};
     std::size_t accepted_face_impulse_updates{};
     unsigned deepest_bisection{};
+    V3 net_contact_impulse_vector{};
+    V3 net_contact_torque_at_application{};
 };
 
 inline void validate(const TimeConsistentSettings& c) {
@@ -162,7 +167,9 @@ inline TimeConsistentMetrics step_time_consistent_whole_face_sphere(
            state.minimum_surface_clearance_m,fem.min_jacobian,
            trial.total_normal_impulse_ns,
            trial.total_tangential_impulse_ns,
-           trial.face_interval_tests,trial.normal_impulses,depth});
+           trial.face_interval_tests,trial.normal_impulses,depth,
+           trial.net_contact_impulse_vector,
+           trial.net_contact_torque_at_application});
         for(std::size_t i=0;i<accumulated_impulses.size();i++)
             accumulated_impulses[i]+=proposal.nodes[i].last_normal_impulse;
 
@@ -176,6 +183,9 @@ inline TimeConsistentMetrics step_time_consistent_whole_face_sphere(
             out.minimum_triangle_clearance_m,state.minimum_surface_clearance_m);
         out.minimum_tetra_jacobian=std::min(
             out.minimum_tetra_jacobian,fem.min_jacobian);
+        out.net_contact_impulse_vector+=trial.net_contact_impulse_vector;
+        out.net_contact_torque_at_application+=
+            trial.net_contact_torque_at_application;
         out.normal_impulse_ns+=trial.total_normal_impulse_ns;
         out.tangential_impulse_ns+=trial.total_tangential_impulse_ns;
         out.accepted_face_impulse_updates+=trial.normal_impulses;
