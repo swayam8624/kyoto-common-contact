@@ -113,6 +113,7 @@ int main(int argc,char**argv) {
     const auto shift=initial.minimum_distance_m-.012;
     for(auto& p:rigid.vertices)p.z+=shift;
     for(auto& node:body.nodes)node.v={0,0,-20.};
+    const s::Body original_unaccepted_source=body;
     std::vector<s::MeshAcceptedTransition> leaves;
     const auto simulated=s::step_time_consistent_rigid_triangle_mesh(
         body,rigid,.00075,{},nullptr,&leaves);
@@ -200,6 +201,118 @@ int main(int argc,char**argv) {
                  <<" cross-EE="<<nEE<<" upstream_CCD_hits="<<vfHit+eeHit
                  <<" broadphase_event_misses="<<missAABB+missIPC+missTree<<'\n';
     }
+    // POSITIVE CCD CONTROL: The solver itself rejected its first
+    // 0.75 ms geometric proposal. Capture that exact proposed geometry
+    // using the optional source-only inspection parameter; never call it
+    // an accepted physical state. Enumerate all *real* official IPC CCD
+    // events on this unaccepted motion and require at least one. This
+    // prevents "zero missed / zero detected events" from being mistaken
+    // for a non-vacuous collision-event coverage experiment.
+    std::vector<s::Triangle3> rigid_triangles;
+    std::vector<s::TriangleBox> rigid_boxes;
+    for(std::size_t i=0;i<rigid.faces.size();++i){
+        const auto triangle=s::face_positions(rigid,i);
+        rigid_triangles.push_back(triangle);
+        rigid_boxes.push_back(s::bounding(triangle));
+    }
+    s::Body unaccepted_copy=original_unaccepted_source;
+    std::vector<s::V3> exact_proposal;
+    const auto rejected=s::try_rigid_mesh_fem_full_step(
+        unaccepted_copy,rigid,rigid_triangles,rigid_boxes,
+        .00075,s::RigidMeshContactSettings{},&exact_proposal);
+    require(!rejected.accepted &&
+            rejected.was_rejected_by_continuous_geometry,
+            "positive CCD control did not use the solver's rejected trial");
+    require(unaccepted_copy.time_seconds==original_unaccepted_source.time_seconds &&
+            exact_proposal.size()==original_unaccepted_source.nodes.size(),
+            "native rejected source trial mutated public clock/geometry");
+    s::Body proposed_end=original_unaccepted_source;
+    for(std::size_t j=0;j<exact_proposal.size();++j)
+        proposed_end.nodes[j].x=exact_proposal[j];
+    auto motion=fem::feature_snapshot(
+        original_unaccepted_source,proposed_end,rigid);
+    motion.topology_epoch=200; // different physical trial/cache epoch
+    const auto inp=prepare(motion);
+    const auto truth=f::exhaustive(motion).pairs;
+    const auto official=upstream_candidates(motion,inp);
+    const auto tree=maintained.query(motion).pairs;
+    require(truth==tree,"positive rejected-trial tree candidate mismatch");
+
+    std::size_t actual_vf=0,actual_ee=0,missing_truth=0,
+                missing_ipc=0,missing_tree=0;
+    double first_toi=1.0;
+    for(std::size_t vi=0;vi<motion.vertices.size();++vi)
+        for(std::size_t fi=0;fi<motion.faces.size();++fi){
+            const auto& v=motion.vertices[vi],&face=motion.faces[fi];
+            const auto owner=motion.vertices[inp.indices.at(
+                face.vertices[0])].object;
+            if(v.object==owner)continue;
+            ipc::FaceVertexCandidate stencil(
+                static_cast<ipc::index_t>(fi),
+                static_cast<ipc::index_t>(vi));
+            double toi=1.0;
+            if(!stencil.ccd(stencil.dof(inp.start,inp.edges,inp.faces),
+                            stencil.dof(inp.end,inp.edges,inp.faces),toi))
+                continue;
+            require(std::isfinite(toi)&&toi>=0&&toi<=1,
+                    "invalid rejected-trial upstream VF collision time");
+            first_toi=std::min(first_toi,toi);
+            ++actual_vf;
+            const f::Candidate pair{f::Kind::VertexFace,v.id,face.id};
+            missing_truth+=!std::binary_search(truth.begin(),truth.end(),pair);
+            missing_ipc+=!std::binary_search(official.begin(),official.end(),pair);
+            missing_tree+=!std::binary_search(tree.begin(),tree.end(),pair);
+        }
+    for(std::size_t ei=0;ei<motion.edges.size();++ei)
+        for(std::size_t ej=ei+1;ej<motion.edges.size();++ej){
+            const auto& a=motion.edges[ei],&b=motion.edges[ej];
+            const auto ownerA=motion.vertices[inp.indices.at(
+                a.vertices[0])].object;
+            const auto ownerB=motion.vertices[inp.indices.at(
+                b.vertices[0])].object;
+            if(ownerA==ownerB)continue;
+            ipc::EdgeEdgeCandidate stencil(
+                static_cast<ipc::index_t>(ei),
+                static_cast<ipc::index_t>(ej));
+            double toi=1.0;
+            if(!stencil.ccd(stencil.dof(inp.start,inp.edges,inp.faces),
+                            stencil.dof(inp.end,inp.edges,inp.faces),toi))
+                continue;
+            require(std::isfinite(toi)&&toi>=0&&toi<=1,
+                    "invalid rejected-trial upstream EE collision time");
+            first_toi=std::min(first_toi,toi);
+            ++actual_ee;
+            const f::Candidate pair{f::Kind::EdgeEdge,
+                std::min(a.id,b.id),std::max(a.id,b.id)};
+            missing_truth+=!std::binary_search(truth.begin(),truth.end(),pair);
+            missing_ipc+=!std::binary_search(official.begin(),official.end(),pair);
+            missing_tree+=!std::binary_search(tree.begin(),tree.end(),pair);
+        }
+    require(actual_vf+actual_ee>0,
+            "rejected real FEM geometric proposal yielded ZERO upstream CCD events");
+    require(missing_truth+missing_ipc+missing_tree==0,
+            "positive upstream CCD event missing from one or more candidates");
+
+    std::ofstream positive(dir/"rejected_native_trial_positive_ccd.json");
+    positive<<std::setprecision(17)
+        <<"{\\n"
+        <<" \\"source\\": \\"native_solver_actual_rejected_FEM_proposal\\",\\n"
+        <<" \\"is_accepted_physical_motion\\": false,\\n"
+        <<" \\"native_full_trial_rejected_by_geometry\\": true,\\n"
+        <<" \\"requested_dt_s\\": 0.00075,\\n"
+        <<" \\"actual_official_IPC_CCD_vf_events\\": "<<actual_vf<<",\\n"
+        <<" \\"actual_official_IPC_CCD_ee_events\\": "<<actual_ee<<",\\n"
+        <<" \\"actual_upstream_earliest_toi_fraction\\": "<<first_toi<<",\\n"
+        <<" \\"missed_by_exhaustive_AABB\\": "<<missing_truth<<",\\n"
+        <<" \\"missed_by_official_LBVH\\": "<<missing_ipc<<",\\n"
+        <<" \\"missed_by_maintained_frontier\\": "<<missing_tree<<"\\n"
+        <<"}\\n";
+    require(positive.good(),"failed to write positive native CCD control");
+    std::cout<<"PASS18 POSITIVE rejected native FEM collision proposal: VF="
+             <<actual_vf<<" EE="<<actual_ee<<" earliest upstream TOI="
+             <<first_toi<<" candidate misses="
+             <<missing_truth+missing_ipc+missing_tree<<'\\n';
+
     require(trace.good(),"original CCD event CSV write failed");
     require(global_misses==0,
             "one or more actual cross-object IPC CCD events were culled");
