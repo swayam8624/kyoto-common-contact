@@ -1,7 +1,7 @@
 // Pass 6: REAL 3D volumetric FEM against a curved rigid analytic obstacle.
 // 900 integrated physical steps, no scripted vertex motion.
 // No upstream IPC mesh-mesh response, no false claims of safe face contacts.
-#include "kyoto/curved_contact.hpp"
+#include "kyoto/sphere_surface_audit.hpp"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -35,6 +35,13 @@ int main(int argc,char**argv){
              "center_x,center_y,center_z,min_vertex_clearance_m,"
              "swept_contacts_interval,normal_impulses_interval,"
              "normal_impulse_ns_interval,total_mass_kg\n";
+    // Independent STATIC full-surface audit on every accepted native step.
+    // Vertex-only CCD cannot establish triangle/sphere safety.
+    std::ofstream surface_audit(dir/"surface_sphere_clearance.csv");
+    surface_audit<<std::setprecision(17);
+    surface_audit<<"step,time_s,minimum_vertex_clearance_m,"
+                    "minimum_triangle_clearance_m,penetrating_triangles,"
+                    "tested_triangles,vertex_penetrations,closest_triangle_id\n";
     std::ofstream impacts(dir/"curved_contact_impulses.csv");
     impacts<<std::setprecision(17);
     impacts<<"step,time_s,vertex_id,x,y,z,impulse_ns\n";
@@ -53,6 +60,9 @@ int main(int argc,char**argv){
             <<tet.n[2]<<','<<tet.n[3]<<','<<tet.rest_volume<<'\n';
     }
     std::size_t impulses_total=0,swept_total=0,contact_frames=0;
+    std::size_t surface_overlap_states=0,overlap_faces_total=0;
+    std::size_t vertex_inside_states=0;
+    double worst_surface_gap=std::numeric_limits<double>::infinity();
     std::size_t interval_impulses=0,interval_sweeps=0;
     double interval_normal_ns=0;
     double max_stress=0,min_j=std::numeric_limits<double>::infinity();
@@ -75,6 +85,20 @@ int main(int argc,char**argv){
                        <<node.last_normal_impulse<<'\n';
             }
         }
+        const auto surface=audit_surface_sphere(b,sphere);
+        surface_audit<<step<<','<<b.time_seconds<<','
+            <<surface.minimum_vertex_clearance_m<<','
+            <<surface.minimum_surface_clearance_m<<','
+            <<surface.penetrating_faces<<','<<surface.tested_faces<<','
+            <<surface.inside_vertex_count<<','
+            <<surface.face_nearest_vertex<<'\n';
+        if(surface.penetrating_faces>0){
+            surface_overlap_states++;
+            overlap_faces_total+=surface.penetrating_faces;
+        }
+        if(surface.inside_vertex_count>0)vertex_inside_states++;
+        worst_surface_gap=std::min(worst_surface_gap,
+                                   surface.minimum_surface_clearance_m);
         if(step%stride)continue;
         const int frame=step/stride;
         const auto diag=b.diagnostics(-100);
@@ -107,9 +131,10 @@ int main(int argc,char**argv){
                <<interval_normal_ns<<','<<diag.total_mass_kg<<'\n';
         interval_impulses=0;interval_sweeps=0;interval_normal_ns=0;
     }
-    states.close();metrics.close();impacts.close();faces.close();tets.close();
+    states.close();metrics.close();impacts.close();faces.close();
+    tets.close();surface_audit.close();
     if(!states.good()||!metrics.good()||!impacts.good()||
-       !faces.good()||!tets.good())
+       !faces.good()||!tets.good()||!surface_audit.good())
         throw std::runtime_error("error writing actual FEM curved scene");
     if(!(first_contact_t>0&&impulses_total>0&&
          max_stress>1&&min_j>0))
@@ -146,7 +171,12 @@ int main(int argc,char**argv){
         <<" \"normal_impulse_vertex_steps\":"<<impulses_total<<",\n"
         <<" \"contact_output_intervals\":"<<contact_frames<<",\n"
         <<" \"peak_von_mises_pa\":"<<max_stress<<",\n"
-        <<" \"minimum_element_jacobian\":"<<min_j<<"\n"
+        <<" \"minimum_element_jacobian\":"<<min_j<<",\n"
+        <<" \"surface_audit_states\":"<<(steps+1)<<",\n"
+        <<" \"states_with_static_triangle_sphere_overlap\":"<<surface_overlap_states<<",\n"
+        <<" \"overlap_face_count_summed_across_states\":"<<overlap_faces_total<<",\n"
+        <<" \"states_with_vertex_inside_sphere\":"<<vertex_inside_states<<",\n"
+        <<" \"minimum_static_triangle_clearance_m\":"<<worst_surface_gap<<"\n"
         <<"}\n";
     if(!manifest.good())throw std::runtime_error("manifest failed");
     std::cout<<"PASS: curved 3D hyperelastic FEM, "
@@ -154,7 +184,9 @@ int main(int argc,char**argv){
              <<swept_total<<" swept sphere contacts, "
              <<impulses_total<<" vertex-step normal impulses; "
              <<"first t="<<first_contact_t<<"s, max Cauchy von Mises "
-             <<max_stress<<" Pa, min J="<<min_j<<'\n';
+             <<max_stress<<" Pa, min J="<<min_j
+             <<", states with triangle overlap="<<surface_overlap_states
+             <<", worst triangle clearance="<<worst_surface_gap<<'\n';
     return 0;
  }catch(const std::exception& e){
     std::cerr<<"FAIL: "<<e.what()<<'\n';
