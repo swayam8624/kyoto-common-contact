@@ -31,6 +31,8 @@ REQUIRED = (
     "cached_ipc_query_ns","cached_ipc_pairs",
     "aa_first_hierarchy_ns","aa_second_hierarchy_ns",
     "aa_first_method","aa_exact_candidate_parity",
+    "compact_frontier_total_ns","compact_frontier_pairs",
+    "compact_frontier_cut_size","compact_vf_merges",
 )
 
 
@@ -66,6 +68,8 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["compact_frontier_pairs"])!=int(row["reference_pairs"]):
+            raise ValueError(f"compacted frontier candidate parity failed at {key}")
         if int(row["aa_exact_candidate_parity"])!=1:
             raise ValueError(f"A/A correctness gate failed at {key}")
         if int(row["cached_ipc_pairs"]) != int(row["official_ipc_pairs"]):
@@ -88,6 +92,8 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         if int(row["aa_first_hierarchy_ns"])<=0 or int(row["aa_second_hierarchy_ns"])<=0:
             raise ValueError(f"invalid independent identical-algorithm A/A timing {key}")
+        if int(row["compact_frontier_total_ns"])<=0:
+            raise ValueError(f"invalid compacted frontier clock at {key}")
         row["official_paid_ns"] = official
         row["cached_ipc_paid_ns"]=sum(int(row[f"cached_ipc_{stage}_ns"])
             for stage in ("conversion","build","query"))
@@ -122,6 +128,7 @@ def summarize(rows: list[dict]):
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
     old_totals=[r["uncached_paid_ns"] for r in rows]
     frontier_totals=[r["frontier_paid_ns"] for r in rows]
+    compact=[int(row["compact_frontier_total_ns"]) for row in rows]
     aa_a=[int(row["aa_first_hierarchy_ns"]) for row in rows]
     aa_b=[int(row["aa_second_hierarchy_ns"]) for row in rows]
     aa_ratios=[a/b for a,b in zip(aa_a,aa_b)]
@@ -216,6 +223,14 @@ def summarize(rows: list[dict]):
         "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "compact_frontier_ablation":{
+            "total_compacted_paid_ns":sum(compact),
+            "total_uncompacted_paid_ns":sum(frontier_totals),
+            "uncompacted_over_compacted":sum(frontier_totals)/sum(compact),
+            "cached_ipc_over_compacted":sum(cached_ipc)/sum(compact),
+            "all_observed_merge_counter":max(int(row["compact_vf_merges"]) for row in rows),
+            "warning":"Compaction is a standard conservative BVH optimization, not an originality claim"
+        },
         "aa_control": {
             "same_algorithm_instances":"Two independent retained-frontier BVHs; same input, same candidate oracle",
             "A_total_ns":sum(aa_a),
