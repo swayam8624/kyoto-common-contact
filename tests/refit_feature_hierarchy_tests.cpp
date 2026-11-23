@@ -94,6 +94,31 @@ int main(){
     verify(uncached,mesh,"uncached skin radius");
     verify(with_cut,mesh,"frontier skin radius");
     verify(with_compaction,mesh,"compacted frontier skin radius");
+    // Deliberately adversarial but purely *feature-level* fixture:
+    // 8 vertices/4 faces begin in one dense coincident AABB cluster.
+    // After a topology-preserving move, two faces and four vertices
+    // jump far away. Coarsening must merge complete disjoint siblings
+    // without deleting even a single independently allowed candidate.
+    f::Mesh separated;
+    separated.thickness=.0005;
+    for(std::uint64_t id=0;id<8;++id)
+        separated.vertices.push_back(vertex(id,{0.,0.,0.}));
+    separated.faces={{0,{0,1,2}},{1,{0,2,3}},
+                     {2,{4,5,6}},{3,{4,6,7}}};
+    separated.edges={{0,{0,1}},{1,{1,2}},{2,{2,3}},
+                     {3,{3,0}},{4,{0,2}},
+                     {5,{4,5}},{6,{5,6}},{7,{6,7}},
+                     {8,{7,4}},{9,{4,6}}};
+    kyoto::contact::atlas::RefitHierarchy collapsing(true,true,true);
+    verify(collapsing,separated,"compaction dense source");
+    for(std::size_t id=4;id<8;++id){
+        Vec3 far{10.,10.,10.};
+        separated.vertices[id].path.control={far,far,far,far};
+    }
+    verify(collapsing,separated,"coarsened disjoint sibling frontier");
+    if(collapsing.compacted_vf_merges()==0)
+        throw std::runtime_error(
+            "topologically safe VF sibling coarsening never exercised");
     // Robustness gate for shared-vertex adjacency vs nonlocal pairs.
     std::cout<<"PASS14 hierarchy: 180 randomized warm refits, "
         "all exhaustive VF/EE candidate sets equal; "
