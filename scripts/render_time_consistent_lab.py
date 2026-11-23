@@ -120,19 +120,28 @@ def fine_model(comparison,out):
        "This is not independent experimental truth. Lower numerical error does not prove accurate real-world dynamics.")
     save(fig,out/"03_fine_model_differences.png")
 def energy(history,out):
+    # Gravitational potential is recorded against an arbitrary -100 m
+    # height datum in the native source. Subtract the *initial* energy
+    # for visualization only; never alter the raw CSV or physics.
     fig,ax=plt.subplots(figsize=(12.8,6.8))
     fig.subplots_adjust(left=.10,right=.95,bottom=.16,top=.81)
-    for key,color,label in [
-      ("kinetic_j",CYAN,"Kinetic"),
-      ("elastic_j",PURPLE,"Neo-Hookean elastic"),
-      ("gravity_j",GOLD,"Gravitational")]:
-        ax.plot(history.time_s,history[key],color=color,lw=2,label=label)
+    potential_delta=history.gravity_j-history.gravity_j.iloc[0]
+    initial_total=float((history.kinetic_j+history.elastic_j+
+                         history.gravity_j).iloc[0])
+    total_delta=(history.kinetic_j+history.elastic_j+
+                 history.gravity_j)-initial_total
+    for data,color,label in [
+      (history.kinetic_j,CYAN,"Kinetic energy"),
+      (history.elastic_j,PURPLE,"Stored neo-Hookean strain energy"),
+      (potential_delta,GOLD,"Change in gravitational potential"),
+      (total_delta,GREEN,"Change in total mechanical energy")]:
+        ax.plot(history.time_s,data,color=color,lw=2,label=label)
     ax.set(xlabel="True integrated physical time (seconds)",
-           ylabel="Source-computed energy (joules)")
-    ax.grid(True);ax.legend(frameon=False,labelcolor=INK)
-    title(fig,"04 / ROUTINE 900-STEP MATERIAL PHYSICS",
-       "Computed kinetic, elastic and gravitational energy in the actual deformable 3D torus.",
-       "No clipping needed in the routine case; the adaptive solver reproduces the whole-face baseline.")
+           ylabel="Native energy or change from initial datum (joules)")
+    ax.grid(True);ax.legend(frameon=False,labelcolor=INK,fontsize=9,ncol=2)
+    title(fig,"04 / ROUTINE 900-STEP MATERIAL ENERGY",
+      "Original C++ kinetic and elastic energies; gravitational and total curves shifted by their initial constants.",
+      "Visual datum shift only. Damping, restitution and friction can dissipate mechanical energy.")
     save(fig,out/"04_routine_energy.png")
 def sphere(c,r):
     th=np.linspace(0,2*np.pi,44);phi=np.linspace(0,np.pi,24)
@@ -148,14 +157,14 @@ def spatial(m,vertices,faces,out):
     groups={k:v.sort_values("vertex_id") for k,v in vertices.groupby("algorithm")}
     xyzsphere=sphere(m["sphere_center_xyz_m"],m["fast_sphere_radius_m"])
     maxstress=max(1.,vertices.von_mises_pa.max())
-    fig=plt.figure(figsize=(14,12.2))
-    fig.subplots_adjust(left=.015,right=.985,top=.87,bottom=.06,hspace=.07,wspace=.01)
+    fig=plt.figure(figsize=(18.8,6.3))
+    fig.subplots_adjust(left=.01,right=.99,top=.78,bottom=.08,wspace=.02)
     for k,name in enumerate(order):
         a=groups[name]
         positions=a[["x","y","z"]].to_numpy(dtype=float)
         stress=a.von_mises_pa.to_numpy(dtype=float)
         triangles=positions[tri]
-        ax=fig.add_subplot(2,2,k+1,projection="3d")
+        ax=fig.add_subplot(1,4,k+1,projection="3d")
         patches=Poly3DCollection(triangles,
             facecolors=cm.viridis(np.clip(stress[tri].mean(axis=1)/maxstress,0,1)),
             edgecolors="#1b3f4b",linewidths=.09,alpha=.95)
@@ -175,21 +184,35 @@ def spatial(m,vertices,faces,out):
       "Colors show actual Cauchy von Mises stress; geometry is physical FEM, not scripted animation.")
     save(fig,out/"05_true_3d_contact_states.png")
 def atlas(out):
-    files=["01_time_partition.png","02_clearance_and_impulse.png",
-           "03_fine_model_differences.png","04_routine_energy.png",
-           "05_true_3d_contact_states.png"]
-    canvas=Image.new("RGB",(1900,2110),BG)
-    for k,file in enumerate(files):
-        im=Image.open(out/file).convert("RGB")
-        im.thumbnail((925,590))
-        x=(k%2)*950+(950-im.width)//2
-        y=155+(k//2)*625+(625-im.height)//2
-        canvas.paste(im,(x,y));im.close()
-    d=ImageDraw.Draw(canvas)
-    try:f=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",36)
-    except OSError:f=ImageFont.load_default()
-    d.text((40,28),"KYOTO / PASS 08 — ELAPSED-TIME CORRECT FEM",fill=INK,font=f)
-    d.text((40,88),"Native adaptive time receipts | physical 3D stress | signed geometric safety | numerical accuracy tradeoffs",fill=MUTED)
+    # 4 full-size scientific figures followed by a genuinely wide
+    # 4-state 3D comparison. This avoids shrinking the 3D evidence
+    # into one quarter of a largely empty research poster.
+    first=["01_time_partition.png","02_clearance_and_impulse.png",
+           "03_fine_model_differences.png","04_routine_energy.png"]
+    canvas=Image.new("RGB",(1900,1940),BG)
+    for k,file in enumerate(first):
+        source=Image.open(out/file).convert("RGB")
+        source.thumbnail((930,505))
+        x=(k%2)*950+(950-source.width)//2
+        y=150+(k//2)*550+(525-source.height)//2
+        canvas.paste(source,(x,y));source.close()
+    wide=Image.open(out/"05_true_3d_contact_states.png").convert("RGB")
+    wide.thumbnail((1860,645))
+    canvas.paste(wide,((1900-wide.width)//2,1270))
+    wide.close()
+    draw=ImageDraw.Draw(canvas)
+    try:
+        font=ImageFont.truetype(
+          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",38)
+    except OSError:font=ImageFont.load_default()
+    draw.text((40,28),"KYOTO / PASS 08 — PHYSICAL TIME REPLAY",
+              fill=INK,font=font)
+    draw.text((40,87),
+      "True physical substeps | full-surface gap | numerical resolution | real 3D FEM impact",
+      fill=MUTED)
+    draw.text((40,1885),
+      "Source: actual C++23 FEM traces. Numerical reference uses the SAME contact model; general IPC physics remains open.",
+      fill=MUTED)
     canvas.save(out/"STAGE8_ADAPTIVE_TIME_REPLAY_ATLAS.png")
 def main():
     p=argparse.ArgumentParser()
