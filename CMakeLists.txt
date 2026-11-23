@@ -64,6 +64,15 @@ target_link_libraries(kyoto_impulse_balance_tests PRIVATE kyoto_contact)
 add_test(NAME independent_barycentric_impulse_energy_and_momentum
          COMMAND kyoto_impulse_balance_tests)
 
+# Pass 10: inward-never-authorized IEEE outward interval arithmetic for
+# every original 3D FEM swept triangle/sphere path and fast event leaf.
+# This check is independent of the production physics integrator.
+add_executable(kyoto_rounded_prism_tests tests/rounded_prism_certificate_tests.cpp)
+target_link_libraries(kyoto_rounded_prism_tests PRIVATE kyoto_contact)
+add_test(NAME outward_IEEE754_interval_swept_sphere_certificate
+         COMMAND kyoto_rounded_prism_tests)
+
+
 
 add_executable(kyoto_time_consistent_experiment apps/time_consistent_experiment.cpp)
 target_link_libraries(kyoto_time_consistent_experiment PRIVATE kyoto_contact)
