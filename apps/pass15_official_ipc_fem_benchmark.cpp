@@ -255,10 +255,20 @@ static std::vector<Source> generate(int sample_stride,int scene_count){
                 a,rigid,.00075);
             const auto y=s::step_time_consistent_rigid_triangle_mesh(
                 b,rigid,.00075);
-            if(x.accepted_leaves<1||y.accepted_leaves<1||
+            // The sufficient swept x-axis witness is only exact for
+            // one accepted linear physical leaf from each source.
+            // Reject multi-leaf source steps instead of interpolating
+            // through an unrecorded adaptive trajectory.
+            if(x.accepted_leaves!=1||y.accepted_leaves!=1||
                std::abs(a.time_seconds-b.time_seconds)>1e-10)
                 throw std::runtime_error(
-                    "uncoupled multibody native FEM physical step failed");
+                    "two-body source needs a pair of actual single physical leaves");
+            const double swept_gap=fem::uncoupled_two_body_swept_x_gap(
+                before_a,a,before_b,b);
+            if(!(std::isfinite(swept_gap)&&swept_gap>.002))
+                throw std::runtime_error(
+                    "unsupported deformable-deformable collision in "
+                    "uncoupled physical two-body source interval");
             if(step%sample_stride!=0)continue;
             double gap=std::numeric_limits<double>::infinity();
             for(const auto& fa:a.surface_faces){
