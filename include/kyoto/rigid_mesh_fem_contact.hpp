@@ -261,6 +261,11 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     MeshAdaptiveStats result;
     result.start_s=initial_clock;
     std::vector<MeshPhysicalLeaf> local;
+    // Nodal impulses are accumulated across ACTUAL accepted physical
+    // leaves. Rejected proposals do not contribute. Without this,
+    // a macro-step's scalar impulse total would include all leaves
+    // while the public per-vertex receipt showed only its last leaf.
+    std::vector<double> accumulated_nodal_impulse(body.nodes.size(),0.);
     std::vector<Triangle3> triangles;
     std::vector<TriangleBox> boxes;
     triangles.reserve(rigid.faces.size());boxes.reserve(rigid.faces.size());
@@ -300,6 +305,9 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
                          r.normal_impulse_ns,r.external_contact_impulse,
                          r.active_face_pairs,r.face_impulse_updates,
                          r.continuous_pair_tests,r.interval_nodes,depth});
+        for(std::size_t i=0;i<trial.nodes.size();i++)
+            accumulated_nodal_impulse[i]+=
+                trial.nodes[i].last_normal_impulse;
         result.integrated_dt_s+=h;
         result.accepted_leaves++;
         result.active_face_pairs+=r.active_face_pairs;
@@ -321,6 +329,9 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
     staged.time_seconds=initial_clock+dt;
     staged.contact_count_step=result.face_impulse_updates;
     staged.normal_impulse_step=result.normal_impulse_ns;
+    for(std::size_t i=0;i<staged.nodes.size();i++)
+        staged.nodes[i].last_normal_impulse=
+            accumulated_nodal_impulse[i];
     result.end_s=staged.time_seconds;
     body=std::move(staged);
     if(receipts)receipts->insert(receipts->end(),
