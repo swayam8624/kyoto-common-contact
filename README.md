@@ -22,6 +22,40 @@ Build and validate:
     ctest --test-dir build --output-on-failure
 
 
+## Pass 12–13 — independently paid energy accounting and 3D FEM candidate baselines
+
+Pass 12 adds a native-source mechanical-energy ledger, deterministic accounting
+unit tests and three original-physics plots. These observations do **not**
+prove a calibrated dissipation law. The native export CI is in
+`.github/workflows/pass12-energy-audit.yml`; see
+`docs/23_PASS12_NATIVE_ENERGY_ACCOUNT.md`.
+
+Pass 13 advances the *same true 3D FEM solver* to 360 physical macro-steps,
+including contact-bearing frames, and records 30 source geometry snapshots.
+The native C++ benchmark compares independently checked exhaustive,
+rebuilt SAP and persistent-order SAP candidate pipelines and charges each
+method's preprocessing, query, and normalization. Persistent-order SAP
+conservatively checks topology/signature changes and rebuilds live swept
+bounds; it is **not** the proposed dual-tree Spacetime Contact Atlas.
+The scientific plots must be generated from measured CSVs, not guessed
+performance. See `docs/24_PASS13_REAL_FEM_REFERENCE_BENCHMARK.md` and
+`.github/workflows/pass13-fem-reference.yml`.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target kyoto_pass13_reference_fem_benchmark --parallel 4
+./build/kyoto_pass13_reference_fem_benchmark results/pass13/native
+python3 scripts/report_pass13_fem_baselines.py \\
+  --input results/pass13/native/native_fem_reference_broadphase.csv \\
+  --output results/pass13/science
+```
+
+**Neither pass proves a speedup against official pinned IPC Toolkit LBVH.**
+That full-paid apples-to-apples benchmark, general floating-point CCD proof,
+complete dual-tree maintained atlas and independent multi-solver physics
+remain open. CI success for the newly added workflows is not asserted here.
+
+
 ## Stage 1 — complete cubic-path envelope and 3D scientific lab
 
 The initial common swept-AABB API remains unchanged. The new
