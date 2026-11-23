@@ -123,24 +123,24 @@ static PaidIPC official(const f::Mesh& mesh){
     const auto d=Clock::now();
     return {std::move(pairs),ns(a,b),ns(b,c),ns(c,d)};
 }
-static std::vector<Source> generate(){
+static std::vector<Source> generate(int sample_stride){
     s::Body body=s::toroidal_solid();
     const auto rigid=s::corrugated_contact_patch();
     std::vector<Source> data;
-    data.reserve(36);
+    data.reserve(std::size_t(360/sample_stride+8));
     for(int step=1;step<=360;++step){
         const s::Body previous=body;
         const auto result=s::step_time_consistent_rigid_triangle_mesh(
             body,rigid,.00075);
         if(result.accepted_leaves<1)
             throw std::runtime_error("unaccepted physical macro-step");
-        if(step%12!=0)continue;
+        if(step%sample_stride!=0)continue;
         data.push_back({step,body.time_seconds,
             result.face_impulse_updates,result.accepted_leaves,
             fem::feature_snapshot(previous,body,rigid),
             "routine", -1});
     }
-    if(data.size()!=30)
+    if(data.size()!=std::size_t(360/sample_stride))
         throw std::runtime_error("native FEM routine snapshot count mismatch");
 
     // Actual fast finite-triangle impact, recorded as the *accepted*
@@ -173,11 +173,17 @@ static std::vector<Source> generate(){
 }
 int main(int argc,char**argv){
  try{
-    if(argc!=2)throw std::invalid_argument(
-        "usage: kyoto_pass15_official_ipc_fem_benchmark OUTPUT_FOLDER");
+    if(argc<2||argc>4)throw std::invalid_argument(
+        "usage: kyoto_pass15_official_ipc_fem_benchmark OUTPUT_FOLDER "
+        "[sample_stride=12] [repeats=12]");
+    const int stride=argc>=3?std::stoi(argv[2]):12;
+    const int repeats=argc>=4?std::stoi(argv[3]):12;
+    if(stride<1||stride>360||360%stride!=0||
+       repeats<2||repeats>24)
+        throw std::invalid_argument("stride must divide 360; 2 <= repeats <= 24");
     const auto directory=std::filesystem::path(argv[1]);
     std::filesystem::create_directories(directory);
-    const auto data=generate(); // Excluded from both methods' costs.
+    const auto data=generate(stride); // Excluded from both methods' costs.
     std::ofstream csv(directory/"official_ipc_fem_paired.csv");
     if(!csv)throw std::runtime_error("failed to create original receipt");
     csv<<"repeat,step,regime,physical_leaf_id,physical_time_s,source_face_impulse_updates,"
@@ -191,7 +197,6 @@ int main(int argc,char**argv){
           "frontier_reused_node_pairs,frontier_skipped_frames,"
           "frontier_attempted_cut_size\n";
     csv<<std::setprecision(17);
-    constexpr int repeats=12;
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
         kyoto::contact::atlas::RefitHierarchy hierarchy;
@@ -277,7 +282,8 @@ int main(int argc,char**argv){
              <<rows<<" matched repeated solver-FEM snapshot rows; "
              <<with_contact<<" contact-bearing repeated snapshots; "
              <<"independent oracle candidate coverage and "
-             <<"12-repeat cached/uncached/frontier BVH control. "
+             <<repeats<<" repeated cached/uncached/frontier BVH controls "
+             <<"at native source stride="<<stride<<". "
              <<"No narrowphase CCD or solver-step speedup claim.\n";
     return 0;
  }catch(const std::exception& e){
