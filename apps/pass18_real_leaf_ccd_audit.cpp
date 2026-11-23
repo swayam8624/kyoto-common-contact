@@ -243,7 +243,8 @@ int main(int argc,char**argv) {
     double first_toi=1.0;
     for(std::size_t vi=0;vi<motion.vertices.size();++vi)
         for(std::size_t fi=0;fi<motion.faces.size();++fi){
-            const auto& v=motion.vertices[vi],&face=motion.faces[fi];
+            const auto& v=motion.vertices[vi];
+            const auto& face=motion.faces[fi];
             const auto owner=motion.vertices[inp.indices.at(
                 face.vertices[0])].object;
             if(v.object==owner)continue;
