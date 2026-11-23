@@ -44,11 +44,11 @@ int main(){
               "degenerate triangle should use line segments");
     }
     {
-        Body b;
-        b.nodes={{a,a,{},0,0},{b,b,{},0,0},{c,c,{},0,0}};
-        b.surface_faces={{0,1,2}};
+        Body mesh;
+        mesh.nodes={{a,a,{},0,0},{b,b,{},0,0},{c,c,{},0,0}};
+        mesh.surface_faces={{0,1,2}};
         const RigidSphere s{{0,0,0},1,.1,.2};
-        const auto audit=audit_surface_sphere(b,s);
+        const auto audit=audit_surface_sphere(mesh,s);
         check(audit.outside_vertex_count==3 && audit.inside_vertex_count==0,
               "fixture vertices must be outside");
         check(audit.minimum_vertex_clearance_m>.9,
