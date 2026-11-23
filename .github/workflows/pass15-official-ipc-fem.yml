@@ -11,6 +11,7 @@ on:
       - "include/kyoto/rigid_mesh_fem_contact.hpp"
       - "tests/rigid_mesh_fast_contact_tests.cpp"
       - "tests/temporal_frontier_stress_tests.cpp"
+      - "tests/maintained_broadphase_fuzz_tests.cpp"
       - "tests/fem_feature_snapshots_tests.cpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
@@ -41,11 +42,12 @@ jobs:
                      kyoto_fem_feature_snapshots_tests \
                      kyoto_fast_mesh_impact_tests \
                      kyoto_temporal_frontier_stress_tests \
+                     kyoto_maintained_broadphase_fuzz_tests \
                      kyoto_pass18_real_leaf_ccd_audit
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|independent_seeded_3D_feature_broadphase_fuzz|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events' \
             --output-on-failure
       - name: Archive independent exhaustive real CCD evidence
         run: |
