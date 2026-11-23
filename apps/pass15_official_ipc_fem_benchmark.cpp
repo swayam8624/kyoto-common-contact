@@ -186,19 +186,22 @@ int main(int argc,char**argv){
           "official_conversion_ns,official_build_ns,official_query_ns,"
           "maintained_paid_total_ns,hierarchy_rebuilds,hierarchy_refits,"
           "first_method,uncached_hierarchy_paid_ns,uncached_hierarchy_pairs,"
-          "first_internal_hierarchy_method\n";
+          "first_internal_hierarchy_method,frontier_paid_total_ns,"
+          "frontier_pairs,frontier_cut_size,frontier_fallbacks,"
+          "frontier_reused_node_pairs\n";
     csv<<std::setprecision(17);
     constexpr int repeats=12;
     std::size_t rows=0,with_contact=0;
     for(int trial=0;trial<repeats;++trial){
         kyoto::contact::atlas::RefitHierarchy hierarchy;
         kyoto::contact::atlas::RefitHierarchy uncached_hierarchy(false);
+        kyoto::contact::atlas::RefitHierarchy maintained_frontier(true,true);
         for(std::size_t i=0;i<data.size();++i){
             const auto& source=data[i];
             const auto oracle=f::exhaustive(source.mesh).pairs;
             PaidIPC upstream;
-            f::Result ours,uncached;
-            std::int64_t ours_ns=0,uncached_ns=0;
+            f::Result ours,uncached,frontier_pairs;
+            std::int64_t ours_ns=0,uncached_ns=0,frontier_ns=0;
             const bool ipc_first=((i+std::size_t(trial))%2==0);
             auto our_run=[&](){
                 const auto begin=Clock::now();
@@ -210,19 +213,28 @@ int main(int argc,char**argv){
                 uncached=uncached_hierarchy.query(source.mesh);
                 uncached_ns=ns(begin,Clock::now());
             };
-            // Independently counterbalance IPC-vs-local and retained-vs-
-            // uncached hierarchy order, so a fixed warm-cache advantage
-            // cannot masquerade as a better spatial data structure.
-            const bool cached_first=((i+std::size_t(trial/2))%2==0);
-            auto run_pair=[&](){
-                if(cached_first){our_run();uncached_run();}
-                else{uncached_run();our_run();}
+            auto frontier_run=[&](){
+                const auto begin=Clock::now();
+                frontier_pairs=maintained_frontier.query(source.mesh);
+                frontier_ns=ns(begin,Clock::now());
             };
-            if(ipc_first){upstream=official(source.mesh);run_pair();}
-            else{run_pair();upstream=official(source.mesh);}
+            // Rotate three independent local implementations and
+            // alternate official IPC-first/last to reduce order bias.
+            const int rotation=static_cast<int>((i+std::size_t(trial))%3);
+            auto local_runs=[&](){
+                if(rotation==0){our_run();uncached_run();frontier_run();}
+                else if(rotation==1){uncached_run();frontier_run();our_run();}
+                else{frontier_run();our_run();uncached_run();}
+            };
+            if(ipc_first){upstream=official(source.mesh);local_runs();}
+            else{local_runs();upstream=official(source.mesh);}
             if(uncached.pairs!=oracle)
                 throw std::runtime_error(
                     "UNCACHED HIERARCHY CANDIDATE PARITY FAILURE at step "+
+                    std::to_string(source.step));
+            if(frontier_pairs.pairs!=oracle)
+                throw std::runtime_error(
+                    "TEMPORAL FRONTIER CANDIDATE PARITY FAILURE at step "+
                     std::to_string(source.step));
             if(ours.pairs!=oracle)
                 throw std::runtime_error(
@@ -248,7 +260,11 @@ int main(int argc,char**argv){
                <<hierarchy.refits()<<','
                <<(ipc_first?"ipc":"hierarchy")<<','
                <<uncached_ns<<','<<uncached.pairs.size()<<','
-               <<(cached_first?"cached":"uncached")<<'\n';
+               <<(rotation==0?"cached":(rotation==1?"uncached":"frontier"))<<','
+               <<frontier_ns<<','<<frontier_pairs.pairs.size()<<','
+               <<maintained_frontier.pair_cut_size()<<','
+               <<maintained_frontier.pair_cut_fallbacks()<<','
+               <<maintained_frontier.pair_cut_reuses()<<'\n';
             ++rows;
             if(source.impulses)++with_contact;
         }
@@ -258,7 +274,7 @@ int main(int argc,char**argv){
              <<rows<<" matched repeated solver-FEM snapshot rows; "
              <<with_contact<<" contact-bearing repeated snapshots; "
              <<"independent oracle candidate coverage and "
-             <<"12-repeat cached-vs-uncached BVH control. "
+             <<"12-repeat cached/uncached/frontier BVH control. "
              <<"No narrowphase CCD or solver-step speedup claim.\n";
     return 0;
  }catch(const std::exception& e){
