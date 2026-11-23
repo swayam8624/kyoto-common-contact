@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/18 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/19 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -20,6 +20,19 @@ contact. Physics correctness comes first, not beautiful animation.
   narrow-phase adapter are required before positive research claims.
 - A mesh's deformation must be solver-generated. Equal candidate sets must
   not be depicted as different physical folds.
+- In Pass 8, a clipped or inverted full-dt proposal is REJECTED
+  and the *real* physical timestep is bisected and re-integrated.
+  Only accepted full substep durations count toward elapsed time;
+  aborting a macro step must preserve the original state and receipts.
+- The 50 m/s, 15-mm-gap fixture tests nontrivial subdivision. A
+  prior 900 m/s shock case exceeded the finite temporal budget
+  after tet inversion. Retain that negative result instead of
+  asserting that adaptive substepping solves arbitrary impact speeds.
+- A 256-substep SAME-model numerical comparison is a refinement
+  reference, never independent validation of physical fidelity.
+  Legacy clipped alpha*dt is a NOMINAL displacement fraction,
+  not physically integrated elapsed dt.
+
 - In Pass 7A, the routine 900-step whole-face FEM has 0/901 accepted
   penetrating faces, versus 458/901 in the older vertex-only control.
   Global clipping was NOT activated on the routine run. Do not attribute
