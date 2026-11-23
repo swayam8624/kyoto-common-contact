@@ -38,8 +38,12 @@ running. Gate status must be evidenced by native outputs or CI links.
 - [x] Exact-arithmetic theorem and C++23 implementation for conservative moving-triangle/sphere time-interval separation using Lipschitz midpoint lower bound.
 - [x] Controlled interior face tunnelling cases, 640 seeded randomized 3D triangle paths and 128,640 sampled path checks; detect original solver's first offending face transition.
 - [ ] Machine-certified directed-rounding implementation for continuous whole-face interval bounds.
-- [ ] **Apply synchronized whole-face safe-prefix/TOI to the actual physical solver**, distribute contact impulse through nearest-face barycentric participation and integrate the remaining time.
-- [ ] Independently verify no triangle/rigid-body penetration on EVERY accepted state AND every accepted linear interval; verify momentum/energy and mesh inversion under contact.
+- [x] Apply globally synchronized whole-face safe-prefix to actual 3D FEM and distribute effective-mass barycentric normal/tangential contact impulses; zero face overlap on all 901 accepted states.
+- [x] Preserve old vertex-only failed 901-state control and run independent 900-step A/B physical-energy/trajectory comparison: 458 versus 0 penetrating states.
+- [x] Adversarial extreme 900 m/s whole-face continuous-tunnelling regression: global accepted fraction strictly below one with no accepted face overlap.
+- [ ] Correctly re-integrate remaining fractional TOI time, without global motion clipping changing the physical integrator's clock; quantify solver accuracy.
+- [x] Verify no static triangle/sphere overlap on ALL 901 accepted whole-face FEM states, with positive tetrahedral Jacobians and finite energy.
+- [ ] Independent machine-certified continuous full-face interval checks, physical energy/momentum accuracy and FP boundary robustness.
 - [ ] General triangle-mesh rigid/deformable response and self-contact with official IPC CCD, beyond a smooth static analytic sphere.
 
 ## Physics scenes and adapters
