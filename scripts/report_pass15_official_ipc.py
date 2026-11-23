@@ -37,6 +37,9 @@ REQUIRED = (
     "adaptive_switches","adaptive_probes",
     "budget1x_frontier_ns","budget1x_frontier_pairs",
     "budget1x_frontier_cut_size","budget1x_coarse_regions",
+    "selective_refit_paid_ns","selective_refit_pairs",
+    "selective_changed_vertices","selective_partial_refits",
+    "selective_unchanged_refits","selective_first",
 )
 
 
@@ -72,6 +75,12 @@ def read_data(path: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate source snapshot/repeat {key}")
         seen.add(key)
+        if int(row["selective_refit_pairs"])!=int(row["reference_pairs"]):
+            raise ValueError(f"selective hierarchy changed independent VF/EE candidates at {key}")
+        if int(row["selective_first"]) not in (0,1):
+            raise ValueError(f"invalid selective timing order at {key}")
+        if int(row["selective_changed_vertices"])>int(row["source_vertices"]):
+            raise ValueError(f"selective dirty vertex count exceeds source vertices at {key}")
         if int(row["budget1x_frontier_pairs"])!=int(row["reference_pairs"]):
             raise ValueError(f"1x frontier candidate parity failed at {key}")
         if int(row["adaptive_pairs"])!=int(row["reference_pairs"]):
@@ -102,6 +111,8 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         if int(row["aa_first_hierarchy_ns"])<=0 or int(row["aa_second_hierarchy_ns"])<=0:
             raise ValueError(f"invalid independent identical-algorithm A/A timing {key}")
+        if int(row["selective_refit_paid_ns"])<=0:
+            raise ValueError(f"invalid selective fully paid clock at {key}")
         if int(row["budget1x_frontier_ns"])<=0:
             raise ValueError(f"invalid 1x budget frontier clock at {key}")
         if int(row["adaptive_paid_total_ns"])<=0:
@@ -145,6 +156,7 @@ def summarize(rows: list[dict]):
     compact=[int(row["compact_frontier_total_ns"]) for row in rows]
     adaptive=[int(row["adaptive_paid_total_ns"]) for row in rows]
     low_budget=[int(row["budget1x_frontier_ns"]) for row in rows]
+    selective=[int(row["selective_refit_paid_ns"]) for row in rows]
     aa_a=[int(row["aa_first_hierarchy_ns"]) for row in rows]
     aa_b=[int(row["aa_second_hierarchy_ns"]) for row in rows]
     aa_ratios=[a/b for a,b in zip(aa_a,aa_b)]
@@ -163,6 +175,7 @@ def summarize(rows: list[dict]):
         paidF=sum(r["frontier_paid_ns"] for r in subset)
         paidAdaptive=sum(int(r["adaptive_paid_total_ns"]) for r in subset)
         paidCompact=sum(int(r["compact_frontier_total_ns"]) for r in subset)
+        paidSelective=sum(int(r["selective_refit_paid_ns"]) for r in subset)
         per_scene[sid]={
             "physics_regime":subset[0]["regime"],
             "physical_intervals":len({int(r["step"]) for r in subset}),
@@ -177,6 +190,12 @@ def summarize(rows: list[dict]):
             "cached_input_ipc_over_frontier":paidStrong/paidF,
             "cached_over_frontier":paidC/paidF,
             "adaptive_paid_total_ns":paidAdaptive,
+            "selective_refit_paid_total_ns":paidSelective,
+            "cached_input_ipc_over_selective":paidStrong/paidSelective,
+            "full_refit_over_selective":paidC/paidSelective,
+            "selective_avg_changed_vertex_fraction":statistics.mean(
+                int(row["selective_changed_vertices"])/
+                int(row["source_vertices"]) for row in subset),
             "budget1x_frontier_total_ns":sum(int(r["budget1x_frontier_ns"]) for r in subset),
             "cached_input_ipc_over_budget1x":paidStrong/
                 sum(int(r["budget1x_frontier_ns"]) for r in subset),
@@ -198,6 +217,7 @@ def summarize(rows: list[dict]):
             "uncached_hierarchy_total_ns":sum(r["uncached_paid_ns"] for r in subset),
             "frontier_hierarchy_total_ns":sum(r["frontier_paid_ns"] for r in subset),
             "adaptive_hierarchy_total_ns":sum(int(r["adaptive_paid_total_ns"]) for r in subset),
+            "selective_refit_total_ns":sum(int(r["selective_refit_paid_ns"]) for r in subset),
             "compacted_frontier_total_ns":sum(int(r["compact_frontier_total_ns"]) for r in subset),
             "contact_bearing_rows":sum(
                 int(r["source_face_impulse_updates"])>0 for r in subset)
@@ -251,6 +271,27 @@ def summarize(rows: list[dict]):
         "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "selective_motion_refit_ablation":{
+            "selective_paid_total_ns":sum(selective),
+            "full_cached_hierarchy_paid_ns":sum(paid_atlas),
+            "cached_input_official_ipc_paid_ns":sum(cached_ipc),
+            "full_refit_over_selective":sum(paid_atlas)/sum(selective),
+            "cached_input_ipc_over_selective":sum(cached_ipc)/sum(selective),
+            "no_moving_vertices_rows":sum(
+                int(r["selective_changed_vertices"])==0 for r in rows),
+            "partly_moving_vertices_rows":sum(
+                0<int(r["selective_changed_vertices"])<int(r["source_vertices"])
+                for r in rows),
+            "all_moving_vertices_rows":sum(
+                int(r["selective_changed_vertices"])==int(r["source_vertices"])
+                for r in rows),
+            "source_mean_changed_vertex_fraction":statistics.mean(
+                int(r["selective_changed_vertices"])/int(r["source_vertices"])
+                for r in rows),
+            "first_selected_order_rows":sum(int(r["selective_first"]) for r in rows),
+            "source_independent_candidate_parity":"required on every native row",
+            "warning":"This is selective feature-box and ancestor maintenance, not independently certified CCD or whole-solver contact timing."
+        },
         "frontier_memory_budget_ablation":{
             "1x_total_paid_ns":sum(low_budget),
             "4x_total_paid_ns":sum(frontier_totals),
