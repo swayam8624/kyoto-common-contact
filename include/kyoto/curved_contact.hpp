@@ -100,7 +100,8 @@ inline SphereContactMetrics step_rigid_sphere(Body& body,
     std::vector<V3> future_x(count),future_v(count);
     std::vector<double> impulses(count,0);
     SphereContactMetrics result;
-    constexpr double skin=1e-9;
+    // Save a strictly pre-impact prefix of the original linear chord.
+    // Normal-offset positions are NOT guaranteed to preserve a safe chord.
     for(std::size_t i=0;i<count;i++){
         const Node& n=body.nodes[i];
         const V3 acceleration=field.elastic_force[i]/n.mass+
@@ -112,9 +113,10 @@ inline SphereContactMetrics step_rigid_sphere(Body& body,
             result.swept_hits++;
             result.maximum_sweep_fraction=
                 std::max(result.maximum_sweep_fraction,hit.time_fraction);
-            // The accepted chord ends at its first touching point
-            // (with tiny outward skin) and therefore cannot tunnel.
-            future_x[i]=hit.surface_point+hit.normal*skin;
+            // Retain only a certified pre-impact prefix of the trial
+            // chord. This also detects outside-to-outside tunnelling.
+            const double safe_tau=std::max(0.0,hit.time_fraction-1e-9);
+            future_x[i]=n.x+(trial_x-n.x)*safe_tau;
             const double vn=dot(trial_v,hit.normal);
             future_v[i]=trial_v;
             if(vn<0){
