@@ -35,9 +35,19 @@ The methods are:
    enumeration with explicit adjacency filtering.
 2. **Rebuilt SAP**: sweep-and-prune using the exact same feature bounds
    and filtering, with no persistent maintained frontier.
+3. **Persistent-order SAP**: retain sorting permutations between physical
+   snapshots, but always rebuild complete swept feature bounds and fully
+   retest live candidate membership. A structural signature containing the
+   topology epoch, feature IDs, connectivity, categories and masks forces
+   invalidation on changed topology or collision filtering. This is **not**
+   the full dual-tree Spacetime Contact Atlas; insertion sorting in an
+   adversarially permuted scene can degrade to quadratic work.
 
-Both include their *own* full mesh/box construction time and candidate
-enumeration/normalization time. A candidate-set mismatch terminates
+All three include their *own* full mesh/box construction time and candidate
+enumeration/normalization time. The persistent method additionally pays
+signature verification and warm-order insertion sorting. Its invalidation
+control changes the epoch and collision mask, independently checking the
+resulting candidate set against the exhaustive oracle. A candidate-set mismatch terminates
 the native executable. The experiment records per-frame raw nanoseconds,
 feature counts, source physical time and genuine impulse-update counts.
 
@@ -87,9 +97,11 @@ source snapshots and declare precision/filter differences. Correctness
 must be a coverage condition, not necessarily exact pair equality,
 because IPC float LBVH may be deliberately conservative.
 
-**Gate C: genuine maintained SCA.** Implement a persistent dual-tree
-frontier with checked topology epochs, local refit, full-rebuild fallback,
-cache and invalidation charges. A rebuilt sweep is NOT an SCA method.
+**Gate C: genuine maintained SCA.** The implemented persistent-order SAP
+is a conservative intermediate control, not SCA. Implement a persistent
+**dual-tree frontier** with checked topology epochs, local refit,
+full-rebuild fallback, cache and invalidation charges. Neither rebuilt
+nor persistent-order sweep is the claimed SCA method.
 
 **Gate D: statistical comparability.** Counterbalanced randomized
 runs, A/A trials, held-out scene families, P50/P95/worst cost, per-trajectory
