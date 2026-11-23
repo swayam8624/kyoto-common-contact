@@ -208,6 +208,56 @@ jobs:
           path: results/whole-face-comparison/
           if-no-files-found: error
           retention-days: 30
+      - name: Reproduce complete physical-time FEM impact and finite-step reference
+        run: ./build/kyoto_time_consistent_experiment results/time-consistent-fem
+      - name: Build source-backed adaptive clock, contact impulse and 3D stress figures
+        run: |
+          python scripts/render_time_consistent_lab.py \
+            --input results/time-consistent-fem \
+            --output results/time-consistent-fem/visuals
+      - name: Independent Pass-8 physical timestep and evidence audit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import csv,json,math
+          root=Path("results/time-consistent-fem")
+          m=json.loads((root/"manifest.json").read_text())
+          assert m["actual_solver_physics"]
+          assert m["ordinary_steps"]==900
+          assert abs(m["ordinary_elapsed_time_s"]-.675)<1e-10
+          assert m["ordinary_minimum_triangle_clearance_m"]>0
+          assert m["ordinary_minimum_tetra_jacobian"]>0
+          assert m["old_global_accepted_fraction"]<1
+          assert m["adaptive_rejected_clipped_proposals"]>0
+          assert m["adaptive_accepted_physical_substeps"]>1
+          assert abs(m["adaptive_total_integrated_time_s"]-m["fast_trial_dt_s"])<1e-12
+          assert m["fine_same_model_steps"]==256
+          assert not m["same_model_fine_reference_is_independent_solver"]
+          history=list(csv.DictReader((root/"routine_900_physics.csv").open()))
+          assert len(history)==901
+          assert all(float(row["minimum_triangle_clearance_m"])>0 for row in history)
+          receipts=list(csv.DictReader((root/"fast_adaptive_accepted_substeps.csv").open()))
+          assert len(receipts)==m["adaptive_accepted_physical_substeps"]
+          assert abs(sum(float(x["dt_s"]) for x in receipts)-m["fast_trial_dt_s"])<1e-12
+          assert all(float(row["minimum_full_triangle_clearance_m"])>=0 for row in receipts)
+          comparison=list(csv.DictReader((root/"fast_original_vs_adaptive_vs_fine.csv").open()))
+          assert [x["algorithm"] for x in comparison]==["legacy_global_clip",
+            "adaptive_full_elapsed_time","fine_256_same_model"]
+          states=list(csv.DictReader((root/"fast_event_true_3d_states.csv").open()))
+          assert len(states)==4*180
+          faces=list(csv.DictReader((root/"fast_event_surface_faces.csv").open()))
+          assert len(faces)==320
+          v=root/"visuals"
+          assert len(list(v.glob("[0-9][0-9]_*.png")))==5
+          assert (v/"STAGE8_ADAPTIVE_TIME_REPLAY_ATLAS.png").stat().st_size>100000
+          print("PASS: actual full physical dt, 900 steps, split event, 256-step numerical control, no full-face penetration and five scientific plots")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage8-time-consistent-real-FEM-evidence
+          path: results/time-consistent-fem/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage7-synchronized-whole-face-fem-evidence
