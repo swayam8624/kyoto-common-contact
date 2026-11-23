@@ -264,6 +264,9 @@ int main(int argc,char**argv){
             <<" \"fast_trial_dt_s\":"<<dt<<",\n"
             <<" \"fast_initial_whole_surface_clearance_m\":0.015,\n"
             <<" \"fast_uniform_initial_velocity_mps\":50,\n"
+            <<" \"fast_sphere_radius_m\":"<<near_sphere.radius<<",\n"
+            <<" \"sphere_center_xyz_m\":["<<near_sphere.center.x<<','
+                 <<near_sphere.center.y<<','<<near_sphere.center.z<<"],\n"
             <<" \"old_global_accepted_fraction\":"<<old_result.accepted_global_fraction<<",\n"
             <<" \"old_displacement_time_s\":"<<old_result.accepted_global_fraction*dt<<",\n"
             <<" \"old_charged_clock_time_s\":"<<old.time_seconds<<",\n"
