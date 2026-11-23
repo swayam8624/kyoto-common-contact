@@ -406,6 +406,20 @@ The original 901-state real nonplanar-mesh source archive reports:
 | Minimum full finite deformable–rigid triangle separation | **1.736230314 mm** |
 | Minimum tetrahedron Jacobian det(F) | **0.722870523** |
 | Maximum genuine Cauchy von Mises stress | **8,987.93 Pa** |
+| Source full-surface independent nearest-feature triangle tests after AABB pruning | 304,069 |
+| Original total combined mechanical energy change | **−389.744797 J** |
+
+The energy change is measured from the source kinetic, elastic
+and gravitational energies. Damping, sequential Coulomb friction
+and explicit numerical time integration can all contribute.
+The measured loss is not independently calibrated physical
+dissipation, just as positive tetrahedra do not establish an
+experimentally correct contact law.
+
+The **304,069** source triangle-distance tests are paid
+face-pair narrow-phase work after AABB pruning across all
+901 accepted states. They are not a full, matched
+whole-step SCA versus official IPC LBVH benchmark.
 
 All 901 accepted original source states passed a FULL
 finite-face/finite-face static surface distance audit;
