@@ -21,6 +21,8 @@ REQUIRED = (
     "official_extra", "official_missing", "official_conversion_ns",
     "official_build_ns", "official_query_ns", "maintained_paid_total_ns",
     "hierarchy_rebuilds", "hierarchy_refits", "first_method",
+    "uncached_hierarchy_paid_ns", "uncached_hierarchy_pairs",
+    "first_internal_hierarchy_method",
 )
 
 
@@ -36,8 +38,9 @@ def read_data(path: Path) -> list[dict]:
     seen = set()
     for i, row in enumerate(rows, 2):
         for k in REQUIRED:
-            if k == "first_method":
-                if row[k] not in ("ipc", "hierarchy"):
+            if k in ("first_method","first_internal_hierarchy_method"):
+                allowed=("ipc","hierarchy") if k=="first_method" else ("cached","uncached")
+                if row[k] not in allowed:
                     raise ValueError(f"invalid measured ordering at row {i}")
                 continue
             value = float(row[k])
@@ -49,6 +52,8 @@ def read_data(path: Path) -> list[dict]:
         seen.add(key)
         if int(row["official_missing"]) != 0:
             raise ValueError(f"official IPC misses reference pairs at {key}")
+        if int(row["uncached_hierarchy_pairs"]) != int(row["reference_pairs"]):
+            raise ValueError(f"uncached hierarchy candidate parity failed at {key}")
         if int(row["maintained_hierarchy_pairs"]) != int(row["reference_pairs"]):
             raise ValueError(f"maintained tree candidate parity failed at {key}")
         if (int(row["official_ipc_pairs"]) - int(row["reference_pairs"])
@@ -61,6 +66,9 @@ def read_data(path: Path) -> list[dict]:
             raise ValueError(f"invalid paid native clock observation at {key}")
         row["official_paid_ns"] = official
         row["hierarchy_paid_ns"] = maintained
+        row["uncached_paid_ns"] = int(row["uncached_hierarchy_paid_ns"])
+        if row["uncached_paid_ns"]<=0:
+            raise ValueError(f"invalid uncached clock observation at {key}")
         row["ratio_official_over_hierarchy"] = official / maintained
     grouped = defaultdict(set)
     for row in rows:
@@ -80,6 +88,19 @@ def summarize(rows: list[dict]):
     paid_ipc = [r["official_paid_ns"] for r in rows]
     paid_atlas = [r["hierarchy_paid_ns"] for r in rows]
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
+    old_totals=[r["uncached_paid_ns"] for r in rows]
+    per_repeat={}
+    for rep in sorted({int(r["repeat"]) for r in rows}):
+        batch=[r for r in rows if int(r["repeat"])==rep]
+        per_repeat[rep]={
+            "ipc_paid_ns":sum(r["official_paid_ns"] for r in batch),
+            "cached_paid_ns":sum(r["hierarchy_paid_ns"] for r in batch),
+            "uncached_paid_ns":sum(r["uncached_paid_ns"] for r in batch),
+        }
+        per_repeat[rep]["ipc_over_cached"]=(
+            per_repeat[rep]["ipc_paid_ns"]/per_repeat[rep]["cached_paid_ns"])
+        per_repeat[rep]["uncached_over_cached"]=(
+            per_repeat[rep]["uncached_paid_ns"]/per_repeat[rep]["cached_paid_ns"])
     warm = [r for r in rows if int(r["hierarchy_refits"]) > 0]
     cold = [r for r in rows if int(r["hierarchy_refits"]) == 0]
     contact = [r for r in rows if int(r["source_face_impulse_updates"]) > 0]
@@ -87,13 +108,19 @@ def summarize(rows: list[dict]):
         "ipc_conversion_ns":sum(int(r["official_conversion_ns"]) for r in rows),
         "ipc_build_ns":sum(int(r["official_build_ns"]) for r in rows),
         "ipc_query_ns":sum(int(r["official_query_ns"]) for r in rows),
-        "maintained_all_paid_ns":sum(paid_atlas)
+        "maintained_all_paid_ns":sum(paid_atlas),
+        "uncached_hierarchy_all_paid_ns":sum(old_totals)
     }
     return {
         "experiment": "Actual pinned official IPC Toolkit LBVH vs refittable feature hierarchy",
         "evidence_scope": "same solver-generated 3D FEM macro-step endpoint-linear snapshots; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
+        "per_repeat_totals":per_repeat,
+        "uncached_hierarchy_paid_total_ns":sum(old_totals),
+        "ratio_of_paid_totals_uncached_over_cached":sum(old_totals)/sum(paid_atlas),
+        "median_per_repeat_uncached_over_cached":statistics.median(
+            v["uncached_over_cached"] for v in per_repeat.values()),
         "distinct_source_snapshots":len({int(r["step"]) for r in rows}),
         "repetitions":len({int(r["repeat"]) for r in rows}),
         "contact_bearing_rows":len(contact),
@@ -115,7 +142,7 @@ def summarize(rows: list[dict]):
             "This is NOT continuous narrowphase CCD parity, solver-step timing, or robust physical contact proof",
             "Original FEM macro-step endpoints do not reconstruct adaptive accepted physical leaf trajectories",
             "Snapshot correlation and only three repeats preclude independent uncertainty inference",
-            "Three runs and alternating order provide preliminary descriptive timing, not calibrated A/A controls",
+            "Twelve repeats with counterbalanced order provide provisional descriptive timings, not independent scenes or A/A controls",
             "No measured speedup or winning regime may be claimed until CI passes on native source artifacts",
         ],
     }
@@ -143,7 +170,9 @@ def main():
     ax.scatter(x,[r["official_paid_ns"]/1e6 for r in rows],
                alpha=.5,s=22,label="Official pinned IPC total paid (ms)")
     ax.scatter(x,[r["hierarchy_paid_ns"]/1e6 for r in rows],
-               alpha=.5,s=22,label="Maintained hierarchy total paid (ms)")
+               alpha=.5,s=22,label="Maintained cached hierarchy total paid (ms)")
+    ax.scatter(x,[r["uncached_paid_ns"]/1e6 for r in rows],
+               alpha=.4,s=10,label="Maintained uncached hierarchy control (ms)")
     ax.set(xlabel="Actual source FEM physical time (s)",ylabel="Paid candidate generation (ms)",
            title="Feature candidate generation only: pinned IPC vs refittable hierarchy")
     ax.grid(alpha=.25);ax.legend();fig.tight_layout()
