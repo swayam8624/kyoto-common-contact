@@ -254,3 +254,11 @@ add_executable(kyoto_maintained_broadphase_fuzz_tests
 target_link_libraries(kyoto_maintained_broadphase_fuzz_tests PRIVATE kyoto_contact)
 add_test(NAME independent_seeded_3D_feature_broadphase_fuzz
          COMMAND kyoto_maintained_broadphase_fuzz_tests)
+
+# Pass 20: native rigid triangle BVH candidate parity; optional integration
+# into physical FEM is kept separate from the reference broadphase.
+add_executable(kyoto_static_rigid_mesh_bvh_tests
+               tests/static_rigid_mesh_bvh_tests.cpp)
+target_link_libraries(kyoto_static_rigid_mesh_bvh_tests PRIVATE kyoto_contact)
+add_test(NAME rigid_static_mesh_BVH_9000_source_candidate_parity
+         COMMAND kyoto_static_rigid_mesh_bvh_tests)
