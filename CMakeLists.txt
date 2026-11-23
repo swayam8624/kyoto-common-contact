@@ -272,3 +272,11 @@ add_executable(kyoto_uncoupled_multibody_fem_tests
 target_link_libraries(kyoto_uncoupled_multibody_fem_tests PRIVATE kyoto_contact)
 add_test(NAME real_two_body_FEM_uncoupled_shared_feature_oracle
          COMMAND kyoto_uncoupled_multibody_fem_tests)
+
+# Experimental Pass 22A only: synchronized moving triangle/triangle
+# conservative continuous separation certificate. No response forces.
+add_executable(kyoto_moving_moving_triangle_certificate_tests
+               tests/moving_moving_triangle_certificate_tests.cpp)
+target_link_libraries(kyoto_moving_moving_triangle_certificate_tests PRIVATE kyoto_contact)
+add_test(NAME conservative_moving_moving_finite_triangle_time_guard
+         COMMAND kyoto_moving_moving_triangle_certificate_tests)

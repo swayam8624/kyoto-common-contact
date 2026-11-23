@@ -1,0 +1,44 @@
+name: Kyoto Pass 22 moving-moving finite-triangle certificate
+
+on:
+  push:
+    branches: [research/pass22-moving-moving-ccd]
+    paths:
+      - "include/kyoto/moving_triangle_pair_certificate.hpp"
+      - "include/kyoto/triangle_mesh_contact.hpp"
+      - "tests/moving_moving_triangle_certificate_tests.cpp"
+      - ".github/workflows/pass22-moving-moving-ccd.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+jobs:
+  independent-3d-ccd-safety:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original C++23 moving-moving geometric certificate
+        run: |
+          cmake -S . -B build-pass22 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass22 --parallel 4 \
+            --target kyoto_moving_moving_triangle_certificate_tests
+      - name: Check deterministic 3D crossing, near-miss, symmetry, invalid data and seeded motion
+        run: |
+          mkdir -p results/pass22
+          ctest --test-dir build-pass22 \
+            -R conservative_moving_moving_finite_triangle_time_guard \
+            --output-on-failure | tee results/pass22/ctest.txt
+          ./build-pass22/kyoto_moving_moving_triangle_certificate_tests \
+            | tee results/pass22/native_stdout.txt
+          git rev-parse HEAD > results/pass22/commit.txt
+      - name: Archive geometric source experiment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass22-moving-moving-certificate-${{ matrix.os }}
+          path: results/pass22/
+          if-no-files-found: warn
