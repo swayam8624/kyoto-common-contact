@@ -16,7 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 
 REQUIRED = (
-    "repeat", "step", "physical_time_s", "source_face_impulse_updates",
+    "repeat", "step", "regime", "physical_time_s", "source_face_impulse_updates",
     "reference_pairs", "official_ipc_pairs", "maintained_hierarchy_pairs",
     "official_extra", "official_missing", "official_conversion_ns",
     "official_build_ns", "official_query_ns", "maintained_paid_total_ns",
@@ -38,6 +38,10 @@ def read_data(path: Path) -> list[dict]:
     seen = set()
     for i, row in enumerate(rows, 2):
         for k in REQUIRED:
+            if k=="regime":
+                if row[k] not in ("routine","fast_adaptive"):
+                    raise ValueError(f"unrecognized source physics regime at row {i}")
+                continue
             if k in ("first_method","first_internal_hierarchy_method"):
                 allowed=("ipc","hierarchy") if k=="first_method" else ("cached","uncached")
                 if row[k] not in allowed:
@@ -90,6 +94,26 @@ def summarize(rows: list[dict]):
     ratios = [r["ratio_official_over_hierarchy"] for r in rows]
     old_totals=[r["uncached_paid_ns"] for r in rows]
     per_repeat={}
+    per_regime={}
+    for kind in ("routine","fast_adaptive"):
+        subset=[r for r in rows if r["regime"]==kind]
+        if not subset:
+            raise ValueError(f"missing original {kind} solver evidence")
+        per_regime[kind]={
+            "rows":len(subset),
+            "unique_source_intervals":len({int(r["step"]) for r in subset}),
+            "ipc_total_ns":sum(r["official_paid_ns"] for r in subset),
+            "cached_hierarchy_total_ns":sum(r["hierarchy_paid_ns"] for r in subset),
+            "uncached_hierarchy_total_ns":sum(r["uncached_paid_ns"] for r in subset),
+            "contact_bearing_rows":sum(
+                int(r["source_face_impulse_updates"])>0 for r in subset)
+        }
+        per_regime[kind]["ipc_over_cached"]=(
+            per_regime[kind]["ipc_total_ns"]/
+            per_regime[kind]["cached_hierarchy_total_ns"])
+        per_regime[kind]["uncached_over_cached"]=(
+            per_regime[kind]["uncached_hierarchy_total_ns"]/
+            per_regime[kind]["cached_hierarchy_total_ns"])
     for rep in sorted({int(r["repeat"]) for r in rows}):
         batch=[r for r in rows if int(r["repeat"])==rep]
         per_repeat[rep]={
@@ -113,10 +137,11 @@ def summarize(rows: list[dict]):
     }
     return {
         "experiment": "Actual pinned official IPC Toolkit LBVH vs refittable feature hierarchy",
-        "evidence_scope": "same solver-generated 3D FEM macro-step endpoint-linear snapshots; feature candidates only",
+        "evidence_scope": "matched real FEM macro-step linearizations plus actual 20m/s adaptively accepted physical leaf intervals; feature candidates only",
         "candidate_coverage": "each native row checks exhaustive reference, tree exact parity, and IPC superset",
         "samples":len(rows),
         "per_repeat_totals":per_repeat,
+        "per_source_physics_regime":per_regime,
         "uncached_hierarchy_paid_total_ns":sum(old_totals),
         "ratio_of_paid_totals_uncached_over_cached":sum(old_totals)/sum(paid_atlas),
         "median_per_repeat_uncached_over_cached":statistics.median(
@@ -140,7 +165,7 @@ def summarize(rows: list[dict]):
         "python_platform":platform.platform(),
         "warnings": [
             "This is NOT continuous narrowphase CCD parity, solver-step timing, or robust physical contact proof",
-            "Original FEM macro-step endpoints do not reconstruct adaptive accepted physical leaf trajectories",
+            "Routine macro-step endpoints may approximate intermediate motion; fast-impact regime contains exact accepted physical-leaf start/end state pairs",
             "Snapshot correlation and only three repeats preclude independent uncertainty inference",
             "Twelve repeats with counterbalanced order provide provisional descriptive timings, not independent scenes or A/A controls",
             "No measured speedup or winning regime may be claimed until CI passes on native source artifacts",
