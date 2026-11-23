@@ -68,6 +68,15 @@ jobs:
           python3 scripts/report_pass15_official_ipc.py \
             --input results/pass15/native/official_ipc_fem_paired.csv \
             --output results/pass15/science
+      - name: Paid full-trajectory real FEM refits at EVERY physical macro-step
+        run: |
+          mkdir -p results/pass15/full-trajectory
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/full-trajectory 1 4 \
+            | tee results/pass15/full-trajectory/native_console.txt
+          python3 scripts/report_pass15_official_ipc.py \
+            --input results/pass15/full-trajectory/official_ipc_fem_paired.csv \
+            --output results/pass15/full-trajectory/science
       - name: Preserve original measurements and figures
         if: always()
         uses: actions/upload-artifact@v4
