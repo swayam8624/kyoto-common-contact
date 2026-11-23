@@ -1,0 +1,56 @@
+name: Kyoto Pass 15 matched official IPC LBVH on native FEM
+
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - "apps/pass15_official_ipc_fem_benchmark.cpp"
+      - "include/kyoto/fem_feature_snapshots.hpp"
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "scripts/report_pass15_official_ipc.py"
+      - ".github/workflows/pass15-official-ipc-fem.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+jobs:
+  official-pinned-source-pairing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Configure REAL upstream IPC Toolkit v1.6.1 pinned by SHA
+        run: |
+          cmake -S . -B build-pass15 -DCMAKE_BUILD_TYPE=Release \
+            -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+      - name: Compile matched native 3D benchmarks and independent tests
+        run: |
+          cmake --build build-pass15 --parallel 2 \
+            --target kyoto_pass15_official_ipc_fem_benchmark \
+                     kyoto_official_ipc_lbvh_tests \
+                     kyoto_refit_feature_hierarchy_tests
+      - name: Check independent hierarchy and pinned official IPC coverage
+        run: |
+          ctest --test-dir build-pass15 \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|pinned_official_ipc_lbvh_feature_coverage' \
+            --output-on-failure
+      - name: Generate verified original-solver matched source receipts
+        run: |
+          mkdir -p results/pass15/native
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/native | tee results/pass15/native/console.txt
+      - name: Check complete paid timings and render real 3D science figures
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass15_official_ipc.py \
+            --input results/pass15/native/official_ipc_fem_paired.csv \
+            --output results/pass15/science
+      - name: Preserve original measurements and figures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass15-official-ipc-native-fem
+          path: results/pass15/
+          if-no-files-found: warn
