@@ -60,6 +60,7 @@ jobs:
             results/pass15/ccd-events | tee results/pass15/ccd-events/native_console.txt
           python3 scripts/audit_pass18_real_leaf_ccd.py \
             --input results/pass15/ccd-events/actual_fast_leaf_exhaustive_ipc_ccd.csv \
+            --positive results/pass15/ccd-events/rejected_native_trial_positive_ccd.json \
             --output results/pass15/ccd-events
       - name: Generate verified original-solver matched source receipts
         run: |
