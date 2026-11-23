@@ -39,6 +39,12 @@ int main(int argc,char**argv){
              "normal_impulse_ns_interval,total_mass_kg\n";
     // Independent STATIC full-surface audit on every accepted native step.
     // Vertex-only CCD cannot establish triangle/sphere safety.
+    std::ofstream response(dir/"whole_face_contact_step_diagnostics.csv");
+    response<<std::setprecision(17);
+    response<<"step,time_s,accepted_global_fraction,time_clipped,"
+              "nearby_face_constraints,normal_impulse_updates,"
+              "normal_impulse_ns,tangential_impulse_ns,"
+              "tested_time_intervals,unresolved_face_time_intervals\n";
     std::ofstream surface_audit(dir/"surface_sphere_clearance.csv");
     surface_audit<<std::setprecision(17);
     surface_audit<<"step,time_s,minimum_vertex_clearance_m,"
@@ -76,6 +82,12 @@ int main(int argc,char**argv){
             const auto c=step_whole_face_sphere(b,sphere,dt,contact_settings);
             clipped_steps+=c.time_clipped;
             minimum_accepted_fraction=std::min(minimum_accepted_fraction,c.accepted_global_fraction);
+            response<<step<<','<<b.time_seconds<<','
+                <<c.accepted_global_fraction<<','<<int(c.time_clipped)<<','
+                <<c.active_face_constraints<<','<<c.normal_impulses<<','
+                <<c.total_normal_impulse_ns<<','
+                <<c.total_tangential_impulse_ns<<','
+                <<c.face_interval_tests<<','<<c.whole_face_unresolved<<'\n';
             swept_total+=c.whole_face_unresolved;
             impulses_total+=c.normal_impulses;
             interval_sweeps+=c.whole_face_unresolved;
@@ -141,9 +153,9 @@ int main(int argc,char**argv){
         interval_impulses=0;interval_sweeps=0;interval_normal_ns=0;
     }
     states.close();metrics.close();impacts.close();faces.close();
-    tets.close();surface_audit.close();
+    tets.close();surface_audit.close();response.close();
     if(!states.good()||!metrics.good()||!impacts.good()||
-       !faces.good()||!tets.good()||!surface_audit.good())
+       !faces.good()||!tets.good()||!surface_audit.good()||!response.good())
         throw std::runtime_error("error writing actual FEM curved scene");
     if(!(first_contact_t>0&&impulses_total>0&&
          max_stress>1&&min_j>0))
