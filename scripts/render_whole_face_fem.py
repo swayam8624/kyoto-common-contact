@@ -318,7 +318,7 @@ def atlas(out):
            "05_curved_stress_and_jacobian.png",
            "06_3d_impulse_footprint.png",
            "07_synchronized_motion_fraction.png"]
-    canvas=Image.new("RGB",(1900,2750),BG)
+    canvas=Image.new("RGB",(1900,2910),BG)
     for i,name in enumerate(names):
         im=Image.open(out/name).convert("RGB")
         im.thumbnail((950,670))
