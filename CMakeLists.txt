@@ -262,3 +262,13 @@ add_executable(kyoto_selective_refit_tests
 target_link_libraries(kyoto_selective_refit_tests PRIVATE kyoto_contact)
 add_test(NAME selective_3D_feature_refit_exhaustive_oracle_and_rollback
          COMMAND kyoto_selective_refit_tests)
+
+# Pass 21: two actual separately integrated neo-Hookean solids against
+# one finite rigid triangle obstacle; all shared-space VF/EE candidates
+# must match independent exhaustive, SAP and selective BVH oracles.
+# It does NOT test coupled deformable/deformable collision response.
+add_executable(kyoto_uncoupled_multibody_fem_tests
+               tests/uncoupled_multibody_fem_tests.cpp)
+target_link_libraries(kyoto_uncoupled_multibody_fem_tests PRIVATE kyoto_contact)
+add_test(NAME real_two_body_FEM_uncoupled_shared_feature_oracle
+         COMMAND kyoto_uncoupled_multibody_fem_tests)
