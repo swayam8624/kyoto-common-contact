@@ -1,7 +1,7 @@
 # Instructions for every agent working on Kyoto / Spacetime Contact Atlas
 
 The user requested a CLEAN RESEARCH RESET. Read README and docs/01 through
-docs/17 before modifying source. Do not restore V4/RBC/CBP or old slide
+docs/18 before modifying source. Do not restore V4/RBC/CBP or old slide
 pipelines. Existing historic branches remain untouched.
 
 The only active thesis is conservative, fully paid swept-contact candidate
@@ -20,6 +20,16 @@ contact. Physics correctness comes first, not beautiful animation.
   narrow-phase adapter are required before positive research claims.
 - A mesh's deformation must be solver-generated. Equal candidate sets must
   not be depicted as different physical folds.
+- In Pass 7A, the routine 900-step whole-face FEM has 0/901 accepted
+  penetrating faces, versus 458/901 in the older vertex-only control.
+  Global clipping was NOT activated on the routine run. Do not attribute
+  all of that win to the time certificate; the face-aware mass-weighted
+  contact impulses supplied the active safety response.
+- The adversarial 900 m/s test exercises the whole-face time certificate
+  separately. Fixed-clock global alpha<1 is a conservative geometric
+  expedient, NOT a time-consistent contact integrator. Preserve physical
+  energy differences and 901-state source audits.
+
 - Explicitly audit full triangle interiors against curved rigid obstacles:
   zero penetrating vertices does NOT imply safe triangle surfaces.
   Pass 6 found 458/901 penetrating-face states despite zero vertex failures.
