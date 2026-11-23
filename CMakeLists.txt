@@ -48,6 +48,8 @@ add_executable(kyoto_time_consistent_tests tests/time_consistent_contact_tests.c
 target_link_libraries(kyoto_time_consistent_tests PRIVATE kyoto_contact)
 add_test(NAME time_consistent_whole_face_adaptive_fem
          COMMAND kyoto_time_consistent_tests)
+add_executable(kyoto_time_consistent_experiment apps/time_consistent_experiment.cpp)
+target_link_libraries(kyoto_time_consistent_experiment PRIVATE kyoto_contact)
 
 
 add_executable(kyoto_whole_face_fem_export apps/whole_face_fem_export.cpp)
