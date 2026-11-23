@@ -25,6 +25,8 @@ on:
       - "include/kyoto/selective_feature_boxes.hpp"
       - "tests/selective_refit_tests.cpp"
       - "scripts/report_pass15_official_ipc.py"
+      - "scripts/report_pass22_abba.py"
+      - "tests/test_pass22_abba_receipts.py"
       - "tests/test_pass15_aa_receipts.py"
       - ".github/workflows/pass15-official-ipc-fem.yml"
       - "CMakeLists.txt"
@@ -41,6 +43,8 @@ jobs:
           python-version: "3.12"
       - name: Reject malformed paid A/A benchmark receipts
         run: python3 -m unittest discover -s tests -p "test_pass15_aa_receipts.py" -v
+      - name: Reject incomplete and incorrectly ordered native ABBA receipts
+        run: python3 -m unittest discover -s tests -p "test_pass22_abba_receipts.py" -v
       - name: Configure REAL upstream IPC Toolkit v1.6.1 pinned by SHA
         run: |
           cmake -S . -B build-pass15 -DCMAKE_BUILD_TYPE=Release \
@@ -110,6 +114,24 @@ jobs:
           python3 scripts/report_pass15_official_ipc.py \
             --input results/pass15/two-real-deformables/official_ipc_fem_paired.csv \
             --output results/pass15/two-real-deformables/science
+      - name: Four-arm ABBA against cached-input IPC on heterogeneous actual FEM scenes
+        run: |
+          mkdir -p results/pass15/abba-multiscene
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/abba-multiscene 12 4 4 abba \
+            | tee results/pass15/abba-multiscene/native_console.txt
+          python3 scripts/report_pass22_abba.py \
+            --input results/pass15/abba-multiscene/official_ipc_isolated_abba.csv \
+            --output results/pass15/abba-multiscene/science
+      - name: Four-arm ABBA against cached-input IPC on all 360 real FEM macro-steps
+        run: |
+          mkdir -p results/pass15/abba-full-trajectory
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/abba-full-trajectory 1 4 1 abba \
+            | tee results/pass15/abba-full-trajectory/native_console.txt
+          python3 scripts/report_pass22_abba.py \
+            --input results/pass15/abba-full-trajectory/official_ipc_isolated_abba.csv \
+            --output results/pass15/abba-full-trajectory/science
       - name: Preserve original measurements and figures
         if: always()
         uses: actions/upload-artifact@v4
