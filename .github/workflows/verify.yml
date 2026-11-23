@@ -305,6 +305,80 @@ jobs:
                 "undecided, and",a["fast_face_intervals"],"fast swept faces with",
                 a["fast_unresolved_intervals"],"undecided; 1200 impulse law identities")
           PY
+      - name: Pass 10 outward IEEE interval proof on all original moving FEM triangles
+        run: ./build/kyoto_rounded_prism_tests results/pass10-rounded
+      - name: Pass 10 entire 3D FEM gravity/elasticity/damping/impulse momentum ledger
+        run: ./build/kyoto_whole_fem_balance_tests results/pass10-rounded
+      - name: Render actual-source seven-figure interval and discrete-physics atlas
+        run: |
+          python scripts/render_pass10_numerical_audit.py \
+            --input results/pass10-rounded \
+            --physics results/time-consistent-fem \
+            --output results/pass10-rounded/visuals
+      - name: Validate entire Pass 10 numerical/contact scientific record
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import csv,json,math
+          p=Path("results/pass10-rounded")
+          n=json.loads((p/"rounded_manifest.json").read_text())
+          m=json.loads((p/"whole_fem_balance_manifest.json").read_text())
+          assert n["ieee754_outward_intervals_used"]
+          assert n["assumes_correctly_rounded_ops_ftz_disabled"]
+          assert not n["formal_hardware_software_proof"]
+          assert not n["general_mesh_mesh_CCD"]
+          assert n["ordinary_macro_steps"]==900
+          assert n["ordinary_face_intervals"]==288000
+          assert n["ordinary_strictly_proven"]+n["ordinary_unresolved"]==288000
+          assert n["fast_face_intervals"]==320*n["fast_physical_substeps"]
+          assert n["fast_strictly_proven"]+n["fast_unresolved"]==n["fast_face_intervals"]
+          assert n["random_separated_cases"]==500
+          assert n["ordinary_min_verified_margin_m"]>0
+          assert n["fast_min_verified_margin_m"]>0
+          assert n["ordinary_outward_dot_checks"]>0
+          assert n["fast_outward_dot_checks"]>0
+          assert m["routine_accepted_physical_substeps"]==900
+          assert m["fast_accepted_physical_substeps"]==n["fast_physical_substeps"]
+          assert m["routine_leaves_with_contact"]>0
+          assert m["angular_transport_term_included"]
+          assert not m["true_physics_calibration_proven"]
+          assert not m["global_energy_conservation_required"]
+          assert m["routine_max_relative_momentum_residual"]<1e-10
+          assert m["routine_max_relative_angular_residual"]<1e-10
+          assert m["fast_max_relative_momentum_residual"]<1e-10
+          assert m["fast_max_relative_angular_residual"]<1e-10
+          assert m["routine_max_internal_force_relative"]<1e-10
+          assert m["routine_max_internal_torque_relative"]<1e-10
+          assert m["fast_max_internal_force_relative"]<1e-10
+          assert m["fast_max_internal_torque_relative"]<1e-10
+          r=list(csv.DictReader((p/"rounded_routine_900.csv").open()))
+          fast=list(csv.DictReader((p/"rounded_fast_substeps.csv").open()))
+          faces=list(csv.DictReader((p/"rounded_fast_1600_faces.csv").open()))
+          balance=list(csv.DictReader((p/"whole_FEM_accepted_substep_balance.csv").open()))
+          assert len(r)==900
+          assert len(fast)==n["fast_physical_substeps"]
+          assert len(faces)==n["fast_face_intervals"]
+          assert len(balance)==900+len(fast)
+          assert all(float(x["momentum_relative"])<1e-10 for x in balance)
+          assert all(float(x["angular_relative"])<1e-10 for x in balance)
+          assert all(float(x["internal_force_relative"])<1e-10 for x in balance)
+          assert all(float(x["internal_torque_relative"])<1e-10 for x in balance)
+          visuals=p/"visuals"
+          assert len(list(visuals.glob("[0-9][0-9]_*.png")))==7
+          assert (visuals/"STAGE10_ROUNDED_CONTACT_AND_FEM_PHYSICS_ATLAS.png").stat().st_size>100000
+          print("PASS: outward IEEE interval sweep",
+                n["ordinary_strictly_proven"],"of",n["ordinary_face_intervals"],
+                "routine and",n["fast_strictly_proven"],"of",
+                n["fast_face_intervals"],"fast; uncertain:",
+                n["ordinary_unresolved"]+n["fast_unresolved"],
+                "; full momentum and angular ledger over",len(balance),"physical substeps")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage10-IEEE-outward-CCD-and-full-FEM-momentum-evidence
+          path: results/pass10-rounded/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage9-independent-swept-CCD-and-contact-impulse-audit
