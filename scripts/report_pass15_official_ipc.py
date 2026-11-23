@@ -154,6 +154,8 @@ def summarize(rows: list[dict]):
         paidStrong=sum(r["cached_ipc_paid_ns"] for r in subset)
         paidC=sum(r["hierarchy_paid_ns"] for r in subset)
         paidF=sum(r["frontier_paid_ns"] for r in subset)
+        paidAdaptive=sum(int(r["adaptive_paid_total_ns"]) for r in subset)
+        paidCompact=sum(int(r["compact_frontier_total_ns"]) for r in subset)
         per_scene[sid]={
             "physics_regime":subset[0]["regime"],
             "physical_intervals":len({int(r["step"]) for r in subset}),
@@ -167,6 +169,11 @@ def summarize(rows: list[dict]):
             "ipc_over_frontier":paidI/paidF,
             "cached_input_ipc_over_frontier":paidStrong/paidF,
             "cached_over_frontier":paidC/paidF,
+            "adaptive_paid_total_ns":paidAdaptive,
+            "compacted_frontier_paid_total_ns":paidCompact,
+            "cached_input_ipc_over_adaptive":paidStrong/paidAdaptive,
+            "cached_input_ipc_over_compacted":paidStrong/paidCompact,
+            "adaptive_frontier_choices":sum(int(r["adaptive_used_frontier"]) for r in subset),
         }
     for kind in ("routine","fast_adaptive"):
         subset=[r for r in rows if r["regime"]==kind]
@@ -180,6 +187,8 @@ def summarize(rows: list[dict]):
             "cached_hierarchy_total_ns":sum(r["hierarchy_paid_ns"] for r in subset),
             "uncached_hierarchy_total_ns":sum(r["uncached_paid_ns"] for r in subset),
             "frontier_hierarchy_total_ns":sum(r["frontier_paid_ns"] for r in subset),
+            "adaptive_hierarchy_total_ns":sum(int(r["adaptive_paid_total_ns"]) for r in subset),
+            "compacted_frontier_total_ns":sum(int(r["compact_frontier_total_ns"]) for r in subset),
             "contact_bearing_rows":sum(
                 int(r["source_face_impulse_updates"])>0 for r in subset)
         }
