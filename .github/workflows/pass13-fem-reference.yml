@@ -1,0 +1,43 @@
+name: Kyoto Pass 13 real FEM reference broadphase
+
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - "apps/pass13_reference_fem_benchmark.cpp"
+      - "scripts/report_pass13_fem_baselines.py"
+      - ".github/workflows/pass13-fem-reference.yml"
+      - "CMakeLists.txt"
+      - "include/kyoto/**"
+  workflow_dispatch:
+
+jobs:
+  native-fem-candidate-reference:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build native physically integrated FEM benchmark
+        run: |
+          cmake -S . -B build-pass13 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass13 --target kyoto_pass13_reference_fem_benchmark --parallel 4
+      - name: Check solver-derived exhaustive and sweep parity and archive original timings
+        run: |
+          ./build-pass13/kyoto_pass13_reference_fem_benchmark results/pass13/native
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass13_fem_baselines.py \
+            --input results/pass13/native/native_fem_reference_broadphase.csv \
+            --output results/pass13/science
+      - name: Preserve original evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass13-real-fem-reference-${{ matrix.os }}
+          path: results/pass13/
+          if-no-files-found: error
