@@ -12,6 +12,8 @@ on:
       - "apps/pass18_real_leaf_ccd_audit.cpp"
       - "scripts/audit_pass18_real_leaf_ccd.py"
       - "include/kyoto/fem_feature_snapshots.hpp"
+      - "include/kyoto/multi_body_fem_snapshots.hpp"
+      - "tests/uncoupled_multibody_fem_tests.cpp"
       - "include/kyoto/rigid_mesh_fem_contact.hpp"
       - "tests/rigid_mesh_fast_contact_tests.cpp"
       - "tests/temporal_frontier_stress_tests.cpp"
@@ -54,11 +56,12 @@ jobs:
                      kyoto_temporal_frontier_stress_tests \
                      kyoto_maintained_broadphase_fuzz_tests \
                      kyoto_pass18_real_leaf_ccd_audit \
-                     kyoto_selective_refit_tests
+                     kyoto_selective_refit_tests \
+                     kyoto_uncoupled_multibody_fem_tests
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|independent_seeded_3D_feature_broadphase_fuzz|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events|selective_3D_feature_refit_exhaustive_oracle_and_rollback' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|independent_seeded_3D_feature_broadphase_fuzz|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events|selective_3D_feature_refit_exhaustive_oracle_and_rollback|real_two_body_FEM_uncoupled_shared_feature_oracle' \
             --output-on-failure
       - name: Archive independent exhaustive real CCD evidence
         run: |
@@ -98,6 +101,15 @@ jobs:
           python3 scripts/report_pass15_official_ipc.py \
             --input results/pass15/multi-physics/official_ipc_fem_paired.csv \
             --output results/pass15/multi-physics/science
+      - name: Physically independent multiobject FEM scaling on shared finite obstacle
+        run: |
+          mkdir -p results/pass15/two-real-deformables
+          ./build-pass15/kyoto_pass15_official_ipc_fem_benchmark \
+            results/pass15/two-real-deformables 12 4 4 \
+            | tee results/pass15/two-real-deformables/native_console.txt
+          python3 scripts/report_pass15_official_ipc.py \
+            --input results/pass15/two-real-deformables/official_ipc_fem_paired.csv \
+            --output results/pass15/two-real-deformables/science
       - name: Preserve original measurements and figures
         if: always()
         uses: actions/upload-artifact@v4
