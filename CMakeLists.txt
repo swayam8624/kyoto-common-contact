@@ -220,3 +220,11 @@ add_executable(kyoto_refit_feature_hierarchy_tests
 target_link_libraries(kyoto_refit_feature_hierarchy_tests PRIVATE kyoto_contact)
 add_test(NAME maintained_refit_hierarchy_VF_EE_oracle_and_invalidation
          COMMAND kyoto_refit_feature_hierarchy_tests)
+
+# Pass 15: source motion adapter is shared between local and pinned IPC
+# measurement pipelines; verify physically integrated endpoint geometry.
+add_executable(kyoto_fem_feature_snapshots_tests
+               tests/fem_feature_snapshots_tests.cpp)
+target_link_libraries(kyoto_fem_feature_snapshots_tests PRIVATE kyoto_contact)
+add_test(NAME identical_real_FEM_feature_source_and_refit_contract
+         COMMAND kyoto_fem_feature_snapshots_tests)
