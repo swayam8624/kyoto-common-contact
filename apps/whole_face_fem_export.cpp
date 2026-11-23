@@ -67,7 +67,7 @@ int main(int argc,char**argv){
         tets<<i<<','<<tet.n[0]<<','<<tet.n[1]<<','
             <<tet.n[2]<<','<<tet.n[3]<<','<<tet.rest_volume<<'\n';
     }
-    std::size_t impulses_total=0,swept_total=0,contact_frames=0;
+    std::size_t impulses_total=0,face_impulse_updates_total=0,swept_total=0,contact_frames=0;
     std::size_t clipped_steps=0;
     double minimum_accepted_fraction=1;
     std::size_t surface_overlap_states=0,overlap_faces_total=0;
@@ -89,7 +89,7 @@ int main(int argc,char**argv){
                 <<c.total_tangential_impulse_ns<<','
                 <<c.face_interval_tests<<','<<c.whole_face_unresolved<<'\n';
             swept_total+=c.whole_face_unresolved;
-            impulses_total+=c.normal_impulses;
+            face_impulse_updates_total+=c.normal_impulses;
             interval_sweeps+=c.whole_face_unresolved;
             interval_impulses+=c.normal_impulses;
             interval_normal_ns+=c.total_normal_impulse_ns;
@@ -98,6 +98,7 @@ int main(int argc,char**argv){
             for(std::size_t i=0;i<b.nodes.size();i++){
                 const auto& node=b.nodes[i];
                 if(node.last_normal_impulse<=0)continue;
+                impulses_total++;
                 impacts<<step<<','<<b.time_seconds<<','<<i<<','
                        <<node.x.x<<','<<node.x.y<<','<<node.x.z<<','
                        <<node.last_normal_impulse<<'\n';
@@ -193,6 +194,7 @@ int main(int argc,char**argv){
         <<" \"first_curved_contact_time_s\":"<<first_contact_t<<",\n"
         <<" \"swept_vertex_sphere_hits\":"<<swept_total<<",\n"
         <<" \"normal_impulse_vertex_steps\":"<<impulses_total<<",\n"
+        <<" \"face_gauss_seidel_impulse_updates\":"<<face_impulse_updates_total<<",\n"
         <<" \"contact_output_intervals\":"<<contact_frames<<",\n"
         <<" \"peak_von_mises_pa\":"<<max_stress<<",\n"
         <<" \"minimum_element_jacobian\":"<<min_j<<",\n"
