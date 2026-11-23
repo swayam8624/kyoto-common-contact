@@ -179,6 +179,35 @@ jobs:
           assert (visuals/"07_interactive_curved_fem.html").stat().st_size>100000
           print("PASS: full-face 0-penetration FEM, 901 source states, 900 paid contact traces, seven 3D/physics charts, 181 volumes")
           PY
+      - name: Independent before-versus-after geometric safety and physics audit
+        run: |
+          python scripts/compare_curved_contact_solvers.py \
+            --old results/curved-fem \
+            --new results/whole-face-fem \
+            --output results/whole-face-comparison
+      - name: Verify completeness of BOTH original simulation trajectories
+        run: |
+          python - <<'PY'
+          import json,pathlib,csv
+          p=pathlib.Path("results/whole-face-comparison")
+          d=json.loads((p/"comparison_summary.json").read_text())
+          assert d["steps_each"]==900
+          assert d["face_audit_states_each"]==901
+          assert d["old_vertex_only_states_with_face_penetration"]==458
+          assert d["new_whole_face_states_with_face_penetration"]==0
+          assert d["new_vertex_inside_states"]==0
+          assert d["new_time_clipped_steps"]>=0
+          assert len(list(csv.DictReader((p/"full_901_state_contact_comparison.csv").open())))==901
+          assert len(list(csv.DictReader((p/"trajectory_divergence.csv").open())))==181
+          assert len(list(p.glob("[0-9][0-9]_*.png")))==3
+          print("PASS: independent 900-step old/new FEM validation, 458 vs zero surface-penetrating states, real energy and trajectory comparison")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-stage7-before-after-full-face-research-comparison
+          path: results/whole-face-comparison/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: kyoto-stage7-synchronized-whole-face-fem-evidence
