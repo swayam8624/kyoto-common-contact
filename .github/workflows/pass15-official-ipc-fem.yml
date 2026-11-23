@@ -18,6 +18,7 @@ on:
       - "tests/maintained_broadphase_fuzz_tests.cpp"
       - "tests/fem_feature_snapshots_tests.cpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "include/kyoto/adaptive_candidate_policy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
       - "scripts/report_pass15_official_ipc.py"
       - "tests/test_pass15_aa_receipts.py"
