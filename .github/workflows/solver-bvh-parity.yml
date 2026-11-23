@@ -26,9 +26,16 @@ jobs:
       - name: Build independent native FEM solver acceleration controls
         run: |
           cmake -S . -B build-bvh -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-bvh --parallel 4 --target kyoto_static_rigid_mesh_bvh_tests
+          cmake --build build-bvh --parallel 4 --target kyoto_static_rigid_mesh_bvh_tests kyoto_rigid_mesh_bvh_solver_parity_tests
       - name: Validate genuine 3D rigid triangle feature candidates
         run: |
           ctest --test-dir build-bvh \
-            -R 'rigid_static_mesh_BVH_9000_source_candidate_parity' \
+            -R 'rigid_static_mesh_BVH_9000_source_candidate_parity|full_real_FEM_mesh_BVH_solver_state_and_impulse_parity' \
             --output-on-failure
+      - name: Preserve full actual source physics receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-solver-bvh-native-physics-${{ matrix.os }}
+          path: build-bvh/solver-bvh-evidence/
+          if-no-files-found: warn
