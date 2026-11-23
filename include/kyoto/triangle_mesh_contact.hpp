@@ -226,7 +226,10 @@ struct MeshSweepCertificate{
     bool entirely_separated{true};
     double safe_prefix{1.};
     double first_unresolved_upper{1.};
-    std::size_t nodes{},pruned{},sampled_piercings{};
+    // Near-zero sampled distance marks POSSIBLE touching/intersection.
+    // An unsigned distance is never negative, so this is NOT a
+    // count of proven penetration or topology-consistent contact.
+    std::size_t nodes{},pruned{},sampled_possible_contacts{};
 };
 inline MeshSweepCertificate certify_moving_triangle_rigid_triangle(
     const LinearTriangleMotion& motion,const Triangle3& rigid,
@@ -256,7 +259,7 @@ inline MeshSweepCertificate certify_moving_triangle_rigid_triangle(
         if(near.distance-.5*max_motion-guard>thickness){
             ++cert.pruned;return true;
         }
-        if(near.distance<thickness-guard)cert.sampled_piercings++;
+        if(near.distance<=thickness+guard)cert.sampled_possible_contacts++;
         if(depth==max_depth){
             cert.entirely_separated=false;
             cert.safe_prefix=t0;
