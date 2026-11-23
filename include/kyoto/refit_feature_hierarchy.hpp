@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -21,7 +22,7 @@ namespace f=kyoto::contact::features;
 class RefitHierarchy {
     struct Node {
         Aabb bounds{};
-        int left{-1},right{-1};
+        int left{-1},right{-1},parent{-1};
         std::size_t record{};
         bool leaf()const{return left<0;}
     };
@@ -65,6 +66,8 @@ class RefitHierarchy {
             const int r=construct(records,mid,end);
             nodes[here].left=l;
             nodes[here].right=r;
+            nodes[l].parent=here;
+            nodes[r].parent=here;
             nodes[here].bounds=f::unite(nodes[l].bounds,nodes[r].bounds);
             return here;
         }
@@ -98,6 +101,8 @@ class RefitHierarchy {
     struct NodePair{int first{},second{};};
     std::vector<NodePair> vf_cut_,ee_cut_;
     bool maintain_pair_cut_{false},pair_cut_ready_{};
+    bool compact_separated_vf_{false};
+    std::size_t compacted_vf_merges_{};
     std::size_t pair_cut_skipped_frames_{};
     std::size_t last_pair_cut_attempted_size_{};
     std::size_t pair_cut_fallbacks_{},pair_cut_reuses_{};
@@ -284,14 +289,62 @@ class RefitHierarchy {
             }
         }
     }
+    // Proof sketch: disjoint cuts partition V x F products. Two items
+    // (leftChild,b) and (rightChild,b) are a complete partition of
+    // (parent,b). If the current parent/b AABBs are disjoint, the union
+    // contains no candidate. Replacing BOTH by (parent,b) is exact.
+    // The symmetric argument holds on the face tree side. A future
+    // frame always rechecks and subdivides the retained parent pair.
+    static void compact_vf_cut(const Tree& vertices,const Tree& faces,
+                               std::vector<NodePair>& cut,
+                               std::size_t& merge_counter){
+        std::set<std::pair<int,int>> items;
+        for(const auto& p:cut)items.emplace(p.first,p.second);
+        bool changed=true;
+        while(changed){
+            changed=false;
+            for(const auto& item:items){
+                const int a=item.first,b=item.second;
+                const int pa=vertices.nodes[a].parent;
+                if(pa>=0&&!overlaps(vertices.nodes[pa].bounds,
+                                    faces.nodes[b].bounds)){
+                    const auto& p=vertices.nodes[pa];
+                    const int sibling=(p.left==a)?p.right:p.left;
+                    if(items.contains({sibling,b})){
+                        items.erase({a,b});
+                        items.erase({sibling,b});
+                        items.emplace(pa,b);
+                        ++merge_counter;changed=true;break;
+                    }
+                }
+                const int pb=faces.nodes[b].parent;
+                if(pb>=0&&!overlaps(vertices.nodes[a].bounds,
+                                    faces.nodes[pb].bounds)){
+                    const auto& p=faces.nodes[pb];
+                    const int sibling=(p.left==b)?p.right:p.left;
+                    if(items.contains({a,sibling})){
+                        items.erase({a,b});
+                        items.erase({a,sibling});
+                        items.emplace(a,pb);
+                        ++merge_counter;changed=true;break;
+                    }
+                }
+            }
+        }
+        cut.clear();cut.reserve(items.size());
+        for(auto [a,b]:items)cut.push_back({a,b});
+    }
 public:
     explicit RefitHierarchy(bool retain_feature_lookup=true,
-                            bool maintain_pair_cut=false)
+                            bool maintain_pair_cut=false,
+                            bool compact_separated_vf=false)
         :retain_feature_lookup_(retain_feature_lookup),
-         maintain_pair_cut_(maintain_pair_cut){}
+         maintain_pair_cut_(maintain_pair_cut),
+         compact_separated_vf_(compact_separated_vf){}
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
+    std::size_t compacted_vf_merges()const{return compacted_vf_merges_;}
     // Count coarse region traversals, not discarded full-size cuts.
     std::size_t pair_cut_fallbacks()const{return pair_cut_fallbacks_;}
     std::size_t pair_cut_size()const{return vf_cut_.size()+ee_cut_.size();}
@@ -361,6 +414,12 @@ public:
                 pair_cut_fallbacks_+=coarse_regions;
                 ++pair_cut_skipped_frames_; // Frames with coarse traversal
             }
+            // Experimentally controlled, fully timed coarsening pass.
+            // Compact only a small sparse cut; avoid quadratic scanning
+            // overhead on large dense fronts. A merge never loses a leaf
+            // product because it requires its complete sibling to exist.
+            if(compact_separated_vf_ && next_vf.size()<=512)
+                compact_vf_cut(vertices_,faces_,next_vf,compacted_vf_merges_);
             last_pair_cut_attempted_size_=next_vf.size()+next_ee.size();
             if(next_vf.size()>vf_budget||next_ee.size()>ee_budget)
                 throw std::logic_error("bounded frontier violated memory cap");
