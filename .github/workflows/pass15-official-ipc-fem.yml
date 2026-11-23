@@ -20,6 +20,8 @@ on:
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "include/kyoto/adaptive_candidate_policy.hpp"
       - "include/kyoto/cached_feature_boxes.hpp"
+      - "include/kyoto/selective_feature_boxes.hpp"
+      - "tests/selective_refit_tests.cpp"
       - "scripts/report_pass15_official_ipc.py"
       - "tests/test_pass15_aa_receipts.py"
       - ".github/workflows/pass15-official-ipc-fem.yml"
@@ -51,11 +53,12 @@ jobs:
                      kyoto_fast_mesh_impact_tests \
                      kyoto_temporal_frontier_stress_tests \
                      kyoto_maintained_broadphase_fuzz_tests \
-                     kyoto_pass18_real_leaf_ccd_audit
+                     kyoto_pass18_real_leaf_ccd_audit \
+                     kyoto_selective_refit_tests
       - name: Check independent hierarchy and pinned official IPC coverage
         run: |
           ctest --test-dir build-pass15 \
-            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|independent_seeded_3D_feature_broadphase_fuzz|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events' \
+            -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|independent_seeded_3D_feature_broadphase_fuzz|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events|selective_3D_feature_refit_exhaustive_oracle_and_rollback' \
             --output-on-failure
       - name: Archive independent exhaustive real CCD evidence
         run: |
