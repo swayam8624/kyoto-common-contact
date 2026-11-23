@@ -1,4 +1,8 @@
 name: Kyoto official IPC Toolkit v1.6.1 reference
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: [research/spacetime-contact-atlas]
