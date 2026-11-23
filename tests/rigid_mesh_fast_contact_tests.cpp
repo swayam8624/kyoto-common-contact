@@ -90,6 +90,15 @@ int main(int argc,char**argv) {
     }
     must(std::abs(accounted-dt)<1e-12,
          "sum of fast finite mesh actually integrated substeps incomplete");
+
+    // Check true impulse accounting across ALL accepted adaptive leaves,
+    // not just the last accepted leaf's nodal diagnostics.
+    double nodal_sum=0;
+    for(const auto& node:body.nodes)
+        nodal_sum+=node.last_normal_impulse;
+    must(std::abs(nodal_sum-accepted.normal_impulse_ns)<
+         1e-8*std::max(1.,accepted.normal_impulse_ns),
+         "fast macro-step per-node impulse receipt excludes earlier physical leaves");
     const auto final=audit_deformable_rigid_mesh(body,rigid,0.);
     must(final.overlapping_face_pairs==0&&final.minimum_distance_m>0,
          "fully adaptive true mesh impact penetrated finite rigid faces");
