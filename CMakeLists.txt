@@ -246,3 +246,11 @@ add_executable(kyoto_temporal_frontier_stress_tests
 target_link_libraries(kyoto_temporal_frontier_stress_tests PRIVATE kyoto_contact)
 add_test(NAME retained_spacetime_pair_frontier_dense_sparse_oracle
          COMMAND kyoto_temporal_frontier_stress_tests)
+
+# Pass 19: reproducible 3D feature-level fuzzing across cached/uncached
+# BVH, budgeted frontier, warm-order SAP and independent rebuilt SAP.
+add_executable(kyoto_maintained_broadphase_fuzz_tests
+               tests/maintained_broadphase_fuzz_tests.cpp)
+target_link_libraries(kyoto_maintained_broadphase_fuzz_tests PRIVATE kyoto_contact)
+add_test(NAME independent_seeded_3D_feature_broadphase_fuzz
+         COMMAND kyoto_maintained_broadphase_fuzz_tests)
