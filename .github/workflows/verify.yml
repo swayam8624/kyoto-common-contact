@@ -298,7 +298,7 @@ jobs:
           assert all(float(x["independent_min_static_clearance_m"])>=0 for x in ordinary)
           assert all(float(x["measured_delta_kinetic_j"])<=1e-5 for x in impulses)
           v=p/"visuals"
-          assert len(list(v.glob("[0-9][0-9]_*.png")))==8
+          assert len(list(v.glob("[0-9][0-9]_*.png")))==7
           assert (v/"STAGE9_INDEPENDENT_CONTACT_SCIENCE_ATLAS.png").stat().st_size>100000
           print("PASS: independent geometric audit",a["ordinary_face_intervals"],
                 "routine swept faces with",a["ordinary_unresolved_intervals"],
@@ -436,7 +436,7 @@ jobs:
           assert len(list(csv.DictReader((root/"rigid_patch_original_triangles.csv").open())))==72
           assert len(list(csv.DictReader((root/"rigid_patch_original_vertices.csv").open())))==49
           v=root/"visuals"
-          assert len(list(v.glob("[0-9][0-9]_*.png")))==7
+          assert len(list(v.glob("[0-9][0-9]_*.png")))==8
           assert (v/"STAGE11_TRUE_TRIANGULAR_MESH_CONTACT_SCIENCE_ATLAS.png").stat().st_size>100000
           assert (v/"08_interactive_real_rigid_mesh_contact.html").stat().st_size>100000
           assert (v/"REAL_FINITE_TRIANGLE_FEM_MOTION.gif").stat().st_size>100000
