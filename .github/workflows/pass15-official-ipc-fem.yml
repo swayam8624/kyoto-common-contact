@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/pass15_official_ipc_fem_benchmark.cpp"
       - "apps/pass18_real_leaf_ccd_audit.cpp"
+      - "scripts/audit_pass18_real_leaf_ccd.py"
       - "include/kyoto/fem_feature_snapshots.hpp"
       - "include/kyoto/rigid_mesh_fem_contact.hpp"
       - "tests/rigid_mesh_fast_contact_tests.cpp"
@@ -46,6 +47,14 @@ jobs:
           ctest --test-dir build-pass15 \
             -R 'maintained_refit_hierarchy_VF_EE_oracle_and_invalidation|identical_real_FEM_feature_source_and_refit_contract|pinned_official_ipc_lbvh_feature_coverage|actual_adaptive_fast_finite_rigid_mesh_FEM_collision|retained_spacetime_pair_frontier_dense_sparse_oracle|pinned_actual_fast_FEM_leaf_exhaustive_IPC_CCD_events' \
             --output-on-failure
+      - name: Archive independent exhaustive real CCD evidence
+        run: |
+          mkdir -p results/pass15/ccd-events
+          ./build-pass15/kyoto_pass18_real_leaf_ccd_audit \
+            results/pass15/ccd-events | tee results/pass15/ccd-events/native_console.txt
+          python3 scripts/audit_pass18_real_leaf_ccd.py \
+            --input results/pass15/ccd-events/actual_fast_leaf_exhaustive_ipc_ccd.csv \
+            --output results/pass15/ccd-events
       - name: Generate verified original-solver matched source receipts
         run: |
           mkdir -p results/pass15/native
