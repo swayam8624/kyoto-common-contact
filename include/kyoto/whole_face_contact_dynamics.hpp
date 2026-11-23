@@ -55,6 +55,11 @@ struct WholeFaceStepMetrics {
     std::size_t face_interval_tests{};
     std::size_t whole_face_unresolved{};
     bool time_clipped{};
+    // Actual 3D VECTOR impulses, not just sums of scalar normal values.
+    // The rigid sphere is stationary; these are EXTERNAL body impulses.
+    V3 net_contact_impulse_vector{};
+    V3 net_contact_torque_about_step_start{};
+    V3 net_contact_torque_at_application{};
 };
 
 inline void validate(const WholeFaceContactSettings& cfg) {
@@ -111,6 +116,22 @@ inline double apply_face_velocity_impulses(
                 velocities[id]+=full_impulse*(w/body.nodes[id].mass);
                 vertex_impulses[id]+=Jn*w;
             }
+            // q_start uses the face weights chosen at the CURRENT
+            // impulse position, but the body original x at the beginning
+            // of this proposed physical step. The first is a measured
+            // contact torque, the second closes the step-level discrete
+            // angular momentum identity at the old position reference.
+            V3 barycentric_at_step_start{};
+            for(int k=0;k<3;k++){
+                const auto id=face[k];
+                barycentric_at_step_start+=
+                    body.nodes[id].x*close.barycentric[k];
+            }
+            metrics.net_contact_impulse_vector+=full_impulse;
+            metrics.net_contact_torque_about_step_start+=
+                cross(barycentric_at_step_start,full_impulse);
+            metrics.net_contact_torque_at_application+=
+                cross(close.nearest,full_impulse);
             normal_sum+=Jn;
             metrics.total_normal_impulse_ns+=Jn;
             metrics.total_tangential_impulse_ns+=Jt;
