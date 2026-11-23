@@ -254,3 +254,11 @@ add_executable(kyoto_maintained_broadphase_fuzz_tests
 target_link_libraries(kyoto_maintained_broadphase_fuzz_tests PRIVATE kyoto_contact)
 add_test(NAME independent_seeded_3D_feature_broadphase_fuzz
          COMMAND kyoto_maintained_broadphase_fuzz_tests)
+
+# Pass 20: selective AABB leaf/ancestor refitting. The ordinary full
+# refit implementation is retained as an independent control.
+add_executable(kyoto_selective_refit_tests
+               tests/selective_refit_tests.cpp)
+target_link_libraries(kyoto_selective_refit_tests PRIVATE kyoto_contact)
+add_test(NAME selective_3D_feature_refit_exhaustive_oracle_and_rollback
+         COMMAND kyoto_selective_refit_tests)
