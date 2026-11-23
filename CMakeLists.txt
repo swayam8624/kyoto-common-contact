@@ -57,6 +57,14 @@ target_link_libraries(kyoto_independent_contact_tests PRIVATE kyoto_contact)
 add_test(NAME independent_swept_prism_and_fem_contact_audit
          COMMAND kyoto_independent_contact_tests)
 
+# Pass 9 contact law's independent local kinetic work, P and L tests:
+# 1200 seeded 3D frame-rotated impulse cases, independent point triangle.
+add_executable(kyoto_impulse_balance_tests tests/contact_impulse_balance_tests.cpp)
+target_link_libraries(kyoto_impulse_balance_tests PRIVATE kyoto_contact)
+add_test(NAME independent_barycentric_impulse_energy_and_momentum
+         COMMAND kyoto_impulse_balance_tests)
+
+
 add_executable(kyoto_time_consistent_experiment apps/time_consistent_experiment.cpp)
 target_link_libraries(kyoto_time_consistent_experiment PRIVATE kyoto_contact)
 
