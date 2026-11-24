@@ -11,6 +11,9 @@ on:
       - "tests/maintained_broadphase_fuzz_tests.cpp"
       - ".github/workflows/pass27-policy-certificates.yml"
   workflow_dispatch:
+defaults:
+  run:
+    shell: bash
 jobs:
   oracle:
     strategy:
@@ -21,6 +24,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Exact low-category and conservative high-category certificate
         run: |
           mkdir -p results/pass27
