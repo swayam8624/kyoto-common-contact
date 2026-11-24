@@ -1,0 +1,49 @@
+name: Kyoto Pass 28 three-arm FEM policy ablation
+on:
+  push:
+    branches: [research/pass28-policy-ablation]
+    paths:
+      - "**.hpp"
+      - "apps/pass28_policy_fem_ablation.cpp"
+      - "scripts/report_pass28_policy_fem.py"
+      - ".github/workflows/pass28-policy-fem.yml"
+  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+jobs:
+  fem-policy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Independent policy algebra and geometry oracle
+        run: |
+          c++ -std=c++20 -O2 -Iinclude tests/policy_signature_tests.cpp -o /tmp/policy-test
+          /tmp/policy-test
+          cmake -S . -B build-pass28 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass28 --parallel 4 --target kyoto_maintained_broadphase_fuzz_tests
+          ctest --test-dir build-pass28 --output-on-failure -R independent_seeded_3D_feature_broadphase_fuzz
+      - name: Compile original FEM workload and measure native three-arm queries
+        run: |
+          mkdir -p results/pass28/native
+          git rev-parse HEAD > results/pass28/native/commit.txt
+          c++ --version > results/pass28/native/compiler.txt
+          c++ -std=c++23 -O3 -DNDEBUG -Iinclude apps/pass28_policy_fem_ablation.cpp -o /tmp/fem-policy
+          /tmp/fem-policy results/pass28/native | tee results/pass28/native/console.txt
+      - name: Audit and plot native receipts
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass28_policy_fem.py results/pass28/native/pass28_fem_policy.csv results/pass28/science
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kyoto-pass28-${{ matrix.os }}
+          path: results/pass28
