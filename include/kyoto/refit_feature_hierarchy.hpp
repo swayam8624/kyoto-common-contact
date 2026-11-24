@@ -51,6 +51,7 @@ private:
         std::vector<int> leaf_of_record;
         // Separate storage: ordinary traversal retains its original node layout.
         std::vector<PolicySignature> policies;
+        std::vector<std::array<std::uint64_t,2>> union_policies;
         int root{-1};
 
         static double centroid(const Aabb& a,int axis){
@@ -117,6 +118,20 @@ private:
                 }
             }
         }
+        void build_union_policy(const std::vector<f::Record>& records){
+            union_policies.resize(nodes.size());
+            for(std::size_t i=nodes.size();i>0;--i){
+                const auto& n=nodes[i-1];
+                if(n.leaf()){
+                    const auto& r=records[n.record];
+                    union_policies[i-1]={r.category,r.mask};
+                }else{
+                    const auto& a=union_policies[n.left];
+                    const auto& b=union_policies[n.right];
+                    union_policies[i-1]={a[0]|b[0],a[1]|b[1]};
+                }
+            }
+        }
         Aabb refit_at(int at,const std::vector<f::Record>& records) {
             Node& n=nodes[at];
             if(n.leaf())return n.bounds=records[n.record].bounds;
@@ -171,6 +186,7 @@ private:
     bool span_descent_{false};
     bool prechecked_children_{false};
     bool policy_certificates_{false};
+    bool union_policy_{false};
     std::size_t policy_prunes_{};
     std::size_t partial_refits_{},unchanged_refits_{};
     // Persistent *pair frontier*: a disjoint cut of the BVH product.
@@ -364,13 +380,22 @@ private:
     // Policy-aware traversal preserves the same geometric/incident
     // candidate contract as the legacy traversal. Count only products
     // actually rejected by policy after geometric overlap is established.
+    template<bool UnionOnly>
+    static bool may_policy(const Tree& a,int ai,const Tree& b,int bi){
+        if constexpr(UnionOnly){
+            const auto& x=a.union_policies[ai];
+            const auto& y=b.union_policies[bi];
+            return (x[0]&y[1])!=0 && (y[0]&x[1])!=0;
+        }else return a.policies[ai].may_collide(b.policies[bi]);
+    }
+    template<bool UnionOnly>
     static void cross_policy(const Tree& a,int ai,const Tree& b,int bi,
                       const std::vector<f::Record>& va,
                       const std::vector<f::Record>& fb,f::Result& out,
                       std::size_t& pruned){
         const auto& x=a.nodes[ai],&y=b.nodes[bi];
         if(!overlaps(x.bounds,y.bounds))return;
-        if(!a.policies[ai].may_collide(b.policies[bi])){
+        if(!may_policy<UnionOnly>(a,ai,b,bi)){
             ++pruned;return;
         }
         if(x.leaf()&&y.leaf()){
@@ -380,42 +405,43 @@ private:
             return;
         }
         if(x.leaf()){
-            cross_policy(a,ai,b,y.left,va,fb,out,pruned);
-            cross_policy(a,ai,b,y.right,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,ai,b,y.left,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,ai,b,y.right,va,fb,out,pruned);
         }else if(y.leaf()){
-            cross_policy(a,x.left,b,bi,va,fb,out,pruned);
-            cross_policy(a,x.right,b,bi,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.left,b,bi,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.right,b,bi,va,fb,out,pruned);
         }else{
-            cross_policy(a,x.left,b,y.left,va,fb,out,pruned);
-            cross_policy(a,x.left,b,y.right,va,fb,out,pruned);
-            cross_policy(a,x.right,b,y.left,va,fb,out,pruned);
-            cross_policy(a,x.right,b,y.right,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.left,b,y.left,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.left,b,y.right,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.right,b,y.left,va,fb,out,pruned);
+            cross_policy<UnionOnly>(a,x.right,b,y.right,va,fb,out,pruned);
         }
     }
+    template<bool UnionOnly>
     static void self_policy(const Tree& t,int ai,int bi,
                       const std::vector<f::Record>& records,f::Result& out,
                       std::size_t& pruned){
         const auto& x=t.nodes[ai],&y=t.nodes[bi];
         if(!overlaps(x.bounds,y.bounds))return;
-        if(!t.policies[ai].may_collide(t.policies[bi])){
+        if(!may_policy<UnionOnly>(t,ai,t,bi)){
             ++pruned;return;
         }
         if(ai==bi){
             if(x.leaf())return;
-            self_policy(t,x.left,x.left,records,out,pruned);
-            self_policy(t,x.left,x.right,records,out,pruned);
-            self_policy(t,x.right,x.right,records,out,pruned);
+            self_policy<UnionOnly>(t,x.left,x.left,records,out,pruned);
+            self_policy<UnionOnly>(t,x.left,x.right,records,out,pruned);
+            self_policy<UnionOnly>(t,x.right,x.right,records,out,pruned);
         }else if(x.leaf()&&y.leaf()){
             const auto& a=records[x.record];const auto& b=records[y.record];
             if(f::valid_pair(a,b,out))
                 out.pairs.push_back({f::Kind::EdgeEdge,
                     std::min(a.id,b.id),std::max(a.id,b.id)});
         }else if(x.leaf()){
-            self_policy(t,ai,y.left,records,out,pruned);
-            self_policy(t,ai,y.right,records,out,pruned);
+            self_policy<UnionOnly>(t,ai,y.left,records,out,pruned);
+            self_policy<UnionOnly>(t,ai,y.right,records,out,pruned);
         }else{
-            self_policy(t,x.left,bi,records,out,pruned);
-            self_policy(t,x.right,bi,records,out,pruned);
+            self_policy<UnionOnly>(t,x.left,bi,records,out,pruned);
+            self_policy<UnionOnly>(t,x.right,bi,records,out,pruned);
         }
     }
 
@@ -583,7 +609,8 @@ public:
                             bool dense_motion_fast_path=false,
                             bool span_descent=false,
                             bool prechecked_children=false,
-                            bool policy_certificates=false)
+                            bool policy_certificates=false,
+                            bool union_policy=false)
         :selective_boxes_(dense_motion_fast_path),
          retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
@@ -592,8 +619,10 @@ public:
          selective_motion_(selective_motion),
          span_descent_(span_descent),
          prechecked_children_(prechecked_children),
-         policy_certificates_(policy_certificates){
-        if(policy_certificates_&&(maintain_pair_cut_||span_descent_||prechecked_children_))
+         policy_certificates_(policy_certificates),union_policy_(union_policy){
+        if(policy_certificates_&&union_policy_)
+            throw std::invalid_argument("choose exactly one policy summary");
+        if((policy_certificates_||union_policy_)&&(maintain_pair_cut_||span_descent_||prechecked_children_))
             throw std::invalid_argument("policy certificate requires legacy root traversal");
         if(frontier_budget_factor_<1||frontier_budget_factor_>8)
             throw std::invalid_argument("frontier budget factor must be 1..8");
@@ -609,6 +638,13 @@ public:
         if(prechecked_children_ && (maintain_pair_cut_||span_descent_))
             throw std::invalid_argument(
                 "prechecked child traversal must use standard full dual-tree mode");
+    }
+    std::size_t policy_allocated_bytes()const{
+        const auto bytes=[](const Tree& t){
+            return t.policies.capacity()*sizeof(PolicySignature)+
+                t.union_policies.capacity()*sizeof(std::array<std::uint64_t,2>);
+        };
+        return bytes(vertices_)+bytes(edges_)+bytes(faces_);
     }
     std::size_t policy_prunes()const{return policy_prunes_;}
     std::size_t rebuilds()const{return rebuilds_;}
@@ -669,6 +705,10 @@ public:
                 vertices_.build_policy(built.vertices);
                 edges_.build_policy(built.edges);
                 faces_.build_policy(built.faces);
+            }else if(union_policy_){
+                vertices_.build_union_policy(built.vertices);
+                edges_.build_union_policy(built.edges);
+                faces_.build_union_policy(built.faces);
             }
             key_=next;initialized_=true;++rebuilds_;
             pair_cut_ready_=false;vf_cut_.clear();ee_cut_.clear();
@@ -694,11 +734,18 @@ public:
         policy_prunes_=0;
         if(policy_certificates_){
             if(vertices_.root>=0&&faces_.root>=0)
-                cross_policy(vertices_,vertices_.root,faces_,faces_.root,
+                cross_policy<false>(vertices_,vertices_.root,faces_,faces_.root,
                              built.vertices,built.faces,out,policy_prunes_);
             if(edges_.root>=0)
-                self_policy(edges_,edges_.root,edges_.root,built.edges,
+                self_policy<false>(edges_,edges_.root,edges_.root,built.edges,
                             out,policy_prunes_);
+        }else if(union_policy_){
+            if(vertices_.root>=0&&faces_.root>=0)
+                cross_policy<true>(vertices_,vertices_.root,faces_,faces_.root,
+                             built.vertices,built.faces,out,policy_prunes_);
+            if(edges_.root>=0)
+                self_policy<true>(edges_,edges_.root,edges_.root,
+                            built.edges,out,policy_prunes_);
         }else if(maintain_pair_cut_){
             std::vector<NodePair> next_vf,next_ee;
             std::size_t coarse_regions=0;
