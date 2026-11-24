@@ -1,4 +1,4 @@
-name: Kyoto Pass 26 original-FEM span descent ABBA
+name: Kyoto Pass 26 original-FEM child overlap prechecks ABBA
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
       - "scripts/report_pass26_prechecked_abba.py"
       - "tests/test_pass26_prechecked_abba_receipts.py"
       - "CMakeLists.txt"
-      - ".github/workflows/pass26-child-overlap-prechecked.yml"
+      - ".github/workflows/pass26-prechecked-vfee.yml"
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  original-fem-span-abba:
+  original-fem-prechecked-abba:
     strategy:
       fail-fast: false
       matrix:
