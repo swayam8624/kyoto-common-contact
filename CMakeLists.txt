@@ -298,3 +298,11 @@ add_test(NAME selective_dense_motion_physical_FEM_ABBA_oracle
 add_executable(kyoto_pass24_stage_profile
                apps/pass24_stage_profile.cpp)
 target_link_libraries(kyoto_pass24_stage_profile PRIVATE kyoto_contact)
+
+# Pass 25: physically integrated same-run ABBA comparison of optional
+# largest-span two-child VF/EE traversal vs independent legacy
+# four-child VF/left-first EE traversal, both maintaining identical
+# validated 3D swept feature caches and exhaustive candidate contract.
+add_executable(kyoto_pass25_traversal_abba
+               apps/pass25_traversal_abba.cpp)
+target_link_libraries(kyoto_pass25_traversal_abba PRIVATE kyoto_contact)
