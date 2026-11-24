@@ -48,6 +48,7 @@ static void compare(const f::Mesh& m,RefitHierarchy& cached,
                     RefitHierarchy& baseline,RefitHierarchy& frontier,
                     RefitHierarchy& span,
                     RefitHierarchy& prechecked,
+                    RefitHierarchy& policy,
                     kyoto::contact::persistent::OrderedSweep& sap,
                     const std::string& scenario){
     const auto truth=f::exhaustive(m).pairs;
@@ -56,6 +57,8 @@ static void compare(const f::Mesh& m,RefitHierarchy& cached,
     const auto temporal=frontier.query(m).pairs;
     const auto two_child_span=span.query(m).pairs;
     const auto child_prechecked=prechecked.query(m).pairs;
+    const auto policy_pairs=policy.query(m).pairs;
+    must(truth==policy_pairs,scenario+": policy certificate missed oracle");
     const auto order=sap.query(m).pairs;
     const auto cold_sweep=f::sweep_and_prune(m).pairs;
     must(truth==got,scenario+": cached BVH candidate mismatch");
@@ -82,7 +85,8 @@ int main(){
         RefitHierarchy cached(true,false),uncached(false,false),
                        frontier(true,true),
                        span_split(true,false,false,4,true,false,true),
-                       child_checks(true,false,false,4,true,false,false,true);
+                       child_checks(true,false,false,4,true,false,false,true),
+                       policy(true,false,false,4,true,false,false,false,true);
         kyoto::contact::persistent::OrderedSweep sap;
         std::mt19937_64 rng(985217+37*seed);
         std::uniform_real_distribution<double> u(-1,1);
@@ -125,7 +129,27 @@ int main(){
                 fce.category=frame%4==1?2:1;
                 fce.mask=(frame%10==0)?0:3;
             }
-            compare(m,cached,uncached,frontier,span_split,child_checks,sap,
+            // Nontrivial mixed directional policies, including high
+            // category bits. Changes do NOT require the caller to bump
+            // the epoch: the complete signature detects them.
+            if(frame%3==1){
+                for(auto& v:m.vertices){
+                    v.category=std::uint64_t{1}<<(rng()%8);
+                    v.mask=rng()&255u;
+                }
+                for(auto& e:m.edges){
+                    e.category=std::uint64_t{1}<<(rng()%8);
+                    e.mask=rng()&255u;
+                }
+                for(auto& face:m.faces){
+                    face.category=std::uint64_t{1}<<(rng()%8);
+                    face.mask=rng()&255u;
+                }
+            }else if(frame%3==2){
+                m.vertices[0].category=std::uint64_t{1}<<63;
+                m.faces[0].mask=~std::uint64_t{0};
+            }
+            compare(m,cached,uncached,frontier,span_split,child_checks,policy,sap,
                 "seed="+std::to_string(seed)+"/frame="+std::to_string(frame));
             ++checked;
             if(frame==17){
@@ -140,7 +164,7 @@ int main(){
                 must(rejected,"invalid numeric path was silently accepted");
                 ++invalid_rejections;
                 m.vertices[5].path.control[2].x=saved;
-                compare(m,cached,uncached,frontier,span_split,child_checks,sap,
+                compare(m,cached,uncached,frontier,span_split,child_checks,policy,sap,
                         "recover-after-NaN");
             }
         }
