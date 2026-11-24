@@ -1,0 +1,64 @@
+name: Kyoto Pass 26 original-FEM span descent ABBA
+
+on:
+  push:
+    branches: [research/pass26-prechecked-vfee]
+    paths:
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "tests/maintained_broadphase_fuzz_tests.cpp"
+      - "apps/pass26_prechecked_abba.cpp"
+      - "scripts/report_pass26_prechecked_abba.py"
+      - "tests/test_pass26_prechecked_abba_receipts.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/pass26-child-overlap-prechecked.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-fem-span-abba:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate original ABBA cost and candidate parser regression
+        run: python3 -m unittest discover -s tests -p "test_pass26_prechecked_abba_receipts.py" -v
+      - name: Compile original C++23 traversal A/B and adversarial oracle fuzz
+        run: |
+          cmake -S . -B build-pass26 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass26 --parallel 4 --target \
+            kyoto_pass26_prechecked_abba \
+            kyoto_maintained_broadphase_fuzz_tests
+      - name: Prove completeness under 1120 adversarial cubic-mesh source states
+        run: |
+          ctest --test-dir build-pass26 --output-on-failure \
+            -R independent_seeded_3D_feature_broadphase_fuzz
+      - name: Physically integrate original FEM and measure true full-paid ABBA traversal
+        run: |
+          mkdir -p results/pass26/native
+          git rev-parse HEAD > results/pass26/native/commit.txt
+          c++ --version | head -n 1 > results/pass26/native/compiler.txt
+          ./build-pass26/kyoto_pass26_prechecked_abba results/pass26/native \
+            | tee results/pass26/native/console.txt
+      - name: Validate source receipt; preserve negative results and A/A noise
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass26_prechecked_abba.py \
+            --input results/pass26/native/pass26_prechecked_original_fem_abba.csv \
+            --output results/pass26/science
+      - name: Upload original native evidence and independent code provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass26-child-overlap-prechecked-ABBA-${{ matrix.os }}
+          path: results/pass26/
+          if-no-files-found: warn
