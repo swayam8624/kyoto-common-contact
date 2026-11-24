@@ -306,3 +306,10 @@ target_link_libraries(kyoto_pass24_stage_profile PRIVATE kyoto_contact)
 add_executable(kyoto_pass25_traversal_abba
                apps/pass25_traversal_abba.cpp)
 target_link_libraries(kyoto_pass25_traversal_abba PRIVATE kyoto_contact)
+
+# Pass 26: optional conservative prechecked child-pair VF/EE traversal,
+# measured against independent incumbent recursive overlap testing
+# with identical original physically integrated FEM source geometry.
+add_executable(kyoto_pass26_prechecked_abba
+               apps/pass26_prechecked_abba.cpp)
+target_link_libraries(kyoto_pass26_prechecked_abba PRIVATE kyoto_contact)
