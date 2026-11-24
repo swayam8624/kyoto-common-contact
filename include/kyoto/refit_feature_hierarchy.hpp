@@ -151,6 +151,7 @@ private:
     CachedFeatureBoxes swept_boxes_;
     SelectiveFeatureBoxes selective_boxes_;
     bool selective_motion_{false};
+    bool span_descent_{false};
     std::size_t partial_refits_{},unchanged_refits_{};
     // Persistent *pair frontier*: a disjoint cut of the BVH product.
     // Each stored node pair covers its Cartesian leaf product, which is
@@ -187,9 +188,22 @@ private:
         return s;
     }
 
+    // Standard BVH partition heuristic: split exactly ONE nonleaf
+    // region at each overlapping node-product step. Choosing the
+    // larger current AABB span often avoids repeatedly generating
+    // and testing all four child pairs. This is correctness-preserving
+    // because either node's two children partition that node's leaves.
+    // It is a classic traversal engineering tactic, NOT novel CCD.
+    static double largest_span(const Aabb& bounds){
+        const auto dx=bounds.max.x-bounds.min.x;
+        const auto dy=bounds.max.y-bounds.min.y;
+        const auto dz=bounds.max.z-bounds.min.z;
+        return std::max({dx,dy,dz});
+    }
     static void cross(const Tree& a,int ai,const Tree& b,int bi,
                       const std::vector<f::Record>& va,
-                      const std::vector<f::Record>& fb,f::Result& out){
+                      const std::vector<f::Record>& fb,f::Result& out,
+                      bool span_descent=false){
         const auto& x=a.nodes[ai],&y=b.nodes[bi];
         if(!overlaps(x.bounds,y.bounds))return;
         if(x.leaf()&&y.leaf()) {
@@ -200,28 +214,40 @@ private:
             return;
         }
         if(x.leaf()) {
-            cross(a,ai,b,y.left,va,fb,out);
-            cross(a,ai,b,y.right,va,fb,out);
+            cross(a,ai,b,y.left,va,fb,out,span_descent);
+            cross(a,ai,b,y.right,va,fb,out,span_descent);
         } else if(y.leaf()){
-            cross(a,x.left,b,bi,va,fb,out);
-            cross(a,x.right,b,bi,va,fb,out);
-        } else {
-            cross(a,x.left,b,y.left,va,fb,out);
-            cross(a,x.left,b,y.right,va,fb,out);
-            cross(a,x.right,b,y.left,va,fb,out);
-            cross(a,x.right,b,y.right,va,fb,out);
+            cross(a,x.left,b,bi,va,fb,out,span_descent);
+            cross(a,x.right,b,bi,va,fb,out,span_descent);
+        } else if(span_descent){
+            // Equal spans break toward the vertex hierarchy. Both
+            // choices cover precisely the same Cartesian product.
+            if(largest_span(x.bounds)>=largest_span(y.bounds)){
+                cross(a,x.left,b,bi,va,fb,out,true);
+                cross(a,x.right,b,bi,va,fb,out,true);
+            }else{
+                cross(a,ai,b,y.left,va,fb,out,true);
+                cross(a,ai,b,y.right,va,fb,out,true);
+            }
+        }else{
+            // Exact legacy four-child implementation remains unchanged
+            // and serves as an independent same-frame control.
+            cross(a,x.left,b,y.left,va,fb,out,false);
+            cross(a,x.left,b,y.right,va,fb,out,false);
+            cross(a,x.right,b,y.left,va,fb,out,false);
+            cross(a,x.right,b,y.right,va,fb,out,false);
         }
     }
     static void self(const Tree& tree,int ai,int bi,
                      const std::vector<f::Record>& records,
-                     f::Result& out){
+                     f::Result& out,bool span_descent=false){
         const auto& x=tree.nodes[ai],&y=tree.nodes[bi];
         if(!overlaps(x.bounds,y.bounds))return;
         if(ai==bi){
             if(x.leaf())return;
-            self(tree,x.left,x.left,records,out);
-            self(tree,x.left,x.right,records,out);
-            self(tree,x.right,x.right,records,out);
+            self(tree,x.left,x.left,records,out,span_descent);
+            self(tree,x.left,x.right,records,out,span_descent);
+            self(tree,x.right,x.right,records,out,span_descent);
             return;
         }
         if(x.leaf()&&y.leaf()){
@@ -231,12 +257,13 @@ private:
                     std::min(a.id,b.id),std::max(a.id,b.id)});
             return;
         }
-        if(x.leaf()){
-            self(tree,ai,y.left,records,out);
-            self(tree,ai,y.right,records,out);
-        } else {
-            self(tree,x.left,bi,records,out);
-            self(tree,x.right,bi,records,out);
+        if(x.leaf() || (span_descent&&!y.leaf()&&
+            largest_span(y.bounds)>largest_span(x.bounds))){
+            self(tree,ai,y.left,records,out,span_descent);
+            self(tree,ai,y.right,records,out,span_descent);
+        }else{
+            self(tree,x.left,bi,records,out,span_descent);
+            self(tree,x.right,bi,records,out,span_descent);
         }
     }
     // A bounded cut partitions the entire product of two trees. A
@@ -400,13 +427,15 @@ public:
                             bool compact_separated_vf=false,
                             std::size_t frontier_budget_factor=4,
                             bool selective_motion=false,
-                            bool dense_motion_fast_path=false)
+                            bool dense_motion_fast_path=false,
+                            bool span_descent=false)
         :selective_boxes_(dense_motion_fast_path),
          retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
          compact_separated_vf_(compact_separated_vf),
          frontier_budget_factor_(frontier_budget_factor),
-         selective_motion_(selective_motion){
+         selective_motion_(selective_motion),
+         span_descent_(span_descent){
         if(frontier_budget_factor_<1||frontier_budget_factor_>8)
             throw std::invalid_argument("frontier budget factor must be 1..8");
         if(selective_motion_&&!retain_feature_lookup_)
@@ -415,6 +444,9 @@ public:
         if(dense_motion_fast_path&&!selective_motion_)
             throw std::invalid_argument(
                 "dense refit optimization requires selective motion tracking");
+        if(span_descent_&&maintain_pair_cut_)
+            throw std::invalid_argument(
+                "span descent is currently only valid with root dual-tree traversal");
     }
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
@@ -533,9 +565,10 @@ public:
         }else{
             if(vertices_.root>=0&&faces_.root>=0)
                 cross(vertices_,vertices_.root,faces_,faces_.root,
-                      built.vertices,built.faces,out);
+                      built.vertices,built.faces,out,span_descent_);
             if(edges_.root>=0)
-                self(edges_,edges_.root,edges_.root,built.edges,out);
+                self(edges_,edges_.root,edges_.root,
+                     built.edges,out,span_descent_);
         }
         const auto t4=stage?Clock::now():Clock::time_point{};
         f::normalize(out);

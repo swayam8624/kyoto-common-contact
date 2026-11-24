@@ -1,0 +1,64 @@
+name: Kyoto Pass 25 original-FEM span descent ABBA
+
+on:
+  push:
+    branches: [research/pass25-span-descent]
+    paths:
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "tests/maintained_broadphase_fuzz_tests.cpp"
+      - "apps/pass25_traversal_abba.cpp"
+      - "scripts/report_pass25_traversal_abba.py"
+      - "tests/test_pass25_traversal_abba_receipts.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/pass25-span-descent.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-fem-span-abba:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate original ABBA cost and candidate parser regression
+        run: python3 -m unittest discover -s tests -p "test_pass25_traversal_abba_receipts.py" -v
+      - name: Compile original C++23 traversal A/B and adversarial oracle fuzz
+        run: |
+          cmake -S . -B build-pass25 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass25 --parallel 4 --target \
+            kyoto_pass25_traversal_abba \
+            kyoto_maintained_broadphase_fuzz_tests
+      - name: Prove completeness under 1120 adversarial cubic-mesh source states
+        run: |
+          ctest --test-dir build-pass25 --output-on-failure \
+            -R independent_seeded_3D_feature_broadphase_fuzz
+      - name: Physically integrate original FEM and measure true full-paid ABBA traversal
+        run: |
+          mkdir -p results/pass25/native
+          git rev-parse HEAD > results/pass25/native/commit.txt
+          c++ --version | head -n 1 > results/pass25/native/compiler.txt
+          ./build-pass25/kyoto_pass25_traversal_abba results/pass25/native \
+            | tee results/pass25/native/console.txt
+      - name: Validate source receipt; preserve negative results and A/A noise
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass25_traversal_abba.py \
+            --input results/pass25/native/pass25_traversal_original_fem_abba.csv \
+            --output results/pass25/science
+      - name: Upload original native evidence and independent code provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass25-span-descent-ABBA-${{ matrix.os }}
+          path: results/pass25/
+          if-no-files-found: warn
