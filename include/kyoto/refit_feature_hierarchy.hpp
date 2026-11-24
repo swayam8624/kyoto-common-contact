@@ -9,6 +9,7 @@
 #include "kyoto/selective_feature_boxes.hpp"
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
@@ -21,6 +22,22 @@ namespace kyoto::contact::atlas {
 namespace f=kyoto::contact::features;
 
 class RefitHierarchy {
+public:
+    // Optional paid-stage measurement. Supplying a non-null pointer
+    // instruments only this query; normal consumers remain unprofiled.
+    // The five consecutive stage intervals SUM exactly to total_ns.
+    // These are native C++ wall-clock durations, not solver-step costs.
+    struct QueryStages {
+        std::int64_t topology_signature_ns{};
+        std::int64_t swept_feature_boxes_ns{};
+        std::int64_t cold_build_or_warm_refit_ns{};
+        std::int64_t vf_ee_traversal_ns{};
+        std::int64_t candidate_normalize_ns{};
+        std::int64_t total_ns{};
+        bool topology_cold{};
+        std::size_t dirty_vertices{},candidate_count{};
+    };
+private:
     struct Node {
         Aabb bounds{};
         int left{-1},right{-1},parent{-1};
@@ -421,11 +438,16 @@ public:
         return last_pair_cut_attempted_size_;
     }
 
-    f::Result query(const f::Mesh& mesh) {
+    f::Result query(const f::Mesh& mesh,QueryStages* stage=nullptr) {
+        // This is a separate INSTRUMENTED path; never mistake its
+        // extra clock reads for a fair head-to-head performance duel.
+        using Clock=std::chrono::steady_clock;
+        const auto t0=stage?Clock::now():Clock::time_point{};
         // Include all source mesh validation, box construction and
         // topology signature work in the benchmark timer.
         const auto next=signature(mesh);
         const bool topology_changed=(!initialized_||next!=key_);
+        const auto t1=stage?Clock::now():Clock::time_point{};
         // Both methods pay current signature validation and fresh swept
         // conservative boxes. Warm calls reuse validated vertex indices.
         f::Built uncached;
@@ -441,6 +463,7 @@ public:
             source=&uncached;
         }
         const auto& built=*source;
+        const auto t2=stage?Clock::now():Clock::time_point{};
         if(topology_changed){
             vertices_.build(built.vertices);
             edges_.build(built.edges);
@@ -464,6 +487,7 @@ public:
             }
             ++refits_;
         }
+        const auto t3=stage?Clock::now():Clock::time_point{};
         f::Result out;
         if(maintain_pair_cut_){
             std::vector<NodePair> next_vf,next_ee;
@@ -513,7 +537,20 @@ public:
             if(edges_.root>=0)
                 self(edges_,edges_.root,edges_.root,built.edges,out);
         }
+        const auto t4=stage?Clock::now():Clock::time_point{};
         f::normalize(out);
+        if(stage){
+            const auto t5=Clock::now();
+            const auto ns=[](Clock::time_point a,Clock::time_point b) {
+                return std::chrono::duration_cast<
+                    std::chrono::nanoseconds>(b-a).count();
+            };
+            // Only commit a complete stage receipt after the entire
+            // candidate set has been generated and normalized.
+            *stage={ns(t0,t1),ns(t1,t2),ns(t2,t3),
+                    ns(t3,t4),ns(t4,t5),ns(t0,t5),
+                    topology_changed,dirty_vertex_count(),out.pairs.size()};
+        }
         return out;
     }
 };
