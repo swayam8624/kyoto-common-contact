@@ -6,6 +6,8 @@ on:
       - "include/kyoto/policy_signature.hpp"
       - "include/kyoto/refit_feature_hierarchy.hpp"
       - "tests/policy_signature_tests.cpp"
+      - "apps/pass27_policy_product_study.cpp"
+      - "scripts/report_pass27_policy_products.py"
       - "tests/maintained_broadphase_fuzz_tests.cpp"
       - ".github/workflows/pass27-policy-certificates.yml"
   workflow_dispatch:
@@ -24,6 +26,12 @@ jobs:
           mkdir -p results/pass27
           c++ -std=c++20 -O2 -Iinclude tests/policy_signature_tests.cpp -o /tmp/policy-test
           /tmp/policy-test | tee results/pass27/policy-algebra.txt
+      - name: Reproduce policy-only count study and render graph
+        run: |
+          c++ -std=c++20 -O2 -Iinclude apps/pass27_policy_product_study.cpp -o /tmp/policy-study
+          /tmp/policy-study > results/pass27/policy-products.csv
+          python3 -m pip install matplotlib numpy
+          python3 scripts/report_pass27_policy_products.py results/pass27/policy-products.csv results/pass27/policy-products.png
       - name: Full production geometry and mask invalidation oracle
         run: |
           cmake -S . -B build-pass27 -DCMAKE_BUILD_TYPE=Release
