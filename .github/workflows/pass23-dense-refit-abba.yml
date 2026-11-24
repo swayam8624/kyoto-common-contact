@@ -1,0 +1,66 @@
+name: Kyoto Pass 23 dense-update isolated real-FEM A/B/B/A
+
+on:
+  push:
+    branches: [research/pass23-dense-refit-abba]
+    paths:
+      - "include/kyoto/selective_feature_boxes.hpp"
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "tests/selective_refit_tests.cpp"
+      - "apps/pass23_dense_refit_abba.cpp"
+      - "scripts/report_pass23_dense_refit_abba.py"
+      - "tests/test_pass23_dense_abba_receipts.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/pass23-dense-refit-abba.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-physical-fem-four-arm-abba:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate native receipt parser before accepting measurements
+        run: python3 -m unittest discover -s tests -p "test_pass23_dense_abba_receipts.py" -v
+      - name: Compile production 3D feature BVH and original physics benchmark
+        run: |
+          cmake -S . -B build-pass23 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass23 --parallel 4 --target \
+            kyoto_selective_refit_tests \
+            kyoto_pass23_dense_refit_abba
+      - name: Prove conservative candidate identity across masks, motion and nonfinite values
+        run: |
+          ctest --test-dir build-pass23 \
+            -R selective_3D_feature_refit_exhaustive_oracle_and_rollback \
+            --output-on-failure
+      - name: Measure three original solver-accepted 3D FEM scenes with four independent ABBA arms
+        run: |
+          mkdir -p results/pass23/native
+          git rev-parse HEAD > results/pass23/native/commit.txt
+          c++ --version | head -n 1 > results/pass23/native/compiler.txt
+          ./build-pass23/kyoto_pass23_dense_refit_abba results/pass23/native \
+            | tee results/pass23/native/console.txt
+      - name: Reject invalid source receipts and render paid original-FEM scientific figures
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass23_dense_refit_abba.py \
+            --input results/pass23/native/pass23_dense_motion_original_fem_abba.csv \
+            --output results/pass23/science
+      - name: Preserve raw per-platform source, full A/A timing and negative results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass23-original-FEM-dense-ABBA-${{ matrix.os }}
+          path: results/pass23/
+          if-no-files-found: warn
