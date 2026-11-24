@@ -313,3 +313,7 @@ target_link_libraries(kyoto_pass25_traversal_abba PRIVATE kyoto_contact)
 add_executable(kyoto_pass26_prechecked_abba
                apps/pass26_prechecked_abba.cpp)
 target_link_libraries(kyoto_pass26_prechecked_abba PRIVATE kyoto_contact)
+
+# Pass 28: genuine FEM endpoint geometry with assigned collision-policy regimes.
+add_executable(kyoto_pass28_policy_fem_ablation apps/pass28_policy_fem_ablation.cpp)
+target_link_libraries(kyoto_pass28_policy_fem_ablation PRIVATE kyoto_contact)
