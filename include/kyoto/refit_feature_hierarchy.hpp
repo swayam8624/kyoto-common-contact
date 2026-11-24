@@ -382,8 +382,10 @@ public:
                             bool maintain_pair_cut=false,
                             bool compact_separated_vf=false,
                             std::size_t frontier_budget_factor=4,
-                            bool selective_motion=false)
-        :retain_feature_lookup_(retain_feature_lookup),
+                            bool selective_motion=false,
+                            bool dense_motion_fast_path=false)
+        :selective_boxes_(dense_motion_fast_path),
+         retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
          compact_separated_vf_(compact_separated_vf),
          frontier_budget_factor_(frontier_budget_factor),
@@ -393,6 +395,9 @@ public:
         if(selective_motion_&&!retain_feature_lookup_)
             throw std::invalid_argument(
                 "selective motion tracking requires feature topology cache");
+        if(dense_motion_fast_path&&!selective_motion_)
+            throw std::invalid_argument(
+                "dense refit optimization requires selective motion tracking");
     }
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
@@ -400,6 +405,10 @@ public:
     std::size_t unchanged_refits()const{return unchanged_refits_;}
     std::size_t dirty_vertex_count()const{
         return selective_motion_?selective_boxes_.dirty_vertices().size():0;
+    }
+    std::size_t dense_motion_warm_frames()const{
+        return selective_motion_?
+            selective_boxes_.dense_motion_warm_frames():0;
     }
     std::size_t pair_cut_reuses()const{return pair_cut_reuses_;}
     std::size_t compacted_vf_merges()const{return compacted_vf_merges_;}
