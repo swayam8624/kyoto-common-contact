@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pass 25: audit ORIGINAL FEM four-arm dense-refit-vs-incumbent receipts.
+"""Pass 25: audit ORIGINAL FEM four-arm span-descent-vs-incumbent receipts.
 
 No synthetic physical input may be accepted as a research measurement.
 Repeated observations from a single simulated trajectory are correlated;
