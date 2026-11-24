@@ -1,0 +1,37 @@
+name: Kyoto Pass 27 conservative policy certificates
+on:
+  push:
+    branches: [research/pass27-policy-certificates]
+    paths:
+      - "include/kyoto/policy_signature.hpp"
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "tests/policy_signature_tests.cpp"
+      - "tests/maintained_broadphase_fuzz_tests.cpp"
+      - ".github/workflows/pass27-policy-certificates.yml"
+  workflow_dispatch:
+jobs:
+  oracle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact low-category and conservative high-category certificate
+        run: |
+          mkdir -p results/pass27
+          c++ -std=c++20 -O2 -Iinclude tests/policy_signature_tests.cpp -o /tmp/policy-test
+          /tmp/policy-test | tee results/pass27/policy-algebra.txt
+      - name: Full production geometry and mask invalidation oracle
+        run: |
+          cmake -S . -B build-pass27 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass27 --parallel 4 --target kyoto_maintained_broadphase_fuzz_tests
+          ctest --test-dir build-pass27 --output-on-failure -R independent_seeded_3D_feature_broadphase_fuzz | tee results/pass27/geometry-oracle.txt
+          git rev-parse HEAD > results/pass27/commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-certificates-${{ matrix.os }}
+          path: results/pass27
