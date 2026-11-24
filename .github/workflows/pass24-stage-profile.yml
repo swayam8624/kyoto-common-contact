@@ -1,0 +1,63 @@
+name: Kyoto Pass 24 original-FEM paid BVH stage attribution
+
+on:
+  push:
+    branches: [research/pass24-stage-profile]
+    paths:
+      - "include/kyoto/refit_feature_hierarchy.hpp"
+      - "tests/selective_refit_tests.cpp"
+      - "apps/pass24_stage_profile.cpp"
+      - "scripts/report_pass24_stage_profile.py"
+      - "tests/test_pass24_stage_profile.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/pass24-stage-profile.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-fem-stage-breakdown:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check strict stage CSV parser independently
+        run: python3 -m unittest discover -s tests -p "test_pass24_stage_profile.py" -v
+      - name: Compile opt-in stage measurement and candidate regressions
+        run: |
+          cmake -S . -B build-pass24 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pass24 --parallel 4 --target \
+            kyoto_pass24_stage_profile kyoto_selective_refit_tests
+      - name: Ensure stage overhead does not alter candidate correctness
+        run: |
+          ctest --test-dir build-pass24 --output-on-failure \
+            -R selective_3D_feature_refit_exhaustive_oracle_and_rollback
+      - name: Physically integrate original FEM and measure complete paid C++ stage partition
+        run: |
+          mkdir -p results/pass24/native
+          git rev-parse HEAD > results/pass24/native/source_commit.txt
+          c++ --version | head -n 1 > results/pass24/native/compiler.txt
+          ./build-pass24/kyoto_pass24_stage_profile results/pass24/native \
+            | tee results/pass24/native/native_console.txt
+      - name: Independently validate original source profile and chart dominant bottleneck
+        run: |
+          python3 -m pip install matplotlib
+          python3 scripts/report_pass24_stage_profile.py \
+            --input results/pass24/native/original_FEM_profiled_BVH_stages.csv \
+            --output results/pass24/science
+      - name: Preserve full raw C++ method stages and negative results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyoto-pass24-FEM-stage-profile-${{ matrix.os }}
+          path: results/pass24/
+          if-no-files-found: warn

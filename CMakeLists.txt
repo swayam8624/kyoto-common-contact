@@ -291,3 +291,10 @@ target_link_libraries(kyoto_pass23_dense_refit_abba PRIVATE kyoto_contact)
 add_test(NAME selective_dense_motion_physical_FEM_ABBA_oracle
          COMMAND kyoto_pass23_dense_refit_abba
                  ${CMAKE_CURRENT_BINARY_DIR}/pass23-original-fem-abba)
+
+# Pass 24: opt-in stage attribution of *actual* C++23
+# original-source FEM broadphase candidate generation, without
+# conflating profiler-instrumented clocks and uninstrumented IPC.
+add_executable(kyoto_pass24_stage_profile
+               apps/pass24_stage_profile.cpp)
+target_link_libraries(kyoto_pass24_stage_profile PRIVATE kyoto_contact)
