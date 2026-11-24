@@ -280,3 +280,14 @@ add_executable(kyoto_moving_moving_triangle_certificate_tests
 target_link_libraries(kyoto_moving_moving_triangle_certificate_tests PRIVATE kyoto_contact)
 add_test(NAME conservative_moving_moving_finite_triangle_time_guard
          COMMAND kyoto_moving_moving_triangle_certificate_tests)
+
+# Pass 23: isolated original physically integrated FEM ABBA. Four
+# independent maintained hierarchies compare old selective dependency
+# marks with an optional >=50%-motion dense linear envelope refresh.
+# No official IPC or solver-step speedup inferred from this ablation.
+add_executable(kyoto_pass23_dense_refit_abba
+               apps/pass23_dense_refit_abba.cpp)
+target_link_libraries(kyoto_pass23_dense_refit_abba PRIVATE kyoto_contact)
+add_test(NAME selective_dense_motion_physical_FEM_ABBA_oracle
+         COMMAND kyoto_pass23_dense_refit_abba
+                 ${CMAKE_CURRENT_BINARY_DIR}/pass23-original-fem-abba)

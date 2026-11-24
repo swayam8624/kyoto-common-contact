@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -34,6 +35,10 @@ class SelectiveFeatureBoxes {
     std::vector<std::size_t> dirty_vertices_,dirty_edges_,dirty_faces_;
     double thickness_{};
     bool ready_{};
+    // Experimental Pass 23 flag. FALSE preserves the exact incumbent
+    // selective-refit implementation for a same-run A/B control.
+    bool dense_motion_fast_path_{};
+    std::size_t dense_motion_warm_frames_{};
 
     static bool same(const CubicVertex& a,const CubicVertex& b) {
         for(std::size_t i=0;i<a.control.size();++i) {
@@ -91,6 +96,11 @@ class SelectiveFeatureBoxes {
             dirty_faces_.push_back(i);
     }
 public:
+    explicit SelectiveFeatureBoxes(bool dense_motion_fast_path=false)
+        :dense_motion_fast_path_(dense_motion_fast_path){}
+    std::size_t dense_motion_warm_frames()const{
+        return dense_motion_warm_frames_;
+    }
     const std::vector<std::size_t>& dirty_vertices()const{return dirty_vertices_;}
     const std::vector<std::size_t>& dirty_edges()const{return dirty_edges_;}
     const std::vector<std::size_t>& dirty_faces()const{return dirty_faces_;}
@@ -121,20 +131,36 @@ public:
                                                mesh.thickness));
             }
         }
-        std::vector<unsigned char> edge_mark(mesh.edges.size(),0);
-        std::vector<unsigned char> face_mark(mesh.faces.size(),0);
         std::vector<std::size_t> changed_edges,changed_faces;
-        for(auto v:changed) {
-            for(auto e:incident_edges_[v]) {
-                if(!edge_mark[e]) {
-                    edge_mark[e]=1;
-                    changed_edges.push_back(e);
+        // An actual source with 50%-100% moving vertices typically
+        // dirties nearly all edges and faces. The incumbent path
+        // allocates two byte masks and repeatedly visits adjacency,
+        // even though it will do a full hierarchy refit afterward.
+        // This safe dense fallback writes EVERY feature envelope.
+        // It deliberately over-updates some static features; doing
+        // more conservative work CANNOT remove a candidate.
+        const bool dense=dense_motion_fast_path_&&!changed.empty()&&
+            changed.size()*2>=mesh.vertices.size();
+        if(dense){
+            changed_edges.resize(mesh.edges.size());
+            changed_faces.resize(mesh.faces.size());
+            std::iota(changed_edges.begin(),changed_edges.end(),std::size_t{0});
+            std::iota(changed_faces.begin(),changed_faces.end(),std::size_t{0});
+        }else if(!changed.empty()){
+            std::vector<unsigned char> edge_mark(mesh.edges.size(),0);
+            std::vector<unsigned char> face_mark(mesh.faces.size(),0);
+            for(auto v:changed) {
+                for(auto e:incident_edges_[v]) {
+                    if(!edge_mark[e]) {
+                        edge_mark[e]=1;
+                        changed_edges.push_back(e);
+                    }
                 }
-            }
-            for(auto face:incident_faces_[v]) {
-                if(!face_mark[face]) {
-                    face_mark[face]=1;
-                    changed_faces.push_back(face);
+                for(auto face:incident_faces_[v]) {
+                    if(!face_mark[face]) {
+                        face_mark[face]=1;
+                        changed_faces.push_back(face);
+                    }
                 }
             }
         }
@@ -159,6 +185,7 @@ public:
                 built_.vertices[ids[2]].bounds);
         }
         thickness_=mesh.thickness;
+        if(dense)++dense_motion_warm_frames_;
         dirty_vertices_=std::move(changed);
         dirty_edges_=std::move(changed_edges);
         dirty_faces_=std::move(changed_faces);
