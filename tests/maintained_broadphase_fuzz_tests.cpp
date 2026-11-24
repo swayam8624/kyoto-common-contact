@@ -47,6 +47,7 @@ static f::Mesh fixture(std::uint64_t seed){
 static void compare(const f::Mesh& m,RefitHierarchy& cached,
                     RefitHierarchy& baseline,RefitHierarchy& frontier,
                     RefitHierarchy& span,
+                    RefitHierarchy& prechecked,
                     kyoto::contact::persistent::OrderedSweep& sap,
                     const std::string& scenario){
     const auto truth=f::exhaustive(m).pairs;
@@ -54,6 +55,7 @@ static void compare(const f::Mesh& m,RefitHierarchy& cached,
     const auto old=baseline.query(m).pairs;
     const auto temporal=frontier.query(m).pairs;
     const auto two_child_span=span.query(m).pairs;
+    const auto child_prechecked=prechecked.query(m).pairs;
     const auto order=sap.query(m).pairs;
     const auto cold_sweep=f::sweep_and_prune(m).pairs;
     must(truth==got,scenario+": cached BVH candidate mismatch");
@@ -61,6 +63,8 @@ static void compare(const f::Mesh& m,RefitHierarchy& cached,
     must(truth==temporal,scenario+": bounded temporal frontier mismatch");
     must(truth==two_child_span,scenario+
          ": larger-span two-child VF/EE traversal missed oracle");
+    must(truth==child_prechecked,scenario+
+         ": child-AABB-prechecked VF/EE traversal missed oracle");
     must(truth==order,scenario+": retained-order SAP mismatch");
     must(truth==cold_sweep,scenario+": rebuilt SAP mismatch");
     const std::size_t budget=std::max(std::size_t{64},
@@ -77,7 +81,8 @@ int main(){
         auto m=fixture(seed);
         RefitHierarchy cached(true,false),uncached(false,false),
                        frontier(true,true),
-                       span_split(true,false,false,4,true,false,true);
+                       span_split(true,false,false,4,true,false,true),
+                       child_checks(true,false,false,4,true,false,false,true);
         kyoto::contact::persistent::OrderedSweep sap;
         std::mt19937_64 rng(985217+37*seed);
         std::uniform_real_distribution<double> u(-1,1);
@@ -120,7 +125,7 @@ int main(){
                 fce.category=frame%4==1?2:1;
                 fce.mask=(frame%10==0)?0:3;
             }
-            compare(m,cached,uncached,frontier,span_split,sap,
+            compare(m,cached,uncached,frontier,span_split,child_checks,sap,
                 "seed="+std::to_string(seed)+"/frame="+std::to_string(frame));
             ++checked;
             if(frame==17){
@@ -135,7 +140,7 @@ int main(){
                 must(rejected,"invalid numeric path was silently accepted");
                 ++invalid_rejections;
                 m.vertices[5].path.control[2].x=saved;
-                compare(m,cached,uncached,frontier,span_split,sap,
+                compare(m,cached,uncached,frontier,span_split,child_checks,sap,
                         "recover-after-NaN");
             }
         }
