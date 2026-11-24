@@ -4,6 +4,7 @@ on:
     branches: [research/pass28-policy-ablation]
     paths:
       - "**.hpp"
+      - "CMakeLists.txt"
       - "apps/pass28_policy_fem_ablation.cpp"
       - "scripts/report_pass28_policy_fem.py"
       - ".github/workflows/pass28-policy-fem.yml"
@@ -36,8 +37,8 @@ jobs:
           mkdir -p results/pass28/native
           git rev-parse HEAD > results/pass28/native/commit.txt
           c++ --version > results/pass28/native/compiler.txt
-          c++ -std=c++23 -O3 -DNDEBUG -Iinclude apps/pass28_policy_fem_ablation.cpp -o /tmp/fem-policy
-          /tmp/fem-policy results/pass28/native | tee results/pass28/native/console.txt
+          cmake --build build-pass28 --parallel 4 --target kyoto_pass28_policy_fem_ablation
+          ./build-pass28/kyoto_pass28_policy_fem_ablation results/pass28/native | tee results/pass28/native/console.txt
       - name: Audit and plot native receipts
         run: |
           python3 -m pip install matplotlib
