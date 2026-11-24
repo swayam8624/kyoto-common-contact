@@ -152,6 +152,7 @@ private:
     SelectiveFeatureBoxes selective_boxes_;
     bool selective_motion_{false};
     bool span_descent_{false};
+    bool prechecked_children_{false};
     std::size_t partial_refits_{},unchanged_refits_{};
     // Persistent *pair frontier*: a disjoint cut of the BVH product.
     // Each stored node pair covers its Cartesian leaf product, which is
@@ -266,6 +267,81 @@ private:
             self(tree,x.right,bi,records,out,span_descent);
         }
     }
+    // Pass26: precheck child-product AABBs BEFORE recursing, so a
+    // disjoint pair never pays the call/frame/dispatch cost of entering
+    // cross() or self(). The parent-to-child overlap test is moved,
+    // not omitted; the source pair-product partition is unchanged.
+    // These helpers are called only for node products already proven
+    // to have intersecting current AABBs in the exact same frame.
+    static void cross_prechecked(const Tree& a,int ai,
+                                 const Tree& b,int bi,
+                                 const std::vector<f::Record>& va,
+                                 const std::vector<f::Record>& fb,
+                                 f::Result& out){
+        const auto& x=a.nodes[ai],&y=b.nodes[bi];
+        if(x.leaf()&&y.leaf()){
+            const auto& v=va[x.record];
+            const auto& face=fb[y.record];
+            if(f::valid_pair(v,face,out))
+                out.pairs.push_back({f::Kind::VertexFace,v.id,face.id});
+            return;
+        }
+        if(x.leaf()){
+            if(overlaps(x.bounds,b.nodes[y.left].bounds))
+                cross_prechecked(a,ai,b,y.left,va,fb,out);
+            if(overlaps(x.bounds,b.nodes[y.right].bounds))
+                cross_prechecked(a,ai,b,y.right,va,fb,out);
+        }else if(y.leaf()){
+            if(overlaps(a.nodes[x.left].bounds,y.bounds))
+                cross_prechecked(a,x.left,b,bi,va,fb,out);
+            if(overlaps(a.nodes[x.right].bounds,y.bounds))
+                cross_prechecked(a,x.right,b,bi,va,fb,out);
+        }else{
+            if(overlaps(a.nodes[x.left].bounds,b.nodes[y.left].bounds))
+                cross_prechecked(a,x.left,b,y.left,va,fb,out);
+            if(overlaps(a.nodes[x.left].bounds,b.nodes[y.right].bounds))
+                cross_prechecked(a,x.left,b,y.right,va,fb,out);
+            if(overlaps(a.nodes[x.right].bounds,b.nodes[y.left].bounds))
+                cross_prechecked(a,x.right,b,y.left,va,fb,out);
+            if(overlaps(a.nodes[x.right].bounds,b.nodes[y.right].bounds))
+                cross_prechecked(a,x.right,b,y.right,va,fb,out);
+        }
+    }
+    static void self_prechecked(const Tree& tree,int ai,int bi,
+                                const std::vector<f::Record>& records,
+                                f::Result& out){
+        const auto& x=tree.nodes[ai],&y=tree.nodes[bi];
+        if(ai==bi){
+            if(x.leaf())return; // no edge-self candidate
+            self_prechecked(tree,x.left,x.left,records,out);
+            if(overlaps(tree.nodes[x.left].bounds,
+                        tree.nodes[x.right].bounds))
+                self_prechecked(tree,x.left,x.right,records,out);
+            self_prechecked(tree,x.right,x.right,records,out);
+            return;
+        }
+        if(x.leaf()&&y.leaf()){
+            const auto& left=records[x.record];
+            const auto& right=records[y.record];
+            if(f::valid_pair(left,right,out))
+                out.pairs.push_back({f::Kind::EdgeEdge,
+                    std::min(left.id,right.id),
+                    std::max(left.id,right.id)});
+            return;
+        }
+        if(x.leaf()){
+            if(overlaps(x.bounds,tree.nodes[y.left].bounds))
+                self_prechecked(tree,ai,y.left,records,out);
+            if(overlaps(x.bounds,tree.nodes[y.right].bounds))
+                self_prechecked(tree,ai,y.right,records,out);
+        }else{
+            if(overlaps(tree.nodes[x.left].bounds,y.bounds))
+                self_prechecked(tree,x.left,bi,records,out);
+            if(overlaps(tree.nodes[x.right].bounds,y.bounds))
+                self_prechecked(tree,x.right,bi,records,out);
+        }
+    }
+
     // A bounded cut partitions the entire product of two trees. A
     // coarse retained node-pair is NOT a rejection certificate: on each
     // new frame it must either be shown separated, refined, or traversed
@@ -428,14 +504,16 @@ public:
                             std::size_t frontier_budget_factor=4,
                             bool selective_motion=false,
                             bool dense_motion_fast_path=false,
-                            bool span_descent=false)
+                            bool span_descent=false,
+                            bool prechecked_children=false)
         :selective_boxes_(dense_motion_fast_path),
          retain_feature_lookup_(retain_feature_lookup),
          maintain_pair_cut_(maintain_pair_cut),
          compact_separated_vf_(compact_separated_vf),
          frontier_budget_factor_(frontier_budget_factor),
          selective_motion_(selective_motion),
-         span_descent_(span_descent){
+         span_descent_(span_descent),
+         prechecked_children_(prechecked_children){
         if(frontier_budget_factor_<1||frontier_budget_factor_>8)
             throw std::invalid_argument("frontier budget factor must be 1..8");
         if(selective_motion_&&!retain_feature_lookup_)
@@ -447,6 +525,9 @@ public:
         if(span_descent_&&maintain_pair_cut_)
             throw std::invalid_argument(
                 "span descent is currently only valid with root dual-tree traversal");
+        if(prechecked_children_ && (maintain_pair_cut_||span_descent_))
+            throw std::invalid_argument(
+                "prechecked child traversal must use standard full dual-tree mode");
     }
     std::size_t rebuilds()const{return rebuilds_;}
     std::size_t refits()const{return refits_;}
@@ -562,6 +643,16 @@ public:
             vf_cut_.swap(next_vf);
             ee_cut_.swap(next_ee);
             pair_cut_ready_=true;
+        }else if(prechecked_children_){
+            if(vertices_.root>=0&&faces_.root>=0&&
+               overlaps(vertices_.nodes[vertices_.root].bounds,
+                        faces_.nodes[faces_.root].bounds))
+                cross_prechecked(vertices_,vertices_.root,
+                                 faces_,faces_.root,
+                                 built.vertices,built.faces,out);
+            if(edges_.root>=0)
+                self_prechecked(edges_,edges_.root,edges_.root,
+                                built.edges,out);
         }else{
             if(vertices_.root>=0&&faces_.root>=0)
                 cross(vertices_,vertices_.root,faces_,faces_.root,
