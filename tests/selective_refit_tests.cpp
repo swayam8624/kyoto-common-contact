@@ -60,6 +60,37 @@ int main(){
     parity(selective,baseline,dense,mesh,"initial cold");
     require(selective.rebuilds()==1,"cold source must build hierarchy");
 
+    // Profiler accounting is a separate experiment. It must preserve
+    // the exact candidate set and produce a complete partition of the
+    // native wall-clock query duration, including cold and warm work.
+    RefitHierarchy instrumented(true,false,false,4,true);
+    RefitHierarchy::QueryStages first{},same_frame{};
+    const auto expected=f::exhaustive(mesh).pairs;
+    require(instrumented.query(mesh,&first).pairs==expected,
+            "instrumented cold hierarchy changed candidate set");
+    require(instrumented.query(mesh,&same_frame).pairs==expected,
+            "instrumented stationary hierarchy changed candidate set");
+    const auto coherent=[](const RefitHierarchy::QueryStages& q){
+        return q.total_ns>0 &&
+            q.total_ns==q.topology_signature_ns+
+                        q.swept_feature_boxes_ns+
+                        q.cold_build_or_warm_refit_ns+
+                        q.vf_ee_traversal_ns+
+                        q.candidate_normalize_ns &&
+            q.topology_signature_ns>=0&&q.swept_feature_boxes_ns>=0&&
+            q.cold_build_or_warm_refit_ns>=0&&
+            q.vf_ee_traversal_ns>=0&&q.candidate_normalize_ns>=0;
+    };
+    require(coherent(first)&&coherent(same_frame),
+            "stage timings do not sum exactly to paid C++ query time");
+    require(first.topology_cold&&!same_frame.topology_cold,
+            "profiled cold/warm source labeling incorrect");
+    require(same_frame.dirty_vertices==0,
+            "profiled unchanged source incorrectly marked dirty");
+    require(first.candidate_count==expected.size() &&
+            same_frame.candidate_count==expected.size(),
+            "profiled candidate metadata incorrect");
+
     // 30 static source frames: the queried geometry is identical, but
     // the broadphase still re-evaluates candidate coverage each frame.
     for(int frame=0;frame<30;++frame){
