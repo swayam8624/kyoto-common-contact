@@ -382,3 +382,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_coupled_torus_physics_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 32A: restricted same-body nonincident face contact.
+add_executable(kyoto_nonincident_self_contact_tests
+               tests/nonincident_self_contact_tests.cpp)
+target_link_libraries(kyoto_nonincident_self_contact_tests PRIVATE kyoto_contact)
+add_test(NAME restricted_nonincident_same_body_contact
+         COMMAND kyoto_nonincident_self_contact_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_nonincident_self_contact_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_nonincident_self_contact_tests PRIVATE /fp:strict)
+endif()
