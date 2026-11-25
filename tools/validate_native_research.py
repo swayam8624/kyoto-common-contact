@@ -48,6 +48,7 @@ EXACT = [
 ]
 IPC = [
     ("kyoto_pass34_connected_ipc_audit", "pinned_IPC_connected_FEM_accepted_and_rejected_CCD"),
+    ("kyoto_pass39_tight_inclusion_native", "direct_upstream_tight_inclusion_native_accepted_rejected"),
     ("kyoto_official_ipc_native_backend_tests", "pinned_IPC_LBVH_inside_native_typed_FEM"),
 ]
 METAL = [("kyoto_pass37_metal_physical_scaling", "physical_Metal_candidate_scaling_smoke")]

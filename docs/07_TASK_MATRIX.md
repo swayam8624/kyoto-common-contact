@@ -1205,3 +1205,42 @@ archive; the repository summary is rounded to three decimals. Timing
 ratios are paired per block, equal-weight geomeans, not whole-solver or
 universal claims. Exact volume receipt SHA-256:
 20d88849b0b019f2ffd6de848f998caf00d77583fb268dff42c0ad8bf75a9c27.
+
+## Executed independent upstream narrow-phase validation
+
+- [x] Retrieve hash-verified actual Tight Inclusion v1.0.6 numerical
+  source, the exact version specified in pinned IPC Toolkit's
+  cmake/recipes/tight_inclusion.cmake (IPC pin 19bcab7e1f5a0d2addfcd28513422ff248ea504e;
+  upstream v1.0.6 tree 7377d78162f9fdb5fe44b54b6f9c01bc6ce0885a).
+- [x] Compile original ccd.cpp, interval.cpp, interval_root_finder.cpp,
+  avx.cpp separately on GCC and Clang, using available Eigen and
+  default double precision, timers/rational/queue limit disabled.
+  Missing spdlog was replaced only in the local build copy with
+  a logging shim (trace no-op; upstream error throws); original
+  numerical source unchanged. No performance result attributed to
+  the external dependency. Full official IPC wrapper/LBVH not run.
+- [x] Exhaustive admissible VF/EE enumeration without broad-phase
+  culling, for 20 accepted native leaves and 2 rejected native
+  proposals, tested at both zero and 0.0005 m separation.
+  Tight Inclusion BFS, auto error bound, tolerance 1e-7 m,
+  max 100000 iterations, tmax=1, no_zero_toi=false.
+  1,192,226 queries per compiler, 1,156,128 on accepted leaves
+  (361,344 VF and 794,784 EE), no reported possible contact on any
+  accepted leaf and zero missing candidate keys on all queries.
+- [x] Positive controls: rejected U-solid proposal reports 57
+  self-event stencils, rejected cross-tetra proposal reports 42
+  cross-event stencils, each at both separations. Both actual
+  zero-subdivision native steps refuse and leave clocks unchanged.
+  TOI values are conservative prefixes, not exact impact times.
+  All GCC and Clang raw receipts byte-identical; SHA-256
+  c30e8a0f08d1cc51567a57dec4210d76fcf508c0f4f2b777daba0dbd8bf38c85.
+- [x] Register direct test against actual CMake dependency when IPC
+  enabled; source and raw exact receipts hash-verified.
+- [ ] Full IPC Toolkit API and LBVH integration still unexecuted.
+- [ ] Real GPU hardware not available (CUDA/MPS false; no GPU devices).
+- [ ] Independent full external contact dynamics solver, beyond
+  narrow-phase validation.
+
+This is actual independent external CCD execution, not a substitute
+solver built from our own equations. It strengthens the empirical
+safety evidence while leaving broader interoperability gates open.

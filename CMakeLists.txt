@@ -589,3 +589,15 @@ add_test(NAME physical_strong_cpu_baselines_smoke COMMAND kyoto_pass39_strong_cp
 if(KYOTO_WITH_EXACT_SELF_VOLUME)
   add_test(NAME physical_coupled_volume_campaign_smoke COMMAND kyoto_pass39_coupled_volume_campaign 1)
 endif()
+
+# Direct independent narrow phase from the pinned IPC dependency.
+if(KYOTO_WITH_OFFICIAL_IPC AND TARGET tight_inclusion::tight_inclusion)
+  add_executable(kyoto_pass39_tight_inclusion_native apps/pass39_tight_inclusion_native.cpp)
+  target_link_libraries(kyoto_pass39_tight_inclusion_native PRIVATE kyoto_contact tight_inclusion::tight_inclusion)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(kyoto_pass39_tight_inclusion_native PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(kyoto_pass39_tight_inclusion_native PRIVATE /fp:strict)
+  endif()
+  add_test(NAME direct_upstream_tight_inclusion_native_accepted_rejected COMMAND kyoto_pass39_tight_inclusion_native)
+endif()
