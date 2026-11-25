@@ -23,6 +23,7 @@ struct CoupledFEMSettings {
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
+    kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
@@ -248,7 +249,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       const CoupledFEMSettings& c={},
                                       std::vector<CoupledFEMLeaf>* trace=nullptr){
     using namespace coupled_detail;
-    if(&a==&b||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+    if(&a==&b||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
@@ -261,7 +262,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         throw std::invalid_argument("coupled bodies have different clocks");
     Body sa=a,sb=b;
     CoupledFEMStats total;
-    TypedSelfAuditor auditor_a,auditor_b; // retained within macrostep, revalidated every query
+    TypedSelfAuditor auditor_a(c.external_self_candidates),auditor_b(c.external_self_candidates); // revalidated every query
     // Verify initial cross-surface separation; volume disjointness and
     // self-validity are explicit caller preconditions, not inferred here.
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
