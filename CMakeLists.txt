@@ -489,7 +489,8 @@ endif()
 # and native physical transaction regression.
 add_executable(kyoto_initial_tet_separation_tests tests/initial_tet_separation_tests.cpp)
 add_executable(kyoto_initial_volume_fem_tests tests/initial_volume_fem_tests.cpp)
-foreach(target kyoto_initial_tet_separation_tests kyoto_initial_volume_fem_tests)
+add_executable(kyoto_initial_tet_exact_oracle_tests tests/initial_tet_exact_oracle_tests.cpp)
+foreach(target kyoto_initial_tet_separation_tests kyoto_initial_volume_fem_tests kyoto_initial_tet_exact_oracle_tests)
   target_link_libraries(${target} PRIVATE kyoto_contact)
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(${target} PRIVATE -ffp-contract=off -fno-fast-math)
@@ -499,3 +500,5 @@ foreach(target kyoto_initial_tet_separation_tests kyoto_initial_volume_fem_tests
 endforeach()
 add_test(NAME outward_initial_tetrahedral_separation COMMAND kyoto_initial_tet_separation_tests)
 add_test(NAME initial_volume_FEM_containment_rollback COMMAND kyoto_initial_volume_fem_tests)
+
+add_test(NAME initial_tetrahedral_exact_integer_oracle COMMAND kyoto_initial_tet_exact_oracle_tests)
