@@ -843,3 +843,44 @@ candidate test dbb0029583bff71f395f91aa92bf2ff06b9aa710;
 volume audit d8496416da9f05545aa5163e699a6f3ffb5cb7df;
 fixture test 381f42aca909135261e8d85e4df9372466706dd7.
 
+
+
+## Pass 39A — measured whole exact-volume audit cost
+
+- [x] Execute five paired ABBA/BAAB blocks per case (two evaluations
+  per arm), with one excluded warmup, on all nine Pass 38I prescribed
+  fixtures. GCC and Clang runs executed sequentially: 360 timed audits
+  total, 180 per compiler. Every run matched exact reference receipts.
+- [x] Preserve both unmodified raw timing CSVs under docs/evidence.
+  GCC blob 96f611ba33fe0db1bda00edc6794bc1e1648c929;
+  Clang blob 13c35320f29dd9fb6808c8fe4de5c3eef3687bd6.
+- [x] Strict C++23 -O2 -Wall -Wextra -Wpedantic -Werror
+  -ffp-contract=off -fno-fast-math builds, GCC 14.2.0 and Clang 17.0.0;
+  Linux x86_64 container, AMD EPYC 9V74, 5 visible CPUs, CPU quota
+  4 cores, 4 GiB memory limit. Shared environment, no controlled
+  clock or load isolation; descriptive results only.
+- [x] Validate raw rows, expected order, reference work and polynomial
+  counts within each paired block; reject incomplete block. Provide
+  reproducible timing and overlap-work plots and paired-block CSV.
+- [x] Descriptive geometric mean of paired exhaustive/sweep elapsed
+  time ratios: GCC 0.9752548871x, Clang 1.0071758602x. These small
+  whole exact audits do not demonstrate meaningful overall speedup.
+  Candidate filtering decreases overlap tests, not exact work.
+  Certificate-dominated cost is a plausible explanation, not a
+  separately profiled attribution. Min/max bars are observed blocks,
+  not confidence intervals or independent workload samples.
+- [ ] Actual native FEM trajectories and independent solver/GPU
+  validation are still pending. These are prescribed paths, not FEM.
+
+Reproduce the analysis (optional Matplotlib for PNG output):
+
+    python3 tools/summarize_pass39.py docs/evidence/pass38i_swept_volume_gcc_clang.csv docs/evidence/pass39-gcc.csv docs/evidence/pass39-clang.csv results/pass39 --plots
+
+Rebuild the measured benchmark from repository root:
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass39_exact_volume_abba.cpp -o /tmp/kyoto-pass39-gcc
+    /tmp/kyoto-pass39-gcc > /tmp/pass39-gcc.csv
+
+Use the same flags with clang++ for the second arm. Source hash
+43d5cb6031b8404b2f662d9543a0892ee6dcb277 and analysis script hash
+70a9d262040735d18e65776705c75f19e5719f46 match locally executed files.
