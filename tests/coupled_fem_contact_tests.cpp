@@ -59,7 +59,45 @@ static void run(bool fast){
     const int steps=fast?1:30;
     const double dt=fast?.004:.0005;
     for(int i=0;i<steps;++i){
-        const auto x=step_coupled_fem(a,b,dt,flat);
+        std::vector<CoupledFEMLeaf> trace;
+        const auto x=step_coupled_fem(a,b,dt,flat,&trace);
+        require(trace.size()==x.accepted_leaves,"missing actual physical leaves");
+        double elapsed=0.;
+        for(std::size_t k=0;k<trace.size();++k){
+            const auto& leaf=trace[k];
+            require(leaf.dt>0.&&leaf.before_a.time_seconds==leaf.before_b.time_seconds&&
+                    leaf.after_a.time_seconds==leaf.after_b.time_seconds&&
+                    std::abs(leaf.after_a.time_seconds-leaf.before_a.time_seconds-leaf.dt)<1e-12,
+                    "leaf physical time is inconsistent");
+            if(k>0){
+                const auto& prev=trace[k-1];
+                require(prev.after_a.time_seconds==leaf.before_a.time_seconds,
+                        "leaf time gap");
+                for(std::size_t j=0;j<leaf.before_a.nodes.size();++j)
+                    require(norm(prev.after_a.nodes[j].x-leaf.before_a.nodes[j].x)==0.,
+                            "first body leaf geometry gap");
+                for(std::size_t j=0;j<leaf.before_b.nodes.size();++j)
+                    require(norm(prev.after_b.nodes[j].x-leaf.before_b.nodes[j].x)==0.,
+                            "second body leaf geometry gap");
+            }
+            // A separate exhaustive dense sample audit: regression, not
+            // a proof of absence of all continuous collisions.
+            for(int t=0;t<=32;++t){
+                const double u=double(t)/32.;
+                for(const auto& f:leaf.before_a.surface_faces)
+                    for(const auto& g:leaf.before_b.surface_faces){
+                        const auto x0=coupled_detail::positions(leaf.before_a,f);
+                        const auto x1=coupled_detail::positions(leaf.after_a,f);
+                        const auto y0=coupled_detail::positions(leaf.before_b,g);
+                        const auto y1=coupled_detail::positions(leaf.after_b,g);
+                        require(triangle_triangle_closest(lerp_vertices(x0,x1,u),
+                                  lerp_vertices(y0,y1,u)).distance>flat.skin,
+                                "sampled accepted physical trajectory crossed skin");
+                    }
+            }
+            elapsed+=leaf.dt;
+        }
+        require(std::abs(elapsed-dt)<1e-12,"accepted leaf durations do not sum");
         const auto y=step_coupled_fem(aa,bb,dt,tree);
         same(a,aa);same(b,bb);
         require(x.impulse_updates==y.impulse_updates&&x.accepted_leaves==y.accepted_leaves&&
@@ -105,10 +143,12 @@ int main(){
         const Body aa=a,bb=b;
         CoupledFEMSettings c;c.max_bisection=0;
         bool rejected=false;
-        try{(void)step_coupled_fem(a,b,.004,c);}
+        std::vector<CoupledFEMLeaf> trace(1);trace[0].dt=-1.;
+        try{(void)step_coupled_fem(a,b,.004,c,&trace);}
         catch(const std::runtime_error&){rejected=true;}
         require(rejected,"unsafe full trial accepted under zero subdivision budget");
         same(a,aa);same(b,bb);
+        require(trace.size()==1&&trace[0].dt==-1.,"failed step mutated caller trace");
         std::cout<<"PASS coupled two-volume FEM physical time, momentum and rollback\n";
         return 0;
     }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<'\n';return 1;}
