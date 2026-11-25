@@ -12,6 +12,7 @@
 // cannot be given to IPC's linear two-endpoint CCD without refinement.
 // No solver/contact response or performance improvement is asserted.
 
+#include "kyoto/linear_candidate_adapter.hpp"
 #include <ipc/broad_phase/lbvh.hpp>
 #include <ipc/candidates/edge_edge.hpp>
 #include <ipc/candidates/face_vertex.hpp>
@@ -155,6 +156,64 @@ bool actual_ccd(const Scene& s,TaggedPair p,double& toi) {
         candidate.dof(s.t0,s.edges,s.faces),
         candidate.dof(s.t1,s.edges,s.faces),toi);
 }
+// Pass 27: replace the broad-phase producer, while retaining exactly
+// the existing upstream CCD implementation and original matrix inputs.
+// Check the entire event set and earliest conservative safe prefix.
+// The persistent adapter survives topology changes between scenes.
+void audit_sca(const Scene& s,const Audit& a,
+               kyoto::contact::atlas::LinearCandidateAdapter& adapter) {
+    using namespace kyoto::contact;
+    std::vector<Vec3> start,end;
+    std::vector<atlas::IndexedEdge> edges;
+    std::vector<atlas::IndexedFace> faces;
+    for(int i=0;i<s.t0.rows();++i){
+        start.push_back({s.t0(i,0),s.t0(i,1),s.t0(i,2)});
+        end.push_back({s.t1(i,0),s.t1(i,1),s.t1(i,2)});
+    }
+    for(int i=0;i<s.edges.rows();++i)
+        edges.push_back({std::size_t(s.edges(i,0)),std::size_t(s.edges(i,1))});
+    for(int i=0;i<s.faces.rows();++i)
+        faces.push_back({std::size_t(s.faces(i,0)),std::size_t(s.faces(i,1)),
+                         std::size_t(s.faces(i,2))});
+    const auto pairs=adapter.query(start,end,edges,faces).pairs;
+    const auto prior_refits=adapter.refits();
+    const auto repeated=adapter.query(start,end,edges,faces).pairs;
+    ensure(pairs==repeated && adapter.refits()==prior_refits+1,
+           s.name+": SCA repeated query lost parity or warm state");
+    std::vector<TaggedPair> events;
+    double earliest=1.;
+    for(const auto& p:pairs){
+        TaggedPair tag;
+        if(p.kind==features::Kind::VertexFace){
+            ensure(p.first<start.size()&&p.second<faces.size(),
+                   s.name+": SCA invalid VF row index");
+            tag={0,int(p.first),int(p.second)};
+            ensure(!incident_vf(s,tag.a,tag.b),
+                   s.name+": SCA emitted incident VF");
+        }else{
+            ensure(p.first<edges.size()&&p.second<edges.size()&&p.first<p.second,
+                   s.name+": SCA invalid EE row index");
+            tag={1,int(p.first),int(p.second)};
+            ensure(!incident_ee(s,tag.a,tag.b),
+                   s.name+": SCA emitted incident EE");
+        }
+        double toi=1.;
+        if(actual_ccd(s,tag,toi)){
+            ensure(std::isfinite(toi)&&toi>=0&&toi<=1,
+                   s.name+": SCA/IPC invalid safe prefix");
+            events.push_back(tag);
+            earliest=std::min(earliest,toi);
+        }
+    }
+    unique(events);
+    ensure(events==a.all_events,
+           s.name+": SCA supplied a different upstream CCD event set");
+    ensure(std::abs(earliest-a.earliest_toi)<=1e-12,
+           s.name+": SCA supplied a different earliest CCD safe prefix");
+    std::cout<<"SCA case="<<s.name<<" candidates="<<pairs.size()
+             <<" upstream_events="<<events.size()
+             <<" earliest_safe_prefix="<<earliest<<'\n';
+}
 Audit validate(const Scene& s) {
     Audit a;
     ipc::LBVH official;
@@ -265,8 +324,10 @@ int main(int argc,char**argv) {
             samples<<"case_name,frame,t,vertex_id,x,y,z\n";
         }
         std::size_t count=0,events=0,missing=0,ambiguous=0;
+        kyoto::contact::atlas::LinearCandidateAdapter sca;
         for(const auto& scene:cases) {
             const Audit a=validate(scene);
+            audit_sca(scene,a,sca);
             count++;
             events+=a.all_events.size();
             if(export_data) {
@@ -293,6 +354,11 @@ int main(int argc,char**argv) {
                      <<" VF_events="<<a.vf_hits<<" EE_events="<<a.ee_hits
                      <<" earliest_TOI="<<a.earliest_toi<<'\n';
         }
+        ensure(sca.rebuilds()>1 && sca.refits()>=count,
+               "SCA topology change and warm reuse were not exercised");
+        std::cout<<"SCA upstream CCD parity gate: "<<count
+                 <<" scenes; rebuilds="<<sca.rebuilds()
+                 <<" refits="<<sca.refits()<<'\n';
         if(export_data) {
             ensure(audit.good()&&samples.good(),"cannot write CCD evidence");
             audit.close();samples.close();
