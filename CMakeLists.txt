@@ -441,3 +441,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_typed_connected_self_contact_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 36A: actual physical warm ownership across macrosteps.
+add_executable(kyoto_persistent_fem_context_tests tests/persistent_fem_context_tests.cpp)
+target_link_libraries(kyoto_persistent_fem_context_tests PRIVATE kyoto_contact)
+add_test(NAME persistent_typed_FEM_physical_parity COMMAND kyoto_persistent_fem_context_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_persistent_fem_context_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_persistent_fem_context_tests PRIVATE /fp:strict)
+endif()
