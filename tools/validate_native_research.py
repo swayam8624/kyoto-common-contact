@@ -16,6 +16,8 @@ NATIVE = [
     ("kyoto_linear_candidate_adapter_tests", "indexed_linear_solver_candidate_adapter_oracle"),
     ("kyoto_external_candidate_filter_tests", "external_candidate_superset_normalization"),
     ("kyoto_cached_axis_sap_tests", "cached_axis_sap_dynamic_topology_and_reversal"),
+    ("kyoto_spatial_first_sap_tests", "spatial_first_sap_dynamic_topology_parity"),
+    ("kyoto_pass40_spatial_first_solver", "spatial_first_native_solver_smoke"),
     ("kyoto_triangle_barycentric_boundary_tests", "triangle_barycentric_boundary_roundoff_regression"),
     ("kyoto_cross_cell_sweep_tests", "bipartite_cross_cell_sweep_exhaustive_parity"),
     ("kyoto_relative_scalar_projection_tests", "relative_scalar_projection_complete_receipt_parity"),

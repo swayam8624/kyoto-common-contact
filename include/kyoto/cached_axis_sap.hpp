@@ -31,6 +31,17 @@ class CachedAxisSweep {
     std::vector<std::size_t> ee_order_;
     std::vector<CachedSweepEntry> vf_order_;
     bool initialized_{};
+    bool spatial_first_{};
+    // Spatial-first deliberately counts overlap predicates before mask/incident
+    // rejection. The key set is the same; work receipts differ by order.
+    bool valid_pair(const f::Record& a,const f::Record& b,f::Result& r)const {
+        if(!spatial_first_)return f::valid_pair(a,b,r);
+        ++r.candidate_aabb_tests;
+        if(!overlaps(a.bounds,b.bounds))return false;
+        if(!f::allows(a,b)){++r.mask_rejections;return false;}
+        if(f::incident(a,b)){++r.incident_rejections;return false;}
+        return true;
+    }
     int axis_{};
     std::size_t invalidations_{};
     std::size_t warm_frames_{};
@@ -68,6 +79,7 @@ class CachedAxisSweep {
         }
     }
 public:
+    explicit CachedAxisSweep(bool spatial_first=false):spatial_first_(spatial_first){}
     std::size_t rebuilds()const{return initialized_?invalidations_+1:0;}
     std::size_t fallback_sorts()const{return fallback_sorts_;}
     std::size_t invalidations()const{return invalidations_;}
@@ -125,7 +137,7 @@ public:
                 active.end());
             for(auto j:active) {
                 const auto& b=built.edges[j];
-                if(f::valid_pair(a,b,result))
+                if(valid_pair(a,b,result))
                     result.pairs.push_back({f::Kind::EdgeEdge,
                         std::min(a.id,b.id),std::max(a.id,b.id)});
             }
@@ -146,7 +158,7 @@ public:
             for(auto j:other){
                 const auto& v=e.vertex?built.vertices[e.index]:built.vertices[j];
                 const auto& face=e.vertex?built.faces[j]:built.faces[e.index];
-                if(f::valid_pair(v,face,result))
+                if(valid_pair(v,face,result))
                     result.pairs.push_back({f::Kind::VertexFace,v.id,face.id});
             }
             own.push_back(e.index);

@@ -1399,3 +1399,32 @@ Real Mac device gate (unrun):
     ./build/kyoto_pass40_metal_packed_mask /tmp/packed-metal 64
 
 Raw evidence CSVs in docs/evidence/pass40_*.csv.
+
+## Executed Pass 40 follow-up: stronger CPU sweep, three-body implicit contact and tiled shader
+
+- [x] Spatial-first optional cached sweep: perform original inclusive binary64 AABB overlap before mask/incident checks. Default remains the previous order. All 4,000 changing-mesh comparisons and 500 malformed/recovery controls per compiler passed, including reversal fallback. Candidate counts agree; work-counter semantics intentionally differ by filter order.
+- [x] Paid matched replay: six sustained coupled workloads plus ten width/regime cases (176 accepted leaves, 16 workloads); six order-balanced measured blocks, three arms, 3,168 queries per compiler, all candidate identities equal to exhaustive. Reference persistent-axis SAP / spatial-first geometric mean 1.3912495283 (GCC) and 1.2193532409 (Clang). Prior cached SAP / spatial-first 1.2885464520 and 1.0971780037. One Clang case regressed versus persistent axis. Measured query includes complete preparation and filtering; this does not establish universal superiority.
+- [x] Optional solver integration with independent context invalidation, spatial-first requiring cached SAP. Three order-balanced measured blocks on ten native width/regime cases; 90 trajectories and 360 macrosteps per compiler, equal physical state and tested decision receipts; switches and rollback passed. Retained BVH / spatial-first whole-solver geomean 1.0069077624 (GCC) and 1.0342789132 (Clang). Cached SAP / spatial-first 1.0372045301 and 1.0345253073. Shared VM; small whole-solver gains must not be overstated. Timeouts were resolved by rerunning only missing complete workload cases; combined data validated for all slots and no duplicates. Benchmark source gained a minimum-case selector for resumption; timed inner loop unchanged.
+- [x] Independent CasADi/IPOPT three-body dynamics, three pairwise fixed directions and independently optimized moving separating planes. Four 32-step trajectories, three active cases (16 simultaneous two-contact steps each) and one separated control. Positive Jacobians (minimum approximately .977058), stationarity residual at most 8.04e-14, complementarity at most 6.14e-11. No claim of arbitrary nonplanar contact or independent self-contact dynamics. Replay each of 128 accepted steps at both zero and .0005 m clearance: 740,736 exhaustive upstream public CCD queries, 18,098 matching candidate identities, 18,324 exact swept cell-pair certificates per compiler. No reported events or missing candidates, zero unresolved certificates. GCC and Clang receipts byte-identical. Upstream IPC remains the previously validated serial compatibility build, not stock oneTBB.
+- [x] Tiled packed GPU work planner: exact binary64 union bounds of groups of 32 features sorted on selected axis, reject disjoint tile pairs, preserve every inclusive candidate via outward float masks and original binary64 host filter. Shared shader compiled to SPIR64 LLVM IR and host-native OpenCL C object; actually execute compiled kernel in serial CPU work-item harness. GCC/Clang each passed 1,000 randomized scenes and 40 native leaves, including all five width scales and two regimes. Physical logical rectangular slots 70,901,664 -> 4,861,344 (93.14% fewer, including diagonal tile reserved slots); output words 2,215,728 -> 154,880 (8,862,912 -> 619,520 bytes, 14.31x smaller). 4,840 jobs and 42,176 coarse tile overlap tests across distinct leaves, 103,888 final candidate keys. Same receipts across compilers, excluding timing. 360 timed CPU queries per compiler across three arms. Persistent SAP / tiled CPU-emulation geomean .7066727351 and .6649408962: slower on CPU. These are logical workload and payload reductions, NOT GPU speedups. Emitted Metal shader has not been compiled or integrated into a new real-device host. GPU hardware unavailable.
+- [x] Execute actual accepted and rejected native IPC leaf visualizations from previously measured source, plus recorded independent three-body trajectory video and impulse plot. Raw source and animation files delivered in a separate evidence archive; renderer source registered in repository. No manuscript work.
+- [ ] Actual GPU device, real Metal compilation and paid GPU comparisons; stock upstream parallel IPC build; broader independent arbitrary contact and adversarial physical generality. No formal percentage acceptance claim.
+
+Reproduce new CPU tests (C++23 strict floating point) via the added CMake targets or direct -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude compilation. Spatial-first solver args are optional maximum width and minimum case ID; use default for full workload. Query campaign optional minimum scene ID (default all). Raw query receipts are gzip-compressed in docs/evidence; decompression is lossless.
+
+Independent contact:
+    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/pass40_three_body_contact.py /tmp/three-body
+    cmake -S . -B build-three -DKYOTO_WITH_OFFICIAL_IPC=ON -DKYOTO_WITH_EXACT_SELF_VOLUME=ON
+    cmake --build build-three --target kyoto_pass40_three_body_replay
+    ./build-three/kyoto_pass40_three_body_replay /tmp/three-body/trajectory.txt
+    python3 tools/render_three_body_contact.py /tmp/three-body /tmp/three-body-visuals
+
+Offline shader (Linux x86-64, Clang OpenCL C compiler):
+    g++ -std=c++23 -O2 -Iinclude tools/export_tiled_gpu_shader.cpp -o /tmp/export-tiles
+    /tmp/export-tiles > /tmp/tiles.cl
+    clang -x cl -cl-std=CL1.2 -target spir64-unknown-unknown -emit-llvm -c -O2 -Werror /tmp/tiles.cl -o /tmp/tiles.bc
+    clang -x cl -cl-std=CL1.2 -target x86_64-unknown-linux-gnu -c -O2 -Werror /tmp/tiles.cl -o /tmp/tiles.o
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/pass40_tiled_gpu_mask_tests.cpp /tmp/tiles.o -o /tmp/tiles-test
+    /tmp/tiles-test > /tmp/tiles.csv
+
+CMake registrations authored; full stock dependency configuration and physical GPU run remain unverified.

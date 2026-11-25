@@ -30,8 +30,9 @@ class LinearCandidateAdapter {
     RefitHierarchy hierarchy_;
     persistent::CachedAxisSweep cached_sap_;
     bool use_cached_sap_{};
+    bool spatial_first_{};
 public:
-    explicit LinearCandidateAdapter(bool cached_sap=false):use_cached_sap_(cached_sap){}
+    explicit LinearCandidateAdapter(bool cached_sap=false,bool spatial_first=false):cached_sap_(spatial_first),use_cached_sap_(cached_sap),spatial_first_(spatial_first){if(spatial_first&&!cached_sap)throw std::invalid_argument("spatial-first requires cached SAP");}
     std::size_t rebuilds() const { return use_cached_sap_?cached_sap_.rebuilds():hierarchy_.rebuilds(); }
     std::size_t refits() const { return use_cached_sap_?cached_sap_.warm_frames():hierarchy_.refits(); }
 
@@ -89,7 +90,7 @@ public:
         }
         if(exhaustive_reference)return f::exhaustive(mesh);
         try { return use_cached_sap_?cached_sap_.query(mesh):hierarchy_.query(mesh); }
-        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{}; throw; }
+        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{spatial_first_}; throw; }
     }
 };
 } // namespace kyoto::contact::atlas
