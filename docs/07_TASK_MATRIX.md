@@ -292,3 +292,37 @@ kernel, so they are not independent exact CCD mathematics.
     ctest --test-dir build -R 'outward_relative_moving_triangle_surface_certificate|coupled_toroidal_volumes_physical_parity' --output-on-failure -V
     ./build/kyoto_coupled_torus_physics_tests results/pass31b
 
+
+
+## Pass 32A — restricted same-body nonincident surface contact
+
+- [x] Canonical unordered nonincident face/face pairs, sorted flat/tree
+  backends, shared-node exclusion and rounded relative swept safety.
+- [x] Optional same-body contact impulses integrated into both physical
+  kick/drift stages of the coupled FEM solver. Only accepted leaf
+  impulses enter the internal work ledger; rejected trials contribute
+  computational counters but never mutate the public bodies.
+- [x] Separate cross-body and same-body impulse and work accounting.
+  A same-body impulse contributes its magnitude to each side's nodal
+  receipt (twice the scalar contact impulse when summed across the body).
+- [x] Author same-storage two-disconnected-tetrahedron fast collision
+  fixture, no cross-body interaction, flat/tree state equality, total
+  momentum and contact kinetic work, 33-sample accepted leaf audit,
+  incident tetrahedron control and zero-budget atomic rollback.
+- [ ] Verify compilation and native execution on Linux/macOS.
+- [ ] Connected folded-solid self-contact, adjacent-face nonincident
+  VF/EE checks, shared-node generalized Jacobians, and global
+  injectivity/containment are NOT solved by the restricted face contract.
+
+The switch is opt-in. Any face pair sharing a vertex is excluded
+because ordinary adjacent surfaces have zero distance. This prevents
+a shared node from receiving two conflicting overwrite operations, but
+can hide collisions away from the shared vertex. No claim of complete
+self-collision detection or response follows. A same-body scalar work
+ledger is separate from the existing cross-body ledger.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_nonincident_self_contact_tests --parallel 2
+    ctest --test-dir build -R restricted_nonincident_same_body_contact --output-on-failure -V
+
+CI is configured in .github/workflows/pass28-native-solver.yml.
