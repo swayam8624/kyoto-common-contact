@@ -54,7 +54,7 @@ static void run(bool fast){
     const auto initial=measure(a,b);
     const auto p0a=momentum(a),p0b=momentum(b);
     V3 impulse{};
-    double min_gap=gap,min_j=1,contact_work=0;
+    double min_gap=gap,min_j=1,certified_j=1,contact_work=0;
     std::size_t updates=0,rejections=0,leaves=0;
     const int steps=fast?1:30;
     const double dt=fast?.004:.0005;
@@ -103,13 +103,16 @@ static void run(bool fast){
         require(x.impulse_updates==y.impulse_updates&&x.accepted_leaves==y.accepted_leaves&&
                 x.rejected_geometry==y.rejected_geometry&&x.rejected_tets==y.rejected_tets&&
                 x.certificate_tests==y.certificate_tests&&x.interval_nodes==y.interval_nodes&&
+                x.orientation_nodes==y.orientation_nodes&&x.certified_min_j==y.certified_min_j&&
                 x.normal_impulse==y.normal_impulse&&x.contact_kinetic_change==y.contact_kinetic_change,
                 "hierarchical contact decisions diverged");
         require(std::abs(a.time_seconds-(i+1)*dt)<1e-12&&a.time_seconds==b.time_seconds,
                 "two physical clocks diverged");
         const double g=minimum_gap(a,b);
-        require(g>flat.skin&&x.min_j>1e-6,"accepted coupled state unsafe");
+        require(g>flat.skin&&x.min_j>1e-6&&x.certified_min_j>1e-6&&x.orientation_nodes>0,
+                "accepted coupled state lacks continuous orientation proof");
         min_gap=std::min(g,min_gap);min_j=std::min(min_j,x.min_j);
+        certified_j=std::min(certified_j,x.certified_min_j);
         double ia=0,ib=0;
         for(const auto& n:a.nodes)ia+=n.last_normal_impulse;
         for(const auto& n:b.nodes)ib+=n.last_normal_impulse;
@@ -129,7 +132,7 @@ static void run(bool fast){
     if(fast)require(rejections>0&&leaves>1,"fast coupled fixture did not exercise subdivision");
     std::cout<<std::setprecision(17)<<"COUPLED_FEM fast="<<fast<<" steps="<<steps
              <<" updates="<<updates<<" geom_rejections="<<rejections<<" leaves="<<leaves
-             <<" min_gap_m="<<min_gap<<" min_j="<<min_j
+             <<" min_gap_m="<<min_gap<<" min_j="<<min_j<<" certified_continuous_min_j="<<certified_j
              <<" momentum_residual="<<norm(final.p-initial.p)
              <<" angular_residual="<<norm(final.l-initial.l)
              <<" contact_work_j="<<contact_work
