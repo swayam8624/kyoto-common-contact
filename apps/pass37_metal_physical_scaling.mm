@@ -132,6 +132,33 @@ public:
         }
     }
 };
+// Explicit conversion controls, including ranges where float precision
+// collapses different doubles and subnormal float values may flush.
+static void precision_controls(MetalMask& gpu){
+    for(double scale:{1.,16777216.,1e-40}){
+        f::Mesh m;
+        auto add=[&](double x,double y,double z){
+            const kyoto::contact::Vec3 p{x,y,z};
+            m.vertices.push_back({std::uint64_t(m.vertices.size()),
+                                  kyoto::contact::CubicVertex{{p,p,p,p}}});
+        };
+        const double delta=scale==16777216.?.25:scale*.125;
+        add(scale,0,0);add(scale+delta,0,0);
+        add(scale,delta,0);add(scale+delta*.5,delta*.5,0);
+        add(scale,0,delta);add(scale+delta,delta,0);
+        m.edges={{0,{0,2}},{1,{1,3}},{2,{4,5}}};
+        m.faces={{0,{0,1,2}}};
+        m.thickness=0.;
+        const auto expected=f::exhaustive(m).pairs;
+        const auto result=gpu.query(m);
+        need(!expected.empty()&&result.candidates.pairs==expected,
+             "Metal rounded precision control failed");
+    }
+    const double tiny=1e-45;
+    need(double(bound(tiny,true))>=tiny&&double(bound(tiny,false))<=tiny&&
+         double(bound(-tiny,true))>=-tiny&&double(bound(-tiny,false))<=-tiny,
+         "Metal subnormal enclosure failed");
+}
 int main(int argc,char** argv){
  @autoreleasepool {
     try{
@@ -145,6 +172,7 @@ int main(int argc,char** argv){
         metadata<<device.name.UTF8String<<'\n';
         csv<<std::setprecision(17)<<"width_cells,regime,block,leaf,backend,query_ns,candidates,rectangular_slots,dispatches,mask_positives\n";
         MetalMask gpu(device);
+        precision_controls(gpu);
         for(unsigned width:{1u,4u,16u,32u,64u}){
             if(width>maximum)continue;
             for(int regime=0;regime<2;++regime){
