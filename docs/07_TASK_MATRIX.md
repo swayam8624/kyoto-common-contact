@@ -1514,3 +1514,67 @@ Actual Mac device gate (unrun):
     ./build-metal/kyoto_pass40_metal_tiled_mask /tmp/kyoto-metal-new 64
 
 The raw paired timings, independent physical receipts and replay CSV are committed under docs/evidence. CMake registration authored but stock dependency build not run.
+
+## Physical Mac results reported by operator; audited tiled producer integration
+
+- [x] Operator reports M2 Pro physical tiled/packed Metal query campaign
+  at ae962885738a5676e73941c7c4ce018f2401149e: 1280 observations,
+  320 matched four-arm groups, all five widths and two regimes, exhaustive
+  candidate-vector parity. Fused CPU SAP has lowest median paid latency at
+  every width in both regimes. Width 64 separated: fused 0.647 ms,
+  spatial-first 0.841, tiled Metal 2.493, packed Metal 8.516; near:
+  fused 0.780, spatial-first 0.943, tiled 2.544, packed 8.316 ms.
+  Hardware measurement includes planning/dispatch/readback/filtering,
+  not a full GPU solver. Do not assert a GPU performance advantage.
+- [x] Operator reports stock pinned IPC Toolkit build (oneTBB, SIMD
+  disabled), native backend CTest 1/1 and independent nonconvex replay
+  128 accepted steps, 32 simultaneous-contact steps, 2032128 CCD
+  checks, 54126 exact pair-path certificates, zero events/missing
+  keys. One zero-skin candidate count 106 vs earlier 102, with differing
+  regenerated gap and IPOPT iteration count; locally verified exhaustive
+  parity. Other 255 rows matched. Preserve the cross-platform variation.
+  Operator also reports actual nonconvex U/insert gallery, shared camera
+  and scale, topology and local volume-change plots. Raw Mac files have
+  not been transferred into this environment, so these are reported
+  results, not independently inspected local artifacts.
+- [x] Execute actual compiled OpenCL C tiled kernel through external
+  candidate hook inside native coupled FEM against fused SAP reference
+  (CPU-host machine code, NOT GPU hardware). All 34 transitive repository
+  headers match pinned Git blobs. Strict GCC/Clang C++23 builds, freshly
+  emitted shader compiled by Clang. 12 physical cases per compiler:
+  all five widths and both regimes, plus rotated width4 near/separated.
+  56 accepted leaves, 448 producer calls, 589120 matching candidate
+  identities, 8780 self impulses, 22469696 tile slots, 22467 jobs,
+  718944 output words per compiler. Every compared state and receipt
+  matches, including before/after accepted leaf endpoints, depth and dt.
+  Both receipts byte-identical, SHA-256
+  8a0bd3c26afd6b45341fa7cb37a002abd230f4921a056cc22f6e4cc2687a381f.
+- [x] Missing candidate injected into a nonempty actual backend result
+  triggers exact exhaustive parity exception; truncated actual dispatch
+  mask triggers exact size exception. Both preserve caller trace and
+  committed states and clear context; subsequent recovery and switching
+  external/fused/external verified. Exhaustive guard remains mandatory;
+  this is an integration correctness test, not a paid speedup test.
+- [x] Extract previously device-tested Metal dispatch class unchanged
+  into common Objective-C++ header and add actual Metal frontend for
+  identical native integration campaign. New frontend/refactor authored
+  but not compiled or executed on Mac here; user-reported earlier
+  query results refer to the previous source. Full device integration
+  gate remains open until the new command passes.
+- [ ] Actual device bridge execution and further generalization beyond
+  tested decompositions; no claim of automatic general nonconvex contact
+  or universal CPU/GPU superiority.
+
+Reproduce host kernel integration (Linux x86-64):
+    g++ -std=c++23 -O2 -Iinclude tools/export_tiled_gpu_shader.cpp -o /tmp/export-tiles
+    /tmp/export-tiles > /tmp/tiles.cl
+    clang -x cl -cl-std=CL1.2 -target x86_64-unknown-linux-gnu -c -O2 -Werror /tmp/tiles.cl -o /tmp/tiles.o
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass40_tiled_solver_host.cpp /tmp/tiles.o -o /tmp/bridge
+    /tmp/bridge 64
+
+New actual Mac solver bridge (unrun here):
+    cmake -S . -B build-metal -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-metal --target kyoto_pass40_metal_solver_bridge
+    ./build-metal/kyoto_pass40_metal_solver_bridge /tmp/kyoto-metal-bridge 64
+
+Raw host receipts: docs/evidence/pass40_tiled_solver_host_gcc_clang.csv.

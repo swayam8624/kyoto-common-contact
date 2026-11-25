@@ -755,3 +755,15 @@ if(KYOTO_WITH_OFFICIAL_IPC AND KYOTO_WITH_EXACT_SELF_VOLUME)
     target_compile_options(kyoto_pass40_nonconvex_replay PRIVATE /fp:strict)
   endif()
 endif()
+
+# Audited GPU candidate integration into actual coupled native solver.
+# Host OpenCL harness is built by the explicit offline shader command below
+# (not an ordinary C++-only CMake target).
+if(APPLE)
+  add_executable(kyoto_pass40_metal_solver_bridge apps/pass40_metal_solver_bridge.mm)
+  set_target_properties(kyoto_pass40_metal_solver_bridge PROPERTIES OBJCXX_STANDARD 23 OBJCXX_STANDARD_REQUIRED ON OBJCXX_EXTENSIONS OFF)
+  target_link_libraries(kyoto_pass40_metal_solver_bridge PRIVATE kyoto_contact "-framework Foundation" "-framework Metal")
+  target_compile_options(kyoto_pass40_metal_solver_bridge PRIVATE -fobjc-arc -ffp-contract=off -fno-fast-math)
+  add_test(NAME physical_Metal_solver_bridge_smoke COMMAND kyoto_pass40_metal_solver_bridge ${CMAKE_CURRENT_BINARY_DIR}/pass40-metal-bridge-smoke 1)
+  set_tests_properties(physical_Metal_solver_bridge_smoke PROPERTIES SKIP_RETURN_CODE 77)
+endif()
