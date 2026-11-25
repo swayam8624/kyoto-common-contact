@@ -31,13 +31,21 @@ int main(){
         const auto exact_skin=motion({0,0,skin},{0,0,skin});
         need(!certify_rounded_relative_triangle_pair(exact_skin,fixed,skin).entirely_separated,
              "strict skin boundary incorrectly certified");
-        // A rotating (affinely interpolated) direction: safe, but the
-        // root relative hull overlaps the origin in a zero-skin sense.
-        // Two tiny parallel triangles trace opposing corners with
-        // the entire relative segment staying away from the origin.
-        const auto diagonal=motion({-.3,.5,.01},{.5,-.3,.01});
-        need(certify_rounded_relative_triangle_pair(diagonal,fixed,.001).entirely_separated,
-             "positive z separation lost");
+        // Root hull contains zero: one endpoint vertex is (1,-1,0)
+        // and another at the other endpoint is (-1,1,0). At every
+        // simultaneous time the triangle nevertheless stays away from
+        // the small static triangle around the origin. Dyadic slabs
+        // recover a witness without accepting the entire root hull.
+        const LinearTriangleMotion turning{
+            {V3{1,-2,0},V3{1,-1,0},V3{1,-1.5,.1}},
+            {V3{-1,1,0},V3{-2,1,0},V3{-1.5,1,.1}}};
+        const Triangle3 small{V3{0,0,0},V3{.001,0,0},V3{0,.001,0}};
+        const LinearTriangleMotion still{small,small};
+        need(!certify_rounded_relative_triangle_pair(turning,still,skin,0).entirely_separated,
+             "root hull fixture did not exercise unresolved support");
+        const auto refined=certify_rounded_relative_triangle_pair(turning,still,skin,12);
+        need(refined.entirely_separated&&refined.max_depth>0,
+             "safe changing witness failed dyadic refinement");
         std::mt19937_64 rng(31012026);
         std::uniform_real_distribution<double> d(-.7,.7);
         auto v=[&](){return V3{d(rng),d(rng),d(rng)};};
