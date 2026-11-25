@@ -475,3 +475,47 @@ not main. It must not be merged before validation.
     cmake --build build-ipc --target kyoto_official_ipc_native_backend_tests --parallel 2
     ctest --test-dir build-ipc -R pinned_IPC_LBVH_inside_native_typed_FEM --no-tests=error --output-on-failure -V
 
+
+
+## Pass 36A–B — persistent physical ownership and paid cold/warm experiment
+
+- [x] Retain original-node topology mapping and candidate hierarchy
+  across actual FEM macrosteps with an optional caller-owned context.
+- [x] Check exact ordered face connectivity and node count every query;
+  invalidate topology epoch and rebuild on changes.
+- [x] Keep actual swept vertex inputs fresh; never cache safety or
+  contact response decisions. Clear context on failed bound transaction.
+- [x] Account for typed safety candidate box tests, incident rejections
+  and certificate interval nodes, previously omitted from the ledger.
+- [x] Author cold/warm physical parity, stable rebuild counts, face
+  reorder invalidation and failed-transaction recovery regressions.
+- [x] Author five-block ABBA/BAAB paid whole-macrostep experiment,
+  discarding one complete warmup block; four independent trajectories
+  per block, eight macrosteps each. Check physical state and receipts
+  after every matched step outside timers. Record raw nanoseconds and
+  available warm reuse counters.
+- [x] Configure independent Linux/macOS validation and measurement jobs
+  with compiler, system and source commit receipts.
+- [ ] Execute and inspect actual numerical and timing receipts.
+- [ ] Extend to representative size/motion distributions and compare
+  SAP, external solver integrations and native GPU implementations
+  using matched contracts. Do not infer speedup from reuse counters.
+
+Context is single-owner, not thread-safe. It only persists typed
+self-contact mapping and hierarchy; cross-body face tree is still
+rebuilt. A validation error before binding has not mutated the
+context; a failure after binding resets it. External producer remains
+audited and is not a performance arm. Timing includes physical state
+copying, force evaluation, candidate preparation, certificates,
+response and commit, but excludes fixture construction and parity
+assertions. This small workload is a first paid comparison, not
+scaling evidence. Hosted runner timing is exploratory.
+
+Draft PR #15 Pass 35 head workflow runs were visible, with jobs queued;
+no native or external pass result observed. Local clone DNS unavailable.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_persistent_fem_context_tests kyoto_pass36_paid_persistent_fem_abba --parallel 2
+    ctest --test-dir build -R persistent_typed_FEM_physical_parity --no-tests=error --output-on-failure -V
+    ./build/kyoto_pass36_paid_persistent_fem_abba results/pass36
+
