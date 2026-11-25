@@ -1340,3 +1340,13 @@ Reproduce with:
     /tmp/cross-reuse > /tmp/cross-reuse-gcc.csv
 
 Raw source-hash-verified CSVs: docs/evidence/pass39_cross_witness_{gcc,clang}.csv.
+
+## Executed long-trajectory independent safety verification
+
+- [x] Re-run all six physical workloads from the cross-witness experiment with both reference and optimized contact response, comparing complete before/after leaf states and time/depth, not just committed macrosteps. Both modes produced identical physical endpoints throughout.
+- [x] Independent exact swept-volume audit of each combined two-body complex and exhaustive admissible Tight Inclusion VF/EE checks at zero and 0.0005 m clearance. Same original upstream v1.0.6 numerical library as earlier direct audit, local logger shim only; no IPC wrapper or LBVH execution claim.
+- [x] GCC 14.2 and Clang 17 strict C++23 O2, warnings-as-errors, no fast math, using prior verified source subset and the latest two changed headers. 136 accepted leaves per compiler, 4,079,760 possible tetrahedral pairs, 433,291 exact pair-path certificates (171547/139408/84080/38256 by shared vertices 0/1/2/3), 27,544,656 upstream CCD queries per compiler. Zero unresolved exact pair/orientation checks, zero reported upstream events at either clearance and zero missing candidates. Full CSV byte-identical; SHA-256 ae1217f8e3702d3c1ce7dd3ef345e85eb5f94e11925a0b05c157f3c04ebcb447. Clean rerun into private temporary files after live CSV export interfered with initial output; only complete rerun accepted.
+- [x] Register optional integrated test when both exact and official IPC dependencies are enabled. Local direct compiler build/run verified; complete CMake target still requires dependency checkout.
+- [ ] Real Metal, complete IPC Toolkit wrapper/LBVH and independent external contact dynamics remain unexecuted.
+
+The audit is outside the timed solver path. It corroborates the tested physical trajectories, not universal solver injectivity or a new performance result. Raw receipt: docs/evidence/pass39_long_physical_audit_gcc_clang.csv.

@@ -632,3 +632,15 @@ foreach(target kyoto_triangle_barycentric_boundary_tests kyoto_pass39_cross_witn
   endif()
 endforeach()
 add_test(NAME triangle_barycentric_boundary_roundoff_regression COMMAND kyoto_triangle_barycentric_boundary_tests)
+
+# Long coupled trajectories, independent exact-volume and upstream CCD audits.
+if(KYOTO_WITH_OFFICIAL_IPC AND KYOTO_WITH_EXACT_SELF_VOLUME AND TARGET tight_inclusion::tight_inclusion)
+  add_executable(kyoto_pass39_long_physical_audit apps/pass39_long_physical_audit.cpp)
+  target_link_libraries(kyoto_pass39_long_physical_audit PRIVATE kyoto_contact tight_inclusion::tight_inclusion)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(kyoto_pass39_long_physical_audit PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(kyoto_pass39_long_physical_audit PRIVATE /fp:strict)
+  endif()
+  add_test(NAME long_coupled_exact_volume_and_upstream_ccd COMMAND kyoto_pass39_long_physical_audit)
+endif()
