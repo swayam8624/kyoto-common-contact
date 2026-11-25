@@ -1,14 +1,15 @@
 #pragma once
 // Pass 29B: actual synchronized two-body neo-Hookean FEM integration.
 // Separate volumes, initially disjoint, fixed topology, frictionless.
-// Cross-body moving face separation uses the existing Pass 22A
-// conservative-in-real-arithmetic certificate. Unknown -> retry smaller dt.
-// Self contact, containment detection, exact rounded CCD and general
+// Pass 31A defaults to the outward-enclosed relative-hull separation
+// certificate; the guarded Pass 22A remains an explicit comparison arm.
+// Unknown -> retry smaller dt. Self contact, containment, exact event CCD and general
 // contact manifolds remain outside this explicit reference solver.
 #include "kyoto/coupled_triangle_normal_impulse.hpp"
 #include "kyoto/moving_triangle_pair_certificate.hpp"
 #include "kyoto/static_face_hierarchy.hpp"
 #include "kyoto/tet_orientation_certificate.hpp"
+#include "kyoto/rounded_relative_triangle_certificate.hpp"
 #include <optional>
 #include <vector>
 
@@ -20,11 +21,13 @@ struct CoupledFEMSettings {
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
+    bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
 struct CoupledFEMStats {
     double integrated_dt{},normal_impulse{},contact_kinetic_change{};
     std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
-        impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{};
+        impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{},
+        rounded_directions{},rounded_projections{};
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
     double certified_min_j{std::numeric_limits<double>::infinity()};
@@ -148,14 +151,28 @@ inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& 
     std::vector<std::size_t> rows;
     for(const auto& f:a0.surface_faces){
         const LinearTriangleMotion path{positions(a0,f),positions(a1,f)};
-        // Match the certificate's root AABB guard exactly.
-        collect_static_face_rows(swept_bounding(path),c.skin+1e-12,boxes,
+        // The full endpoint AABB bounds the linear path. With finite
+        // binary64 endpoints, a rounded-to-nearest upper sum cannot
+        // fall below a representable coordinate that is <= the exact sum.
+        // The upward-expanded skin additionally preserves the legacy guard.
+        const double broad_gap=rounded::up(c.skin+1e-12);
+        collect_static_face_rows(swept_bounding(path),broad_gap,boxes,
             tree?&*tree:nullptr,rows,stats.box_tests);
         for(auto j:rows){
             ++stats.certificate_tests;
-            const auto cert=certify_two_moving_triangles(path,paths[j],c.skin,c.interval_depth);
-            stats.interval_nodes+=cert.nodes;
-            if(!cert.entirely_separated)return false;
+            if(c.rounded_surface){
+                const auto cert=certify_rounded_relative_triangle_pair(
+                    path,paths[j],c.skin,c.interval_depth);
+                stats.interval_nodes+=cert.nodes;
+                stats.rounded_directions+=cert.directions;
+                stats.rounded_projections+=cert.interval_projections;
+                if(!cert.entirely_separated)return false;
+            }else{
+                const auto cert=certify_two_moving_triangles(
+                    path,paths[j],c.skin,c.interval_depth);
+                stats.interval_nodes+=cert.nodes;
+                if(!cert.entirely_separated)return false;
+            }
         }
     }
     return true;
@@ -181,6 +198,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
          c.impulse_iterations<=10&&c.interval_depth<=20&&c.orientation_depth<=20&&c.max_bisection<=20&&
          c.max_leaves>0&&std::isfinite(c.min_dt)&&c.min_dt>0&&dt>=c.min_dt))
         throw std::invalid_argument("invalid coupled FEM settings");
+    if(!rounded::prerequisites())throw std::runtime_error("unsupported coupled FEM FP model");
     validate_body(a);validate_body(b);
     if(a.time_seconds!=b.time_seconds)
         throw std::invalid_argument("coupled bodies have different clocks");
@@ -208,6 +226,8 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         total.certificate_tests+=local.certificate_tests;
         total.interval_nodes+=local.interval_nodes;
         total.orientation_nodes+=local.orientation_nodes;
+        total.rounded_directions+=local.rounded_directions;
+        total.rounded_projections+=local.rounded_projections;
         if(!geo||!tet){
             total.rejected_geometry+=!geo;total.rejected_tets+=!tet;
             if(depth>=c.max_bisection||h*.5<c.min_dt)
