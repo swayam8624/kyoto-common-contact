@@ -147,3 +147,27 @@ leaves, so no stale obstacle is retained. The independent whole-surface
 endpoint audits are deliberately unchanged. This is not external IPC
 physics, general moving/deforming contact, nor a measured speedup.
 CI: .github/workflows/pass28-native-solver.yml.
+
+
+## Pass 29A — two finite-mass contact law (execution pending)
+
+- [x] Implement local frictionless normal impulses distributed to two
+  distinct deformable triangle states with arbitrary positive nodal masses.
+- [x] Add independent linear/angular momentum and kinetic-work checks on
+  1,600 seeded unequal-mass cases, restitution endpoints and a real
+  closest-triangle witness fixture.
+- [ ] Confirm source compilation and numerical audit via Mac/Linux CI.
+- [ ] Integrate this kernel with two independent volumetric bodies,
+  synchronizing adaptive physical time and rejecting unknown moving
+  face/face intervals. No coupled solver result exists yet.
+
+The witness relative velocity is u, the unit normal n points from B to A,
+and k is the sum of both triangles' weighted squared inverse nodal masses.
+For closing u.n, J = -(1+e)(u.n)/k; for separation J = 0. The normal
+impulse is applied with opposite signs and normalized barycentric weights.
+Total linear impulse vanishes, and the angular impulse is
+(p_A-p_B) cross (J n) = 0. The kinetic change equals
+-(1-e^2)(u.n)^2/(2k). These are local instantaneous identities, not global
+solver accuracy or energy conservation. Friction is deliberately disabled
+until an explicit angular-momentum model is justified. No self-contact
+or shared-node stencils are supported by this local two-state kernel.
