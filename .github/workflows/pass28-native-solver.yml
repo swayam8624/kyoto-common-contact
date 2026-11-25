@@ -13,6 +13,7 @@ on:
       - 'tests/nonincident_self_contact_tests.cpp'
       - 'tests/typed_self_contact_audit_tests.cpp'
       - 'tests/typed_connected_self_contact_tests.cpp'
+      - 'tests/persistent_fem_context_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   pull_request:
@@ -47,6 +48,18 @@ jobs:
       - run: ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_typed_connected_self_contact_tests --parallel 2
       - run: ctest --test-dir build -R typed_connected_FEM_self_contact --output-on-failure --no-tests=error -V
+  persistent-context:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_persistent_fem_context_tests --parallel 2
+      - run: ctest --test-dir build -R persistent_typed_FEM_physical_parity --no-tests=error --output-on-failure -V
   connected-volumes:
     strategy:
       fail-fast: false
