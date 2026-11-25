@@ -9,7 +9,7 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/pass34-connected-ipc.yml'
   pull_request:
-    branches: [main]
+    branches: [validation/sca-pass34-base]
   workflow_dispatch:
 permissions:
   contents: read
