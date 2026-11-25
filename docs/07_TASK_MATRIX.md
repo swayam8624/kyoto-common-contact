@@ -245,3 +245,50 @@ independent formal oracle. CI results have not been observed.
     cmake --build build --target kyoto_tet_orientation_certificate_tests kyoto_coupled_fem_contact_tests --parallel 2
     ctest --test-dir build -R 'outward_continuous_tet_orientation_certificate|synchronized_two_body_FEM_contact_and_rollback' --output-on-failure -V
 
+
+
+## Pass 31A–B — synchronized relative hull and connected two-body FEM
+
+- [x] Outward-rounded relative support certificate for two linearly
+  moving finite triangles. Every synchronized relative point lies in
+  the convex hull of the 18 endpoint vertex differences of a slab.
+  Candidate normals (axis, closest witnesses, face normals, edge cross
+  products) are verified by interval projection against the clearance
+  times the upper normal length; failed candidates cannot certify.
+- [x] Make the new certificate the default in the coupled FEM solver;
+  retain the guarded Pass 22A comparison arm. Both broad-phase backends
+  use the same expanded endpoint-box cull. Unknown triggers rejection.
+- [x] Author analytical co-motion, strict skin, crossing, subdivision
+  and 300 seeded moving-triangle regression cases.
+- [x] Add connected two-volume toroidal fixture (64 nodes, 96 tets,
+  128 surface triangles in total), 12 physical macrosteps, equal-state
+  flat/tree comparison, positive continuous Jacobian, full endpoint
+  gap audit, and mutual finite-mass momentum ledger.
+- [x] Native VTK exports for all 13 macro states including volumetric
+  cells, source velocity, von Mises stress, nodal normal impulse and
+  body ID; native scalar CSV; independent Mac/Linux artifact jobs.
+- [ ] Confirm actual execution and inspect numerical receipts and VTK
+  outputs. No measured result is claimed until the workflow passes.
+- [ ] Add self-contact, independent external IPC surface event audit,
+  general containment checks and stronger scale/conditioning tests.
+- [ ] Establish paid performance and compare prior art; the relative
+  hull is a sufficient separation test, not automatically a novelty
+  claim or exact event-time CCD.
+
+The outward proof is conditional on the same IEEE environment as
+Pass 30; the support construction models stored binary64 input
+coordinates and synchronized linear vertex paths. The root broad-phase
+uses finite endpoint extrema and a rounded-to-nearest addition with
+a widened nonnegative gap. For representable coordinates, monotonic
+rounding cannot make a true coordinate <= exact sum compare greater
+than the rounded sum. Overflow may cause an error or conservative
+non-pruning, never permission to accept an invalid physical state.
+The interval certificate is separate from the approximate closest
+feature witness generator. Dense samples share the earlier distance
+kernel, so they are not independent exact CCD mathematics.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_rounded_relative_triangle_tests kyoto_coupled_torus_physics_tests --parallel 2
+    ctest --test-dir build -R 'outward_relative_moving_triangle_surface_certificate|coupled_toroidal_volumes_physical_parity' --output-on-failure -V
+    ./build/kyoto_coupled_torus_physics_tests results/pass31b
+
