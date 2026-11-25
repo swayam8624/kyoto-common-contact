@@ -1,0 +1,17 @@
+compiler,workload,arm,relative_to_persistent_axis_runtime_geomean
+GCC,all_10_cases,adaptive_sap,1.231
+GCC,all_10_cases,exhaustive,2.566
+GCC,all_10_cases,persistent_sap_axis,1
+GCC,all_10_cases,persistent_sap_x,2.080
+GCC,all_10_cases,rebuilt_bvh,1.860
+GCC,all_10_cases,rebuilt_sap,1.950
+GCC,all_10_cases,retained_refit,1.038
+GCC,all_10_cases,retained_selective_frontier,1.058
+Clang,all_10_cases,adaptive_sap,1.269
+Clang,all_10_cases,exhaustive,2.327
+Clang,all_10_cases,persistent_sap_axis,1
+Clang,all_10_cases,persistent_sap_x,1.952
+Clang,all_10_cases,rebuilt_bvh,1.925
+Clang,all_10_cases,rebuilt_sap,1.894
+Clang,all_10_cases,retained_refit,1.003
+Clang,all_10_cases,retained_selective_frontier,1.072

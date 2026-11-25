@@ -7,6 +7,7 @@
 // a changed signature forces a cold order initialization. No stale
 // geometry or cached candidate can silently survive an invalidation.
 #include "kyoto/feature_broadphase.hpp"
+#include "kyoto/projected_sap_axis.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -27,6 +28,8 @@ class OrderedSweep {
     std::vector<std::size_t> ee_order_;
     std::vector<Entry> vf_order_;
     bool initialized_{};
+    bool select_axis_{};
+    int axis_{};
     std::size_t invalidations_{};
     std::size_t warm_frames_{};
 
@@ -61,15 +64,18 @@ class OrderedSweep {
     }
 
 public:
+    explicit OrderedSweep(bool select_axis=false):select_axis_(select_axis){}
     std::size_t invalidations()const{return invalidations_;}
     std::size_t warm_frames()const{return warm_frames_;}
 
     // A full physical frame must be measured INCLUDING f::build() and
     // topology/signature validation. Run this method inside the timer.
     f::Result query(const f::Mesh& mesh) {
-        const auto built=f::build(mesh);
+        auto built=f::build(mesh);
         const auto key=signature(mesh);
-        if(!initialized_ || key!=topology_) {
+        const bool cold=!initialized_ || key!=topology_;
+        if(cold) {
+            axis_=select_axis_?f::projected_sap_axis(built):0;
             if(initialized_)++invalidations_;
             initialized_=true;
             topology_=key;
@@ -82,6 +88,7 @@ public:
             for(std::size_t i=0;i<built.faces.size();++i)
                 vf_order_.push_back({false,i});
         } else ++warm_frames_;
+        f::permute_sap_axis(built,axis_);
 
         // Warm path has insertion-sort motion coherence; cold path uses
         // std::sort. A degenerate reordered scene remains correct, though
@@ -100,13 +107,9 @@ public:
             if(a.vertex!=b.vertex)return a.vertex<b.vertex;
             return a.index<b.index;
         };
-        // A cold query can be identified by the zeroed warm counter only
-        // on first invocation; comparing the prior signature is simpler:
-        // std::sort on cold and insertion on subsequent calls both
-        // preserve candidate correctness, so always insertion sort here.
-        // No unmeasured fallback/rebuild is hidden.
-        insertion_sort(ee_order_,ee_less);
-        insertion_sort(vf_order_,vf_less);
+        // Cold topology uses O(n log n) sorting; warm frames retain ordering.
+        if(cold){std::sort(ee_order_.begin(),ee_order_.end(),ee_less);std::sort(vf_order_.begin(),vf_order_.end(),vf_less);}
+        else{insertion_sort(ee_order_,ee_less);insertion_sort(vf_order_,vf_less);}
 
         f::Result result;
         std::vector<std::size_t> active;

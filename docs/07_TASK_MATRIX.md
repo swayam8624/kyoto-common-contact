@@ -1152,3 +1152,56 @@ Read `docs/manuscript/SCA_MANUSCRIPT.md` and
 `docs/evidence/PASS39_PHYSICAL_EVIDENCE.md`. The one-command integrated
 runner is `tools/run_final_campaign.py`; an exit status of zero means
 its listed executable gates passed, not general novelty or safety.
+
+## Executed coupled FEM campaign — physical CPU gate now tested
+
+- [x] Recover exact pinned source files (base c5e33ff61cb175cc671fedef6ec8f5944c665bd9) by connector
+  transfer; 46 source entries verified against Git blob SHA. Local
+  GCC 14.2 / Clang 17, strict C++23 -O2 -Wall -Wextra -Wpedantic
+  -Werror -ffp-contract=off -fno-fast-math. Correct initializer ordering
+  in RefitHierarchy (no change to actual member initialization order).
+- [x] Twelve native regression executables passed on each compiler:
+  coupled FEM, typed connected self contact, nonincident self contact,
+  persistent context, initial containment, exact static endpoint,
+  exact swept accepted leaves, coupled torus, native fixture topology,
+  typed audit, linear adapter and coupled normal impulse.
+- [x] Paid persistence: five ABBA/BAAB blocks (20 measured trajectories,
+  eight macrosteps each), all physical parity checks passed. Whole-step
+  cold/warm geomean GCC 1.034554x, Clang 1.063909x (shared Linux VM).
+- [x] Full five-arm CPU campaign: widths 1/4/16/32/64, both near and
+  separated, four accepted leaves each, 1,000 timed queries per compiler.
+  All candidate identities match exhaustive. Near-contact impulses
+  129/424/1299/2280/4077; separated zero. Max 1920 U tets + 48 remote.
+- [x] Stronger eight-arm physical replay on same ten workloads and
+  40 accepted leaves: add persistent x SAP, per-query projected-overlap
+  axis selection, and persistent SAP with first-frame selected axis.
+  Fix OrderedSweep cold path to use sort as documented. Eight rotated
+  measured blocks, 2,560 queries per compiler; exact parity on every
+  query. Retained refit / persistent selected-axis SAP runtime ratio
+  GCC 1.038, Clang 1.003; frontier 1.058/1.072. At width64 persistent
+  selected-axis SAP is faster than both retained hierarchies on this
+  workload. The earlier win against fixed-x SAP does NOT establish
+  superiority against a strong baseline.
+- [x] Independent exact combined-volume audit of 52 actual accepted
+  leaves (40 U scaling, 12 cross-torus) per compiler, 799,768 exact
+  pair-path certificates, 20,848,440 possible pairs, zero unresolved
+  accepted leaves. Strata 364648/264752/121744/48624 (0/1/2/3 shared
+  vertices). Cross-torus 1073 impulses. Deliberate rejected cross-body
+  proposal fails certificate and independent exact static endpoint
+  oracle confirms overlap; zero-subdivision step rolls back clocks.
+  GCC and Clang full audit CSVs byte-identical.
+- [ ] Official pinned IPC execution, external mesh-contact integration,
+  real Metal execution. No GPU device; IPC dependency unavailable.
+  CPU result is actual coupled native execution, not floor replay.
+
+Reproduce from repository root:
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass39_strong_cpu_baselines.cpp -o /tmp/strong
+    /tmp/strong /tmp/strong-results 64
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass39_coupled_volume_campaign.cpp -o /tmp/coupled-volume
+    /tmp/coupled-volume 64 > /tmp/coupled-volume.csv
+
+The raw timing files are retained in a separate downloadable local evidence
+archive; the repository summary is rounded to three decimals. Timing
+ratios are paired per block, equal-weight geomeans, not whole-solver or
+universal claims. Exact volume receipt SHA-256:
+20d88849b0b019f2ffd6de848f998caf00d77583fb268dff42c0ad8bf75a9c27.
