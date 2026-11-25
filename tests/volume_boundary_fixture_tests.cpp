@@ -1,6 +1,9 @@
 // Standalone combinatorial compatibility test for the native mesh
 // construction patterns. No FEM forces or collision dynamics are run.
 #include "kyoto/volume_boundary_topology.hpp"
+#ifdef KYOTO_EXACT_FIXTURE_AUDIT
+#include "kyoto/exact_tet_intersection.hpp"
+#endif
 #include <cmath>
 #include <iostream>
 #include <numbers>
@@ -64,6 +67,23 @@ static Mesh u_solid(unsigned width){
     for(const auto& [f,n]:counts)if(n==1)m.boundary.push_back(f);
     return m;
 }
+#ifdef KYOTO_EXACT_FIXTURE_AUDIT
+int main(){
+    std::size_t pairs=0,exact_pairs=0,incident=0;
+    auto check=[&](const Mesh& m,const char* label){
+        const auto r=audit_exact_self_volume(m.p,m.cells);
+        need(r.valid,"fixture has invalid static volume intersection");
+        pairs+=r.pair_tests;exact_pairs+=r.exact_pairs;incident+=r.incident_pairs;
+        std::cout<<label<<" tets="<<m.cells.size()<<" all_pairs="<<r.pair_tests
+                 <<" exact_pairs="<<r.exact_pairs<<" incident_pairs="<<r.incident_pairs<<'\n';
+    };
+    check(torus(8,2,2),"torus8");check(torus(20,2,2),"torus20");
+    check(u_solid(1),"U1");check(u_solid(4),"U4");
+    need(pairs>0&&exact_pairs>0&&incident>0,"vacuous fixture audit");
+    std::cout<<"PASS exact fixture patterns all_pairs="<<pairs<<" exact_pairs="<<exact_pairs
+             <<" incident_pairs="<<incident<<'\n';
+}
+#else
 int main(){
     std::size_t total_tets=0,total_meshes=0;
     for(unsigned n:{8u,20u,64u})for(unsigned r:{2u,3u,8u})for(unsigned z:{2u,3u,8u}){
@@ -78,3 +98,4 @@ int main(){
     }
     std::cout<<"PASS boundary fixture patterns meshes="<<total_meshes<<" tetrahedra="<<total_tets<<'\n';
 }
+#endif

@@ -709,3 +709,38 @@ Local test source Git blob: 9d1db0e445b080208ebcf5e8e2a4235bd35c666b.
     cmake --build build-exact --target kyoto_exact_tet_intersection_tests kyoto_native_exact_self_volume_tests --parallel 2
     ctest --test-dir build-exact -R 'exact_static_tetrahedral_intersection|exact_static_native_FEM_endpoint_self_volume' --no-tests=error --output-on-failure -V
 
+
+
+## Pass 38F — exact static fixture campaign and independent failure receipts
+
+- [x] Run exact static oracle on four independently reconstructed
+  mesh patterns on GCC and Clang. Identical receipts on both:
+  torus8 (48 cells, 1,128 pairs, 345 exact, 296 incident);
+  torus20 (120 cells, 7,140 pairs, 993 exact, 740 incident);
+  U1 (30 cells, 435 pairs, 291 exact, 190 incident);
+  U4 (120 cells, 7,140 pairs, 3,000 exact, 1,558 incident).
+  Total 15,843 pairs, 4,629 exact checks, 2,784 incident checks,
+  no invalid pair. These are reconstructed static mesh patterns,
+  not native FEM factory calls or accepted physical endpoints.
+- [x] Preserve the original 32-configuration topology campaign
+  under the default standalone test; exact fixture mode is optional.
+- [x] Add Ubuntu exact-reference CI job with explicit Boost dependency.
+- [x] Add tools/validate_native_research.py: independent configuration
+  groups, per-target build/test logs, anchored CTest selections,
+  no-tests-as-error, explicit skips and JSON manifest. Never
+  overwrite an earlier evidence directory; return nonzero on failure.
+  Local integration test using a small actual CMake project proved
+  continued execution after build failure, test failure, missing
+  test and skipped test. Python byte-compilation also passed.
+- [ ] Run the runner against the full repository. DNS/queued CI
+  remain blockers. Native, IPC, and Metal results are not inferred.
+
+From the repository root on a Mac with CMake, Boost headers and Metal:
+
+    python3 tools/validate_native_research.py --output /tmp/kyoto-validation-$(date +%Y%m%d-%H%M%S) --exact --ipc --metal
+
+Omit --exact or --ipc for unavailable optional dependencies, and
+--metal on non-Apple hosts. The script runs 17 native gates and
+optionally 3 exact, 2 IPC and 1 Metal gates. It does not execute the
+separate full scaling campaigns.
+
