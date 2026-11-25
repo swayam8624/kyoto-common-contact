@@ -321,3 +321,10 @@ add_executable(kyoto_linear_candidate_adapter_tests
 target_link_libraries(kyoto_linear_candidate_adapter_tests PRIVATE kyoto_contact)
 add_test(NAME indexed_linear_solver_candidate_adapter_oracle
          COMMAND kyoto_linear_candidate_adapter_tests)
+
+# Pass 28: actual FEM solver with an optional static finite-face hierarchy.
+add_executable(kyoto_static_face_solver_parity_tests
+               tests/static_face_solver_parity_tests.cpp)
+target_link_libraries(kyoto_static_face_solver_parity_tests PRIVATE kyoto_contact)
+add_test(NAME actual_FEM_static_face_broadphase_physical_parity
+         COMMAND kyoto_static_face_solver_parity_tests)
