@@ -342,3 +342,19 @@ add_executable(kyoto_coupled_fem_contact_tests
 target_link_libraries(kyoto_coupled_fem_contact_tests PRIVATE kyoto_contact)
 add_test(NAME synchronized_two_body_FEM_contact_and_rollback
          COMMAND kyoto_coupled_fem_contact_tests)
+
+# Pass 30A: continuous orientation under the explicit IEEE FP model.
+add_executable(kyoto_tet_orientation_certificate_tests
+               tests/tet_orientation_certificate_tests.cpp)
+target_link_libraries(kyoto_tet_orientation_certificate_tests PRIVATE kyoto_contact)
+add_test(NAME outward_continuous_tet_orientation_certificate
+         COMMAND kyoto_tet_orientation_certificate_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  foreach(target kyoto_tet_orientation_certificate_tests kyoto_coupled_fem_contact_tests)
+    target_compile_options(${target} PRIVATE -ffp-contract=off -fno-fast-math)
+  endforeach()
+elseif(MSVC)
+  foreach(target kyoto_tet_orientation_certificate_tests kyoto_coupled_fem_contact_tests)
+    target_compile_options(${target} PRIVATE /fp:strict)
+  endforeach()
+endif()
