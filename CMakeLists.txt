@@ -471,3 +471,16 @@ elseif(MSVC)
 endif()
 add_test(NAME physical_CPU_candidate_scaling_smoke
          COMMAND kyoto_pass37_cpu_physical_scaling ${CMAKE_CURRENT_BINARY_DIR}/pass37-smoke 1)
+
+# Pass 37B: optional native Metal correctness and paid mask baseline.
+if(APPLE)
+  enable_language(OBJCXX)
+  add_executable(kyoto_pass37_metal_physical_scaling apps/pass37_metal_physical_scaling.mm)
+  set_target_properties(kyoto_pass37_metal_physical_scaling PROPERTIES
+    OBJCXX_STANDARD 23 OBJCXX_STANDARD_REQUIRED ON OBJCXX_EXTENSIONS OFF)
+  target_link_libraries(kyoto_pass37_metal_physical_scaling PRIVATE kyoto_contact "-framework Foundation" "-framework Metal")
+  target_compile_options(kyoto_pass37_metal_physical_scaling PRIVATE -fobjc-arc -ffp-contract=off -fno-fast-math)
+  add_test(NAME physical_Metal_candidate_scaling_smoke
+    COMMAND kyoto_pass37_metal_physical_scaling ${CMAKE_CURRENT_BINARY_DIR}/pass37-metal-smoke 1)
+  set_tests_properties(physical_Metal_candidate_scaling_smoke PROPERTIES SKIP_RETURN_CODE 77)
+endif()
