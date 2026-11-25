@@ -16,7 +16,7 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   pull_request:
-    branches: [main]
+    branches: [validation/sca-pass34-base]
   workflow_dispatch:
 permissions:
   contents: read
