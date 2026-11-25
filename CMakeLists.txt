@@ -328,3 +328,10 @@ add_executable(kyoto_static_face_solver_parity_tests
 target_link_libraries(kyoto_static_face_solver_parity_tests PRIVATE kyoto_contact)
 add_test(NAME actual_FEM_static_face_broadphase_physical_parity
          COMMAND kyoto_static_face_solver_parity_tests)
+
+# Pass 29A: local two-finite-mass normal contact law, not coupled FEM.
+add_executable(kyoto_coupled_triangle_normal_impulse_tests
+               tests/coupled_triangle_normal_impulse_tests.cpp)
+target_link_libraries(kyoto_coupled_triangle_normal_impulse_tests PRIVATE kyoto_contact)
+add_test(NAME two_finite_mass_triangle_normal_impulse_balance
+         COMMAND kyoto_coupled_triangle_normal_impulse_tests)
