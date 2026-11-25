@@ -922,3 +922,40 @@ are docs/evidence/pass39b-gcc.csv and pass39b-clang.csv. Ratio per block
 is sum(reference ns)/sum(factored ns); equal-weight geometric mean
 over all 27 blocks per compiler. Ranges are observed, not confidence
 intervals.
+
+
+## Pass 39B2 — exact constant-normal specialization
+
+- [x] Extract the tested factored normal polynomial helper. Preserve the
+  default determinant route and prior factored route, add an opt-in
+  constant-normal mode. Constant directions use one cross product;
+  moving directions whose exact normal coefficients satisfy N2=N0 and
+  N1=2N0 also qualify. Project using two dot products rather than six:
+  [3a,2a+b,a+2b,3b], a=N0·r0, b=N0·r1.
+- [x] Compile standalone helper on GCC 14.2 and Clang 17 with strict
+  C++23 warnings-as-errors and no fast-math. Each passes 24,000
+  coefficient comparisons versus independent eight-determinant
+  expansion: 1,000 axes in each of three groups, eight rays per axis,
+  integer shifts 0,64,1074. Zero/sign-changing controls passed.
+- [x] Execute paid microbenchmark including normal construction,
+  projection and exact checksum. Five ABBA/BAAB blocks per group,
+  excluded warmup, 60 timed batches per compiler, 8,000 projections
+  per batch. Geometric mean prior factored / specialization times:
+  static directions GCC 2.71543x Clang 2.86297x;
+  moving constant normal GCC 2.27239x Clang 2.41000x;
+  general moving normal GCC 1.03465x Clang 1.02982x.
+  Shared Linux container; ratios descriptive, not population estimates.
+- [x] Preserve exact tested helper and test source hashes, raw
+  timing CSVs (pass39c-gcc.csv and pass39c-clang.csv; filenames
+  reflect the experimental run, not completion of physical Pass39C).
+- [x] Wire optional mode into pair and whole-volume APIs; register test.
+- [ ] Compile and execute full integrated held-out pair/mesh tests.
+  This run validates the exact helper and measures a synthetic
+  projection kernel, not full pair, mesh or FEM performance.
+  Full native CI remains queued/pending; no new physical claim.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/exact_constant_axis_tests.cpp -o /tmp/kyoto-constant-axis
+    /tmp/kyoto-constant-axis --timing
+
+Tested source blobs: helper 3cb726b9111438e10b2121be9222bb2e99872e9d;
+test 742d36612b5eb58584ed7fc6f17dd4f37f3638f8.

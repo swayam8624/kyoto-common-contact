@@ -36,6 +36,7 @@ EXACT = [
     ("kyoto_exact_tet_intersection_tests", "exact_static_tetrahedral_intersection"),
     ("kyoto_exact_swept_tet_certificate_tests", "exact_continuous_tetrahedral_separation"),
     ("kyoto_exact_factored_axis_tests", "exact_factored_axis_coefficient_and_pair_parity"),
+    ("kyoto_exact_constant_axis_tests", "exact_constant_axis_polynomial_parity"),
     ("kyoto_exact_swept_volume_fixture_tests", "exact_continuous_volume_fixture_patterns"),
     ("kyoto_native_exact_swept_volume_tests", "exact_continuous_native_FEM_leaf_volume"),
     ("kyoto_exact_volume_fixture_tests", "exact_static_volume_fixture_patterns"),
