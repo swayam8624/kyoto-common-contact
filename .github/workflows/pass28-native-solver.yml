@@ -9,6 +9,7 @@ on:
       - 'tests/coupled_fem_contact_tests.cpp'
       - 'tests/tet_orientation_certificate_tests.cpp'
       - 'tests/rounded_relative_triangle_certificate_tests.cpp'
+      - 'tests/coupled_torus_physics_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   workflow_dispatch:
@@ -35,3 +36,20 @@ jobs:
       - run: ctest --test-dir build -R outward_relative_moving_triangle_surface_certificate --output-on-failure -V
       - run: cmake --build build --target kyoto_coupled_fem_contact_tests --parallel 2
       - run: ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
+  connected-volumes:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_coupled_torus_physics_tests --parallel 2
+      - run: ./build/kyoto_coupled_torus_physics_tests results/pass31b
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pass31b-native-volumetric-evidence-${{ matrix.os }}
+          path: results/pass31b/
+          if-no-files-found: error
