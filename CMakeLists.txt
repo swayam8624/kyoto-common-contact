@@ -460,3 +460,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_pass36_paid_persistent_fem_abba PRIVATE /fp:strict)
 endif()
+
+# Pass 37A: matched paid CPU candidate scaling on accepted native leaves.
+add_executable(kyoto_pass37_cpu_physical_scaling apps/pass37_cpu_physical_scaling.cpp)
+target_link_libraries(kyoto_pass37_cpu_physical_scaling PRIVATE kyoto_contact)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_pass37_cpu_physical_scaling PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_pass37_cpu_physical_scaling PRIVATE /fp:strict)
+endif()
+add_test(NAME physical_CPU_candidate_scaling_smoke
+         COMMAND kyoto_pass37_cpu_physical_scaling ${CMAKE_CURRENT_BINARY_DIR}/pass37-smoke 1)
