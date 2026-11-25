@@ -11,6 +11,7 @@
 #include "kyoto/tet_orientation_certificate.hpp"
 #include "kyoto/rounded_relative_triangle_certificate.hpp"
 #include "kyoto/nonincident_self_contact.hpp"
+#include "kyoto/typed_self_contact_response.hpp"
 #include <optional>
 #include <vector>
 
@@ -22,6 +23,7 @@ struct CoupledFEMSettings {
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
+    bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
@@ -189,7 +191,15 @@ inline void self_accepted(SelfContactStats& a,const SelfContactStats& b){
     a.impulse_updates+=b.impulse_updates;a.normal_impulse+=b.normal_impulse;
     a.contact_work+=b.contact_work;
 }
-inline void self_impulses(Body& a,Body& b,const CoupledFEMSettings& c,CoupledFEMStats& s){
+inline void self_impulses(Body& a,Body& b,const CoupledFEMSettings& c,CoupledFEMStats& s,
+                         TypedSelfAuditor& auditor_a,TypedSelfAuditor& auditor_b){
+    if(c.typed_self_contact){
+        apply_typed_self_impulses(a,auditor_a,c.skin,c.skin+c.activation_width,
+                                  c.restitution,c.impulse_iterations,!c.hierarchy,s.self_a);
+        apply_typed_self_impulses(b,auditor_b,c.skin,c.skin+c.activation_width,
+                                  c.restitution,c.impulse_iterations,!c.hierarchy,s.self_b);
+        return;
+    }
     if(!c.nonincident_self_contact)return;
     apply_nonincident_self_impulses(a,c.skin,c.skin+c.activation_width,c.restitution,
                                    c.impulse_iterations,c.hierarchy,s.self_a);
@@ -197,7 +207,16 @@ inline void self_impulses(Body& a,Body& b,const CoupledFEMSettings& c,CoupledFEM
                                    c.impulse_iterations,c.hierarchy,s.self_b);
 }
 inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body& b1,
-                        const CoupledFEMSettings& c,CoupledFEMStats& s){
+                        const CoupledFEMSettings& c,CoupledFEMStats& s,
+                        TypedSelfAuditor& auditor_a,TypedSelfAuditor& auditor_b){
+    if(c.typed_self_contact){
+        auto check=[&](TypedSelfAuditor& auditor,const Body& before,const Body& after,SelfContactStats& stats){
+            const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy);
+            stats.certificate_tests+=r.certificates;stats.projections+=r.projections;
+            return r.separated;
+        };
+        return check(auditor_a,a0,a1,s.self_a)&&check(auditor_b,b0,b1,s.self_b);
+    }
     return !c.nonincident_self_contact ||
         (certify_nonincident_self_sweep(a0,a1,c.skin,c.interval_depth,c.hierarchy,s.self_a)&&
          certify_nonincident_self_sweep(b0,b1,c.skin,c.interval_depth,c.hierarchy,s.self_b));
@@ -217,7 +236,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       const CoupledFEMSettings& c={},
                                       std::vector<CoupledFEMLeaf>* trace=nullptr){
     using namespace coupled_detail;
-    if(&a==&b||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+    if(&a==&b||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
@@ -230,9 +249,10 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         throw std::invalid_argument("coupled bodies have different clocks");
     Body sa=a,sb=b;
     CoupledFEMStats total;
+    TypedSelfAuditor auditor_a,auditor_b; // retained within macrostep, revalidated every query
     // Verify initial cross-surface separation; volume disjointness and
     // self-validity are explicit caller preconditions, not inferred here.
-    if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total))
+    if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
         throw std::runtime_error("initial coupled surfaces violate skin");
     std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
     std::vector<CoupledFEMLeaf> staged_trace;
@@ -242,10 +262,10 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         Body ta=sa,tb=sb;
         CoupledFEMStats local;
         kick(ta,h);kick(tb,h);
-        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local);
+        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local,auditor_a,auditor_b);
         for(auto& n:ta.nodes)n.x+=n.v*h;
         for(auto& n:tb.nodes)n.x+=n.v*h;
-        const bool geo=swept_safe(sa,ta,sb,tb,c,local)&&self_safety(sa,ta,sb,tb,c,local);
+        const bool geo=swept_safe(sa,ta,sb,tb,c,local)&&self_safety(sa,ta,sb,tb,c,local,auditor_a,auditor_b);
         const bool tet=positive_tets(ta)&&positive_tets(tb)&&
             continuous_tets(sa,ta,c,local)&&continuous_tets(sb,tb,c,local);
         total.box_tests+=local.box_tests;
@@ -264,7 +284,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         // Both proposed trajectories are certified before post-drift
         // contact response; no position clamping or phantom elapsed time.
         const auto old_tests=local.box_tests;
-        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local);
+        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local,auditor_a,auditor_b);
         self_work(total.self_a,local.self_a);self_work(total.self_b,local.self_b);
         total.box_tests+=local.box_tests-old_tests;
         local.min_j=std::min(ta.evaluate().min_jacobian,tb.evaluate().min_jacobian);
