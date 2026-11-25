@@ -12,6 +12,7 @@ on:
       - 'tests/coupled_torus_physics_tests.cpp'
       - 'tests/nonincident_self_contact_tests.cpp'
       - 'tests/typed_self_contact_audit_tests.cpp'
+      - 'tests/typed_connected_self_contact_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   workflow_dispatch:
@@ -29,19 +30,21 @@ jobs:
       - uses: actions/checkout@v4
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --target kyoto_static_face_solver_parity_tests --parallel 2
-      - run: ctest --test-dir build -R actual_FEM_static_face_broadphase_physical_parity --output-on-failure -V
+      - run: ctest --test-dir build -R actual_FEM_static_face_broadphase_physical_parity --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_coupled_triangle_normal_impulse_tests --parallel 2
-      - run: ctest --test-dir build -R two_finite_mass_triangle_normal_impulse_balance --output-on-failure -V
+      - run: ctest --test-dir build -R two_finite_mass_triangle_normal_impulse_balance --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_tet_orientation_certificate_tests --parallel 2
-      - run: ctest --test-dir build -R outward_continuous_tet_orientation_certificate --output-on-failure -V
+      - run: ctest --test-dir build -R outward_continuous_tet_orientation_certificate --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_rounded_relative_triangle_tests --parallel 2
-      - run: ctest --test-dir build -R outward_relative_moving_triangle_surface_certificate --output-on-failure -V
+      - run: ctest --test-dir build -R outward_relative_moving_triangle_surface_certificate --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_coupled_fem_contact_tests --parallel 2
-      - run: ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
+      - run: ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_nonincident_self_contact_tests --parallel 2
-      - run: ctest --test-dir build -R restricted_nonincident_same_body_contact --output-on-failure -V
+      - run: ctest --test-dir build -R restricted_nonincident_same_body_contact --output-on-failure --no-tests=error -V
       - run: cmake --build build --target kyoto_typed_self_contact_audit_tests --parallel 2
-      - run: ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure -V
+      - run: ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure --no-tests=error -V
+      - run: cmake --build build --target kyoto_typed_connected_self_contact_tests --parallel 2
+      - run: ctest --test-dir build -R typed_connected_FEM_self_contact --output-on-failure --no-tests=error -V
   connected-volumes:
     strategy:
       fail-fast: false
