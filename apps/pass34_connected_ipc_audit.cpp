@@ -123,6 +123,30 @@ static void write(std::ostream& o,const char* type,std::size_t id,double t,doubl
      <<r.vf_hits<<','<<r.ee_hits<<','<<r.misses<<','<<r.sca_candidates<<','
      <<r.ipc_candidates<<','<<r.earliest<<'\n';
 }
+// Evidence uses native positions, not interpolated/fabricated geometry.
+static void export_motion(std::ostream& o,const char* type,std::size_t id,
+                          const Mesh& m){
+    for(std::size_t i=0;i<m.start.size();++i){
+        const auto p=m.start[i],q=m.end[i];
+        o<<type<<','<<id<<','<<m.owner[i]<<','<<i<<','
+         <<p.x<<','<<p.y<<','<<p.z<<','<<q.x<<','<<q.y<<','<<q.z<<'\n';
+    }
+}
+static void export_topology(std::ostream& o,const char* scene,const Mesh& m){
+    for(std::size_t i=0;i<m.t.size();++i)
+        o<<scene<<",face,"<<i<<','<<m.t[i][0]<<','<<m.t[i][1]<<','<<m.t[i][2]<<'\n';
+    for(std::size_t i=0;i<m.e.size();++i)
+        o<<scene<<",edge,"<<i<<','<<m.e[i][0]<<','<<m.e[i][1]<<",-1\n";
+}
+static s::Body tetra(double plane,double direction,double speed,double density){
+    s::Body b;b.material.gravity=b.material.damping=0.;b.material.density=density;
+    for(s::V3 p:{s::V3{plane,0,0},s::V3{plane,.2,0},s::V3{plane,0,.2},
+                 s::V3{plane+.2*direction,0,0}})
+        b.nodes.push_back({p,p,{-direction*speed,0,0},0,0});
+    b.add_tet({0,1,2,3});
+    b.surface_faces={{0,1,2},{0,3,1},{1,3,2},{2,3,0}};
+    return b;
+}
 int main(int argc,char** argv){
     try{
         if(argc!=2)throw std::invalid_argument("usage: pass34 audit OUTPUT_DIR");
@@ -130,7 +154,14 @@ int main(int argc,char** argv){
         std::ofstream csv(dir/"connected_native_ipc_event_audit.csv");
         csv<<std::setprecision(17)
            <<"type,leaf,start_s,dt_s,self_vf,self_ee,cross_vf,cross_ee,self_hits,cross_hits,vf_hits,ee_hits,candidate_misses,sca_candidates,ipc_candidates,earliest_safe_prefix\n";
+        std::ofstream geometry(dir/"native_leaf_surface_endpoints.csv");
+        std::ofstream topology(dir/"native_surface_connectivity.csv");
+        geometry<<std::setprecision(17)
+                <<"type,leaf,body,row,x0,y0,z0,x1,y1,z1\n";
+        topology<<"scene,feature,row,v0,v1,v2\n";
+        need(csv.good()&&geometry.good()&&topology.good(),"cannot create source audit receipts");
         s::Body a=s::fixtures::u_solid(),b=s::fixtures::remote();
+        export_topology(topology,"connected",prepare(a,a,b,b));
         s::CoupledFEMSettings cfg;cfg.typed_self_contact=true;cfg.hierarchy=true;
         at::LinearCandidateAdapter adapter;
         std::size_t count=0,impulses=0,stencils=0;
@@ -140,9 +171,11 @@ int main(int argc,char** argv){
             need(leaves.size()==step.accepted_leaves,"incomplete native leaf trace");
             impulses+=step.self_a.impulse_updates;
             for(const auto& leaf:leaves){
-                const auto r=audit(prepare(leaf.before_a,leaf.after_a,
-                                           leaf.before_b,leaf.after_b),adapter);
-                write(csv,"accepted",count++,leaf.before_a.time_seconds,leaf.dt,r);
+                const auto mesh=prepare(leaf.before_a,leaf.after_a,
+                                        leaf.before_b,leaf.after_b);
+                const auto r=audit(mesh,adapter);
+                export_motion(geometry,"accepted_connected",count,mesh);
+                write(csv,"accepted_connected",count++,leaf.before_a.time_seconds,leaf.dt,r);
                 need(r.self_hits==0&&r.cross_hits==0&&r.misses==0,
                      "official IPC reported event on accepted native motion");
                 stencils+=r.self_vf+r.self_ee+r.cross_vf+r.cross_ee;
@@ -163,13 +196,48 @@ int main(int argc,char** argv){
         try{(void)s::step_coupled_fem(a,b,dt,cfg);}
         catch(const std::runtime_error&){rejected=true;}
         need(rejected&&a.time_seconds==0.&&b.time_seconds==0.,"positive trial not rejected atomically");
-        const auto pos=audit(prepare(a,proposed_a,b,proposed_b),adapter);
-        write(csv,"rejected_positive",count,0.,dt,pos);
+        const auto self_positive_mesh=prepare(a,proposed_a,b,proposed_b);
+        const auto pos=audit(self_positive_mesh,adapter);
+        export_motion(geometry,"rejected_self_positive",count,self_positive_mesh);
+        write(csv,"rejected_self_positive",count++,0.,dt,pos);
         need(pos.self_hits>0&&pos.misses==0,"rejected native positive CCD event missing");
-        need(csv.good(),"IPC receipt write failed");
-        std::cout<<"PASS34 native accepted leaves="<<count<<" exhaustive stencil tests="<<stencils
+        // Separate non-vacuous cross-object native fast-impact campaign.
+        a=tetra(0.,-1.,1.,360.);b=tetra(.006,1.,1.,480.);
+        const auto cross_start_a=a,cross_start_b=b;
+        cfg.activation_width=.003;cfg.max_bisection=16;
+        export_topology(topology,"cross_tetra",prepare(a,a,b,b));
+        std::vector<s::CoupledFEMLeaf> cross_leaves;
+        const auto cross_step=s::step_coupled_fem(a,b,.004,cfg,&cross_leaves);
+        need(cross_step.impulse_updates>0&&cross_step.rejected_geometry>0&&cross_leaves.size()>1,
+             "native cross-body fixture did not exercise adaptive contact");
+        for(const auto& leaf:cross_leaves){
+            const auto mesh=prepare(leaf.before_a,leaf.after_a,leaf.before_b,leaf.after_b);
+            const auto r=audit(mesh,adapter);
+            export_motion(geometry,"accepted_cross",count,mesh);
+            write(csv,"accepted_cross",count++,leaf.before_a.time_seconds,leaf.dt,r);
+            need(r.self_hits==0&&r.cross_hits==0&&r.misses==0,
+                 "upstream event on accepted cross-body physical leaf");
+            stencils+=r.self_vf+r.self_ee+r.cross_vf+r.cross_ee;
+        }
+        a=cross_start_a;b=cross_start_b;proposed_a=a;proposed_b=b;
+        cfg.max_bisection=0;scratch={};
+        s::coupled_detail::propose_drift(proposed_a,proposed_b,.004,cfg,scratch,ta,tb);
+        rejected=false;
+        try{(void)s::step_coupled_fem(a,b,.004,cfg);}
+        catch(const std::runtime_error&){rejected=true;}
+        need(rejected&&a.time_seconds==0.&&b.time_seconds==0.,
+             "native cross positive trial not rejected");
+        const auto cross_mesh=prepare(a,proposed_a,b,proposed_b);
+        const auto cross_pos=audit(cross_mesh,adapter);
+        export_motion(geometry,"rejected_cross_positive",count,cross_mesh);
+        write(csv,"rejected_cross_positive",count++,0.,.004,cross_pos);
+        need(cross_pos.cross_hits>0&&cross_pos.misses==0,
+             "native rejected cross-object trial lacked upstream event coverage");
+        need(csv.good()&&geometry.good()&&topology.good(),"IPC receipt write failed");
+        std::cout<<"PASS34 native accepted leaves="<<count-2<<" exhaustive stencil tests="<<stencils
                  <<" native self impulses="<<impulses<<" rejected positive self events="<<pos.self_hits
-                 <<" candidate misses="<<pos.misses<<" upstream earliest prefix="<<pos.earliest<<'\n';
+                 <<" rejected positive cross events="<<cross_pos.cross_hits
+                 <<" candidate misses="<<pos.misses+cross_pos.misses<<" upstream earliest prefix="<<pos.earliest<<'\n';
         return 0;
     }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<'\n';return 1;}
 }
