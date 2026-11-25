@@ -121,3 +121,29 @@ The release gate is scientific, not aesthetic: zero independently
 observed candidate/CCD misses, physically valid solver trajectories,
 fair full-cost baselines, and at least two true solver integrations for
 generality. Every negative outcome is kept.
+
+
+## Pass 27–28: solver-facing integration gates (new source, execution pending)
+
+- [x] Pass 27 linear indexed retained VF/EE boundary authored and registered in CTest.
+- [ ] Verify 240 independent endpoint-oracle frames and 35 upstream IPC CCD event/prefix parity scenarios on actual CI.
+- [x] Pass 28 optional static finite-face BVH inside the ORIGINAL FEM pre/post impulse loops and actual swept whole-face rejection path. Default flat control is preserved. This is a separate specialization, not the Pass 27 VF/EE producer.
+- [ ] Verify 1,000 independent ordered finite-face candidate queries, 450 routine physical macrosteps and actual adaptive fast impact, with identical full state and impulse/geometry receipts.
+- [ ] Compare full paid wall time across independently repeated scene clusters, including static tree construction and exhaustive retained static audits. Alternating-order exploratory timing is not a publication result.
+- [ ] Implement and independently validate moving/deforming two-body contact impulse kernel and synchronized adaptive physical integration, including self-contact as a separate gate.
+
+For the static obstacle the child AABB is enclosed by the parent AABB.
+With the same nonnegative gap and finite input, each inequality in
+the existing maybe_near predicate is monotone under enlargement.
+Hence a rejected parent excludes all descendant leaf pairs, and a
+leaf is accepted exactly when the original flat predicate accepts it.
+Sorting by original obstacle row preserves the sequential impulse and
+early-exit CCD order. This proof preserves the existing predicate, not
+a new universal directed-rounded geometric separation proof.
+
+The default flat solver remains unchanged in pair order and early exit.
+The tree is rebuilt per macrostep and shared among actual adaptive
+leaves, so no stale obstacle is retained. The independent whole-surface
+endpoint audits are deliberately unchanged. This is not external IPC
+physics, general moving/deforming contact, nor a measured speedup.
+CI: .github/workflows/pass28-native-solver.yml.
