@@ -1371,3 +1371,31 @@ Raw paired timings in docs/evidence/pass39_cross_volume_sweep_{gcc,clang}.csv. D
 - [ ] Actual upstream parallel oneTBB/SIMD stock build; independent external mesh-contact dynamics solver; real Metal hardware. No performance claims against upstream serial compatibility build. Further broad-phase superiority is not established.
 
 Raw receipt: docs/evidence/pass39_long_ipc_wrapper_gcc_clang.csv. Local execution archive includes upstream source subset, exact configuration and shims, logs, native source and raw receipts.
+
+## Independent contact dynamics and packed GPU mask execution
+
+- [x] Independently formulate compressible neo-Hookean implicit Euler FEM via CasADi 3.7.2/IPOPT. A fixed separating direction and an optimized moving plane impose a positive 1.5 mm gap between two deformable blocks, while positive Jacobian constraints guard orientation. Different integrator/contact law from native impulse solver. Six actual 32-step simulations at 1 ms; 12/48/96 total tetrahedra, aligned/rotated impacts and separated control. Five nonvacuous active-contact runs; minimum J 0.970788357, maximum stationarity residual 8.1222e-14, complementarity 9.8151e-11, total momentum error 2.6037e-17 kg m/s. No claim of general nonplanar contact, self-contact, or native trajectory equality.
+- [x] Replay all 192 independent steps through native exhaustive/SAP and pinned upstream LBVH and public CCD wrapper (same serial dependency adaptation described above). Two clearances, all admissible VF/EE stencils exhaustively enumerated: 2,218,752 queries, 36,345 matching candidate identities, 114,948 exact volume pair-path certificates, zero unresolved certificates or possible contact/missing keys per compiler. GCC/Clang strict C++23 O2 receipts byte-identical. The input trajectory SHA-256 is 6cce7c1b64a821b015682dcfe13380a7d5a78d208ce5a4bc015140aadc1e9cbd; full trajectory is in local evidence archive and reproducible from the generator.
+- [x] Shared packed GPU mask body, binary64 outward float enclosure and exact canonical host filter. One word for 32 flags instead of one word per pair. Same scalar source emitted to OpenCL and Metal. Clang OpenCL C compiled to SPIR64 LLVM bitcode and x86-64 object; actual compiled kernel executed by serial host work-item harness with get_global_id shim. GCC and Clang host code separately compiled and passed. 1,000 randomized scenes per compiler with tiny/large coordinates, masks, sparse IDs, odd chunk lengths, padding guard and overflow controls; 40 actual native physical accepted leaves across all five U widths and both contact regimes. 70,901,664 rectangular pair slots, 2,215,728 words, 328 dispatch batches and 347,680 float mask positives per compiler. Exact candidate parity; raw receipts byte-identical. Logical mask payload 283,606,656 -> 8,862,912 bytes (~32x); not measured transfer time, GPU speedup or device execution.
+- [x] Author separate Metal benchmark comparing original mask, packed mask and persistent selected-axis SAP, six order-balanced blocks; retain original benchmark. Metal host source and CMake target not compiled or run on this Linux environment. No Metal or OpenCL device platform (clGetPlatformIDs returned -1001), no actual GPU timings.
+- [ ] Broader independent contact solver generality, stock parallel IPC and actual GPU hardware execution. Do not label GPU milestone complete from offline compilation.
+
+Reproduce independent dynamics:
+    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/pass40_ipopt_contact.py /tmp/kyoto-ipopt
+    cmake -S . -B build-ipopt -DKYOTO_WITH_OFFICIAL_IPC=ON -DKYOTO_WITH_EXACT_SELF_VOLUME=ON
+    cmake --build build-ipopt --target kyoto_pass40_ipopt_replay
+    ./build-ipopt/kyoto_pass40_ipopt_replay /tmp/kyoto-ipopt/trajectory.txt > /tmp/ipopt-replay.csv
+
+Offline shader execution (Linux x86-64, Clang OpenCL C compiler):
+    g++ -std=c++23 -O2 -Iinclude tools/export_gpu_shader.cpp -o /tmp/export-gpu
+    /tmp/export-gpu > /tmp/packed-mask.cl
+    clang -x cl -cl-std=CL1.2 -target spir64-unknown-unknown -emit-llvm -c -O2 -Werror /tmp/packed-mask.cl -o /tmp/packed-mask.bc
+    clang -x cl -cl-std=CL1.2 -target x86_64-unknown-linux-gnu -c -O2 -Werror /tmp/packed-mask.cl -o /tmp/packed-mask.o
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/pass40_gpu_packed_mask_tests.cpp /tmp/packed-mask.o -o /tmp/packed-mask-test
+    /tmp/packed-mask-test > /tmp/packed-mask.csv
+
+Real Mac device gate (unrun):
+    cmake --build build --target kyoto_pass40_metal_packed_mask
+    ./build/kyoto_pass40_metal_packed_mask /tmp/packed-metal 64
+
+Raw evidence CSVs in docs/evidence/pass40_*.csv.
