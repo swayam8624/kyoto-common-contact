@@ -442,3 +442,36 @@ or physical accuracy claim follows.
     ctest --test-dir build-ipc -R pinned_IPC_connected_FEM_accepted_and_rejected_CCD --no-tests=error --output-on-failure -V
 
 CI: .github/workflows/pass34-connected-ipc.yml.
+
+
+## Pass 35A — audited external broadphase inside native FEM
+
+- [x] Add an optional producer callback at the validated dense-index
+  candidate boundary. External results must exactly match the
+  normalized exhaustive VF/EE set on every query; otherwise throw
+  before any physical state is committed.
+- [x] Implement pinned official IPC LBVH producer using identical
+  outward-enclosed vertex boxes and dense topology; route it through
+  native typed self-contact response and continuous safety.
+- [x] Author eight macrostep connected U-solid comparison of retained
+  SCA versus actual upstream LBVH, including accepted-leaf endpoint
+  and time parity, physical impulse/work equality, and deliberately
+  corrupted producer rollback with caller trace preservation.
+- [x] Add an independent pinned IPC job and enable PR-triggered native,
+  external and candidate-gate workflows for isolated validation base.
+- [ ] Observe actual CI compilation and numerical receipts.
+- [ ] Full external physics *integrator* embedding, benchmark without
+  exhaustive gate, persistent cross-macrostep ownership, paid costs,
+  external CCD clearance parity and general self-contact remain open.
+
+This is actual external broadphase interoperability in the native
+solver, not a second physics solver and not a runtime speedup.
+The exhaustive guard is intentionally paid on every external query.
+Internal LBVH traversal counters are unavailable, not zero-work.
+Draft PR #15 targets validation/sca-pass34-base (Pass 34 snapshot),
+not main. It must not be merged before validation.
+
+    cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+    cmake --build build-ipc --target kyoto_official_ipc_native_backend_tests --parallel 2
+    ctest --test-dir build-ipc -R pinned_IPC_LBVH_inside_native_typed_FEM --no-tests=error --output-on-failure -V
+
