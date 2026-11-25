@@ -83,5 +83,5 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y libboost-dev
       - run: cmake -S . -B build-exact -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_EXACT_SELF_VOLUME=ON
-      - run: cmake --build build-exact --target kyoto_exact_tet_intersection_tests kyoto_exact_volume_fixture_tests kyoto_native_exact_self_volume_tests --parallel 2
-      - run: ctest --test-dir build-exact -R 'exact_static_tetrahedral_intersection|exact_static_volume_fixture_patterns|exact_static_native_FEM_endpoint_self_volume' --no-tests=error --output-on-failure -V
+      - run: cmake --build build-exact --target kyoto_exact_tet_intersection_tests kyoto_exact_volume_fixture_tests kyoto_native_exact_self_volume_tests kyoto_exact_swept_tet_certificate_tests --parallel 2
+      - run: ctest --test-dir build-exact -R 'exact_static_tetrahedral_intersection|exact_static_volume_fixture_patterns|exact_static_native_FEM_endpoint_self_volume|exact_continuous_tetrahedral_separation' --no-tests=error --output-on-failure -V

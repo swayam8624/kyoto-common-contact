@@ -744,3 +744,38 @@ Omit --exact or --ipc for unavailable optional dependencies, and
 optionally 3 exact, 2 IPC and 1 Metal gates. It does not execute the
 separate full scaling campaigns.
 
+
+
+## Pass 38G — exact continuous moving separating-plane certificate
+
+- [x] Use exact binary64 dyadic coordinate conversion and cubic
+  integer Bernstein coefficients of determinant(e(t),f(t),r(t)).
+  A direction cross(e,f) may move in time. For disjoint cells,
+  all sixteen relative vertex projections must have strict sign.
+  For incident cells, shared vertices lie identically on the
+  moving plane, both sides have weak opposite signs, and one
+  side has strict signs for every nonshared vertex. The common
+  simplex is then exactly the intersection for the entire slab.
+- [x] Exact dyadic subdivision; unresolved remains unknown.
+  Continuous cell nondegeneracy/orientation is a separate condition.
+- [x] Locally execute GCC and Clang strict-warning C++23 builds and
+  GCC AddressSanitizer/UndefinedBehaviorSanitizer: 1,000 seeded
+  analytically classified translated simplex paths (884 separated,
+  116 intersecting), 884 certified, zero false clears, zero unknowns
+  among separated paths. Shared-face/edge/vertex, swapped, moving
+  plane and extreme scale controls passed.
+- [x] First shared-vertex positive control was unresolved; add
+  diagonal constant directions and rerun all tests.
+- [x] Register optional Boost reference target and validation runner.
+- [ ] Evaluate certification coverage on whole moving meshes.
+  Incomplete proposed directions can leave valid incident pairs
+  unresolved; this is a sound sufficient certificate, not an exact
+  complete continuous collision decision procedure.
+- [ ] Native/IPC/GPU integrated execution remains unavailable;
+  latest Pass 38F workflows are queued.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/exact_swept_tet_certificate_tests.cpp -o /tmp/kyoto-swept-exact
+    /tmp/kyoto-swept-exact
+
+Locally tested source blob: 9ecedf1fb908914a4c48f66639f3eac6fd35a7ca.
+Test blob: 6b2aba12d3c8c69bf3108d5fa5e00775e3413e2b.
