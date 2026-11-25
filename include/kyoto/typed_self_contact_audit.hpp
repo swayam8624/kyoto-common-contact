@@ -9,6 +9,7 @@
 // between a vertex and its incident face or edges sharing a vertex.
 #include "kyoto/linear_candidate_adapter.hpp"
 #include "kyoto/rounded_relative_triangle_certificate.hpp"
+#include "kyoto/nonincident_self_contact.hpp"
 #include <map>
 #include <set>
 namespace kyoto::solid {
@@ -17,15 +18,25 @@ struct TypedSelfAudit {
     std::size_t vertices{},edges{},faces{},candidates{},certificates{},projections{};
     kyoto::contact::features::Candidate unresolved{};
 };
+struct TypedSelfStencil {
+    std::array<std::size_t,3> left{},right{};
+    kyoto::contact::features::Kind kind{};
+};
+struct TypedSelfCandidates {
+    TypedSelfAudit info;
+    std::vector<TypedSelfStencil> stencils;
+    std::vector<kyoto::contact::features::Candidate> keys;
+    std::size_t box_tests{},incident_rejections{};
+};
 class TypedSelfAuditor {
     kyoto::contact::atlas::LinearCandidateAdapter adapter_;
 public:
-    TypedSelfAudit audit(const Body& a,const Body& b,double skin,unsigned depth=12){
+    TypedSelfCandidates candidates(const Body& a,const Body& b,double skin,bool exhaustive=false){
         namespace f=kyoto::contact::features;
         namespace at=kyoto::contact::atlas;
         using kyoto::contact::Vec3;
         if(a.nodes.size()!=b.nodes.size()||a.surface_faces!=b.surface_faces||
-           !std::isfinite(skin)||skin<0.||depth>20||!rounded::prerequisites())
+           !std::isfinite(skin)||skin<0.||!rounded::prerequisites())
             throw std::invalid_argument("invalid typed self audit");
         std::set<std::size_t> ids;
         for(const auto& face:a.surface_faces)for(auto i:face){
@@ -51,30 +62,42 @@ public:
             }
         }
         const std::vector<at::IndexedEdge> edges(unique_edges.begin(),unique_edges.end());
-        const auto pairs=adapter_.query(start,end,edges,faces,1,skin).pairs;
-        TypedSelfAudit out;
-        out.vertices=start.size();out.edges=edges.size();out.faces=faces.size();
-        out.candidates=pairs.size();
-        auto path=[&](at::IndexedFace row){
-            LinearTriangleMotion m;
-            for(int k=0;k<3;++k){
-                m.start[k]=a.nodes[original.at(row[k])].x;
-                m.end[k]=b.nodes[original.at(row[k])].x;
-            }
-            return m;
+        const auto result=adapter_.query(start,end,edges,faces,1,skin,exhaustive);
+        TypedSelfCandidates out;
+        out.info.vertices=start.size();out.info.edges=edges.size();out.info.faces=faces.size();
+        out.info.candidates=result.pairs.size();
+        out.box_tests=result.candidate_aabb_tests;out.incident_rejections=result.incident_rejections;
+        out.keys=result.pairs;
+        auto global=[&](at::IndexedFace row){
+            for(auto& k:row)k=original.at(k);
+            return row;
         };
-        for(const auto& p:pairs){
-            LinearTriangleMotion x,y;
+        for(const auto& p:result.pairs){
             if(p.kind==f::Kind::VertexFace){
                 const auto i=std::size_t(p.first);
-                x=path({i,i,i});y=path(faces.at(p.second));
+                out.stencils.push_back({global({i,i,i}),global(faces.at(p.second)),p.kind});
             }else{
                 const auto e=edges.at(p.first),g=edges.at(p.second);
-                x=path({e[0],e[1],e[1]});y=path({g[0],g[1],g[1]});
+                out.stencils.push_back({global({e[0],e[1],e[1]}),
+                                        global({g[0],g[1],g[1]}),p.kind});
             }
-            const auto c=certify_rounded_relative_triangle_pair(x,y,skin,depth);
+        }
+        return out;
+    }
+    TypedSelfAudit audit(const Body& a,const Body& b,double skin,unsigned depth=12,
+                         bool exhaustive=false){
+        if(depth>20)throw std::invalid_argument("invalid typed self depth");
+        const auto set=candidates(a,b,skin,exhaustive);
+        auto out=set.info;
+        auto path=[&](const auto& row){
+            return LinearTriangleMotion{self_positions(a,row),self_positions(b,row)};
+        };
+        for(std::size_t i=0;i<set.stencils.size();++i){
+            const auto& s=set.stencils[i];
+            const auto c=certify_rounded_relative_triangle_pair(
+                path(s.left),path(s.right),skin,depth);
             ++out.certificates;out.projections+=c.interval_projections;
-            if(!c.entirely_separated){out.separated=false;out.unresolved=p;return out;}
+            if(!c.entirely_separated){out.separated=false;out.unresolved=set.keys[i];return out;}
         }
         return out;
     }
