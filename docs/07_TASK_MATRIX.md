@@ -1428,3 +1428,66 @@ Offline shader (Linux x86-64, Clang OpenCL C compiler):
     /tmp/tiles-test > /tmp/tiles.csv
 
 CMake registrations authored; full stock dependency configuration and physical GPU run remain unverified.
+
+## Executed adaptive separating normals and fused active-list sweep
+
+- [x] Independent CasADi/IPOPT three-body solver extends the fixed-plane
+  formulation to optimized unit separating normals for each pair at each
+  step. Normal-only 1e-8 proximal regularization selects nearby feasible
+  directions; spin is added to active workloads. Four 32-step scenes:
+  three rotating impact cases and separated control. All 128 implicit
+  steps converged, 48 simultaneously active steps, largest normal
+  change from initial 9.946124 degrees, minimum element J 0.956324478,
+  maximum unit-normal error 4.564e-11, stationarity 8.158e-11,
+  momentum error 7.035e-11 kg m/s. Positive 1.5 mm separating gap.
+  Contact model remains pairwise globally separating planes; cannot
+  claim arbitrary nonconvex surface contact or external IPC dynamics.
+- [x] Existing GCC/Clang three-body replay executables independently
+  audited the new trajectories at 0 and 0.5 mm clearance. Per compiler:
+  128 accepted linear leaves, 740,736 exhaustive public upstream CCD
+  queries, 20,024 matching candidate keys, 18,668 exact pair-path
+  certificates (count once per leaf), zero unresolved or reported
+  collision/missing candidates. Raw receipts byte-identical. IPC is
+  the previously disclosed serial compatibility build.
+- [x] Fused active-list SAP merges expiration and candidate enumeration,
+  lazily compacts only the opposing VF active list, and retains the
+  original spatial-first exact binary64 filter. Independent tests on
+  GCC/Clang strict C++23: 4,000 changing meshes each, 500 malformed
+  recovery checks, reversal fallback and empty invalid input controls.
+  Never caches candidate membership.
+- [x] Paid query comparison across eight independent 32-step contact
+  trajectories (four moving normals, four previous fixed normals) and
+  ten native four-step U-width/near-separated workloads. 296 distinct
+  physical leaves per compiler, six rotated measured blocks and
+  excluded warmup, three methods, 5,328 timed queries per compiler.
+  All candidate identities match exhaustive. Equal-weight paired
+  block-sum geometric means: persistent selected-axis SAP / fused
+  GCC 1.595133, Clang 1.466904; spatial-first / fused 1.170239 and
+  1.144211. Independent-only persistent/fused 1.737172 and 1.627156;
+  native-only 1.489910 and 1.350144. One GCC workload regresses
+  against persistent axis SAP, one slightly regresses against
+  spatial-first. Shared Linux VM timings; no universal or whole-solver
+  performance claim. Fused backend is a separate research query class,
+  not yet integrated into the physical solver.
+- [x] Author actual tiled Metal host using existing packed and tiled
+  shared kernels, command completion, precision controls, exact key
+  comparison, and measured planning/upload/dispatch/readback/filter
+  against spatial-first SAP. Six rotated blocks, five native width
+  scales. Metal host remains uncompiled/unexecuted on Linux. No actual
+  GPU performance evidence; no GPU device or OpenCL platform.
+- [ ] Stock upstream parallel IPC, real GPU execution, broad arbitrary
+  surface-contact dynamics, and fused full-solver integration remain.
+
+Reproduce adaptive contact:
+    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/pass40_adaptive_contact.py /tmp/adaptive-contact
+    ./build/kyoto_pass40_three_body_replay /tmp/adaptive-contact/trajectory.txt
+    ./build/kyoto_pass40_fused_axis_campaign /tmp/adaptive-contact/trajectory.txt /tmp/three-body/trajectory.txt
+
+Physical Metal gate (unrun):
+    cmake -S . -B build-metal -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-metal --target kyoto_pass40_metal_tiled_mask
+    ./build-metal/kyoto_pass40_metal_tiled_mask /tmp/kyoto-tiled-metal 64
+
+Raw timings are losslessly gzip-compressed. Full independent trajectory
+and logs retained in the local evidence archive. Direct strict compiler
+builds and native replays executed; new CMake registrations authored.
