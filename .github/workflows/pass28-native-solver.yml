@@ -45,8 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - run: cmake --build build --target kyoto_initial_tet_separation_tests kyoto_initial_tet_exact_oracle_tests kyoto_initial_volume_fem_tests kyoto_volume_boundary_topology_tests --parallel 2
-      - run: ctest --test-dir build -R 'outward_initial_tetrahedral_separation|initial_tetrahedral_exact_integer_oracle|initial_volume_FEM_containment_rollback|complete_volume_boundary_topology' --no-tests=error --output-on-failure -V
+      - run: cmake --build build --target kyoto_initial_tet_separation_tests kyoto_initial_tet_exact_oracle_tests kyoto_initial_volume_fem_tests kyoto_volume_boundary_topology_tests kyoto_volume_boundary_fixture_tests kyoto_native_volume_boundary_fixture_tests --parallel 2
+      - run: ctest --test-dir build -R 'outward_initial_tetrahedral_separation|initial_tetrahedral_exact_integer_oracle|initial_volume_FEM_containment_rollback|complete_volume_boundary_topology|standalone_volume_boundary_fixture_patterns|actual_native_volume_boundary_factories' --no-tests=error --output-on-failure -V
   persistent-context:
     strategy:
       fail-fast: false

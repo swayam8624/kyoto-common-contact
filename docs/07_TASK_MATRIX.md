@@ -659,3 +659,21 @@ Local test source Git blob: 9d1db0e445b080208ebcf5e8e2a4235bd35c666b.
     g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/volume_boundary_topology_tests.cpp -o /tmp/kyoto-boundary
     /tmp/kyoto-boundary
 
+
+
+## Pass 38D — compatibility with scalable volumetric mesh construction
+
+- [x] Independently reconstruct the native toroidal and U-solid
+  connectivity patterns without depending on the entire FEM solver.
+  Run the production boundary checker on 27 toroidal resolutions
+  (major 8/20/64, radial and vertical 2/3/8) and 5 U widths
+  (1/4/16/32/64). Verify analytical boundary triangle counts.
+- [x] Local GCC and Clang strict-warning C++23 runs both passed
+  all 32 meshes, totaling 58,710 tetrahedra. Standalone source blob
+  cde1d826e07cc9a54be8cf20d300951c0e5412be.
+- [x] Register direct native Body-factory compatibility test using
+  identical size combinations and analytical expected counts.
+- [ ] Execute direct native factory and solver tests. The local
+  standalone result verifies the reproduced connectivity patterns,
+  not actual native FEM factory execution or physical trajectories.
+

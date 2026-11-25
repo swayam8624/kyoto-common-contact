@@ -507,3 +507,17 @@ add_test(NAME initial_tetrahedral_exact_integer_oracle COMMAND kyoto_initial_tet
 add_executable(kyoto_volume_boundary_topology_tests tests/volume_boundary_topology_tests.cpp)
 target_link_libraries(kyoto_volume_boundary_topology_tests PRIVATE kyoto_contact)
 add_test(NAME complete_volume_boundary_topology COMMAND kyoto_volume_boundary_topology_tests)
+
+# Pass 38D: standalone and actual native volume factory compatibility.
+add_executable(kyoto_volume_boundary_fixture_tests tests/volume_boundary_fixture_tests.cpp)
+add_executable(kyoto_native_volume_boundary_fixture_tests tests/native_volume_boundary_fixture_tests.cpp)
+foreach(target kyoto_volume_boundary_fixture_tests kyoto_native_volume_boundary_fixture_tests)
+  target_link_libraries(${target} PRIVATE kyoto_contact)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(${target} PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(${target} PRIVATE /fp:strict)
+  endif()
+endforeach()
+add_test(NAME standalone_volume_boundary_fixture_patterns COMMAND kyoto_volume_boundary_fixture_tests)
+add_test(NAME actual_native_volume_boundary_factories COMMAND kyoto_native_volume_boundary_fixture_tests)
