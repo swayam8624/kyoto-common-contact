@@ -29,6 +29,44 @@ static Ledger measure(const Body& a,const Body& b){
     }
     return r;
 }
+// Independent discrete ledger: reconstruct the force/damping kick
+// from the ORIGINAL accepted start state, not the contact kernel.
+struct KickLedger{V3 dp{},dl{};double dk{};};
+static KickLedger kick_ledger(const Body& before,double dt){
+    const auto field=before.evaluate();
+    const double damp=std::exp(-before.material.damping*dt);
+    KickLedger out;
+    for(std::size_t i=0;i<before.nodes.size();++i){
+        const auto& n=before.nodes[i];
+        const V3 predicted=(n.v+(field.elastic_force[i]/n.mass+
+                                  V3{0,0,-before.material.gravity})*dt)*damp;
+        const V3 delta=(predicted-n.v)*n.mass;
+        out.dp+=delta;out.dl+=cross(n.x,delta);
+        out.dk+=.5*n.mass*(dot(predicted,predicted)-dot(n.v,n.v));
+    }
+    return out;
+}
+static double gravity_energy(const Body& b){
+    double u=0.;for(const auto& n:b.nodes)u+=n.mass*b.material.gravity*n.x.z;return u;
+}
+static double audit_discrete_leaf(const CoupledFEMLeaf& leaf){
+    const auto before=measure(leaf.before_a,leaf.before_b);
+    const auto after=measure(leaf.after_a,leaf.after_b);
+    const auto ka=kick_ledger(leaf.before_a,leaf.dt),kb=kick_ledger(leaf.before_b,leaf.dt);
+    const double dk=ka.dk+kb.dk;
+    const double de=after.elastic-before.elastic;
+    const double dg=gravity_energy(leaf.after_a)+gravity_energy(leaf.after_b)-
+                    gravity_energy(leaf.before_a)-gravity_energy(leaf.before_b);
+    const double delta_mechanical=after.kinetic-before.kinetic+de+dg;
+    const double residual=delta_mechanical-(dk+leaf.receipt.contact_kinetic_change+de+dg);
+    const double scale=std::max({1.,std::abs(before.kinetic),std::abs(after.kinetic),std::abs(dk)});
+    require(std::abs(residual)<1e-9*scale,"discrete energy accounting mismatch");
+    require(norm(after.p-before.p-ka.dp-kb.dp)<1e-9*scale,
+            "discrete linear impulse accounting mismatch");
+    require(norm(after.l-before.l-ka.dl-kb.dl)<1e-9*scale,
+            "discrete angular impulse accounting mismatch");
+    return std::abs(residual);
+}
 static V3 momentum(const Body& b){V3 p{};for(const auto& n:b.nodes)p+=n.v*n.mass;return p;}
 static void same(const Body& a,const Body& b){
     require(a.time_seconds==b.time_seconds&&a.contact_count_step==b.contact_count_step&&
@@ -54,7 +92,7 @@ static void run(bool fast){
     const auto initial=measure(a,b);
     const auto p0a=momentum(a),p0b=momentum(b);
     V3 impulse{};
-    double min_gap=gap,min_j=1,certified_j=1,contact_work=0;
+    double min_gap=gap,min_j=1,certified_j=1,contact_work=0,max_energy_residual=0;
     std::size_t updates=0,rejections=0,leaves=0;
     const int steps=fast?1:30;
     const double dt=fast?.004:.0005;
@@ -95,6 +133,7 @@ static void run(bool fast){
                                 "sampled accepted physical trajectory crossed skin");
                     }
             }
+            max_energy_residual=std::max(max_energy_residual,audit_discrete_leaf(leaf));
             elapsed+=leaf.dt;
         }
         require(std::abs(elapsed-dt)<1e-12,"accepted leaf durations do not sum");
@@ -136,12 +175,24 @@ static void run(bool fast){
              <<" momentum_residual="<<norm(final.p-initial.p)
              <<" angular_residual="<<norm(final.l-initial.l)
              <<" contact_work_j="<<contact_work
+             <<" max_discrete_energy_residual_j="<<max_energy_residual
              <<" mechanical_change_j="<<final.kinetic+final.elastic-initial.kinetic-initial.elastic
              <<'\n';
 }
 int main(){
     try{
         run(false);run(true);
+        // Free-flight under unequal gravity and damping: verify the
+        // same accounting without assuming isolated-system conservation.
+        {
+            Body a=tetra(0.,-1.,.1,360.),b=tetra(.1,1.,.1,480.);
+            a.material.gravity=9.81;b.material.gravity=3.;
+            a.material.damping=.4;b.material.damping=.7;
+            std::vector<CoupledFEMLeaf> trace;
+            const auto receipt=step_coupled_fem(a,b,.0005,{},&trace);
+            require(receipt.impulse_updates==0&&!trace.empty(),"free-flight fixture contacted");
+            for(const auto& leaf:trace)(void)audit_discrete_leaf(leaf);
+        }
         Body a=tetra(0.,-1.,1.,360.),b=tetra(.006,1.,1.,480.);
         const Body aa=a,bb=b;
         CoupledFEMSettings c;c.max_bisection=0;
