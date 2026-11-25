@@ -1,0 +1,39 @@
+name: Pass 36 paid native FEM persistence
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/**'
+      - 'apps/pass36_paid_persistent_fem_abba.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/pass36-paid-persistence.yml'
+  pull_request:
+    branches: [validation/sca-pass34-base]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paid-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_pass36_paid_persistent_fem_abba --parallel 2
+      - run: |
+          mkdir -p results/pass36
+          uname -a > results/pass36/environment.txt
+          c++ --version >> results/pass36/environment.txt
+          cmake --version >> results/pass36/environment.txt
+          git rev-parse HEAD >> results/pass36/environment.txt
+          ./build/kyoto_pass36_paid_persistent_fem_abba results/pass36
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass36-paid-native-${{ matrix.os }}
+          path: results/pass36/
+          if-no-files-found: warn
