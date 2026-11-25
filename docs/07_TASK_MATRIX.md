@@ -1123,3 +1123,32 @@ campaign. The manifest records the source revision and logs. On macOS
 install CMake, Boost, Python NumPy/SciPy/pandas/Matplotlib/Pillow and
 ffmpeg; the IPC dependency is fetched by CMake. Actual data must be
 examined after each run; no result should be guessed from a target name.
+
+## Pass 40 — technical manuscript and final evidence boundary
+
+- [x] Complete technical manuscript with sufficient pair and whole-complex
+  injectivity theorems, exact arithmetic formulation, reproducibility,
+  measured experimental results, limitations, references and related work.
+- [x] Review original IPC, Bernstein sign classification, Tight Inclusion,
+  TightCCD, exact root parity and scalable CCD sources. The combination
+  is a research direction, not an established first-in-literature claim.
+- [x] Produce local 13-page rendered/inspected PDF and raw archive with
+  both compiler datasets, previous exact audit measurements, source subset,
+  native floor-contact figures and animations, and verified checksums.
+  The raw archive is delivered separately; it is not silently replaced by
+  summary tables. Markdown Git blob matches the local manuscript.
+- [ ] Final research acceptance: actual coupled CPU/GPU campaigns,
+  upstream IPC execution, independent full mesh-contact dynamics
+  integration, real coupled source figures, and direct related-work
+  dataset comparisons. Full native checkout unavailable and CI pending.
+  Keep the validation PR draft. No claim that these unexecuted gates passed.
+
+The exact-arithmetic milestone (39B) is closed; the physical floor-contact
+CPU evidence, independent numerical replay and its visualization are
+complete at their stated scope. The technical manuscript is complete as
+a draft; submission-ready scientific validation remains open.
+
+Read `docs/manuscript/SCA_MANUSCRIPT.md` and
+`docs/evidence/PASS39_PHYSICAL_EVIDENCE.md`. The one-command integrated
+runner is `tools/run_final_campaign.py`; an exit status of zero means
+its listed executable gates passed, not general novelty or safety.
