@@ -6,6 +6,7 @@
 // A change of row order/connectivity/epoch invalidates the retained BVH.
 // No physical response, nonlinear CCD, or additional filters are implied.
 #include "kyoto/refit_feature_hierarchy.hpp"
+#include "kyoto/cached_axis_sap.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -27,9 +28,12 @@ class LinearCandidateAdapter {
     // Retained full-refit baseline; selective or frontier optimizations
     // should be compared separately, not silently change this boundary.
     RefitHierarchy hierarchy_;
+    persistent::CachedAxisSweep cached_sap_;
+    bool use_cached_sap_{};
 public:
-    std::size_t rebuilds() const { return hierarchy_.rebuilds(); }
-    std::size_t refits() const { return hierarchy_.refits(); }
+    explicit LinearCandidateAdapter(bool cached_sap=false):use_cached_sap_(cached_sap){}
+    std::size_t rebuilds() const { return use_cached_sap_?cached_sap_.rebuilds():hierarchy_.rebuilds(); }
+    std::size_t refits() const { return use_cached_sap_?cached_sap_.warm_frames():hierarchy_.refits(); }
 
     f::Result query(std::span<const Vec3> start,
                     std::span<const Vec3> end,
@@ -84,8 +88,8 @@ public:
             return result;
         }
         if(exhaustive_reference)return f::exhaustive(mesh);
-        try { return hierarchy_.query(mesh); }
-        catch(...) { hierarchy_=RefitHierarchy{}; throw; }
+        try { return use_cached_sap_?cached_sap_.query(mesh):hierarchy_.query(mesh); }
+        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{}; throw; }
     }
 };
 } // namespace kyoto::contact::atlas

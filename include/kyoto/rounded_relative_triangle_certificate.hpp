@@ -37,21 +37,32 @@ inline Differences differences(const Triangle3& a,const Triangle3& b){
     for(int i=0;i<3;++i)for(int j=0;j<3;++j)d[3*i+j]=subtract(a[i],b[j]);
     return d;
 }
-inline I3 lerp(I3 a,I3 b,double t){
+// Multiplication by an exact finite scalar has only two distinct
+// corner products. Preserve the reference outward rounding and failure
+// semantics, including overflow and subnormal arithmetic.
+inline Interval scalar_product(Interval a,double b){
+    if(!good(a)||!std::isfinite(b))return {-INFINITY,INFINITY};
+    const double x=a.lo*b,y=a.hi*b;
+    if(!std::isfinite(x)||!std::isfinite(y))return {-INFINITY,INFINITY};
+    return {down(std::min(x,y)),up(std::max(x,y))};
+}
+inline I3 lerp(I3 a,I3 b,double t,bool fast=false){
     if(t==0.)return a;
     if(t==1.)return b;
     const auto f=[&](Interval x,Interval y){
-        return plus(product(exact(1.-t),x),product(exact(t),y));
+        return fast?plus(scalar_product(x,1.-t),scalar_product(y,t)):
+                    plus(product(exact(1.-t),x),product(exact(t),y));
     };
     return {f(a.x,b.x),f(a.y,b.y),f(a.z,b.z)};
 }
-inline Interval projection(I3 p,V3 n){
+inline Interval projection(I3 p,V3 n,bool fast=false){
+    if(fast)return plus(plus(scalar_product(p.x,n.x),scalar_product(p.y,n.y)),scalar_product(p.z,n.z));
     return plus(plus(product(p.x,exact(n.x)),product(p.y,exact(n.y))),
                 product(p.z,exact(n.z)));
 }
 inline bool prove_direction(const Differences& a,const Differences& b,
                             V3 n,double skin,RoundedPairCertificate& out,
-                            double& lower){
+                            double& lower,bool fast=false){
     if(!finite(n))return false;
     // Scaling directions is not needed for correctness. Reject tiny,
     // nonfinite or overflowing directions without claiming separation.
@@ -64,7 +75,7 @@ inline bool prove_direction(const Differences& a,const Differences& b,
     double pmin=std::numeric_limits<double>::infinity();
     for(const auto* set:{&a,&b})for(const auto& p:*set){
         ++out.interval_projections;
-        const auto dot=projection(p,n);
+        const auto dot=projection(p,n,fast);
         if(!good(dot)||!(dot.lo>target.hi))return false;
         pmin=std::min(pmin,dot.lo);
     }
@@ -74,7 +85,7 @@ inline bool prove_direction(const Differences& a,const Differences& b,
 } // namespace relative_hull_detail
 inline RoundedPairCertificate certify_rounded_relative_triangle_pair(
     const LinearTriangleMotion& a,const LinearTriangleMotion& b,
-    double skin=0.,unsigned depth_limit=12){
+    double skin=0.,unsigned depth_limit=12,bool fast=false){
     using namespace relative_hull_detail;
     if(!rounded::prerequisites())throw std::runtime_error("unsupported relative hull FP model");
     if(!std::isfinite(skin)||skin<0.||depth_limit>20)
@@ -89,11 +100,11 @@ inline RoundedPairCertificate certify_rounded_relative_triangle_pair(
         ++out.nodes;out.max_depth=std::max(out.max_depth,depth);
         Differences lo,hi;
         for(int i=0;i<9;++i){
-            lo[i]=lerp(start[i],end[i],t0);
-            hi[i]=lerp(start[i],end[i],t1);
+            lo[i]=lerp(start[i],end[i],t0,fast);
+            hi[i]=lerp(start[i],end[i],t1,fast);
         }
         double lower=0.;
-        auto test=[&](V3 n){return prove_direction(lo,hi,n,skin,out,lower);};
+        auto test=[&](V3 n){return prove_direction(lo,hi,n,skin,out,lower,fast);};
         bool proven=false;
         for(V3 n:{V3{1,0,0},V3{-1,0,0},V3{0,1,0},V3{0,-1,0},V3{0,0,1},V3{0,0,-1}})
             if(test(n)){proven=true;break;}

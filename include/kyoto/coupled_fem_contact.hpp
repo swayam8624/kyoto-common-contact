@@ -26,6 +26,8 @@ struct CoupledFEMSettings {
     double min_dt{1e-10};
     bool hierarchy{false};
     kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
+    bool fast_relative_projection{false}; // identical scalar-product interval specialization
+    bool cached_self_sap{false}; // optional topology-cached axis SAP for typed self contact
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
     bool initial_volume_audit{true}; // initial cross-body volume disjointness, not self-injectivity
@@ -57,10 +59,11 @@ struct CoupledFEMLeaf {
 class CoupledFEMContext {
     std::optional<TypedSelfAuditor> a_,b_;
     kyoto::contact::atlas::ExternalCandidateProducer external_{};
+    bool cached_sap_{};
 public:
-    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;}
-    void bind(kyoto::contact::atlas::ExternalCandidateProducer p){
-        if(!a_||!b_||p!=external_){reset();a_.emplace(p);b_.emplace(p);external_=p;}
+    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;cached_sap_=false;}
+    void bind(kyoto::contact::atlas::ExternalCandidateProducer p,bool cached_sap=false){
+        if(!a_||!b_||p!=external_||cached_sap_!=cached_sap){reset();a_.emplace(p,cached_sap);b_.emplace(p,cached_sap);external_=p;cached_sap_=cached_sap;}
     }
     TypedSelfAuditor& first(){return a_.value();}
     TypedSelfAuditor& second(){return b_.value();}
@@ -249,7 +252,7 @@ inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& 
             ++stats.certificate_tests;
             if(c.rounded_surface){
                 const auto cert=certify_rounded_relative_triangle_pair(
-                    path,paths[j],c.skin,c.interval_depth);
+                    path,paths[j],c.skin,c.interval_depth,c.fast_relative_projection);
                 stats.interval_nodes+=cert.nodes;
                 stats.rounded_directions+=cert.directions;
                 stats.rounded_projections+=cert.interval_projections;
@@ -293,7 +296,7 @@ inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body&
                         TypedSelfAuditor& auditor_a,TypedSelfAuditor& auditor_b){
     if(c.typed_self_contact){
         auto check=[&](TypedSelfAuditor& auditor,const Body& before,const Body& after,SelfContactStats& stats){
-            const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy);
+            const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy,c.fast_relative_projection);
             stats.certificate_tests+=r.certificates;stats.projections+=r.projections;
             stats.box_tests+=r.box_tests;stats.incident_exclusions+=r.incident_rejections;
             stats.interval_nodes+=r.interval_nodes;
@@ -333,7 +336,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       std::vector<CoupledFEMLeaf>* trace=nullptr,
                                       CoupledFEMContext* context=nullptr){
     using namespace coupled_detail;
-    if(&a==&b||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+    if(&a==&b||(c.cached_self_sap&&(!c.typed_self_contact||!c.hierarchy||c.external_self_candidates))||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
@@ -353,7 +356,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         bool committed{};
         ~ResetOnFailure(){if(!committed)value.reset();}
     } guard{warm};
-    warm.bind(c.external_self_candidates);
+    warm.bind(c.external_self_candidates,c.cached_self_sap);
     auto& auditor_a=warm.first();auto& auditor_b=warm.second();
     // Initial cross-volume disjointness is checked unless explicitly disabled.
     // Combinatorial boundary is validated; geometric self-injectivity remains a caller precondition.

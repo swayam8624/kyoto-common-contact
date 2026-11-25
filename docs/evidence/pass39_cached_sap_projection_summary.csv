@@ -1,0 +1,7 @@
+compiler,experiment,ratio_reference_over_new
+GCC,cached_sap_candidate_vs_persistent_axis,0.984903
+Clang,cached_sap_candidate_vs_persistent_axis,1.094739
+GCC,cached_sap_whole_solver_vs_retained_bvh,0.9964636076056841
+Clang,cached_sap_whole_solver_vs_retained_bvh,1.0004891199805896
+GCC,scalar_projection_whole_solver,1.1384441884057344
+Clang,scalar_projection_whole_solver,0.9869305000549607

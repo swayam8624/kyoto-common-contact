@@ -1244,3 +1244,52 @@ universal claims. Exact volume receipt SHA-256:
 This is actual independent external CCD execution, not a substitute
 solver built from our own equations. It strengthens the empirical
 safety evidence while leaving broader interoperability gates open.
+
+## Executed performance follow-up — cached sweep and scalar interval specialization
+
+- [x] Add topology-validated cached feature lookup to persistent selected-axis
+  SAP. Recompute all bounds; no candidate membership cache. Bounded order
+  repair falls back to full sort after 8N swaps. Test 4,000 changing-mesh
+  queries per compiler, 500 malformed/recovery controls, sparse IDs,
+  masks, reordered source rows, epoch changes, and severe reversal
+  (two fallback sorts). Exact exhaustive candidate parity.
+- [x] Nine-arm physical replay at all five widths and both regimes,
+  nine rotated measured blocks, four accepted leaves per case,
+  3,240 timed queries per compiler, all canonical keys match exhaustive.
+  Persistent selected-axis SAP / cached SAP timing ratio GCC 0.984903,
+  Clang 1.094739. Mixed result; not a portable speedup.
+- [x] Integrate cached sweep as an explicit typed-self backend in the
+  actual solver (default off). Full state/receipt parity after every
+  physical macrostep, 120 measured trajectories of four macrosteps per
+  compiler. Verify context backend switching and failure recovery.
+  Retained BVH / cached SAP whole-solver ratio GCC 0.9964636076,
+  Clang 1.0004891200. No demonstrated whole-solver speedup.
+- [x] Add optional exact-scalar specialization for outward interval
+  multiplication in relative triangle certificates. A point interval
+  multiplier has only two distinct endpoint products; outward bounds
+  and failure semantics remain unchanged. Test 200,000 random finite
+  binary64 interval/scalar products and explicit subnormal/signed-zero
+  controls per compiler; 2,000 full certificate comparisons per compiler
+  (1,365 clear, 635 unresolved) match all receipt fields exactly.
+- [x] Actual full solver comparison with reference versus specialized
+  projection, 120 measured trajectories of four steps per compiler,
+  all state and physical decision receipts identical. Reference/fast
+  geomean GCC 1.1384441884 and Clang 0.9869305001. GCC improves 13.8%
+  in speed ratio, Clang slightly regresses. Both options default off.
+  The legacy triangle certificate and restricted nonincident self
+  contact path are unchanged. No new safety claim.
+- [x] Record four raw whole-solver timing CSVs and summary. Initial
+  candidate timing was measured before adding the redundant explicit
+  thickness validation and optional integration; subsequent final
+  candidate source builds pass, but timings refer to that initial run.
+  Shared Linux VM, strict C++23, paired block sums and equal-weight
+  geometric means over workload/block combinations. No independent
+  hardware replication or universal superiority.
+- [ ] Full official IPC wrapper/LBVH and hardware Metal execution.
+  Latest CI remained pending/queued. No GPU result claimed.
+
+Run from checkout with -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror
+-ffp-contract=off -fno-fast-math -Iinclude. Use the registered unit
+tests and apps/pass39_cached_sap_campaign.cpp (output directory and 64),
+apps/pass39_cached_sap_solver.cpp and apps/pass39_projection_solver.cpp
+(stdout CSV). Preserve separate compiler runs and warmup exclusion.

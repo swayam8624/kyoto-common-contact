@@ -74,7 +74,7 @@ class TypedSelfAuditor {
         source_nodes_=a.nodes.size();++epoch_;++mapping_rebuilds_;
     }
 public:
-    explicit TypedSelfAuditor(kyoto::contact::atlas::ExternalCandidateProducer external=nullptr):external_(external){}
+    explicit TypedSelfAuditor(kyoto::contact::atlas::ExternalCandidateProducer external=nullptr,bool cached_sap=false):adapter_(cached_sap),external_(external){}
     std::size_t mapping_rebuilds()const{return mapping_rebuilds_;}
     std::size_t hierarchy_rebuilds()const{return adapter_.rebuilds();}
     std::size_t hierarchy_refits()const{return adapter_.refits();}
@@ -116,7 +116,7 @@ public:
         return out;
     }
     TypedSelfAudit audit(const Body& a,const Body& b,double skin,unsigned depth=12,
-                         bool exhaustive=false){
+                         bool exhaustive=false,bool fast_projection=false){
         if(depth>20)throw std::invalid_argument("invalid typed self depth");
         const auto set=candidates(a,b,skin,exhaustive);
         auto out=set.info;
@@ -127,7 +127,7 @@ public:
         for(std::size_t i=0;i<set.stencils.size();++i){
             const auto& s=set.stencils[i];
             const auto c=certify_rounded_relative_triangle_pair(
-                path(s.left),path(s.right),skin,depth);
+                path(s.left),path(s.right),skin,depth,fast_projection);
             ++out.certificates;out.projections+=c.interval_projections;out.interval_nodes+=c.nodes;
             if(!c.entirely_separated){out.separated=false;out.unresolved=set.keys[i];return out;}
         }
