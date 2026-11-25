@@ -1,0 +1,25 @@
+name: Pass 28 native FEM physical parity
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/**'
+      - 'tests/static_face_solver_parity_tests.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/pass28-native-solver.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_static_face_solver_parity_tests --parallel 2
+      - run: ctest --test-dir build -R actual_FEM_static_face_broadphase_physical_parity --output-on-failure -V
