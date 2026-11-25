@@ -22,6 +22,8 @@
 // continuous face intervals are NEVER silently accepted.
 
 #include "kyoto/triangle_mesh_contact.hpp"
+#include "kyoto/static_face_hierarchy.hpp"
+#include <optional>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -44,6 +46,7 @@ struct RigidMeshContactSettings{
     unsigned maximum_bisection_depth{16};
     std::size_t maximum_accepted_leaves{10000};
     double minimum_dt_s{1e-10};
+    bool use_static_face_hierarchy{false}; // Pass 28 opt-in; legacy default
 };
 inline void validate(const RigidMeshContactSettings& c){
     if(!(c.clearance_skin_m>0&&std::isfinite(c.clearance_skin_m)&&
@@ -92,7 +95,7 @@ struct MeshAdaptiveStats{
     std::size_t accepted_leaves{},rejected_geom_trials{},
                 rejected_tetra_trials{},continuous_pair_tests{},
                 interval_nodes{},face_impulse_updates{},
-                active_face_pairs{};
+                active_face_pairs{},broadphase_box_tests{};
     double min_clearance_m{std::numeric_limits<double>::infinity()};
     double min_tetra_j{std::numeric_limits<double>::infinity()};
     double normal_impulse_ns{},tangential_impulse_ns{};
@@ -109,17 +112,24 @@ inline void apply_rigid_mesh_impulses(
     const std::vector<TriangleBox>& rigid_boxes,
     const std::vector<V3>& positions,std::vector<V3>& velocity,
     std::vector<double>& nodal_normal_impulses,
-    const RigidMeshContactSettings& cfg,MeshStepResult& metrics){
+    const RigidMeshContactSettings& cfg,MeshStepResult& metrics,
+    const StaticFaceHierarchy* hierarchy=nullptr){
     const double activation=cfg.clearance_skin_m+cfg.activation_width_m;
+    std::vector<std::size_t> rows;
     for(unsigned iter=0;iter<cfg.impulse_iterations;iter++){
         for(const auto& face:body.surface_faces){
             const Triangle3 a={positions[face[0]],positions[face[1]],
                                positions[face[2]]};
             const auto aabb=bounding(a);
-            for(std::size_t j=0;j<rigid.faces.size();j++){
-                ++metrics.broadphase_box_tests;
-                if(!maybe_near(aabb,rigid_boxes[j],activation))
-                    continue;
+            // Keep the legacy loop order for sequential impulses.
+            if(hierarchy)hierarchy->query(aabb,activation,rows,metrics.broadphase_box_tests);
+            const auto count=hierarchy?rows.size():rigid.faces.size();
+            for(std::size_t krow=0;krow<count;krow++){
+                const auto j=hierarchy?rows[krow]:krow;
+                if(!hierarchy){
+                    ++metrics.broadphase_box_tests;
+                    if(!maybe_near(aabb,rigid_boxes[j],activation))continue;
+                }
                 const auto nearest=triangle_triangle_closest(
                     a,rigid_triangles[j]);
                 if(nearest.distance>activation)continue;
@@ -167,7 +177,8 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     const std::vector<Triangle3>& rigid_triangles,
     const std::vector<TriangleBox>& rigid_boxes,
     double dt,const RigidMeshContactSettings& cfg,
-    std::vector<V3>* trial_proposal_positions=nullptr) {
+    std::vector<V3>* trial_proposal_positions=nullptr,
+    const StaticFaceHierarchy* hierarchy=nullptr) {
     MeshStepResult out;
     if(!(std::isfinite(dt)&&dt>0))
         throw std::invalid_argument("invalid rigid mesh physical trial dt");
@@ -192,7 +203,7 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     // Apply velocity reaction before the trial; otherwise a common
     // gravitating near-contact state repeatedly clips and loses time.
     apply_rigid_mesh_impulses(body,rigid,rigid_triangles,rigid_boxes,
-                             x,v,nodal_impulses,cfg,out);
+                             x,v,nodal_impulses,cfg,out,hierarchy);
     for(std::size_t i=0;i<x.size();i++)
         predicted.push_back(x[i]+v[i]*dt);
     // Optional source-only inspection: THESE are the native solver's
@@ -201,16 +212,21 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     // Default nullptr preserves all existing numerical solver behavior.
     if(trial_proposal_positions)
         *trial_proposal_positions=predicted;
+    std::vector<std::size_t> swept_rows;
     for(const auto& face:body.surface_faces){
         const LinearTriangleMotion trajectory{
             {x[face[0]],x[face[1]],x[face[2]]},
             {predicted[face[0]],predicted[face[1]],
              predicted[face[2]]}};
         const auto box=swept_bounding(trajectory);
-        for(std::size_t j=0;j<rigid.faces.size();j++){
-            ++out.broadphase_box_tests;
-            if(!maybe_near(box,rigid_boxes[j],cfg.clearance_skin_m))
-                continue;
+        if(hierarchy)hierarchy->query(box,cfg.clearance_skin_m,swept_rows,out.broadphase_box_tests);
+        const auto count=hierarchy?swept_rows.size():rigid.faces.size();
+        for(std::size_t krow=0;krow<count;krow++){
+            const auto j=hierarchy?swept_rows[krow]:krow;
+            if(!hierarchy){
+                ++out.broadphase_box_tests;
+                if(!maybe_near(box,rigid_boxes[j],cfg.clearance_skin_m))continue;
+            }
             out.continuous_pair_tests++;
             const auto c=certify_moving_triangle_rigid_triangle(
                trajectory,rigid_triangles[j],
@@ -238,7 +254,7 @@ inline MeshStepResult try_rigid_mesh_fem_full_step(
     }
     // Only now is post-displacement impulse response permitted.
     apply_rigid_mesh_impulses(body,rigid,rigid_triangles,rigid_boxes,
-                             predicted,v,nodal_impulses,cfg,out);
+                             predicted,v,nodal_impulses,cfg,out,hierarchy);
     Body candidate=body;
     for(std::size_t i=0;i<candidate.nodes.size();i++){
         candidate.nodes[i].x=predicted[i];
@@ -292,6 +308,10 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
         triangles.push_back(tri);
         boxes.push_back(bounding(tri));
     }
+    // The obstacle is static during this entire macro-step, including
+    // rejected trials and all adaptive substeps. No stale dynamic cache.
+    std::optional<StaticFaceHierarchy> hierarchy;
+    if(cfg.use_static_face_hierarchy)hierarchy.emplace(boxes);
     const auto subdivide=[&](auto&& self,double h,
                              unsigned depth)->void {
         if(result.accepted_leaves>=cfg.maximum_accepted_leaves)
@@ -302,7 +322,9 @@ inline MeshAdaptiveStats step_time_consistent_rigid_triangle_mesh(
                 "mesh contact cannot certify minimum physical timestep");
         Body trial=staged;
         const auto r=try_rigid_mesh_fem_full_step(
-            trial,rigid,triangles,boxes,h,cfg);
+            trial,rigid,triangles,boxes,h,cfg,nullptr,
+            hierarchy?&*hierarchy:nullptr);
+        result.broadphase_box_tests+=r.broadphase_box_tests;
         result.continuous_pair_tests+=r.continuous_pair_tests;
         result.interval_nodes+=r.interval_nodes;
         if(!r.accepted){
