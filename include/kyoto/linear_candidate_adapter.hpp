@@ -17,6 +17,12 @@ namespace kyoto::contact::atlas {
 using IndexedEdge = std::array<std::size_t,2>;
 using IndexedFace = std::array<std::size_t,3>;
 
+// External candidate producers receive the same validated universal
+// collision mesh, including outward spatial padding. This optional
+// hook is deliberately audit-only: a backend must match exhaustive
+// canonical candidates before any result may reach a physical solver.
+using ExternalCandidateProducer = f::Result (*)(const f::Mesh&);
+
 class LinearCandidateAdapter {
     // Retained full-refit baseline; selective or frontier optimizations
     // should be compared separately, not silently change this boundary.
@@ -31,7 +37,8 @@ public:
                     std::span<const IndexedFace> faces,
                     std::uint64_t epoch=1,
                     double per_vertex_padding=0.0,
-                    bool exhaustive_reference=false) {
+                    bool exhaustive_reference=false,
+                    ExternalCandidateProducer external=nullptr) {
         if(start.size()!=end.size() || epoch==0 ||
            !std::isfinite(per_vertex_padding) || per_vertex_padding<0)
             throw std::invalid_argument("invalid indexed linear motion");
@@ -67,6 +74,15 @@ public:
         // Query state belongs to this adapter alone. If any exception
         // occurs during a hierarchy mutation, discard its caches so
         // the next valid call cannot observe a partly updated tree.
+        if(external){
+            const auto built=f::build(mesh);
+            auto result=external(mesh);
+            f::normalize(result);
+            const auto truth=f::exhaustive(built);
+            if(result.pairs!=truth.pairs)
+                throw std::runtime_error("external candidate producer differs from exhaustive contract");
+            return result;
+        }
         if(exhaustive_reference)return f::exhaustive(mesh);
         try { return hierarchy_.query(mesh); }
         catch(...) { hierarchy_=RefitHierarchy{}; throw; }
