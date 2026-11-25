@@ -46,6 +46,30 @@ struct CoupledFEMLeaf {
     unsigned depth{};
     CoupledFEMStats receipt;
 };
+// Caller-owned optional warm state. The context caches only candidate
+// topology and hierarchy data; it never owns committed physical bodies.
+// A failed macrostep clears both auditors, so no rejected geometry can
+// be mistaken for a previously accepted source. Not thread-safe.
+class CoupledFEMContext {
+    std::optional<TypedSelfAuditor> a_,b_;
+    kyoto::contact::atlas::ExternalCandidateProducer external_{};
+public:
+    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;}
+    void bind(kyoto::contact::atlas::ExternalCandidateProducer p){
+        if(!a_||!b_||p!=external_){reset();a_.emplace(p);b_.emplace(p);external_=p;}
+    }
+    TypedSelfAuditor& first(){return a_.value();}
+    TypedSelfAuditor& second(){return b_.value();}
+    std::size_t mapping_rebuilds()const{
+        return (a_?a_->mapping_rebuilds():0)+(b_?b_->mapping_rebuilds():0);
+    }
+    std::size_t hierarchy_rebuilds()const{
+        return (a_?a_->hierarchy_rebuilds():0)+(b_?b_->hierarchy_rebuilds():0);
+    }
+    std::size_t hierarchy_refits()const{
+        return (a_?a_->hierarchy_refits():0)+(b_?b_->hierarchy_refits():0);
+    }
+};
 namespace coupled_detail {
 using Face = std::array<std::size_t,3>;
 inline void validate_body(const Body& b){
@@ -214,6 +238,8 @@ inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body&
         auto check=[&](TypedSelfAuditor& auditor,const Body& before,const Body& after,SelfContactStats& stats){
             const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy);
             stats.certificate_tests+=r.certificates;stats.projections+=r.projections;
+            stats.box_tests+=r.box_tests;stats.incident_exclusions+=r.incident_rejections;
+            stats.interval_nodes+=r.interval_nodes;
             return r.separated;
         };
         return check(auditor_a,a0,a1,s.self_a)&&check(auditor_b,b0,b1,s.self_b);
@@ -247,7 +273,8 @@ inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
 
 inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       const CoupledFEMSettings& c={},
-                                      std::vector<CoupledFEMLeaf>* trace=nullptr){
+                                      std::vector<CoupledFEMLeaf>* trace=nullptr,
+                                      CoupledFEMContext* context=nullptr){
     using namespace coupled_detail;
     if(&a==&b||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
@@ -262,7 +289,15 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         throw std::invalid_argument("coupled bodies have different clocks");
     Body sa=a,sb=b;
     CoupledFEMStats total;
-    TypedSelfAuditor auditor_a(c.external_self_candidates),auditor_b(c.external_self_candidates); // revalidated every query
+    CoupledFEMContext local_context;
+    auto& warm=context?*context:local_context;
+    struct ResetOnFailure {
+        CoupledFEMContext& value;
+        bool committed{};
+        ~ResetOnFailure(){if(!committed)value.reset();}
+    } guard{warm};
+    warm.bind(c.external_self_candidates);
+    auto& auditor_a=warm.first();auto& auditor_b=warm.second();
     // Verify initial cross-surface separation; volume disjointness and
     // self-validity are explicit caller preconditions, not inferred here.
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
@@ -323,6 +358,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     // Single publication point for both bodies, after every leaf passed.
     a=std::move(sa);b=std::move(sb);
     if(trace)trace->swap(staged_trace); // replace only after successful macro-step
+    guard.committed=true;
     return total;
 }
 } // namespace kyoto::solid
