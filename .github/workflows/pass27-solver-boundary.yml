@@ -1,0 +1,32 @@
+name: Pass 27 solver candidate boundary
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/**'
+      - 'tests/linear_candidate_adapter_tests.cpp'
+      - 'tests/ipc_continuous_ccd_tests.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/pass27-solver-boundary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_linear_candidate_adapter_tests --parallel 2
+      - run: ctest --test-dir build -R indexed_linear_solver_candidate_adapter_oracle --output-on-failure -V
+  official-ipc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+      - run: cmake --build build-ipc --target kyoto_official_ipc_ccd_tests --parallel 2
+      - run: ctest --test-dir build-ipc -R pinned_official_ipc_continuous_CCD_coverage --output-on-failure -V
