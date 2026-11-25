@@ -813,3 +813,33 @@ Tested Git blobs: pair certificate 4066a4db2b95cc16aef3d59dfeb3c1cc1b83c66f;
 whole volume c1b7c61aa651ecb55f84399137040cb4f3c7685f;
 test 28644870058daa6f37dbec5c0b7c58fb790b0639;
 fixture 38fb36a425fc738f9f4ff45e7bdeaec987a412db.
+
+
+## Pass 38I — matched whole-volume broad phase and native leaf audit
+
+- [x] Add a dependency-free inclusive swept cell SAP with exact
+  projected-overlap-count axis selection and canonical pair order.
+- [x] GCC/Clang strict-warning C++23 runs: 1,000 seeded box scenes,
+  12,360 candidate pairs matched exactly; exhaustive 1,478,460 vs
+  sweep 278,544 three-axis overlap tests. Sparse 4,096-cell case
+  selected its separating axis and required zero three-axis tests.
+- [x] Rerun all nine exact whole-volume prescribed fixture paths on
+  both compilers. Exact certificate work, decisions, pair identity
+  and unresolved counts equal exhaustive; sweep 16,245 vs exhaustive
+  26,109 three-axis overlap tests. No runtime speedup asserted:
+  sorting, active scans and output normalization are additional work.
+- [x] Refresh and retain matching CSV receipts, including the earlier
+  rerun of Pass 38H (old local CSV contained pre-fix unresolved case).
+- [x] Register an optional actual native continuous leaf test for
+  combined two-body geometry, with disjoint global index namespaces,
+  explicit exhaustive parity and unresolved diagnostics.
+- [ ] Execute native integration and full external/GPU gates; latest
+  PR runs remain pending. Native continuous test is authored only.
+  The exact verifier is sufficient, not complete, and no generic
+  solver-wide safety or performance claim follows from these tests.
+
+Tested source blobs: candidate header 64da4134463881c5e35f4e790ac090447bcb7e8c;
+candidate test dbb0029583bff71f395f91aa92bf2ff06b9aa710;
+volume audit d8496416da9f05545aa5163e699a6f3ffb5cb7df;
+fixture test 381f42aca909135261e8d85e4df9372466706dd7.
+

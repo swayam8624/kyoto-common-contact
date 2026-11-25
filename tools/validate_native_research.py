@@ -14,6 +14,7 @@ import time
 
 NATIVE = [
     ("kyoto_linear_candidate_adapter_tests", "indexed_linear_solver_candidate_adapter_oracle"),
+    ("kyoto_swept_cell_candidates_tests", "swept_cell_candidate_exhaustive_parity"),
     ("kyoto_static_face_solver_parity_tests", "actual_FEM_static_face_broadphase_physical_parity"),
     ("kyoto_coupled_triangle_normal_impulse_tests", "two_finite_mass_triangle_normal_impulse_balance"),
     ("kyoto_tet_orientation_certificate_tests", "outward_continuous_tet_orientation_certificate"),
@@ -35,6 +36,7 @@ EXACT = [
     ("kyoto_exact_tet_intersection_tests", "exact_static_tetrahedral_intersection"),
     ("kyoto_exact_swept_tet_certificate_tests", "exact_continuous_tetrahedral_separation"),
     ("kyoto_exact_swept_volume_fixture_tests", "exact_continuous_volume_fixture_patterns"),
+    ("kyoto_native_exact_swept_volume_tests", "exact_continuous_native_FEM_leaf_volume"),
     ("kyoto_exact_volume_fixture_tests", "exact_static_volume_fixture_patterns"),
     ("kyoto_native_exact_self_volume_tests", "exact_static_native_FEM_endpoint_self_volume"),
 ]

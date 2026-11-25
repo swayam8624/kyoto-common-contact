@@ -4,10 +4,11 @@
 // cell orientation and pairwise intersection confined to shared simplices.
 // Unknown is counted, never promoted to valid. This is not a fast solver.
 #include "kyoto/exact_swept_tet_certificate.hpp"
+#include "kyoto/exact_swept_cell_candidates.hpp"
 namespace kyoto::geometry {
 struct ExactSweptVolumeReceipt {
     bool certified{};
-    std::size_t cells{},orientation_unknown{},pair_tests{},aabb_pruned{};
+    std::size_t cells{},orientation_unknown{},pair_tests{},aabb_pruned{},overlap_tests{};
     std::array<std::size_t,4> tested{},unknown{};
     std::size_t pair_nodes{},axes{},polynomials{};
     std::array<std::size_t,2> first_unknown{};
@@ -31,7 +32,7 @@ inline bool certify_exact_positive_cell(const ExactLinearTetMotion& m,unsigned l
 }
 inline ExactSweptVolumeReceipt audit_exact_swept_volume(
     const std::vector<Point>& start,const std::vector<Point>& end,
-    const std::vector<ExactTetIds>& cells,unsigned depth=6){
+    const std::vector<ExactTetIds>& cells,unsigned depth=6,bool exhaustive=false){
     if(start.empty()||start.size()!=end.size()||cells.empty()||depth>12)
         throw std::invalid_argument("invalid swept volume inputs");
     for(const auto* points:{&start,&end})for(auto p:*points)for(double v:p)
@@ -49,12 +50,20 @@ inline ExactSweptVolumeReceipt audit_exact_swept_volume(
         r.orientation_unknown+=!certify_exact_positive_cell(e.m,depth);
         entries.push_back(e);
     }
+    std::vector<SweptCellBox> boxes;boxes.reserve(entries.size());
+    for(const auto& e:entries)boxes.push_back({e.lo,e.hi});
+    const auto candidates=swept_cell_candidates(boxes,exhaustive);
+    // Count possible pairs without overflow; the actual broad-phase work
+    // is overlap_tests, and aabb_pruned includes axis-sweep rejections.
+    const auto n=entries.size();
+    const auto p=n%2?n:n/2,q=n%2?(n-1)/2:n-1;
+    if(q&&p>std::numeric_limits<std::size_t>::max()/q)
+        throw std::overflow_error("swept volume pair count overflow");
+    r.pair_tests=p*q;r.overlap_tests=candidates.overlap_tests;
+    r.aabb_pruned=r.pair_tests-candidates.pairs.size();
     bool recorded=false;
-    for(std::size_t i=0;i<entries.size();++i)for(std::size_t j=i+1;j<entries.size();++j){
-        ++r.pair_tests;
+    for(const auto& [i,j]:candidates.pairs){
         const auto& a=entries[i];const auto& b=entries[j];
-        bool disjoint=false;for(int k=0;k<3;++k)disjoint|=a.hi[k]<b.lo[k]||b.hi[k]<a.lo[k];
-        if(disjoint){++r.aabb_pruned;continue;}
         std::size_t shared=0;for(auto x:a.m.ids)for(auto y:b.m.ids)shared+=x==y;
         if(shared==4)throw std::invalid_argument("duplicate swept cell");
         ++r.tested[shared];
