@@ -451,3 +451,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_persistent_fem_context_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 36B: fully paid native whole-step timings (not a speed assertion).
+add_executable(kyoto_pass36_paid_persistent_fem_abba apps/pass36_paid_persistent_fem_abba.cpp)
+target_link_libraries(kyoto_pass36_paid_persistent_fem_abba PRIVATE kyoto_contact)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_pass36_paid_persistent_fem_abba PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_pass36_paid_persistent_fem_abba PRIVATE /fp:strict)
+endif()
