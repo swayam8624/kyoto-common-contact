@@ -38,7 +38,7 @@ static void candidate_oracle(){
     StaticFaceHierarchy t(touch);std::vector<std::size_t> ids;
     std::size_t tests=0;t.query({{1,0,0},{1,1,1}},0.,ids,tests);
     need(ids==std::vector<std::size_t>{0},"inclusive boundary lost");
-    StaticFaceHierarchy empty({});empty.query({{0,0,0},{1,1,1}},0.,ids,tests);
+    StaticFaceHierarchy empty(std::vector<TriangleBox>{});empty.query({{0,0,0},{1,1,1}},0.,ids,tests);
     need(ids.empty(),"empty hierarchy emitted candidates");
 }
 static void physical_case(bool fast){
