@@ -10,6 +10,7 @@
 #include "kyoto/static_face_hierarchy.hpp"
 #include "kyoto/tet_orientation_certificate.hpp"
 #include "kyoto/rounded_relative_triangle_certificate.hpp"
+#include "kyoto/nonincident_self_contact.hpp"
 #include <optional>
 #include <vector>
 
@@ -21,6 +22,7 @@ struct CoupledFEMSettings {
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
+    bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
 struct CoupledFEMStats {
@@ -28,6 +30,7 @@ struct CoupledFEMStats {
     std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
         impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{},
         rounded_directions{},rounded_projections{};
+    SelfContactStats self_a{},self_b{}; // separate internal impulses, not cross-body transfer
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
     double certified_min_j{std::numeric_limits<double>::infinity()};
@@ -177,7 +180,30 @@ inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& 
     }
     return true;
 }
+inline void self_work(SelfContactStats& a,const SelfContactStats& b){
+    a.box_tests+=b.box_tests;a.incident_exclusions+=b.incident_exclusions;
+    a.certificate_tests+=b.certificate_tests;a.interval_nodes+=b.interval_nodes;
+    a.projections+=b.projections;
+}
+inline void self_accepted(SelfContactStats& a,const SelfContactStats& b){
+    a.impulse_updates+=b.impulse_updates;a.normal_impulse+=b.normal_impulse;
+    a.contact_work+=b.contact_work;
+}
+inline void self_impulses(Body& a,Body& b,const CoupledFEMSettings& c,CoupledFEMStats& s){
+    if(!c.nonincident_self_contact)return;
+    apply_nonincident_self_impulses(a,c.skin,c.skin+c.activation_width,c.restitution,
+                                   c.impulse_iterations,c.hierarchy,s.self_a);
+    apply_nonincident_self_impulses(b,c.skin,c.skin+c.activation_width,c.restitution,
+                                   c.impulse_iterations,c.hierarchy,s.self_b);
+}
+inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body& b1,
+                        const CoupledFEMSettings& c,CoupledFEMStats& s){
+    return !c.nonincident_self_contact ||
+        (certify_nonincident_self_sweep(a0,a1,c.skin,c.interval_depth,c.hierarchy,s.self_a)&&
+         certify_nonincident_self_sweep(b0,b1,c.skin,c.interval_depth,c.hierarchy,s.self_b));
+}
 inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
+    self_accepted(a.self_a,b.self_a);self_accepted(a.self_b,b.self_b);
     a.normal_impulse+=b.normal_impulse;
     a.contact_kinetic_change+=b.contact_kinetic_change;
     a.impulse_updates+=b.impulse_updates;
@@ -206,7 +232,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     CoupledFEMStats total;
     // Verify initial cross-surface separation; volume disjointness and
     // self-validity are explicit caller preconditions, not inferred here.
-    if(!swept_safe(sa,sa,sb,sb,c,total))
+    if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total))
         throw std::runtime_error("initial coupled surfaces violate skin");
     std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
     std::vector<CoupledFEMLeaf> staged_trace;
@@ -216,10 +242,10 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         Body ta=sa,tb=sb;
         CoupledFEMStats local;
         kick(ta,h);kick(tb,h);
-        impulses(ta,tb,c,local);
+        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local);
         for(auto& n:ta.nodes)n.x+=n.v*h;
         for(auto& n:tb.nodes)n.x+=n.v*h;
-        const bool geo=swept_safe(sa,ta,sb,tb,c,local);
+        const bool geo=swept_safe(sa,ta,sb,tb,c,local)&&self_safety(sa,ta,sb,tb,c,local);
         const bool tet=positive_tets(ta)&&positive_tets(tb)&&
             continuous_tets(sa,ta,c,local)&&continuous_tets(sb,tb,c,local);
         total.box_tests+=local.box_tests;
@@ -229,6 +255,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         total.rounded_directions+=local.rounded_directions;
         total.rounded_projections+=local.rounded_projections;
         if(!geo||!tet){
+            self_work(total.self_a,local.self_a);self_work(total.self_b,local.self_b);
             total.rejected_geometry+=!geo;total.rejected_tets+=!tet;
             if(depth>=c.max_bisection||h*.5<c.min_dt)
                 throw std::runtime_error("coupled FEM cannot certify physical trial");
@@ -237,7 +264,8 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         // Both proposed trajectories are certified before post-drift
         // contact response; no position clamping or phantom elapsed time.
         const auto old_tests=local.box_tests;
-        impulses(ta,tb,c,local);
+        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local);
+        self_work(total.self_a,local.self_a);self_work(total.self_b,local.self_b);
         total.box_tests+=local.box_tests-old_tests;
         local.min_j=std::min(ta.evaluate().min_jacobian,tb.evaluate().min_jacobian);
         for(std::size_t i=0;i<ia.size();++i)ia[i]+=ta.nodes[i].last_normal_impulse;
@@ -256,8 +284,10 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         throw std::runtime_error("coupled physical time accounting failure");
     sa.time_seconds=sb.time_seconds=a.time_seconds+dt;
     if(!std::isfinite(sa.time_seconds))throw std::runtime_error("coupled clock overflow");
-    sa.contact_count_step=sb.contact_count_step=total.impulse_updates;
-    sa.normal_impulse_step=sb.normal_impulse_step=total.normal_impulse;
+    sa.contact_count_step=total.impulse_updates+total.self_a.impulse_updates;
+    sb.contact_count_step=total.impulse_updates+total.self_b.impulse_updates;
+    sa.normal_impulse_step=total.normal_impulse+2.*total.self_a.normal_impulse;
+    sb.normal_impulse_step=total.normal_impulse+2.*total.self_b.normal_impulse;
     for(std::size_t i=0;i<ia.size();++i)sa.nodes[i].last_normal_impulse=ia[i];
     for(std::size_t i=0;i<ib.size();++i)sb.nodes[i].last_normal_impulse=ib[i];
     // Single publication point for both bodies, after every leaf passed.
