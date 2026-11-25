@@ -313,3 +313,11 @@ target_link_libraries(kyoto_pass25_traversal_abba PRIVATE kyoto_contact)
 add_executable(kyoto_pass26_prechecked_abba
                apps/pass26_prechecked_abba.cpp)
 target_link_libraries(kyoto_pass26_prechecked_abba PRIVATE kyoto_contact)
+
+# Pass 27: native solver-facing linear endpoint adapter. The opt-in
+# pinned official IPC continuous CCD gate also exercises this adapter.
+add_executable(kyoto_linear_candidate_adapter_tests
+               tests/linear_candidate_adapter_tests.cpp)
+target_link_libraries(kyoto_linear_candidate_adapter_tests PRIVATE kyoto_contact)
+add_test(NAME indexed_linear_solver_candidate_adapter_oracle
+         COMMAND kyoto_linear_candidate_adapter_tests)
