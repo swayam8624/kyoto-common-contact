@@ -404,3 +404,41 @@ hierarchy, not an independent exact CCD oracle.
     cmake --build build --target kyoto_typed_connected_self_contact_tests --parallel 2
     ctest --test-dir build -R typed_connected_FEM_self_contact --no-tests=error --output-on-failure -V
 
+
+
+## Pass 34A–B — external CCD audit of accepted and rejected native FEM paths
+
+- [x] Extract shared connected U-solid fixture; native parity and
+  external audit use identical initial geometry and material.
+- [x] Factor actual native pre-certification force/impulse/drift path
+  into a reusable proposal routine, without changing the committed
+  physical state or accepted-leaf transaction.
+- [x] Independently enumerate all admissible surface VF/EE stencils
+  (self and cross-body), run pinned official IPC Toolkit default CCD
+  on the original linear source endpoints, and compare detected
+  events against both retained SCA and official IPC LBVH.
+- [x] Require no IPC CCD events on accepted connected and adaptive
+  cross-body physical leaves; require nonzero relevant IPC events
+  on both native rejected full proposals and zero candidate misses.
+- [x] Export native leaf endpoints, actual feature connectivity, per
+  leaf event counts, earliest safe prefix and candidate receipts.
+- [x] Register strict FP target under pinned IPC dependency and
+  dedicated Linux workflow with uploaded audit receipts.
+- [ ] Verify native and IPC executions; no measured results yet.
+- [ ] Positive-skin upstream CCD with explicitly verified API,
+  further dense connected workloads, physical-model calibration,
+  external *solver* integration and scalability remain separate.
+
+The upstream CCD here uses its existing default distance convention
+(zero-skin contact); the native skin separation remains a distinct
+conditional outward certificate. IPC can return conservative safe
+prefixes, not exact impact times. This is independent CCD relative to
+the native certificate, but uses the same IPC kernel for exhaustive
+event enumeration and filtered event coverage. No IPC solver response
+or physical accuracy claim follows.
+
+    cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+    cmake --build build-ipc --target kyoto_pass34_connected_ipc_audit --parallel 2
+    ctest --test-dir build-ipc -R pinned_IPC_connected_FEM_accepted_and_rejected_CCD --no-tests=error --output-on-failure -V
+
+CI: .github/workflows/pass34-connected-ipc.yml.
