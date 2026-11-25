@@ -1,0 +1,215 @@
+#pragma once
+// Pass 29B: actual synchronized two-body neo-Hookean FEM integration.
+// Separate volumes, initially disjoint, fixed topology, frictionless.
+// Cross-body moving face separation uses the existing Pass 22A
+// conservative-in-real-arithmetic certificate. Unknown -> retry smaller dt.
+// Self contact, containment detection, exact rounded CCD and general
+// contact manifolds remain outside this explicit reference solver.
+#include "kyoto/coupled_triangle_normal_impulse.hpp"
+#include "kyoto/moving_triangle_pair_certificate.hpp"
+#include "kyoto/static_face_hierarchy.hpp"
+#include <optional>
+#include <vector>
+
+namespace kyoto::solid {
+struct CoupledFEMSettings {
+    double skin{.0005},activation_width{.003},restitution{};
+    unsigned impulse_iterations{3},interval_depth{12},max_bisection{16};
+    std::size_t max_leaves{10000};
+    double min_dt{1e-10};
+    bool hierarchy{false};
+};
+struct CoupledFEMStats {
+    double integrated_dt{},normal_impulse{},contact_kinetic_change{};
+    std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
+        impulse_updates{},box_tests{},certificate_tests{},interval_nodes{};
+    V3 impulse_on_a{};
+    double min_j{std::numeric_limits<double>::infinity()};
+};
+namespace coupled_detail {
+using Face = std::array<std::size_t,3>;
+inline void validate_body(const Body& b){
+    validate(b.material);
+    if(b.nodes.empty()||b.tets.empty()||b.surface_faces.empty()||
+       !std::isfinite(b.time_seconds))
+        throw std::invalid_argument("invalid coupled FEM body");
+    for(const auto& n:b.nodes)
+        if(!finite(n.x)||!finite(n.v)||!std::isfinite(n.mass)||n.mass<=0)
+            throw std::invalid_argument("invalid coupled FEM node");
+    for(const auto& t:b.tets)for(auto i:t.n)
+        if(i>=b.nodes.size())throw std::invalid_argument("invalid coupled FEM tet");
+    for(const auto& f:b.surface_faces){
+        if(f[0]==f[1]||f[1]==f[2]||f[0]==f[2])
+            throw std::invalid_argument("degenerate coupled topology");
+        for(auto i:f)if(i>=b.nodes.size())
+            throw std::invalid_argument("invalid coupled FEM face");
+    }
+    (void)b.evaluate();
+}
+inline Triangle3 positions(const Body& b,const Face& f){
+    return {b.nodes[f[0]].x,b.nodes[f[1]].x,b.nodes[f[2]].x};
+}
+inline ContactTriangleState state(const Body& b,const Face& f){
+    ContactTriangleState t;
+    t.x=positions(b,f);
+    for(int i=0;i<3;++i){t.v[i]=b.nodes[f[i]].v;t.mass[i]=b.nodes[f[i]].mass;}
+    return t;
+}
+inline void kick(Body& b,double dt){
+    const auto field=b.evaluate();
+    const double damp=std::exp(-b.material.damping*dt);
+    for(std::size_t i=0;i<b.nodes.size();++i){
+        auto& n=b.nodes[i];
+        n.v=(n.v+(field.elastic_force[i]/n.mass+V3{0,0,-b.material.gravity})*dt)*damp;
+        if(!finite(n.v))throw std::runtime_error("nonfinite coupled FEM kick");
+        n.last_normal_impulse=0.;
+    }
+}
+inline bool positive_tets(const Body& b){
+    for(const auto& t:b.tets){
+        const auto x=b.nodes[t.n[0]].x;
+        const auto F=from_cols(b.nodes[t.n[1]].x-x,b.nodes[t.n[2]].x-x,
+                               b.nodes[t.n[3]].x-x)*t.inverse_rest;
+        const double j=determinant(F);
+        if(!(std::isfinite(j)&&j>1e-6))return false;
+    }
+    return true;
+}
+inline void impulses(Body& a,Body& b,const CoupledFEMSettings& c,
+                     CoupledFEMStats& stats){
+    const double activation=c.skin+c.activation_width;
+    std::vector<TriangleBox> boxes;
+    for(const auto& f:b.surface_faces)boxes.push_back(bounding(positions(b,f)));
+    std::optional<StaticFaceHierarchy> tree;
+    if(c.hierarchy)tree.emplace(boxes);
+    std::vector<std::size_t> rows;
+    for(unsigned it=0;it<c.impulse_iterations;++it)
+        for(const auto& f:a.surface_faces){
+            const auto ta=positions(a,f);
+            collect_static_face_rows(bounding(ta),activation,boxes,
+                tree?&*tree:nullptr,rows,stats.box_tests);
+            for(auto j:rows){
+                const auto& g=b.surface_faces[j];
+                const auto near=triangle_triangle_closest(ta,positions(b,g));
+                if(near.distance>activation)continue;
+                if(!(near.distance>c.skin))
+                    throw std::runtime_error("coupled FEM source violates skin");
+                auto sa=state(a,f),sb=state(b,g);
+                const auto r=apply_two_triangle_normal_impulse(sa,sb,
+                    near.deformable_weights,near.rigid_weights,c.restitution);
+                if(r.normal_impulse==0.)continue;
+                for(int k=0;k<3;++k){
+                    a.nodes[f[k]].v=sa.v[k];b.nodes[g[k]].v=sb.v[k];
+                    a.nodes[f[k]].last_normal_impulse+=r.normal_impulse*near.deformable_weights[k];
+                    b.nodes[g[k]].last_normal_impulse+=r.normal_impulse*near.rigid_weights[k];
+                }
+                ++stats.impulse_updates;
+                stats.normal_impulse+=r.normal_impulse;
+                stats.contact_kinetic_change+=r.predicted_kinetic_change;
+                stats.impulse_on_a+=r.impulse_on_a;
+            }
+        }
+}
+inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& b1,
+                      const CoupledFEMSettings& c,CoupledFEMStats& stats){
+    std::vector<LinearTriangleMotion> paths;
+    std::vector<TriangleBox> boxes;
+    for(const auto& g:b0.surface_faces){
+        paths.push_back({positions(b0,g),positions(b1,g)});
+        boxes.push_back(swept_bounding(paths.back()));
+    }
+    std::optional<StaticFaceHierarchy> tree;
+    if(c.hierarchy)tree.emplace(boxes);
+    std::vector<std::size_t> rows;
+    for(const auto& f:a0.surface_faces){
+        const LinearTriangleMotion path{positions(a0,f),positions(a1,f)};
+        // Match the certificate's root AABB guard exactly.
+        collect_static_face_rows(swept_bounding(path),c.skin+1e-12,boxes,
+            tree?&*tree:nullptr,rows,stats.box_tests);
+        for(auto j:rows){
+            ++stats.certificate_tests;
+            const auto cert=certify_two_moving_triangles(path,paths[j],c.skin,c.interval_depth);
+            stats.interval_nodes+=cert.nodes;
+            if(!cert.entirely_separated)return false;
+        }
+    }
+    return true;
+}
+inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
+    a.normal_impulse+=b.normal_impulse;
+    a.contact_kinetic_change+=b.contact_kinetic_change;
+    a.impulse_updates+=b.impulse_updates;
+    a.impulse_on_a+=b.impulse_on_a;
+    a.min_j=std::min(a.min_j,b.min_j);
+}
+} // namespace coupled_detail
+
+inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
+                                      const CoupledFEMSettings& c={}){
+    using namespace coupled_detail;
+    if(&a==&b||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+         std::isfinite(c.activation_width)&&c.activation_width>=0&&
+         std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
+         c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
+         c.impulse_iterations<=10&&c.interval_depth<=20&&c.max_bisection<=20&&
+         c.max_leaves>0&&std::isfinite(c.min_dt)&&c.min_dt>0&&dt>=c.min_dt))
+        throw std::invalid_argument("invalid coupled FEM settings");
+    validate_body(a);validate_body(b);
+    if(a.time_seconds!=b.time_seconds)
+        throw std::invalid_argument("coupled bodies have different clocks");
+    Body sa=a,sb=b;
+    CoupledFEMStats total;
+    // Verify initial cross-surface separation; volume disjointness and
+    // self-validity are explicit caller preconditions, not inferred here.
+    if(!swept_safe(sa,sa,sb,sb,c,total))
+        throw std::runtime_error("initial coupled surfaces violate skin");
+    std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
+    const auto recurse=[&](auto&& self,double h,unsigned depth)->void{
+        if(h<c.min_dt||total.accepted_leaves>=c.max_leaves)
+            throw std::runtime_error("coupled FEM timestep budget exhausted");
+        Body ta=sa,tb=sb;
+        CoupledFEMStats local;
+        kick(ta,h);kick(tb,h);
+        impulses(ta,tb,c,local);
+        for(auto& n:ta.nodes)n.x+=n.v*h;
+        for(auto& n:tb.nodes)n.x+=n.v*h;
+        const bool geo=swept_safe(sa,ta,sb,tb,c,local);
+        const bool tet=positive_tets(ta)&&positive_tets(tb);
+        total.box_tests+=local.box_tests;
+        total.certificate_tests+=local.certificate_tests;
+        total.interval_nodes+=local.interval_nodes;
+        if(!geo||!tet){
+            total.rejected_geometry+=!geo;total.rejected_tets+=!tet;
+            if(depth>=c.max_bisection||h*.5<c.min_dt)
+                throw std::runtime_error("coupled FEM cannot certify physical trial");
+            self(self,h*.5,depth+1);self(self,h-h*.5,depth+1);return;
+        }
+        // Both proposed trajectories are certified before post-drift
+        // contact response; no position clamping or phantom elapsed time.
+        const auto old_tests=local.box_tests;
+        impulses(ta,tb,c,local);
+        total.box_tests+=local.box_tests-old_tests;
+        local.min_j=std::min(ta.evaluate().min_jacobian,tb.evaluate().min_jacobian);
+        for(std::size_t i=0;i<ia.size();++i)ia[i]+=ta.nodes[i].last_normal_impulse;
+        for(std::size_t i=0;i<ib.size();++i)ib[i]+=tb.nodes[i].last_normal_impulse;
+        ta.time_seconds+=h;tb.time_seconds+=h;
+        total.integrated_dt+=h;++total.accepted_leaves;
+        accumulate(total,local);
+        sa=std::move(ta);sb=std::move(tb);
+    };
+    recurse(recurse,dt,0);
+    if(std::abs(total.integrated_dt-dt)>3e-12*std::max(1.,dt)||
+       std::abs(sa.time_seconds-(a.time_seconds+dt))>3e-12*std::max(1.,dt)||
+       sa.time_seconds!=sb.time_seconds)
+        throw std::runtime_error("coupled physical time accounting failure");
+    sa.time_seconds=sb.time_seconds=a.time_seconds+dt;
+    if(!std::isfinite(sa.time_seconds))throw std::runtime_error("coupled clock overflow");
+    sa.contact_count_step=sb.contact_count_step=total.impulse_updates;
+    sa.normal_impulse_step=sb.normal_impulse_step=total.normal_impulse;
+    for(std::size_t i=0;i<ia.size();++i)sa.nodes[i].last_normal_impulse=ia[i];
+    for(std::size_t i=0;i<ib.size();++i)sb.nodes[i].last_normal_impulse=ib[i];
+    // Single publication point for both bodies, after every leaf passed.
+    a=std::move(sa);b=std::move(sb);
+    return total;
+}
+} // namespace kyoto::solid
