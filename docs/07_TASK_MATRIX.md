@@ -326,3 +326,33 @@ ledger is separate from the existing cross-body ledger.
     ctest --test-dir build -R restricted_nonincident_same_body_contact --output-on-failure -V
 
 CI is configured in .github/workflows/pass28-native-solver.yml.
+
+
+## Pass 32B — typed nonincident VF/EE self-contact audit
+
+- [x] Compact surface-only vertices, derive canonical edges, and pass
+  actual endpoints through the retained Pass 27 candidate adapter.
+- [x] Certify each candidate point/triangle or segment/segment stencil
+  through the Pass 31A relative convex-hull certificate, representing
+  points and segments by repeated triangle vertices. This does not
+  change their convex sets. Failed witnesses return unresolved.
+- [x] Construct adjacent shared-edge faces with a nonincident vertex
+  crossing the opposite triangle interior. The restricted Pass 32A
+  face-pair filter is blind by design; the new typed audit must reject
+  the swept path while accepting each separated endpoint.
+- [x] Register co-motion, compact mapping and topology-change tests,
+  strict FP compilation and Linux/macOS CI.
+- [ ] Verify native execution; validate arbitrary degenerate witness
+  handling and independent official IPC event parity.
+- [ ] Integrate typed VF/EE impulses and audit into actual connected
+  folded-solid FEM response. The auditor is currently standalone,
+  not a complete self-contact solver or exact event-time CCD.
+
+The adapter applies per-vertex skin padding to both stencils, which
+conservatively overgenerates candidates for the requested pair skin.
+Only nonincident typed stencils are certified. Initial valid geometry,
+complete topology and the explicit IEEE model remain preconditions.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_typed_self_contact_audit_tests --parallel 2
+    ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure -V
