@@ -574,3 +574,57 @@ On a Mac with an actual Metal device:
     ./build/kyoto_pass37_metal_physical_scaling results/pass37-metal 64
 
 CI: .github/workflows/pass37-cpu-scaling.yml.
+
+
+## Pass 38A–B — initial cross-volume containment and exact SAT validation
+
+- [x] Add independent convex tetrahedron separating-plane certificate.
+  Propose coordinate axes, tetrahedron face normals and edge-cross
+  axes; verify all 16 relative vertex projections with outward
+  binary64 arithmetic. Strict separation only; unknown fails closed.
+- [x] Default initial cross-body volume gate in coupled FEM, including
+  body-level disjoint AABB fast path and exhaustive overlapping
+  tetrahedron-pair checks. Record paid work counters.
+- [x] Author integrated nested-volume counterexample: surfaces
+  separated, volumes contained; require rejected physical transaction,
+  unchanged state and unchanged caller trace. Test disjoint oblique
+  pair and body-level fast path.
+- [x] Execute standalone tests on Linux x86_64 GCC 14.2.0 and Clang
+  17.0.0 with C++23, -O2, -ffp-contract=off, -fno-fast-math.
+  Both compilers: 2,000 known-contained plus 2,000 known-separated
+  seeded checks and analytic controls passed.
+- [x] Execute independent bounded int64 exact SAT oracle on both
+  compilers: 10,000 independently generated nondegenerate integer
+  tetrahedron pairs, each under three exactly representable dyadic
+  coordinate transforms; 30,000 comparisons, 11,694 exact-separated,
+  18,306 exact-nonseparated, 0 false clears, 0 conservative unknowns
+  among exact-separated cases. These are correlated transforms,
+  not 30,000 independent scenes.
+- [x] Verify the three tested local file Git blob hashes exactly
+  match the repository blobs:
+  kernel c168f54a3bcbcfadda25198177f2d53cc2480416;
+  analytic test 6ac53918aee2a014740178c76788ed1bb32b545f;
+  exact oracle 521db9746ccdf7f197eb4e1c951493b044dfeaed.
+- [ ] Execute integrated FEM containment gate and all accumulated
+  solver/IPC/Metal jobs. Earlier CI remains queued; local full clone
+  fails DNS. Only standalone kernel results are verified here.
+- [ ] Same-body volumetric injectivity, completeness of supplied
+  boundary topology, nonincident internal-cell overlap, and general
+  robust CCD remain separate unresolved issues.
+
+The separating-plane proof follows from convexity: every point
+difference is a convex combination of the 16 vertex differences.
+If their outward-enclosed projections all have strictly the same
+sign, the two convex solids cannot share a point. The proof is
+conditional on the supported IEEE model; approximate axes need not
+be exact for a successful witness to be valid. The initial volume
+check is not a continuous volumetric certificate by itself.
+
+Local standalone reproduction (run from repository root):
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -ffp-contract=off -fno-fast-math -Iinclude tests/initial_tet_separation_tests.cpp -o /tmp/kyoto-tet-sat
+    /tmp/kyoto-tet-sat
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -ffp-contract=off -fno-fast-math -Iinclude tests/initial_tet_exact_oracle_tests.cpp -o /tmp/kyoto-tet-oracle
+    /tmp/kyoto-tet-oracle
+
+Verified locally on exact source blobs, not inferred from CI status.
