@@ -5,6 +5,7 @@ on:
     paths:
       - 'include/kyoto/**'
       - 'tests/static_face_solver_parity_tests.cpp'
+      - 'tests/coupled_triangle_normal_impulse_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   workflow_dispatch:
@@ -23,3 +24,5 @@ jobs:
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --target kyoto_static_face_solver_parity_tests --parallel 2
       - run: ctest --test-dir build -R actual_FEM_static_face_broadphase_physical_parity --output-on-failure -V
+      - run: cmake --build build --target kyoto_coupled_triangle_normal_impulse_tests --parallel 2
+      - run: ctest --test-dir build -R two_finite_mass_triangle_normal_impulse_balance --output-on-failure -V
