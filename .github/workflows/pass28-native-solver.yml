@@ -11,6 +11,7 @@ on:
       - 'tests/rounded_relative_triangle_certificate_tests.cpp'
       - 'tests/coupled_torus_physics_tests.cpp'
       - 'tests/nonincident_self_contact_tests.cpp'
+      - 'tests/typed_self_contact_audit_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   workflow_dispatch:
@@ -39,6 +40,8 @@ jobs:
       - run: ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
       - run: cmake --build build --target kyoto_nonincident_self_contact_tests --parallel 2
       - run: ctest --test-dir build -R restricted_nonincident_same_body_contact --output-on-failure -V
+      - run: cmake --build build --target kyoto_typed_self_contact_audit_tests --parallel 2
+      - run: ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure -V
   connected-volumes:
     strategy:
       fail-fast: false
