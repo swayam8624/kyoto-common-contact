@@ -6,6 +6,7 @@
 // against exhaustive truth before it can affect physical dynamics.
 // No timing or external physical integrator claim is made.
 #include "kyoto/linear_candidate_adapter.hpp"
+#include "kyoto/external_candidate_filter.hpp"
 #include <ipc/broad_phase/lbvh.hpp>
 #include <ipc/broad_phase/aabb.hpp>
 #include <ipc/candidates/edge_edge.hpp>
@@ -37,20 +38,22 @@ inline f::Result official_ipc_candidate_producer(const f::Mesh& mesh){
         if(mesh.faces[i].id!=i)throw std::invalid_argument("IPC adapter requires dense face IDs");
         for(int k=0;k<3;++k)faces(i,k)=int(mesh.faces[i].vertices[k]);
     }
+    if(boxes.empty())return {};
     ipc::LBVH bp;bp.can_vertices_collide=[](auto,auto){return true;};
     bp.build(boxes,edges,faces,static_cast<std::uint8_t>(3));
     std::vector<ipc::FaceVertexCandidate> vf;
     std::vector<ipc::EdgeEdgeCandidate> ee;
     bp.detect_face_vertex_candidates(vf);bp.detect_edge_edge_candidates(ee);
-    f::Result result;
-    for(const auto& p:vf)result.pairs.push_back({f::Kind::VertexFace,
+    std::vector<f::Candidate> raw;
+    for(const auto& p:vf)raw.push_back({f::Kind::VertexFace,
         std::uint64_t(p.vertex_id),std::uint64_t(p.face_id)});
-    for(const auto& p:ee)result.pairs.push_back({f::Kind::EdgeEdge,
-        std::uint64_t(std::min(p.edge0_id,p.edge1_id)),
-        std::uint64_t(std::max(p.edge0_id,p.edge1_id))});
-    f::normalize(result);
-    // IPC internal traversal counts are unavailable; zero here means
-    // uninstrumented, not zero work. Only physical parity is compared.
-    return result;
+    for(const auto& p:ee)raw.push_back({f::Kind::EdgeEdge,
+        std::uint64_t(p.edge0_id),std::uint64_t(p.edge1_id)});
+    // The pinned upstream LBVH outward-expands double boxes into float
+    // nodes. Remove extra conservative hits using the original binary64
+    // feature contract; do not manufacture a missing candidate.
+    // The adapter's independent exhaustive check remains mandatory.
+    // Counts here describe post-filter work, not upstream traversal.
+    return f::filter_dense_external_candidates(built,raw);
 }
 } // namespace kyoto::contact::atlas

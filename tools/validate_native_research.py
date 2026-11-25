@@ -14,6 +14,7 @@ import time
 
 NATIVE = [
     ("kyoto_linear_candidate_adapter_tests", "indexed_linear_solver_candidate_adapter_oracle"),
+    ("kyoto_external_candidate_filter_tests", "external_candidate_superset_normalization"),
     ("kyoto_swept_cell_candidates_tests", "swept_cell_candidate_exhaustive_parity"),
     ("kyoto_static_face_solver_parity_tests", "actual_FEM_static_face_broadphase_physical_parity"),
     ("kyoto_coupled_triangle_normal_impulse_tests", "two_finite_mass_triangle_normal_impulse_balance"),
@@ -25,6 +26,7 @@ NATIVE = [
     ("kyoto_typed_connected_self_contact_tests", "typed_connected_FEM_self_contact"),
     ("kyoto_coupled_torus_physics_tests", "coupled_toroidal_volumes_physical_parity"),
     ("kyoto_persistent_fem_context_tests", "persistent_typed_FEM_physical_parity"),
+    ("kyoto_pass37_cpu_physical_scaling", "physical_CPU_candidate_scaling_smoke"),
     ("kyoto_initial_tet_separation_tests", "outward_initial_tetrahedral_separation"),
     ("kyoto_initial_tet_exact_oracle_tests", "initial_tetrahedral_exact_integer_oracle"),
     ("kyoto_initial_volume_fem_tests", "initial_volume_FEM_containment_rollback"),

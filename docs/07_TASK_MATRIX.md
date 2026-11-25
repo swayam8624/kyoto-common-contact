@@ -1085,3 +1085,41 @@ Use separate compiler-specific build and evidence directories. Recorded
 timings used strict C++23 -O2 without fast math in a shared Linux VM;
 Release CMake timings can differ. No production whole-solver acceleration
 or GPU performance conclusion is supported.
+
+
+## Passes 39C–39E — final physical campaign execution boundary
+
+- [x] Verify upstream custom AABB constructor, LBVH build overload and
+  index types at exact IPC Toolkit pin 19bcab7e1f5a0d2addfcd28513422ff248ea504e.
+  The upstream lbvh.cpp explicitly outward-expands double bounds into
+  float nodes. Normalize conservative extra candidates with the original
+  binary64 predicate; keep the independent exhaustive equality guard.
+- [x] Locally build and run external filter tests with GCC and Clang,
+  strict C++23 warnings as errors: 1,000 randomized supersets plus
+  binary64 precision, duplicate/incident/malformed/missing candidate
+  controls. Filter cannot synthesize an absent candidate.
+- [x] Final campaign runner independently preserves failure, build,
+  timeout and device-blocked status; executes native/exact/IPC/Metal
+  regression runner, paid persistence, all width scales, floor replay
+  and independent validation, visualizations. Failure fixture and
+  Python byte-compilation passed; actual full campaign unrun.
+- [x] Accepted/rejected coupled-leaf visualization script validates
+  source rows and event receipts, labels uncommitted trials and
+  explicitly crops remote geometry. Four synthetic schema smoke
+  GIF/PNG pairs rendered successfully (NOT physical results).
+- [ ] Actual upstream IPC executable build/run, real coupled solver
+  and Metal hardware; still not validated. No new upstream speed
+  or correctness result is inferred from the filter unit test.
+- [ ] Independent full external contact dynamics solver integration,
+  which is beyond replacing a candidate producer in native FEM.
+- [ ] Run final campaign on actual Mac checkout and retain the raw
+  receipts. A successful campaign means the listed gates passed,
+  not a universal safety or novelty proof.
+
+    python3 tools/run_final_campaign.py --output /tmp/kyoto-final-$(date +%Y%m%d-%H%M%S) --width 64
+
+Use `--without-metal` only to explicitly record an incomplete CPU
+campaign. The manifest records the source revision and logs. On macOS
+install CMake, Boost, Python NumPy/SciPy/pandas/Matplotlib/Pillow and
+ffmpeg; the IPC dependency is fetched by CMake. Actual data must be
+examined after each run; no result should be guessed from a target name.

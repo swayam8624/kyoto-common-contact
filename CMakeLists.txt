@@ -565,3 +565,13 @@ endif()
 add_executable(kyoto_swept_cell_candidates_tests tests/swept_cell_candidates_tests.cpp)
 target_link_libraries(kyoto_swept_cell_candidates_tests PRIVATE kyoto_contact)
 add_test(NAME swept_cell_candidate_exhaustive_parity COMMAND kyoto_swept_cell_candidates_tests)
+
+# Pass 39D: independent external superset normalization regression.
+add_executable(kyoto_external_candidate_filter_tests tests/external_candidate_filter_tests.cpp)
+target_link_libraries(kyoto_external_candidate_filter_tests PRIVATE kyoto_contact)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_external_candidate_filter_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_external_candidate_filter_tests PRIVATE /fp:strict)
+endif()
+add_test(NAME external_candidate_superset_normalization COMMAND kyoto_external_candidate_filter_tests)
