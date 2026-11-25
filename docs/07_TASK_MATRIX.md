@@ -677,3 +677,35 @@ Local test source Git blob: 9d1db0e445b080208ebcf5e8e2a4235bd35c666b.
   standalone result verifies the reproduced connectivity patterns,
   not actual native FEM factory execution or physical trajectories.
 
+
+
+## Pass 38E — exact static same-body volume oracle
+
+- [x] Convert finite binary64 source coordinates to a common exact
+  dyadic integer lattice. Use Boost.Multiprecision only in an optional
+  reference target, not in the production solver.
+- [x] Enumerate all 56 triples of tetrahedron halfspace planes;
+  homogeneous integer Cramer's rule and all eight inequalities check
+  intersection vertices exactly. For incident tetrahedra, all feasible
+  vertices must belong to the shared simplex; for nonincident cells,
+  there must be no feasible vertex. This is static, not continuous.
+- [x] GCC 14.2 and Clang 17 strict-warning C++23 execution, plus GCC
+  ASan/UBSan: 2,000 independently generated dyadic translation tests
+  (1,170 separated, 830 intersecting), shared simplex positive and
+  negative controls, extreme exponents -1070 through +1000, conforming
+  12-cell mesh and deliberately folded cell counterexample passed.
+  The first GCC build hit a Boost left-shift warning; replaced that
+  conversion with explicit bit setting and reran all three builds.
+- [x] Add optional native accepted-endpoint audit on connected solid
+  and remote torus, requiring actual self-contact impulses.
+- [ ] Execute native endpoint integration; static endpoint checks
+  alone cannot prove continuous self-volume injectivity. Exact
+  all-pairs reference is deliberately not a performance method.
+- [ ] Full native/IPC/GPU evidence still requires actual execution.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/exact_tet_intersection_tests.cpp -o /tmp/kyoto-exact-static
+    /tmp/kyoto-exact-static
+    cmake -S . -B build-exact -DKYOTO_WITH_EXACT_SELF_VOLUME=ON -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-exact --target kyoto_exact_tet_intersection_tests kyoto_native_exact_self_volume_tests --parallel 2
+    ctest --test-dir build-exact -R 'exact_static_tetrahedral_intersection|exact_static_native_FEM_endpoint_self_volume' --no-tests=error --output-on-failure -V
+
