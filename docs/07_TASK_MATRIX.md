@@ -519,3 +519,58 @@ no native or external pass result observed. Local clone DNS unavailable.
     ctest --test-dir build -R persistent_typed_FEM_physical_parity --no-tests=error --output-on-failure -V
     ./build/kyoto_pass36_paid_persistent_fem_abba results/pass36
 
+
+
+## Pass 37A–B — connected physical CPU and native Metal candidate scaling
+
+- [x] Parameterize connected U solid by width cells, arm gap and approach
+  speed. 30/120/480/960/1920 tetrahedra correspond to widths 1/4/16/32/64.
+  This scales physical width at fixed cell dimensions, NOT fixed-domain
+  mesh convergence or independent material/workload families.
+- [x] Generate source data exclusively from accepted native FEM leaves
+  in two regimes (near contact and separated). Require actual self
+  impulses in the near-contact fixture; record orientation receipts.
+- [x] Compare exhaustive, rebuilt SAP, rebuilt BVH, retained full-refit
+  and retained selective/frontier CPU methods on identical snapshots.
+  Each must match the complete canonical exhaustive candidate set.
+- [x] Pay each backend's validation, envelopes, traversal, filtering,
+  maintenance, and output normalization. Separately record shared
+  source snapshot assembly and trace-enabled source integration.
+  Five rotated-order measurement blocks and a discarded warmup.
+- [x] Validate paired trajectory-block timing summary, geometric mean
+  SAP/arm ratios and bootstrap repeatability intervals. Do not treat
+  correlated leaf times as independent scenes.
+- [x] Implement native Metal rectangular VF/EE overlap-mask baseline.
+  Outward float conversion, subnormal avoidance, bounded mask buffers,
+  paid host-device dispatch/readback, exact double postfilter and
+  adjacency, canonical pair output, exhaustive equality.
+- [x] Add explicit large-coordinate and tiny-coordinate GPU precision
+  controls. Device-unavailable is reported as skip, never as a result.
+- [x] Register Linux/macOS CPU campaign and Apple-only Metal target.
+- [ ] Obtain actual CI receipts. Previous PR jobs remain queued, local
+  repository DNS unavailable. No measured timing or device claim.
+- [ ] Optimize GPU candidate compaction/hierarchy, test independent
+  external physical integrator, extend workload families and sizes,
+  adversarial evidence, run on dedicated hardware.
+
+GPU method is an O(VF + E^2) rectangular mask baseline, not a GPU
+implementation of the maintained SCA hierarchy. CPU postfilter and
+mask readback are included in measured query time; initial pipeline
+compilation is excluded and the first block is discarded. CPU and
+Metal campaigns each have matched within-run SAP controls. Do not
+directly compare absolute timings across different runners.
+Default CI maximum width is 16 (480 tets), with 32 and 64 selectable
+locally. The workload is a small constructed connected FEM campaign,
+not sufficient evidence of general asymptotic superiority.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_pass37_cpu_physical_scaling --parallel 2
+    ./build/kyoto_pass37_cpu_physical_scaling results/pass37 64
+    python3 tools/summarize_pass37_scaling.py results/pass37/matched_cpu_candidate_scaling.csv results/pass37/paired_summary.json
+
+On a Mac with an actual Metal device:
+
+    cmake --build build --target kyoto_pass37_metal_physical_scaling --parallel 2
+    ./build/kyoto_pass37_metal_physical_scaling results/pass37-metal 64
+
+CI: .github/workflows/pass37-cpu-scaling.yml.
