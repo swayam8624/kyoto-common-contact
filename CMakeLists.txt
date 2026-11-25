@@ -484,3 +484,18 @@ if(APPLE)
     COMMAND kyoto_pass37_metal_physical_scaling ${CMAKE_CURRENT_BINARY_DIR}/pass37-metal-smoke 1)
   set_tests_properties(physical_Metal_candidate_scaling_smoke PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# Pass 38A: initial cross-body volume disjointness, independent kernel
+# and native physical transaction regression.
+add_executable(kyoto_initial_tet_separation_tests tests/initial_tet_separation_tests.cpp)
+add_executable(kyoto_initial_volume_fem_tests tests/initial_volume_fem_tests.cpp)
+foreach(target kyoto_initial_tet_separation_tests kyoto_initial_volume_fem_tests)
+  target_link_libraries(${target} PRIVATE kyoto_contact)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(${target} PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(${target} PRIVATE /fp:strict)
+  endif()
+endforeach()
+add_test(NAME outward_initial_tetrahedral_separation COMMAND kyoto_initial_tet_separation_tests)
+add_test(NAME initial_volume_FEM_containment_rollback COMMAND kyoto_initial_volume_fem_tests)
