@@ -29,6 +29,7 @@ inline CoupledNormalReceipt apply_two_triangle_normal_impulse(
     ContactTriangleState& a,ContactTriangleState& b,
     const std::array<double,3>& wa,const std::array<double,3>& wb,
     double restitution){
+    if(&a==&b)throw std::invalid_argument("two distinct triangle states required");
     if(!(std::isfinite(restitution)&&restitution>=0&&restitution<=1))
         throw std::invalid_argument("invalid restitution");
     const auto check=[](const ContactTriangleState& t,const std::array<double,3>& w){
