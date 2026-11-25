@@ -7,6 +7,7 @@ on:
       - 'tests/static_face_solver_parity_tests.cpp'
       - 'tests/coupled_triangle_normal_impulse_tests.cpp'
       - 'tests/coupled_fem_contact_tests.cpp'
+      - 'tests/tet_orientation_certificate_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
   workflow_dispatch:
@@ -27,5 +28,7 @@ jobs:
       - run: ctest --test-dir build -R actual_FEM_static_face_broadphase_physical_parity --output-on-failure -V
       - run: cmake --build build --target kyoto_coupled_triangle_normal_impulse_tests --parallel 2
       - run: ctest --test-dir build -R two_finite_mass_triangle_normal_impulse_balance --output-on-failure -V
+      - run: cmake --build build --target kyoto_tet_orientation_certificate_tests --parallel 2
+      - run: ctest --test-dir build -R outward_continuous_tet_orientation_certificate --output-on-failure -V
       - run: cmake --build build --target kyoto_coupled_fem_contact_tests --parallel 2
       - run: ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
