@@ -29,6 +29,7 @@ struct CoupledFEMSettings {
     kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
     bool fast_relative_projection{false}; // identical scalar-product interval specialization
     bool reuse_cross_geometry{false}; // cache witnesses only within one impulse call
+    bool fused_self_sap{false}; // optional fused active-list spatial-first sweep
     bool spatial_first_self_sap{false}; // test overlap before incident/mask filtering
     bool cached_self_sap{false}; // optional topology-cached axis SAP for typed self contact
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
@@ -65,10 +66,11 @@ class CoupledFEMContext {
     kyoto::contact::atlas::ExternalCandidateProducer external_{};
     bool cached_sap_{};
     bool spatial_first_{};
+    bool fused_{};
 public:
-    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;cached_sap_=false;spatial_first_=false;}
-    void bind(kyoto::contact::atlas::ExternalCandidateProducer p,bool cached_sap=false,bool spatial_first=false){
-        if(!a_||!b_||p!=external_||cached_sap_!=cached_sap||spatial_first_!=spatial_first){reset();a_.emplace(p,cached_sap,spatial_first);b_.emplace(p,cached_sap,spatial_first);external_=p;cached_sap_=cached_sap;spatial_first_=spatial_first;}
+    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;cached_sap_=false;spatial_first_=false;fused_=false;}
+    void bind(kyoto::contact::atlas::ExternalCandidateProducer p,bool cached_sap=false,bool spatial_first=false,bool fused=false){
+        if(!a_||!b_||p!=external_||cached_sap_!=cached_sap||spatial_first_!=spatial_first||fused_!=fused){reset();a_.emplace(p,cached_sap,spatial_first,fused);b_.emplace(p,cached_sap,spatial_first,fused);external_=p;cached_sap_=cached_sap;spatial_first_=spatial_first;fused_=fused;}
     }
     TypedSelfAuditor& first(){return a_.value();}
     TypedSelfAuditor& second(){return b_.value();}
@@ -363,7 +365,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       std::vector<CoupledFEMLeaf>* trace=nullptr,
                                       CoupledFEMContext* context=nullptr){
     using namespace coupled_detail;
-    if(&a==&b||(c.spatial_first_self_sap&&!c.cached_self_sap)||(c.cached_self_sap&&(!c.typed_self_contact||!c.hierarchy||c.external_self_candidates))||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+    if(&a==&b||(c.fused_self_sap&&(!c.cached_self_sap||!c.spatial_first_self_sap))||(c.spatial_first_self_sap&&!c.cached_self_sap)||(c.cached_self_sap&&(!c.typed_self_contact||!c.hierarchy||c.external_self_candidates))||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
@@ -383,7 +385,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         bool committed{};
         ~ResetOnFailure(){if(!committed)value.reset();}
     } guard{warm};
-    warm.bind(c.external_self_candidates,c.cached_self_sap,c.spatial_first_self_sap);
+    warm.bind(c.external_self_candidates,c.cached_self_sap,c.spatial_first_self_sap,c.fused_self_sap);
     auto& auditor_a=warm.first();auto& auditor_b=warm.second();
     // Initial cross-volume disjointness is checked unless explicitly disabled.
     // Combinatorial boundary is validated; geometric self-injectivity remains a caller precondition.

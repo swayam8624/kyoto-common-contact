@@ -4,6 +4,7 @@
 #include "kyoto/tiled_gpu_mask.hpp"
 #include "kyoto/physical_scaling_snapshot.hpp"
 #include "kyoto/cached_axis_sap.hpp"
+#include "kyoto/fused_axis_sap.hpp"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <chrono>
@@ -65,6 +66,6 @@ int main(int argc,char** argv){@autoreleasepool{try{
         auto a=s::fixtures::u_solid(width,near?.0025:.02,.1),b=s::fixtures::remote();s::CoupledFEMSettings cfg;cfg.hierarchy=cfg.typed_self_contact=true;s::CoupledFEMContext ctx;std::vector<f::Mesh> source;std::size_t impulses=0;
         for(int step=0;step<4;++step){std::vector<s::CoupledFEMLeaf> trace;const auto r=s::step_coupled_fem(a,b,.00025,cfg,&trace,&ctx);need(!trace.empty()&&trace.size()==r.accepted_leaves,"physical trace");impulses+=r.self_a.impulse_updates;for(const auto& l:trace)source.push_back(kyoto::contact::physical_scaling::snapshot(l.before_a,l.after_a,cfg.skin));}
         need(near?impulses>0:impulses==0,"nonrepresentative workload");std::vector<std::vector<f::Candidate>> truth;for(const auto& m:source)truth.push_back(f::exhaustive(m).pairs);
-        for(int block=-1;block<6;++block){kyoto::contact::persistent::CachedAxisSweep cpu{true};for(std::size_t leaf=0;leaf<source.size();++leaf)for(int slot=0;slot<3;++slot){const int arm=(slot+block+3)%3;t::Work w;std::uint64_t words=0;const auto begin=Clock::now();auto r=arm==0?cpu.query(source[leaf]):arm==1?packed(source[leaf],words):tiled(source[leaf],w);const auto ns=std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now()-begin).count();need(r.pairs==truth[leaf],"GPU/CPU candidate mismatch");if(block>=0)csv<<width<<','<<near<<','<<block<<','<<leaf<<','<<slot<<','<<(arm==0?"spatial_first":arm==1?"metal_packed":"metal_tiled")<<','<<ns<<','<<r.pairs.size()<<','<<(arm==2?w.mask_words:words)<<','<<w.pair_slots<<','<<w.jobs<<'\n';}}
+        for(int block=-1;block<8;++block){kyoto::contact::persistent::CachedAxisSweep cpu{true};kyoto::contact::persistent::FusedAxisSweep fused;for(std::size_t leaf=0;leaf<source.size();++leaf)for(int slot=0;slot<4;++slot){const int arm=(slot+block+4)%4;t::Work w;std::uint64_t words=0;const auto begin=Clock::now();auto r=arm==0?cpu.query(source[leaf]):arm==1?fused.query(source[leaf]):arm==2?packed(source[leaf],words):tiled(source[leaf],w);const auto ns=std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now()-begin).count();need(r.pairs==truth[leaf],"GPU/CPU candidate mismatch");if(block>=0)csv<<width<<','<<near<<','<<block<<','<<leaf<<','<<slot<<','<<(arm==0?"spatial_first":arm==1?"fused_sap":arm==2?"metal_packed":"metal_tiled")<<','<<ns<<','<<r.pairs.size()<<','<<(arm==3?w.mask_words:words)<<','<<w.pair_slots<<','<<w.jobs<<'\n';}}
     }need(csv.good()&&meta.good(),"output failure");return 0;
 }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}}

@@ -1491,3 +1491,26 @@ Physical Metal gate (unrun):
 Raw timings are losslessly gzip-compressed. Full independent trajectory
 and logs retained in the local evidence archive. Direct strict compiler
 builds and native replays executed; new CMake registrations authored.
+
+## Executed fused whole-solver comparison and independent nonconvex contact
+
+- [x] Integrate FusedAxisSweep as opt-in typed-self candidate backend. Require cached and spatial-first flags; preserve original default. Context invalidates on backend switch and failed transaction. Actual GCC/Clang strict C++23 O2, warnings as errors, no fast math. Four arms, four rotated measured blocks, ten physical cases, four macrosteps each, excluded warmup. 160 timed trajectories and 640 measured macrosteps per compiler. Every compared state and listed physical/certification receipt matches after every step. Backend switching and rollback passed. Equal-weight paired block geomean reference/fused whole solver: retained BVH GCC 1.019920 / Clang 1.017664; cached SAP 1.015135 / 1.019547; spatial-first 1.007892 / 1.014807. Small gains, shared Linux VM; no universal superiority or portable hardware claim.
+- [x] Independent CasADi/IPOPT implicit neo-Hookean FEM for connected concave U (42 tetrahedra) and inserted cube (6 tetrahedra). The insert starts strictly inside convex hull of the connected U, making a single global separating plane impossible. Three local groups cover all U cells; optimized per-region unit normals and planes constrain contact against the insert. Four 32-step cases, including rotation, narrower clearance and stationary control. All 128 steps converged, 32 simultaneous two-region contact steps. Minimum J 0.9736933, minimum gap 0.0015 m within tolerance; maximum total momentum error 1.367961e-10 kg m/s, stationarity 9.833160e-11, complementarity 3.106928e-9, normal rotation 0.762061 degrees. First run rejected wider insert hull-placement fixture (z touched hull); corrected z-centering and repeated all four cases. No arbitrary automatic nonconvex solver or self-contact response claim.
+- [x] Exhaustive independent replay of all 128 accepted linear paths on GCC and Clang, explicitly distinguish unequal body node counts. Native exhaustive/SAP and normalized pinned upstream LBVH agree, 37,326 candidate identities per compiler across two clearances. 2,032,128 upstream VF/EE checks per compiler (681,984 VF, 1,350,144 EE), 54,126 exact swept cell-pair certificates, zero unresolved, no possible CCD events or missing candidates. Compiler receipts byte-identical. Uses earlier upstream serial scheduling/logging adaptation, not stock parallel IPC.
+- [x] Update real-device Metal tiled comparison to include both spatial-first and fused SAP, packed and tiled Metal with eight rotated measured blocks. Source authored; hardware compile/run remains unverified. No GPU platforms available (OpenCL -1001, CUDA/MPS false, no device nodes). Do not equate offline CPU execution with GPU execution.
+- [ ] Stock parallel IPC build and real Metal device measurements, broader automatic contact constraints and further adversarial/generalization validation. No claim of total research completion.
+
+Reproduce:
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass40_fused_solver.cpp -o /tmp/fused
+    /tmp/fused 64
+    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/pass40_nonconvex_contact.py /tmp/nonconvex
+    cmake -S . -B build-closeout -DKYOTO_WITH_OFFICIAL_IPC=ON -DKYOTO_WITH_EXACT_SELF_VOLUME=ON
+    cmake --build build-closeout --target kyoto_pass40_nonconvex_replay
+    ./build-closeout/kyoto_pass40_nonconvex_replay /tmp/nonconvex/trajectory.txt
+
+Actual Mac device gate (unrun):
+    cmake -S . -B build-metal -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-metal --target kyoto_pass40_metal_tiled_mask
+    ./build-metal/kyoto_pass40_metal_tiled_mask /tmp/kyoto-metal-new 64
+
+The raw paired timings, independent physical receipts and replay CSV are committed under docs/evidence. CMake registration authored but stock dependency build not run.

@@ -1,0 +1,42 @@
+// Paid full native macrostep comparison with retained BVH vs cached SAP.
+// Each arm starts from the same physical state, maintains its own context,
+// and is checked against the other arms after every actual macrostep.
+#include "kyoto/connected_self_contact_fixture.hpp"
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+using namespace kyoto::solid;
+using Clock=std::chrono::steady_clock;
+static void need(bool b,const char* why){if(!b)throw std::runtime_error(why);}
+static void same(const Body& a,const Body& b){
+    need(a.nodes.size()==b.nodes.size()&&a.time_seconds==b.time_seconds&&a.normal_impulse_step==b.normal_impulse_step&&a.contact_count_step==b.contact_count_step,"physical metadata mismatch");
+    for(std::size_t i=0;i<a.nodes.size();++i){const auto& x=a.nodes[i];const auto& y=b.nodes[i];need(norm(x.x-y.x)==0.&&norm(x.v-y.v)==0.&&x.last_normal_impulse==y.last_normal_impulse,"physical state mismatch");}
+}
+struct Run{Body a,b;CoupledFEMContext context;double ns{};std::size_t leaves{},impulses{},rejects{},certificates{};};
+int main(int argc,char** argv){
+    const unsigned maxw=argc>=2?unsigned(std::stoul(argv[1])):64u;
+    const unsigned minid=argc>=3?unsigned(std::stoul(argv[2])):0u;
+    if(argc>3)throw std::invalid_argument("usage: solver [maximum width] [minimum case id]");
+    std::cout<<std::setprecision(17)<<"width,regime,block,slot,arm,macrosteps,elapsed_ns,leaves,self_impulses,rejections,certificates\n";
+    for(unsigned w:{1u,4u,16u,32u,64u})if(w<=maxw)for(int near:{0,1})if(w*2+unsigned(near)>=minid){
+        for(int block=-1;block<4;++block){
+            std::array<Run,4> runs;
+            for(auto& r:runs){r.a=fixtures::u_solid(w,near?.0025:.02,.1);r.b=fixtures::remote();}
+            for(int step=0;step<4;++step){
+                for(int slot=0;slot<4;++slot){auto& r=runs[slot];CoupledFEMSettings c;c.typed_self_contact=c.hierarchy=true;const int arm=(slot+block+4)%4;c.cached_self_sap=arm!=0;c.spatial_first_self_sap=arm>=2;c.fused_self_sap=arm==3;
+                    const auto start=Clock::now();const auto v=step_coupled_fem(r.a,r.b,.00025,c,nullptr,&r.context);const auto stop=Clock::now();
+                    r.ns+=std::chrono::duration<double,std::nano>(stop-start).count();r.leaves+=v.accepted_leaves;r.impulses+=v.self_a.impulse_updates;r.rejects+=v.rejected_geometry+v.rejected_tets;r.certificates+=v.self_a.certificate_tests+v.self_b.certificate_tests;
+                }
+                for(int slot=1;slot<4;++slot){const auto& a=runs[0];const auto& b=runs[slot];same(a.a,b.a);same(a.b,b.b);need(a.leaves==b.leaves&&a.impulses==b.impulses&&a.rejects==b.rejects&&a.certificates==b.certificates,"physical decision mismatch");}
+            }
+            for(int slot=0;slot<4;++slot){const auto& r=runs[slot];need((near?r.impulses>0:r.impulses==0)&&r.context.mapping_rebuilds()==2&&r.context.hierarchy_rebuilds()==2&&r.context.hierarchy_refits()>0,"vacuous solver comparison");if(block>=0)std::cout<<w<<','<<(near?"near":"separated")<<','<<block<<','<<slot<<','<<((slot+block+4)%4==0?"retained_bvh":(slot+block+4)%4==1?"cached_sap":(slot+block+4)%4==2?"spatial_first":"fused")<<",4,"<<r.ns<<','<<r.leaves<<','<<r.impulses<<','<<r.rejects<<','<<r.certificates<<'\n';}
+        }
+        std::cerr<<"PASS width="<<w<<" near="<<near<<" whole-solver state parity\n";
+    }
+    // Context backend switching must rebuild both candidate states.
+    auto a=fixtures::u_solid(),b=fixtures::remote(),aa=a,bb=b;CoupledFEMContext warm,ref;CoupledFEMSettings c;c.hierarchy=c.typed_self_contact=true;
+    for(int mode:{0,1,2,3,1,0,3,2}){c.cached_self_sap=mode!=0;c.spatial_first_self_sap=mode>=2;c.fused_self_sap=mode==3;(void)step_coupled_fem(a,b,.00025,c,nullptr,&warm);c.cached_self_sap=false;c.spatial_first_self_sap=false;c.fused_self_sap=false;(void)step_coupled_fem(aa,bb,.00025,c,nullptr,&ref);same(a,aa);same(b,bb);need(warm.hierarchy_rebuilds()==2,"backend switch failed rebuild");}
+    c.cached_self_sap=true;c.spatial_first_self_sap=true;c.fused_self_sap=true;auto bad=a,other=a;bool rejected=false;try{(void)step_coupled_fem(bad,other,.00025,c,nullptr,&warm);}catch(const std::runtime_error&){rejected=true;}need(rejected&&warm.hierarchy_rebuilds()==0,"failed backend transaction retained cache");
+    (void)step_coupled_fem(a,b,.00025,c,nullptr,&warm);c.cached_self_sap=false;c.spatial_first_self_sap=false;c.fused_self_sap=false;(void)step_coupled_fem(aa,bb,.00025,c,nullptr,&ref);same(a,aa);same(b,bb);
+    std::cerr<<"PASS switched backend and rollback recovery\n";
+}

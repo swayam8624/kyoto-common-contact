@@ -74,7 +74,7 @@ class TypedSelfAuditor {
         source_nodes_=a.nodes.size();++epoch_;++mapping_rebuilds_;
     }
 public:
-    explicit TypedSelfAuditor(kyoto::contact::atlas::ExternalCandidateProducer external=nullptr,bool cached_sap=false,bool spatial_first=false):adapter_(cached_sap,spatial_first),external_(external){}
+    explicit TypedSelfAuditor(kyoto::contact::atlas::ExternalCandidateProducer external=nullptr,bool cached_sap=false,bool spatial_first=false,bool fused=false):adapter_(cached_sap,spatial_first,fused),external_(external){}
     std::size_t mapping_rebuilds()const{return mapping_rebuilds_;}
     std::size_t hierarchy_rebuilds()const{return adapter_.rebuilds();}
     std::size_t hierarchy_refits()const{return adapter_.refits();}

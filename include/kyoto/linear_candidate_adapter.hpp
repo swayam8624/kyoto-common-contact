@@ -7,6 +7,7 @@
 // No physical response, nonlinear CCD, or additional filters are implied.
 #include "kyoto/refit_feature_hierarchy.hpp"
 #include "kyoto/cached_axis_sap.hpp"
+#include "kyoto/fused_axis_sap.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -31,10 +32,12 @@ class LinearCandidateAdapter {
     persistent::CachedAxisSweep cached_sap_;
     bool use_cached_sap_{};
     bool spatial_first_{};
+    bool use_fused_{};
+    persistent::FusedAxisSweep fused_;
 public:
-    explicit LinearCandidateAdapter(bool cached_sap=false,bool spatial_first=false):cached_sap_(spatial_first),use_cached_sap_(cached_sap),spatial_first_(spatial_first){if(spatial_first&&!cached_sap)throw std::invalid_argument("spatial-first requires cached SAP");}
-    std::size_t rebuilds() const { return use_cached_sap_?cached_sap_.rebuilds():hierarchy_.rebuilds(); }
-    std::size_t refits() const { return use_cached_sap_?cached_sap_.warm_frames():hierarchy_.refits(); }
+    explicit LinearCandidateAdapter(bool cached_sap=false,bool spatial_first=false,bool fused=false):cached_sap_(spatial_first),use_cached_sap_(cached_sap),spatial_first_(spatial_first),use_fused_(fused){if((spatial_first&&!cached_sap)||(fused&&(!cached_sap||!spatial_first)))throw std::invalid_argument("spatial-first requires cached SAP");}
+    std::size_t rebuilds() const { return use_fused_?fused_.rebuilds():use_cached_sap_?cached_sap_.rebuilds():hierarchy_.rebuilds(); }
+    std::size_t refits() const { return use_fused_?fused_.warm_frames():use_cached_sap_?cached_sap_.warm_frames():hierarchy_.refits(); }
 
     f::Result query(std::span<const Vec3> start,
                     std::span<const Vec3> end,
@@ -89,8 +92,8 @@ public:
             return result;
         }
         if(exhaustive_reference)return f::exhaustive(mesh);
-        try { return use_cached_sap_?cached_sap_.query(mesh):hierarchy_.query(mesh); }
-        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{spatial_first_}; throw; }
+        try { return use_fused_?fused_.query(mesh):use_cached_sap_?cached_sap_.query(mesh):hierarchy_.query(mesh); }
+        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{spatial_first_};fused_=persistent::FusedAxisSweep{}; throw; }
     }
 };
 } // namespace kyoto::contact::atlas
