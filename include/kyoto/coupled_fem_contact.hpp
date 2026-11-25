@@ -8,6 +8,7 @@
 #include "kyoto/coupled_triangle_normal_impulse.hpp"
 #include "kyoto/moving_triangle_pair_certificate.hpp"
 #include "kyoto/static_face_hierarchy.hpp"
+#include "kyoto/tet_orientation_certificate.hpp"
 #include <optional>
 #include <vector>
 
@@ -15,6 +16,7 @@ namespace kyoto::solid {
 struct CoupledFEMSettings {
     double skin{.0005},activation_width{.003},restitution{};
     unsigned impulse_iterations{3},interval_depth{12},max_bisection{16};
+    unsigned orientation_depth{12};
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
@@ -22,9 +24,10 @@ struct CoupledFEMSettings {
 struct CoupledFEMStats {
     double integrated_dt{},normal_impulse{},contact_kinetic_change{};
     std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
-        impulse_updates{},box_tests{},certificate_tests{},interval_nodes{};
+        impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{};
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
+    double certified_min_j{std::numeric_limits<double>::infinity()};
 };
 // Optional evidence records contain actual accepted leaf endpoints for
 // BOTH bodies. Rejected trials never appear in the public trace.
@@ -80,6 +83,20 @@ inline bool positive_tets(const Body& b){
                                b.nodes[t.n[3]].x-x)*t.inverse_rest;
         const double j=determinant(F);
         if(!(std::isfinite(j)&&j>1e-6))return false;
+    }
+    return true;
+}
+// The exact real path through the *stored* binary64 inverse rest matrix
+// is certified, not just the two rounded endpoint determinant samples.
+inline bool continuous_tets(const Body& before,const Body& after,
+                            const CoupledFEMSettings& c,CoupledFEMStats& stats){
+    for(const auto& t:before.tets){
+        TetPositions p,q;
+        for(int k=0;k<4;++k){p[k]=before.nodes[t.n[k]].x;q[k]=after.nodes[t.n[k]].x;}
+        const auto cert=certify_linear_tet_orientation(p,q,t.inverse_rest,1e-6,c.orientation_depth);
+        stats.orientation_nodes+=cert.nodes;
+        if(!cert.certified)return false;
+        stats.certified_min_j=std::min(stats.certified_min_j,cert.lower_j);
     }
     return true;
 }
@@ -149,6 +166,7 @@ inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
     a.impulse_updates+=b.impulse_updates;
     a.impulse_on_a+=b.impulse_on_a;
     a.min_j=std::min(a.min_j,b.min_j);
+    a.certified_min_j=std::min(a.certified_min_j,b.certified_min_j);
 }
 } // namespace coupled_detail
 
@@ -160,7 +178,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
-         c.impulse_iterations<=10&&c.interval_depth<=20&&c.max_bisection<=20&&
+         c.impulse_iterations<=10&&c.interval_depth<=20&&c.orientation_depth<=20&&c.max_bisection<=20&&
          c.max_leaves>0&&std::isfinite(c.min_dt)&&c.min_dt>0&&dt>=c.min_dt))
         throw std::invalid_argument("invalid coupled FEM settings");
     validate_body(a);validate_body(b);
@@ -184,10 +202,12 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         for(auto& n:ta.nodes)n.x+=n.v*h;
         for(auto& n:tb.nodes)n.x+=n.v*h;
         const bool geo=swept_safe(sa,ta,sb,tb,c,local);
-        const bool tet=positive_tets(ta)&&positive_tets(tb);
+        const bool tet=positive_tets(ta)&&positive_tets(tb)&&
+            continuous_tets(sa,ta,c,local)&&continuous_tets(sb,tb,c,local);
         total.box_tests+=local.box_tests;
         total.certificate_tests+=local.certificate_tests;
         total.interval_nodes+=local.interval_nodes;
+        total.orientation_nodes+=local.orientation_nodes;
         if(!geo||!tet){
             total.rejected_geometry+=!geo;total.rejected_tets+=!tet;
             if(depth>=c.max_bisection||h*.5<c.min_dt)
