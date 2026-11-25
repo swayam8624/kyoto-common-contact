@@ -1,0 +1,27 @@
+name: Pass 34 connected physical IPC CCD audit
+on:
+  push:
+    branches: [research/spacetime-contact-atlas]
+    paths:
+      - 'include/kyoto/**'
+      - 'apps/pass34_connected_ipc_audit.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/pass34-connected-ipc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  official-ipc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+      - run: cmake --build build-ipc --target kyoto_pass34_connected_ipc_audit --parallel 2
+      - run: ctest --test-dir build-ipc -R pinned_IPC_connected_FEM_accepted_and_rejected_CCD --no-tests=error --output-on-failure -V
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass34-native-connected-ipc-receipts
+          path: build-ipc/pass34-connected-ipc/
+          if-no-files-found: warn
