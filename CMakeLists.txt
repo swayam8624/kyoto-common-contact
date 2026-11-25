@@ -203,6 +203,17 @@ if(KYOTO_WITH_OFFICIAL_IPC)
            COMMAND kyoto_pass18_real_leaf_ccd_audit
                    ${CMAKE_CURRENT_BINARY_DIR}/pass18-leaf-ccd)
 
+  # Pass 35A: actual external broadphase inside native physical response.
+  add_executable(kyoto_official_ipc_native_backend_tests tests/official_ipc_native_backend_tests.cpp)
+  target_link_libraries(kyoto_official_ipc_native_backend_tests PRIVATE kyoto_contact ipc::toolkit)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(kyoto_official_ipc_native_backend_tests PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(kyoto_official_ipc_native_backend_tests PRIVATE /fp:strict)
+  endif()
+  add_test(NAME pinned_IPC_LBVH_inside_native_typed_FEM
+           COMMAND kyoto_official_ipc_native_backend_tests)
+
   # Pass 34A: external CCD audit of actual connected self-contact FEM.
   add_executable(kyoto_pass34_connected_ipc_audit apps/pass34_connected_ipc_audit.cpp)
   target_link_libraries(kyoto_pass34_connected_ipc_audit PRIVATE kyoto_contact ipc::toolkit)
