@@ -779,3 +779,37 @@ separate full scaling campaigns.
 
 Locally tested source blob: 9ecedf1fb908914a4c48f66639f3eac6fd35a7ca.
 Test blob: 6b2aba12d3c8c69bf3108d5fa5e00775e3413e2b.
+
+
+## Pass 38H — whole moving mesh exact reference
+
+- [x] Exhaustive whole-volume linear path audit: positive exact
+  orientation for every cell and strict swept AABB rejection or
+  exact moving-plane certificate for every remaining cell pair.
+- [x] Classify unresolved pairs by shared vertex count.
+- [x] Initial GCC run certified eight of nine prescribed fixture
+  paths; larger U shear had two unresolved shared-vertex pairs.
+  Add exact midpoint dual-cone witness (sum feasible oriented
+  cross products) followed by the unchanged exact slab sign test.
+- [x] GCC 14.2 and Clang 17 strict-warning C++23 execution both
+  certified all nine paths (torus8, U1, U4; static, shear and
+  nonuniform deformation). Identical CSV receipts: 594 cell-path
+  orientation checks, 26,109 pair-path checks, 13,563 swept AABB
+  rejections, 12,546 exact pair certificates (6,414 nonincident,
+  3,360 shared vertex, 1,920 shared edge, 852 shared face).
+  Zero unresolved among the nine paths; inverted-cell control
+  not certified. Prior 1,000 analytic pair tests also rerun on
+  both compilers with unchanged results.
+- [x] Register reference campaign in CTest/CI and local runner.
+- [ ] Actual native accepted leaf audit and external/GPU execution.
+  This campaign uses reconstructed geometry and prescribed paths,
+  not forces or measured simulation. Unknown remains possible
+  for other geometry and no general completeness claim is made.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/exact_swept_volume_fixture_tests.cpp -o /tmp/kyoto-swept-volume
+    /tmp/kyoto-swept-volume
+
+Tested Git blobs: pair certificate 4066a4db2b95cc16aef3d59dfeb3c1cc1b83c66f;
+whole volume c1b7c61aa651ecb55f84399137040cb4f3c7685f;
+test 28644870058daa6f37dbec5c0b7c58fb790b0639;
+fixture 38fb36a425fc738f9f4ff45e7bdeaec987a412db.

@@ -34,6 +34,7 @@ NATIVE = [
 EXACT = [
     ("kyoto_exact_tet_intersection_tests", "exact_static_tetrahedral_intersection"),
     ("kyoto_exact_swept_tet_certificate_tests", "exact_continuous_tetrahedral_separation"),
+    ("kyoto_exact_swept_volume_fixture_tests", "exact_continuous_volume_fixture_patterns"),
     ("kyoto_exact_volume_fixture_tests", "exact_static_volume_fixture_patterns"),
     ("kyoto_native_exact_self_volume_tests", "exact_static_native_FEM_endpoint_self_volume"),
 ]

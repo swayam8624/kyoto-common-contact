@@ -140,6 +140,26 @@ inline ExactSweptTetCertificate certify_exact_swept_tet_pair(
                 }
                 for(std::size_t i=0;i<other.size();++i)for(std::size_t j=i+1;j<other.size();++j)
                     if(try_axis(other[i],other[j]))return true;
+                // At the exact midpoint, orient all cone rays towards
+                // the same halfspace. Sum feasible extreme normal rays
+                // to propose a constant interior direction. Exact
+                // Bernstein checks still validate the entire slab.
+                std::vector<Q> rays;
+                for(int i=0;i<4;++i){
+                    if(!shared_a[i]){const auto d=difference(u[i],u[anchor]);rays.push_back(sum(d.a,d.b));}
+                    if(!shared_b[i]){const auto d=difference(u[anchor],v[i]);rays.push_back(sum(d.a,d.b));}
+                }
+                Q normal{0,0,0};
+                for(std::size_t i=0;i<rays.size();++i)for(std::size_t j=i+1;j<rays.size();++j){
+                    auto n=cross(rays[i],rays[j]);
+                    bool pos=true,neg=true;
+                    for(const auto& r:rays){const auto p=dot(n,r);pos&=p>=0;neg&=p<=0;}
+                    if(pos&&!neg)normal=sum(normal,n);
+                    else if(neg&&!pos)normal=sub(normal,n);
+                }
+                const Q e=normal[0]!=0||normal[1]!=0?Q{normal[1],-normal[0],0}:Q{1,0,0};
+                const Q f=cross(normal,e);
+                if(try_axis({e,e},{f,f}))return true;
             }
         }else{
             constexpr int faces[4][3]={{0,1,2},{0,1,3},{0,2,3},{1,2,3}};

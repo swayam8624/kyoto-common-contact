@@ -67,7 +67,9 @@ static Mesh u_solid(unsigned width){
     for(const auto& [f,n]:counts)if(n==1)m.boundary.push_back(f);
     return m;
 }
-#ifdef KYOTO_EXACT_FIXTURE_AUDIT
+#if defined(KYOTO_FIXTURE_PATTERNS_ONLY)
+// Used by the continuous fixture campaign.
+#elif defined(KYOTO_EXACT_FIXTURE_AUDIT)
 int main(){
     std::size_t pairs=0,exact_pairs=0,incident=0;
     auto check=[&](const Mesh& m,const char* label){
@@ -97,5 +99,6 @@ int main(){
         total_tets+=out.cells;++total_meshes;
     }
     std::cout<<"PASS boundary fixture patterns meshes="<<total_meshes<<" tetrahedra="<<total_tets<<'\n';
+    return 0;
 }
 #endif
