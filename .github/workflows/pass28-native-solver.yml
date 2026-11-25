@@ -15,6 +15,8 @@ on:
       - 'tests/typed_connected_self_contact_tests.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/pass28-native-solver.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
