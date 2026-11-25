@@ -370,3 +370,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_rounded_relative_triangle_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 31B: native two connected toroidal volumes and source export.
+add_executable(kyoto_coupled_torus_physics_tests
+               tests/coupled_torus_physics_tests.cpp)
+target_link_libraries(kyoto_coupled_torus_physics_tests PRIVATE kyoto_contact)
+add_test(NAME coupled_toroidal_volumes_physical_parity
+         COMMAND kyoto_coupled_torus_physics_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_coupled_torus_physics_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_coupled_torus_physics_tests PRIVATE /fp:strict)
+endif()
