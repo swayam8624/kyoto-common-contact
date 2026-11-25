@@ -845,3 +845,37 @@ self-contact and independent physical convergence, then a genuine maintained
 whole-cost SCA hierarchy versus pinned official IPC Toolkit LBVH on held-out
 contact-rich 3D physical solver trajectories.
 Do not substitute candidate parity for actual continuous collision proof.
+
+
+## Pass 27 — solver-facing indexed linear contact candidate boundary
+
+`include/kyoto/linear_candidate_adapter.hpp` converts original linear
+endpoint positions and dense indexed connectivity into the existing
+retained VF/EE hierarchy. The returned IDs are current solver row indices.
+Connectivity and epoch changes invalidate the hierarchy; invalid input is
+rejected. Per-vertex padding is a spatial broad-phase envelope parameter,
+not a solver contact-distance convention. Only universally compatible,
+nonincident VF/EE stencils are supported.
+
+The dependency-free regression uses 240 seeded linear frames with
+a separately constructed exhaustive endpoint-box oracle, connectivity
+reordering, epoch changes, padding changes, malformed input and empty
+topology. The existing pinned upstream IPC CCD gate now also consumes
+SCA-generated stencils for all 35 linear scenarios, requires exact
+upstream event-set equality and matching earliest conservative safe
+prefix, and exercises persistent warm and cold topology paths.
+
+Validation commands:
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_linear_candidate_adapter_tests --parallel 2
+    ctest --test-dir build -R indexed_linear_solver_candidate_adapter_oracle --output-on-failure
+    cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+    cmake --build build-ipc --target kyoto_official_ipc_ccd_tests --parallel 2
+    ctest --test-dir build-ipc -R pinned_official_ipc_continuous_CCD_coverage --output-on-failure
+
+CI configuration: `.github/workflows/pass27-solver-boundary.yml`.
+These gates were added to source control; no successful new run is
+claimed until actual logs are reviewed. This is a narrow-phase consumer
+integration, not yet an IPC physics solver replacement, independent
+CCD mathematics, nonlinear trajectories, coupled response or speedup.
