@@ -356,3 +356,51 @@ complete topology and the explicit IEEE model remain preconditions.
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build --target kyoto_typed_self_contact_audit_tests --parallel 2
     ctest --test-dir build -R typed_adjacent_face_self_contact_audit --output-on-failure -V
+
+
+## Pass 32C / 33A — typed response and connected U-solid
+
+- [x] Share original-node typed stencil mapping between continuous
+  VF/EE safety audit and physical impulse response. Retain an explicit
+  exhaustive candidate reference in the indexed adapter.
+- [x] Coalesce signed barycentric weights by original node ID before
+  forming effective inverse mass, relative velocity, contact normal,
+  or writing velocities. Shared coefficients cancel; repeated IDs
+  are squared only after coalescing.
+- [x] Opt-in typed self-contact response in both physical stages and
+  the actual adaptive safety gate. Separate internal impulse/work
+  accounting; disallow simultaneous legacy face-pair self-response.
+- [x] Retain candidate hierarchy within a macrostep, with independent
+  topology/geometry validation on each query. Cross-macrostep
+  persistent ownership is still a separate performance task.
+- [x] Author a connected 30-tet U-shaped solid with shared bottom
+  bridge and opposing arms; derive boundary triangles from tet-face
+  incidence and verify connectivity. Compare eight actual physical
+  macrosteps under exhaustive and retained typed candidate backends.
+- [x] Author repeated/shared-node analytical mass, momentum,
+  restitution/energy identity tests, positive continuous Jacobian
+  checks and exhaustive same-method audit of every accepted leaf.
+- [ ] Execute on Linux/macOS, verify numerical results and archive
+  source evidence. CI source is configured, but runs unconfirmed.
+- [ ] Independent official IPC audit, robust initial surface and
+  volume validity, manifold accuracy, broader connected folds,
+  self-contact performance and actual external solver integration.
+
+The signed coefficient is c_i = alpha_i - beta_i after accumulating
+all weights associated with node i. Then k = sum(c_i^2/m_i),
+u = sum(c_i*v_i), and each node receives c_i*J*n. Linear momentum
+and angular momentum identities follow from sum(c_i)=0 and
+sum(c_i*x_i) parallel to n. Gross scalar nodal receipts still
+count both sides (including repeated weights), rather than claiming
+a net vector impulse magnitude. The proof is local and frictionless.
+
+The connected U fixture is a small constructed volumetric scene,
+not yet a dense folded cloth or a calibrated physical benchmark.
+The typed audit uses the same rounded relative-hull certificate as
+the solver, so the exhaustive check is independent of the candidate
+hierarchy, not an independent exact CCD oracle.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_typed_connected_self_contact_tests --parallel 2
+    ctest --test-dir build -R typed_connected_FEM_self_contact --no-tests=error --output-on-failure -V
+
