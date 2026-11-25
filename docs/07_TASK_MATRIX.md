@@ -208,3 +208,40 @@ energy conservation is not asserted. Validation is pending.
     ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
 
 CI: .github/workflows/pass28-native-solver.yml.
+
+
+## Pass 30A–B — continuous tetrahedral orientation and discrete energy ledger
+
+- [x] Implement outward interval cubic Bernstein determinant bound for
+  every linearly swept tetrahedron in both bodies. The three-times-scaled
+  Bernstein coefficients come from mixed endpoint column determinants.
+  Strict positivity above the threshold for all coefficients establishes
+  a continuous lower bound; dyadic subdivision resolves loose bounds.
+- [x] Reject or reintegrate any physical trial whose element orientation
+  is unresolved, including positive endpoint but negative interior cases.
+- [x] Author 800 randomized affine paths, analytic double inversion,
+  interior singularity, and a safely positive path requiring subdivision.
+- [x] Require positive continuous lower Jacobian bounds in real coupled
+  solver state parity tests.
+- [x] Audit actual accepted leaves with independently reconstructed
+  force/damping kick and momentum, angular momentum and kinetic contact
+  work balances; include a gravity/damping free-flight control.
+- [ ] Confirm test compilation and numerical receipts on both platforms.
+- [ ] Independent outward continuous *surface* separation and self-contact
+  certification remain open; continuous element orientation does not
+  establish global injectivity, absence of containment, or surface safety.
+
+FP assumptions: IEC559 binary64, round-to-nearest, no fast-math,
+contraction or reassociation, gradual underflow; the source models the
+stored inverse-rest matrix as exact binary64 data, not an exact inverse
+of an ideal real-valued reference mesh. Other consumers of the header
+must compile under the same FP conditions. The discrete energy ledger
+accounts for kick and contact work and actual potential changes, not
+exact energy conservation, and shares the constitutive force evaluator.
+Sampled long-double determinants are regression observations, not an
+independent formal oracle. CI results have not been observed.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_tet_orientation_certificate_tests kyoto_coupled_fem_contact_tests --parallel 2
+    ctest --test-dir build -R 'outward_continuous_tet_orientation_certificate|synchronized_two_body_FEM_contact_and_rollback' --output-on-failure -V
+
