@@ -30,7 +30,9 @@ struct TypedSelfCandidates {
 };
 class TypedSelfAuditor {
     kyoto::contact::atlas::LinearCandidateAdapter adapter_;
+    kyoto::contact::atlas::ExternalCandidateProducer external_{};
 public:
+    explicit TypedSelfAuditor(kyoto::contact::atlas::ExternalCandidateProducer external=nullptr):external_(external){}
     TypedSelfCandidates candidates(const Body& a,const Body& b,double skin,bool exhaustive=false){
         namespace f=kyoto::contact::features;
         namespace at=kyoto::contact::atlas;
@@ -62,7 +64,7 @@ public:
             }
         }
         const std::vector<at::IndexedEdge> edges(unique_edges.begin(),unique_edges.end());
-        const auto result=adapter_.query(start,end,edges,faces,1,skin,exhaustive);
+        const auto result=adapter_.query(start,end,edges,faces,1,skin,exhaustive,external_);
         TypedSelfCandidates out;
         out.info.vertices=start.size();out.info.edges=edges.size();out.info.faces=faces.size();
         out.info.candidates=result.pairs.size();
