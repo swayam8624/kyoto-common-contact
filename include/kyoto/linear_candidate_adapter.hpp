@@ -30,7 +30,8 @@ public:
                     std::span<const IndexedEdge> edges,
                     std::span<const IndexedFace> faces,
                     std::uint64_t epoch=1,
-                    double per_vertex_padding=0.0) {
+                    double per_vertex_padding=0.0,
+                    bool exhaustive_reference=false) {
         if(start.size()!=end.size() || epoch==0 ||
            !std::isfinite(per_vertex_padding) || per_vertex_padding<0)
             throw std::invalid_argument("invalid indexed linear motion");
@@ -66,6 +67,7 @@ public:
         // Query state belongs to this adapter alone. If any exception
         // occurs during a hierarchy mutation, discard its caches so
         // the next valid call cannot observe a partly updated tree.
+        if(exhaustive_reference)return f::exhaustive(mesh);
         try { return hierarchy_.query(mesh); }
         catch(...) { hierarchy_=RefitHierarchy{}; throw; }
     }
