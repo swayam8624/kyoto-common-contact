@@ -221,6 +221,18 @@ inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body&
         (certify_nonincident_self_sweep(a0,a1,c.skin,c.interval_depth,c.hierarchy,s.self_a)&&
          certify_nonincident_self_sweep(b0,b1,c.skin,c.interval_depth,c.hierarchy,s.self_b));
 }
+// This is the actual pre-certification physical proposal. It operates
+// on private copies; never label its geometry accepted. External CCD
+// audits use this SAME path for a positive rejected-trial control.
+inline void propose_drift(Body& ta,Body& tb,double h,const CoupledFEMSettings& c,
+                          CoupledFEMStats& local,TypedSelfAuditor& auditor_a,
+                          TypedSelfAuditor& auditor_b){
+    kick(ta,h);kick(tb,h);
+    impulses(ta,tb,c,local);
+    self_impulses(ta,tb,c,local,auditor_a,auditor_b);
+    for(auto& n:ta.nodes)n.x+=n.v*h;
+    for(auto& n:tb.nodes)n.x+=n.v*h;
+}
 inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
     self_accepted(a.self_a,b.self_a);self_accepted(a.self_b,b.self_b);
     a.normal_impulse+=b.normal_impulse;
@@ -261,10 +273,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
             throw std::runtime_error("coupled FEM timestep budget exhausted");
         Body ta=sa,tb=sb;
         CoupledFEMStats local;
-        kick(ta,h);kick(tb,h);
-        impulses(ta,tb,c,local);self_impulses(ta,tb,c,local,auditor_a,auditor_b);
-        for(auto& n:ta.nodes)n.x+=n.v*h;
-        for(auto& n:tb.nodes)n.x+=n.v*h;
+        propose_drift(ta,tb,h,c,local,auditor_a,auditor_b);
         const bool geo=swept_safe(sa,ta,sb,tb,c,local)&&self_safety(sa,ta,sb,tb,c,local,auditor_a,auditor_b);
         const bool tet=positive_tets(ta)&&positive_tets(tb)&&
             continuous_tets(sa,ta,c,local)&&continuous_tets(sb,tb,c,local);
