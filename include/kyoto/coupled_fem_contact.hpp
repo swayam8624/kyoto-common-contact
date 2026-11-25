@@ -26,6 +26,14 @@ struct CoupledFEMStats {
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
 };
+// Optional evidence records contain actual accepted leaf endpoints for
+// BOTH bodies. Rejected trials never appear in the public trace.
+struct CoupledFEMLeaf {
+    Body before_a,before_b,after_a,after_b;
+    double dt{};
+    unsigned depth{};
+    CoupledFEMStats receipt;
+};
 namespace coupled_detail {
 using Face = std::array<std::size_t,3>;
 inline void validate_body(const Body& b){
@@ -145,7 +153,8 @@ inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
 } // namespace coupled_detail
 
 inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
-                                      const CoupledFEMSettings& c={}){
+                                      const CoupledFEMSettings& c={},
+                                      std::vector<CoupledFEMLeaf>* trace=nullptr){
     using namespace coupled_detail;
     if(&a==&b||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
@@ -164,6 +173,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     if(!swept_safe(sa,sa,sb,sb,c,total))
         throw std::runtime_error("initial coupled surfaces violate skin");
     std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
+    std::vector<CoupledFEMLeaf> staged_trace;
     const auto recurse=[&](auto&& self,double h,unsigned depth)->void{
         if(h<c.min_dt||total.accepted_leaves>=c.max_leaves)
             throw std::runtime_error("coupled FEM timestep budget exhausted");
@@ -193,6 +203,8 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         for(std::size_t i=0;i<ia.size();++i)ia[i]+=ta.nodes[i].last_normal_impulse;
         for(std::size_t i=0;i<ib.size();++i)ib[i]+=tb.nodes[i].last_normal_impulse;
         ta.time_seconds+=h;tb.time_seconds+=h;
+        local.integrated_dt=h;local.accepted_leaves=1;
+        if(trace)staged_trace.push_back({sa,sb,ta,tb,h,depth,local});
         total.integrated_dt+=h;++total.accepted_leaves;
         accumulate(total,local);
         sa=std::move(ta);sb=std::move(tb);
@@ -210,6 +222,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     for(std::size_t i=0;i<ib.size();++i)sb.nodes[i].last_normal_impulse=ib[i];
     // Single publication point for both bodies, after every leaf passed.
     a=std::move(sa);b=std::move(sb);
+    if(trace)trace->swap(staged_trace); // replace only after successful macro-step
     return total;
 }
 } // namespace kyoto::solid
