@@ -1350,3 +1350,14 @@ Raw source-hash-verified CSVs: docs/evidence/pass39_cross_witness_{gcc,clang}.cs
 - [ ] Real Metal, complete IPC Toolkit wrapper/LBVH and independent external contact dynamics remain unexecuted.
 
 The audit is outside the timed solver path. It corroborates the tested physical trajectories, not universal solver injectivity or a new performance result. Raw receipt: docs/evidence/pass39_long_physical_audit_gcc_clang.csv.
+
+## Executed initial cross-volume sweep experiment
+
+- [x] Conservative closed-AABB bipartite sweep with inclusive endpoint tie order, best projected cross-overlap axis, canonical pair order, and finite/ordered input validation. No same-body pairs generated.
+- [x] 2,000 seeded random bipartite scenes per compiler, 30,087 matching candidate identities, 4,582,075 exhaustive versus 804,122 three-axis checks. Touching/zero-width and malformed controls passed on both.
+- [x] Optional initial_cross_sweep solver integration; same body-level rejection, same strict initial tetrahedron certificate, same canonical order; no skip/reuse of geometric certification. Existing initial-volume regression runs both modes including containment and incomplete-boundary rejection, oblique safe overlap of bounds, and remote fast path. Both compilers passed.
+- [x] Six sustained physical workloads, three paired ABBA/BAAB measured blocks plus discarded warmup. Reference and sweep both enable within-call cross witness reuse. 72 measured trajectories, 1,632 macrosteps per compiler, identical nodal states and all listed physical and certificate receipts. Rotated torus initial-volume checks 345,624 -> 134,803 per trajectory (24,247 exact separating-plane certificates unchanged); oblique torus 55,320 -> 28,968 (9,528 certificates unchanged); four body-disjoint workloads retain the fast path. Reference/sweep whole-solver geometric mean GCC 0.9990062557, Clang 1.0007277788. No measurable end-to-end win; retain default off. Shared VM and some overlapping regression compilation; small timing differences are not evidence of superiority.
+- [x] Re-run previously incomplete longer-trajectory regression batch: barycentric, typed connected self contact, coupled torus, persistent context, native exact swept volume, both compilers, all ten executions passed before the new optional sweep change. Long physical audit results in previous commit apply to reference and witness-reuse modes without this new sweep. Sweep campaign independently checks equal physical states and certificate work.
+- [ ] Real Metal hardware, full IPC wrapper/LBVH, independent external dynamics solver remain outstanding. CI still pending/queued.
+
+Raw paired timings in docs/evidence/pass39_cross_volume_sweep_{gcc,clang}.csv. Direct builds used strict C++23 -O2, warnings-as-errors, -ffp-contract=off -fno-fast-math -Iinclude. CMake registration authored, full CMake dependency graph not run.

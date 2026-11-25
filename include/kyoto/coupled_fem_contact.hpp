@@ -13,6 +13,7 @@
 #include "kyoto/nonincident_self_contact.hpp"
 #include "kyoto/typed_self_contact_response.hpp"
 #include "kyoto/initial_tet_separation.hpp"
+#include "kyoto/cross_cell_sweep.hpp"
 #include "kyoto/volume_boundary_topology.hpp"
 #include <optional>
 #include <vector>
@@ -31,6 +32,7 @@ struct CoupledFEMSettings {
     bool cached_self_sap{false}; // optional topology-cached axis SAP for typed self contact
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
+    bool initial_cross_sweep{false}; // exact same cross-volume predicate, bipartite sweep
     bool initial_volume_audit{true}; // initial cross-body volume disjointness, not self-injectivity
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
@@ -109,7 +111,7 @@ inline void validate_body(const Body& b){
 // Every cross-body tet pair must have disjoint AABBs or a verified
 // strict separating plane. Nonincident self-volume injectivity is
 // a separate problem; incident cells intentionally share boundaries.
-inline bool initial_cross_volume_safe(const Body& a,const Body& b,CoupledFEMStats& stats){
+inline bool initial_cross_volume_safe(const Body& a,const Body& b,CoupledFEMStats& stats,bool sweep=false){
     using kyoto::geometry::Tetrahedron;
     struct Box{V3 lo,hi;};
     auto extend=[](Box& box,V3 p){
@@ -141,13 +143,22 @@ inline bool initial_cross_volume_safe(const Body& a,const Body& b,CoupledFEMStat
         return out;
     };
     const auto aa=entries(a),bb=entries(b);
-    for(const auto& x:aa)for(const auto& y:bb){
-        ++stats.volume_box_tests;
-        if(separated(x.box,y.box))continue;
+    auto certify=[&](const Entry& x,const Entry& y){
         ++stats.volume_certificates;
         const auto cert=kyoto::geometry::certify_initial_tet_separation(x.p,y.p);
         stats.volume_directions+=cert.directions;stats.volume_projections+=cert.projections;
-        if(!cert.separated)return false;
+        return cert.separated;
+    };
+    if(sweep){
+        auto boxes=[](const auto& entries){std::vector<kyoto::geometry::SweptCellBox> out;out.reserve(entries.size());
+            for(const auto& e:entries)out.push_back({{e.box.lo.x,e.box.lo.y,e.box.lo.z},{e.box.hi.x,e.box.hi.y,e.box.hi.z}});
+            return out;};
+        const auto candidates=kyoto::geometry::cross_cell_candidates(boxes(aa),boxes(bb));
+        stats.volume_box_tests+=candidates.overlap_tests;
+        for(const auto& [i,j]:candidates.pairs)if(!certify(aa[i],bb[j]))return false;
+    }else for(const auto& x:aa)for(const auto& y:bb){
+        ++stats.volume_box_tests;
+        if(!separated(x.box,y.box)&&!certify(x,y))return false;
     }
     return true;
 }
@@ -374,7 +385,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     auto& auditor_a=warm.first();auto& auditor_b=warm.second();
     // Initial cross-volume disjointness is checked unless explicitly disabled.
     // Combinatorial boundary is validated; geometric self-injectivity remains a caller precondition.
-    if(c.initial_volume_audit&&!initial_cross_volume_safe(sa,sb,total))
+    if(c.initial_volume_audit&&!initial_cross_volume_safe(sa,sb,total,c.initial_cross_sweep))
         throw std::runtime_error("initial coupled volumes overlap or cannot be certified disjoint");
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
         throw std::runtime_error("initial coupled surfaces violate skin");

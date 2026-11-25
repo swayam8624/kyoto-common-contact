@@ -644,3 +644,16 @@ if(KYOTO_WITH_OFFICIAL_IPC AND KYOTO_WITH_EXACT_SELF_VOLUME AND TARGET tight_inc
   endif()
   add_test(NAME long_coupled_exact_volume_and_upstream_ccd COMMAND kyoto_pass39_long_physical_audit)
 endif()
+
+# Bipartite cross-volume candidate sweep: opt-in initial audit backend.
+add_executable(kyoto_cross_cell_sweep_tests tests/cross_cell_sweep_tests.cpp)
+add_executable(kyoto_pass39_cross_volume_sweep apps/pass39_cross_volume_sweep.cpp)
+foreach(target kyoto_cross_cell_sweep_tests kyoto_pass39_cross_volume_sweep)
+  target_link_libraries(${target} PRIVATE kyoto_contact)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(${target} PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(${target} PRIVATE /fp:strict)
+  endif()
+endforeach()
+add_test(NAME bipartite_cross_cell_sweep_exhaustive_parity COMMAND kyoto_cross_cell_sweep_tests)

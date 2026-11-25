@@ -17,6 +17,7 @@ NATIVE = [
     ("kyoto_external_candidate_filter_tests", "external_candidate_superset_normalization"),
     ("kyoto_cached_axis_sap_tests", "cached_axis_sap_dynamic_topology_and_reversal"),
     ("kyoto_triangle_barycentric_boundary_tests", "triangle_barycentric_boundary_roundoff_regression"),
+    ("kyoto_cross_cell_sweep_tests", "bipartite_cross_cell_sweep_exhaustive_parity"),
     ("kyoto_relative_scalar_projection_tests", "relative_scalar_projection_complete_receipt_parity"),
     ("kyoto_pass39_cached_sap_campaign", "physical_cached_sap_candidate_smoke"),
     ("kyoto_swept_cell_candidates_tests", "swept_cell_candidate_exhaustive_parity"),
