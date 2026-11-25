@@ -1,15 +1,11 @@
 name: Pass 36 paid native FEM persistence
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'include/kyoto/**'
-      - 'apps/pass36_paid_persistent_fem_abba.cpp'
-      - 'CMakeLists.txt'
-      - '.github/workflows/pass36-paid-persistence.yml'
   pull_request:
     branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

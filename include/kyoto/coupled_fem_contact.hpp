@@ -13,6 +13,7 @@
 #include "kyoto/nonincident_self_contact.hpp"
 #include "kyoto/typed_self_contact_response.hpp"
 #include "kyoto/initial_tet_separation.hpp"
+#include "kyoto/volume_boundary_topology.hpp"
 #include <optional>
 #include <vector>
 
@@ -91,6 +92,13 @@ inline void validate_body(const Body& b){
         for(auto i:f)if(i>=b.nodes.size())
             throw std::invalid_argument("invalid coupled FEM face");
     }
+    // Surface CCD is meaningful only when the complete volume boundary
+    // is represented. Winding of supplied triangles is immaterial for
+    // this two-sided contact solver; tetrahedron incidence must agree.
+    std::vector<kyoto::geometry::CellRow> cells;cells.reserve(b.tets.size());
+    for(const auto& t:b.tets)cells.push_back(t.n);
+    (void)kyoto::geometry::validate_volume_boundary_topology(
+        b.nodes.size(),cells,b.surface_faces);
     (void)b.evaluate();
 }
 // A surface-only audit cannot detect a fully contained closed volume.
@@ -348,7 +356,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     warm.bind(c.external_self_candidates);
     auto& auditor_a=warm.first();auto& auditor_b=warm.second();
     // Initial cross-volume disjointness is checked unless explicitly disabled.
-    // Self-validity and complete boundary topology remain caller preconditions.
+    // Combinatorial boundary is validated; geometric self-injectivity remains a caller precondition.
     if(c.initial_volume_audit&&!initial_cross_volume_safe(sa,sb,total))
         throw std::runtime_error("initial coupled volumes overlap or cannot be certified disjoint");
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))

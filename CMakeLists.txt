@@ -502,3 +502,8 @@ add_test(NAME outward_initial_tetrahedral_separation COMMAND kyoto_initial_tet_s
 add_test(NAME initial_volume_FEM_containment_rollback COMMAND kyoto_initial_volume_fem_tests)
 
 add_test(NAME initial_tetrahedral_exact_integer_oracle COMMAND kyoto_initial_tet_exact_oracle_tests)
+
+# Pass 38C: standalone complete volume-boundary topology validation.
+add_executable(kyoto_volume_boundary_topology_tests tests/volume_boundary_topology_tests.cpp)
+target_link_libraries(kyoto_volume_boundary_topology_tests PRIVATE kyoto_contact)
+add_test(NAME complete_volume_boundary_topology COMMAND kyoto_volume_boundary_topology_tests)

@@ -1,16 +1,11 @@
 name: Pass 34 connected physical IPC CCD audit
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'include/kyoto/**'
-      - 'apps/pass34_connected_ipc_audit.cpp'
-      - 'tests/official_ipc_native_backend_tests.cpp'
-      - 'CMakeLists.txt'
-      - '.github/workflows/pass34-connected-ipc.yml'
   pull_request:
     branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

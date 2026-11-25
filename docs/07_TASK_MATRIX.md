@@ -628,3 +628,34 @@ Local standalone reproduction (run from repository root):
     /tmp/kyoto-tet-oracle
 
 Verified locally on exact source blobs, not inferred from CI status.
+
+
+## Pass 38C — complete combinatorial collision boundary and CI queue control
+
+- [x] Validate unique tetrahedra, in-range distinct node IDs, all
+  nodes used, interior face incidence and opposite orientation,
+  boundary edge degree two, and a single cycle in each boundary
+  vertex link. Require supplied unordered surface triangles to equal
+  the incidence-derived boundary exactly.
+- [x] Local GCC/Clang C++23 -O2 -Wall -Wextra -Wpedantic -Werror:
+  1,000 valid renumbered complexes, 1,000 missing-face rejections,
+  and analytic duplicate, orientation, nonmanifold, disconnected and
+  pinched-boundary controls passed. GCC ASan/UBSan also passed.
+- [x] Integrate boundary validation before actual coupled FEM trials;
+  add missing-boundary transactional regression. Integrated execution
+  remains unverified.
+- [x] Consolidate five recent workflow triggers to PR/manual only,
+  with cancellation of superseded runs within each workflow and
+  source branch. Existing queued runs may remain; no CI result inferred.
+
+This is a combinatorial boundary check, not a certificate of internal
+vertex/edge links, geometric embedding, global injectivity, or continuous
+volumetric noninterpenetration. Supplied triangle winding is ignored for
+two-sided contact. Validation is currently paid each macrostep.
+
+Local kernel source Git blob: 8a552f257e199dc83f1079b3873f06ee888a17f4.
+Local test source Git blob: 9d1db0e445b080208ebcf5e8e2a4235bd35c666b.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/volume_boundary_topology_tests.cpp -o /tmp/kyoto-boundary
+    /tmp/kyoto-boundary
+

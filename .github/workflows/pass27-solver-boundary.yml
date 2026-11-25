@@ -1,16 +1,11 @@
 name: Pass 27 solver candidate boundary
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'include/kyoto/**'
-      - 'tests/linear_candidate_adapter_tests.cpp'
-      - 'tests/ipc_continuous_ccd_tests.cpp'
-      - 'CMakeLists.txt'
-      - '.github/workflows/pass27-solver-boundary.yml'
   pull_request:
     branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

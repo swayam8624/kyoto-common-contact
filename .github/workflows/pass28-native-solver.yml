@@ -1,27 +1,11 @@
 name: Pass 28 native FEM physical parity
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'include/kyoto/**'
-      - 'tests/static_face_solver_parity_tests.cpp'
-      - 'tests/coupled_triangle_normal_impulse_tests.cpp'
-      - 'tests/coupled_fem_contact_tests.cpp'
-      - 'tests/tet_orientation_certificate_tests.cpp'
-      - 'tests/rounded_relative_triangle_certificate_tests.cpp'
-      - 'tests/coupled_torus_physics_tests.cpp'
-      - 'tests/nonincident_self_contact_tests.cpp'
-      - 'tests/typed_self_contact_audit_tests.cpp'
-      - 'tests/typed_connected_self_contact_tests.cpp'
-      - 'tests/persistent_fem_context_tests.cpp'
-      - 'tests/initial_tet_separation_tests.cpp'
-      - 'tests/initial_tet_exact_oracle_tests.cpp'
-      - 'tests/initial_volume_fem_tests.cpp'
-      - 'CMakeLists.txt'
-      - '.github/workflows/pass28-native-solver.yml'
   pull_request:
     branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -61,8 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - run: cmake --build build --target kyoto_initial_tet_separation_tests kyoto_initial_tet_exact_oracle_tests kyoto_initial_volume_fem_tests --parallel 2
-      - run: ctest --test-dir build -R 'outward_initial_tetrahedral_separation|initial_tetrahedral_exact_integer_oracle|initial_volume_FEM_containment_rollback' --no-tests=error --output-on-failure -V
+      - run: cmake --build build --target kyoto_initial_tet_separation_tests kyoto_initial_tet_exact_oracle_tests kyoto_initial_volume_fem_tests kyoto_volume_boundary_topology_tests --parallel 2
+      - run: ctest --test-dir build -R 'outward_initial_tetrahedral_separation|initial_tetrahedral_exact_integer_oracle|initial_volume_FEM_containment_rollback|complete_volume_boundary_topology' --no-tests=error --output-on-failure -V
   persistent-context:
     strategy:
       fail-fast: false

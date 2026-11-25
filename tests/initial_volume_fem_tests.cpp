@@ -44,5 +44,16 @@ int main(){
     s={};
     need(coupled_detail::initial_cross_volume_safe(a,b,s)&&s.volume_box_tests==1&&s.volume_certificates==0,
          "disjoint body fast path failed");
+    // A missing boundary triangle must be rejected before geometry
+    // certification, even if the remaining surface appears separated.
+    a=tet({},1.);b=tet({10.,0,0},1.);
+    a.surface_faces.pop_back();
+    bool missing_rejected=false;
+    try{(void)step_coupled_fem(a,b,.00025,cfg);}
+    catch(const std::invalid_argument& e){
+        missing_rejected=std::string(e.what()).find("supplied boundary differs")!=std::string::npos;
+    }
+    need(missing_rejected&&a.time_seconds==0.&&b.time_seconds==0.,
+         "incomplete collision boundary advanced physical state");
     std::cout<<"PASS38A initial cross-volume FEM integration and rollback\n";
 }

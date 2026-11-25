@@ -1,18 +1,11 @@
 name: Pass 37 physical CPU scaling
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'apps/pass37_cpu_physical_scaling.cpp'
-      - 'apps/pass37_metal_physical_scaling.mm'
-      - 'include/kyoto/physical_scaling_snapshot.hpp'
-      - 'include/kyoto/connected_self_contact_fixture.hpp'
-      - 'CMakeLists.txt'
-      - 'tools/summarize_pass37_scaling.py'
-      - '.github/workflows/pass37-cpu-scaling.yml'
   pull_request:
     branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
