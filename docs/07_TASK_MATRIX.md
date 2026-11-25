@@ -171,3 +171,40 @@ Total linear impulse vanishes, and the angular impulse is
 solver accuracy or energy conservation. Friction is deliberately disabled
 until an explicit angular-momentum model is justified. No self-contact
 or shared-node stencils are supported by this local two-state kernel.
+
+
+## Pass 29B–C — two volumetric bodies and native physical evidence
+
+- [x] Implement explicit two-body neo-Hookean FEM integration with the
+  finite-mass normal law. Both bodies drift on identical physical
+  substep clocks; uncertified cross-body swept triangles or nonpositive
+  endpoint tetrahedral Jacobians trigger rejection and reintegration.
+- [x] Integrate sorted finite-face tree candidates as an optional backend;
+  flat cross-body enumeration remains the reference default. The moving
+  second-body hierarchy is rebuilt for each relevant endpoint/swept
+  geometry. This is not a maintained VF/EE performance result.
+- [x] Author unequal-density tetrahedral head-on routine and fast impact
+  fixtures, state parity, positive clearance, impulse accounting,
+  isolated-system linear/angular momentum and all-or-nothing rollback.
+- [x] Optional true accepted substep endpoints for both bodies; output
+  trace is replaced only after a successful macro-step. Audit every
+  accepted leaf at 33 time samples across every cross-body face pair.
+- [ ] Confirm compilation and all numerical gates using actual CI logs.
+- [ ] Repeat on dense toroidal volumes and additional geometries,
+  independent IPC CCD and external solver integrations.
+- [ ] Prove continuous element orientation, support general self-contact
+  and containment detection; no universal solver correctness claim.
+
+Initial disjoint volumes, valid self geometry, fixed topology and
+frictionless contact are preconditions. The guarded moving/moving
+certificate is reused, not a new formally rounded CCD proof. Positive
+endpoint Jacobians do not prove absence of in-step element inversion.
+Dense samples are regression checks, not independent CCD mathematics.
+The kinetic contact work ledger is local; full discrete mechanical
+energy conservation is not asserted. Validation is pending.
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target kyoto_coupled_fem_contact_tests --parallel 2
+    ctest --test-dir build -R synchronized_two_body_FEM_contact_and_rollback --output-on-failure -V
+
+CI: .github/workflows/pass28-native-solver.yml.
