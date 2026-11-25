@@ -1293,3 +1293,50 @@ Run from checkout with -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror
 tests and apps/pass39_cached_sap_campaign.cpp (output directory and 64),
 apps/pass39_cached_sap_solver.cpp and apps/pass39_projection_solver.cpp
 (stdout CSV). Preserve separate compiler runs and warmup exclusion.
+
+## Executed longer cross-contact campaign — within-call witness reuse
+
+- [x] Six native physical workloads, 20/24 macrosteps per trajectory:
+  aligned 96-tet torus pair, oblique translated 96-tet pair, rotated
+  240-tet pair, separated 96-tet pair, 168-tet U/remote pair and
+  rotated 528-tet U/remote pair. All use the actual coupled solver.
+- [x] Larger rotated case exposed a real pre-existing Voronoi
+  barycentric failure: (-7.4081044109974115e-17,
+  0.99999999999999944, 6.2919255642255239e-16). Add bounded
+  64-epsilon excursion repair, clamp/renormalize/recompute witness
+  only when needed; larger excursions remain fail-closed. Exact
+  captured point and triangle regression passes GCC and Clang.
+  This is floating-point response robustness, not an exact
+  point-triangle distance proof. Both benchmark arms share the fix.
+- [x] Optional reuse_cross_geometry caches geometric face-pair
+  witnesses only inside an impulse call, preserving canonical face
+  iteration and recomputing velocity-dependent impulses every pass.
+  No reuse across drift or source changes; default remains off.
+- [x] GCC/Clang strict C++23 O2, warnings-as-errors, no fast math.
+  Three measured ABBA/BAAB blocks per scene, excluded warmup.
+  72 measured trajectories / 1632 macrosteps per compiler; every
+  nodal coordinate, velocity, impulse, time, contact count and
+  listed safety/decision receipt equal across arms after each step.
+  Cross impulses per trajectory 2818/100/5564; self impulses
+  1195/3920; separated control has zero impulses. All steps accepted.
+  Prior GCC coupled FEM, typed self-contact and torus tests passed;
+  Clang coupled FEM passed before the regression batch timed out.
+  Captured barycentric regression passed on both compilers.
+- [x] Paired block-sum reference/reuse speed ratio (higher is better):
+  GCC 1.142454x overall, 1.319180x on three active cross-body cases;
+  Clang 1.158695x overall, 1.335657x on active cross-body cases.
+  Aligned impact 1.674698/1.668208, oblique 1.120061/1.146934,
+  larger rotated 1.223865/1.245365, separated .959390/1.007024,
+  U self 1.006699/1.008256, rotated U 1.002824/1.000274.
+  Actual whole-solver timing, including candidate and safety checks;
+  shared Linux VM, no hardware-independent inference. Cross-contact
+  reuse is a response-stage optimization, not a new broad-phase win.
+- [ ] Full upstream IPC wrapper/LBVH and real Metal still unexecuted.
+  Long trajectories have native safety certificates; no new
+  independent upstream/exact whole-volume audit of these paths yet.
+
+Reproduce with:
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass39_cross_witness_reuse.cpp -o /tmp/cross-reuse
+    /tmp/cross-reuse > /tmp/cross-reuse-gcc.csv
+
+Raw source-hash-verified CSVs: docs/evidence/pass39_cross_witness_{gcc,clang}.csv.

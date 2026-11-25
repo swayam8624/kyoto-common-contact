@@ -27,6 +27,7 @@ struct CoupledFEMSettings {
     bool hierarchy{false};
     kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
     bool fast_relative_projection{false}; // identical scalar-product interval specialization
+    bool reuse_cross_geometry{false}; // cache witnesses only within one impulse call
     bool cached_self_sap{false}; // optional topology-cached axis SAP for typed self contact
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
@@ -201,8 +202,32 @@ inline void impulses(Body& a,Body& b,const CoupledFEMSettings& c,
     std::optional<StaticFaceHierarchy> tree;
     if(c.hierarchy)tree.emplace(boxes);
     std::vector<std::size_t> rows;
-    for(unsigned it=0;it<c.impulse_iterations;++it)
-        for(const auto& f:a.surface_faces){
+    struct Witness {std::size_t i,j;RigidFaceContact near;};
+    std::vector<Witness> witnesses;
+    auto apply=[&](const Face& f,const Face& g,const RigidFaceContact& near){
+        auto sa=state(a,f),sb=state(b,g);
+        const auto r=apply_two_triangle_normal_impulse(sa,sb,
+            near.deformable_weights,near.rigid_weights,c.restitution);
+        if(r.normal_impulse==0.)return;
+        for(int k=0;k<3;++k){
+            a.nodes[f[k]].v=sa.v[k];b.nodes[g[k]].v=sb.v[k];
+            a.nodes[f[k]].last_normal_impulse+=r.normal_impulse*near.deformable_weights[k];
+            b.nodes[g[k]].last_normal_impulse+=r.normal_impulse*near.rigid_weights[k];
+        }
+        ++stats.impulse_updates;
+        stats.normal_impulse+=r.normal_impulse;
+        stats.contact_kinetic_change+=r.predicted_kinetic_change;
+        stats.impulse_on_a+=r.impulse_on_a;
+    };
+    // Positions are immutable inside this call. Reuse geometry only,
+    // never velocity-dependent impulses; preserve sequential face order.
+    for(unsigned it=0;it<c.impulse_iterations;++it){
+        if(c.reuse_cross_geometry&&it>0){
+            for(const auto& w:witnesses)apply(a.surface_faces[w.i],b.surface_faces[w.j],w.near);
+            continue;
+        }
+        for(std::size_t i=0;i<a.surface_faces.size();++i){
+            const auto& f=a.surface_faces[i];
             const auto ta=positions(a,f);
             collect_static_face_rows(bounding(ta),activation,boxes,
                 tree?&*tree:nullptr,rows,stats.box_tests);
@@ -210,23 +235,12 @@ inline void impulses(Body& a,Body& b,const CoupledFEMSettings& c,
                 const auto& g=b.surface_faces[j];
                 const auto near=triangle_triangle_closest(ta,positions(b,g));
                 if(near.distance>activation)continue;
-                if(!(near.distance>c.skin))
-                    throw std::runtime_error("coupled FEM source violates skin");
-                auto sa=state(a,f),sb=state(b,g);
-                const auto r=apply_two_triangle_normal_impulse(sa,sb,
-                    near.deformable_weights,near.rigid_weights,c.restitution);
-                if(r.normal_impulse==0.)continue;
-                for(int k=0;k<3;++k){
-                    a.nodes[f[k]].v=sa.v[k];b.nodes[g[k]].v=sb.v[k];
-                    a.nodes[f[k]].last_normal_impulse+=r.normal_impulse*near.deformable_weights[k];
-                    b.nodes[g[k]].last_normal_impulse+=r.normal_impulse*near.rigid_weights[k];
-                }
-                ++stats.impulse_updates;
-                stats.normal_impulse+=r.normal_impulse;
-                stats.contact_kinetic_change+=r.predicted_kinetic_change;
-                stats.impulse_on_a+=r.impulse_on_a;
+                if(!(near.distance>c.skin))throw std::runtime_error("coupled FEM source violates skin");
+                if(c.reuse_cross_geometry&&c.impulse_iterations>1)witnesses.push_back({i,j,near});
+                apply(f,g,near);
             }
         }
+    }
 }
 inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& b1,
                       const CoupledFEMSettings& c,CoupledFEMStats& stats){
