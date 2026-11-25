@@ -358,3 +358,15 @@ elseif(MSVC)
     target_compile_options(${target} PRIVATE /fp:strict)
   endforeach()
 endif()
+
+# Pass 31A: outward synchronized moving triangle hull separation.
+add_executable(kyoto_rounded_relative_triangle_tests
+               tests/rounded_relative_triangle_certificate_tests.cpp)
+target_link_libraries(kyoto_rounded_relative_triangle_tests PRIVATE kyoto_contact)
+add_test(NAME outward_relative_moving_triangle_surface_certificate
+         COMMAND kyoto_rounded_relative_triangle_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_rounded_relative_triangle_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_rounded_relative_triangle_tests PRIVATE /fp:strict)
+endif()
