@@ -394,3 +394,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_nonincident_self_contact_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 32B: typed nonincident self audit beyond whole-face adjacency.
+add_executable(kyoto_typed_self_contact_audit_tests
+               tests/typed_self_contact_audit_tests.cpp)
+target_link_libraries(kyoto_typed_self_contact_audit_tests PRIVATE kyoto_contact)
+add_test(NAME typed_adjacent_face_self_contact_audit
+         COMMAND kyoto_typed_self_contact_audit_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_typed_self_contact_audit_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_typed_self_contact_audit_tests PRIVATE /fp:strict)
+endif()
