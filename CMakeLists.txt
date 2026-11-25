@@ -406,3 +406,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
   target_compile_options(kyoto_typed_self_contact_audit_tests PRIVATE /fp:strict)
 endif()
+
+# Pass 32C/33A: typed connected self-contact physical response.
+add_executable(kyoto_typed_connected_self_contact_tests
+               tests/typed_connected_self_contact_tests.cpp)
+target_link_libraries(kyoto_typed_connected_self_contact_tests PRIVATE kyoto_contact)
+add_test(NAME typed_connected_FEM_self_contact
+         COMMAND kyoto_typed_connected_self_contact_tests)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(kyoto_typed_connected_self_contact_tests PRIVATE -ffp-contract=off -fno-fast-math)
+elseif(MSVC)
+  target_compile_options(kyoto_typed_connected_self_contact_tests PRIVATE /fp:strict)
+endif()
