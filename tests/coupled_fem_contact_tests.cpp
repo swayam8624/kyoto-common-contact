@@ -93,7 +93,7 @@ static void run(bool fast){
     const auto p0a=momentum(a),p0b=momentum(b);
     V3 impulse{};
     double min_gap=gap,min_j=1,certified_j=1,contact_work=0,max_energy_residual=0;
-    std::size_t updates=0,rejections=0,leaves=0;
+    std::size_t updates=0,rejections=0,leaves=0,projections=0;
     const int steps=fast?1:30;
     const double dt=fast?.004:.0005;
     for(int i=0;i<steps;++i){
@@ -143,6 +143,7 @@ static void run(bool fast){
                 x.rejected_geometry==y.rejected_geometry&&x.rejected_tets==y.rejected_tets&&
                 x.certificate_tests==y.certificate_tests&&x.interval_nodes==y.interval_nodes&&
                 x.orientation_nodes==y.orientation_nodes&&x.certified_min_j==y.certified_min_j&&
+                x.rounded_directions==y.rounded_directions&&x.rounded_projections==y.rounded_projections&&
                 x.normal_impulse==y.normal_impulse&&x.contact_kinetic_change==y.contact_kinetic_change,
                 "hierarchical contact decisions diverged");
         require(std::abs(a.time_seconds-(i+1)*dt)<1e-12&&a.time_seconds==b.time_seconds,
@@ -158,10 +159,12 @@ static void run(bool fast){
         require(std::abs(ia-x.normal_impulse)<1e-9&&std::abs(ib-x.normal_impulse)<1e-9,
                 "accepted nodal impulse receipts incomplete");
         updates+=x.impulse_updates;rejections+=x.rejected_geometry;leaves+=x.accepted_leaves;
+        projections+=x.rounded_projections;
         impulse+=x.impulse_on_a;contact_work+=x.contact_kinetic_change;
     }
     const auto final=measure(a,b);
     require(updates>0&&norm(impulse)>0,"no true finite-mass contact response");
+    if(fast)require(projections>0,"fast impact did not exercise rounded surface witness");
     require(norm(final.p-initial.p)<1e-9&&norm(final.l-initial.l)<1e-9,
             "isolated two-body total momentum balance failed");
     require(norm(momentum(a)-p0a-impulse)<1e-9&&norm(momentum(b)-p0b+impulse)<1e-9,
@@ -170,7 +173,7 @@ static void run(bool fast){
             "invalid contact work or mechanical energy");
     if(fast)require(rejections>0&&leaves>1,"fast coupled fixture did not exercise subdivision");
     std::cout<<std::setprecision(17)<<"COUPLED_FEM fast="<<fast<<" steps="<<steps
-             <<" updates="<<updates<<" geom_rejections="<<rejections<<" leaves="<<leaves
+             <<" rounded_projections="<<projections<<" updates="<<updates<<" geom_rejections="<<rejections<<" leaves="<<leaves
              <<" min_gap_m="<<min_gap<<" min_j="<<min_j<<" certified_continuous_min_j="<<certified_j
              <<" momentum_residual="<<norm(final.p-initial.p)
              <<" angular_residual="<<norm(final.l-initial.l)
