@@ -4,6 +4,7 @@
 // on each closed time slab. Unknown is never a collision or safety verdict.
 // The caller separately checks continuous nondegeneracy/orientation of cells.
 #include "kyoto/exact_tet_intersection.hpp"
+#include <optional>
 
 namespace kyoto::geometry {
 struct ExactLinearTetMotion { Tetrahedron start,end; ExactTetIds ids; };
@@ -27,6 +28,17 @@ inline Coeff det_coeff(const Line& x,const Line& y,const Line& z){
         d(x.a,y.b,z.b)+d(x.b,y.a,z.b)+d(x.b,y.b,z.a),
         3*d(x.b,y.b,z.b)};
 }
+// Quadratic Bernstein normal, with the middle coefficient doubled.
+// Reuse these cross-product coefficients for each exact projection.
+struct AxisCoefficients {
+    Q n0,n1,n2;
+    AxisCoefficients(const Line& e,const Line& f):
+        n0(cross(e.a,f.a)),n1(sum(cross(e.b,f.a),cross(e.a,f.b))),n2(cross(e.b,f.b)){}
+    Coeff project(const Line& z)const{
+        return {3*dot(n0,z.a),dot(n0,z.b)+dot(n1,z.a),
+                dot(n1,z.b)+dot(n2,z.a),3*dot(n2,z.b)};
+    }
+};
 inline bool signed_coeff(const Coeff& c,int sign,bool strict){
     for(const auto& v:c){
         if(sign>0?(strict?v<=0:v<0):(strict?v>=0:v>0))return false;
@@ -64,7 +76,7 @@ inline Motion half(const Motion& m,bool right){
 } // namespace swept_tet_detail
 
 inline ExactSweptTetCertificate certify_exact_swept_tet_pair(
-    const ExactLinearTetMotion& a,const ExactLinearTetMotion& b,unsigned depth_limit=6){
+    const ExactLinearTetMotion& a,const ExactLinearTetMotion& b,unsigned depth_limit=6,bool factored=false){
     using namespace swept_tet_detail;
     if(depth_limit>12)throw std::invalid_argument("exact swept tet depth must be <=12");
     unique_ids(a.ids);unique_ids(b.ids);
@@ -85,10 +97,13 @@ inline ExactSweptTetCertificate certify_exact_swept_tet_pair(
         ++receipt.nodes;receipt.max_depth=std::max(receipt.max_depth,depth);
         auto try_axis=[&](const Line& e,const Line& f){
             ++receipt.axes;
+            std::optional<AxisCoefficients> normal;
+            if(factored)normal.emplace(e,f);
+            auto project=[&](const Line& z){return factored?normal->project(z):det_coeff(e,f,z);};
             if(!common){
                 bool pos=true,neg=true;
                 for(const auto& p:u)for(const auto& q:v){
-                    ++receipt.polynomials;const auto c=det_coeff(e,f,difference(p,q));
+                    ++receipt.polynomials;const auto c=project(difference(p,q));
                     pos=pos&&signed_coeff(c,1,true);neg=neg&&signed_coeff(c,-1,true);
                     if(!pos&&!neg)return false;
                 }
@@ -96,8 +111,8 @@ inline ExactSweptTetCertificate certify_exact_swept_tet_pair(
             }
             std::array<Coeff,4> ca,cb;
             for(int i=0;i<4;++i){
-                ca[i]=det_coeff(e,f,difference(u[i],u[anchor]));
-                cb[i]=det_coeff(e,f,difference(v[i],u[anchor]));
+                ca[i]=project(difference(u[i],u[anchor]));
+                cb[i]=project(difference(v[i],u[anchor]));
                 receipt.polynomials+=2;
                 if((shared_a[i]&&!zero(ca[i]))||(shared_b[i]&&!zero(cb[i])))return false;
             }

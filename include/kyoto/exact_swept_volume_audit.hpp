@@ -32,7 +32,7 @@ inline bool certify_exact_positive_cell(const ExactLinearTetMotion& m,unsigned l
 }
 inline ExactSweptVolumeReceipt audit_exact_swept_volume(
     const std::vector<Point>& start,const std::vector<Point>& end,
-    const std::vector<ExactTetIds>& cells,unsigned depth=6,bool exhaustive=false){
+    const std::vector<ExactTetIds>& cells,unsigned depth=6,bool exhaustive=false,bool factored=false){
     if(start.empty()||start.size()!=end.size()||cells.empty()||depth>12)
         throw std::invalid_argument("invalid swept volume inputs");
     for(const auto* points:{&start,&end})for(auto p:*points)for(double v:p)
@@ -67,7 +67,7 @@ inline ExactSweptVolumeReceipt audit_exact_swept_volume(
         std::size_t shared=0;for(auto x:a.m.ids)for(auto y:b.m.ids)shared+=x==y;
         if(shared==4)throw std::invalid_argument("duplicate swept cell");
         ++r.tested[shared];
-        const auto p=certify_exact_swept_tet_pair(a.m,b.m,depth);
+        const auto p=certify_exact_swept_tet_pair(a.m,b.m,depth,factored);
         r.pair_nodes+=p.nodes;r.axes+=p.axes;r.polynomials+=p.polynomials;
         if(!p.certified){++r.unknown[shared];if(!recorded){r.first_unknown={i,j};recorded=true;}}
     }

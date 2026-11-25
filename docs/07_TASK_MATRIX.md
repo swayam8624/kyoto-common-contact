@@ -884,3 +884,41 @@ Rebuild the measured benchmark from repository root:
 Use the same flags with clang++ for the second arm. Source hash
 43d5cb6031b8404b2f662d9543a0892ee6dcb277 and analysis script hash
 70a9d262040735d18e65776705c75f19e5719f46 match locally executed files.
+
+
+## Pass 39B — reuse exact separating-axis normal polynomial
+
+- [x] Factor cubic determinant projections through the exact quadratic
+  normal coefficients N0=e0×f0, N1=e1×f0+e0×f1, N2=e1×f1.
+  The scaled cubic coefficients are 3N0·r0, N0·r1+N1·r0,
+  N1·r1+N2·r0, 3N2·r1. Compute the normal once per proposed
+  axis and retain the original expansion as an explicit control.
+- [x] GCC 14.2 and Clang 17 strict-warning C++23 execution: 10,000
+  exact coefficient comparisons (integer shifts 0,64,1074) and
+  1,000 full swept pair receipt comparisons on each compiler.
+  Fixed a Boost shift diagnostic in the test generator by explicit
+  bit setting, rather than weakening warning flags.
+- [x] Paid comparison: identical sweep candidate generation and
+  exact certificate receipts, 3 ABBA/BAAB blocks per each of nine
+  prescribed fixtures plus an excluded warmup. 108 timed whole
+  audits per compiler, 216 total. Geometric mean reference/factored:
+  GCC 2.1680193836x (block range 1.919999–2.446978);
+  Clang 2.1773600349x (1.893871–2.389381).
+  Shared Linux x86_64 AMD EPYC 9V74 container, sequential timing.
+- [x] Preserve raw timing CSV and exact tested source blobs.
+- [x] Register optional coefficient parity test in CMake and CI.
+- [ ] Keep factored path opt-in pending further held-out adversarial
+  validation. The reference default and previous benchmarks are
+  preserved. No native FEM or GPU acceleration claim; prescribed
+  trajectories and exact audit only. Full integrated execution pending.
+
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/exact_factored_axis_tests.cpp -o /tmp/kyoto-factored
+    /tmp/kyoto-factored
+    g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass39b_factored_axis_abba.cpp -o /tmp/kyoto-pass39b
+    /tmp/kyoto-pass39b > /tmp/pass39b-gcc.csv
+
+Use clang++ with identical flags for the second compiler. Raw CSVs
+are docs/evidence/pass39b-gcc.csv and pass39b-clang.csv. Ratio per block
+is sum(reference ns)/sum(factored ns); equal-weight geometric mean
+over all 27 blocks per compiler. Ranges are observed, not confidence
+intervals.
