@@ -335,3 +335,10 @@ add_executable(kyoto_coupled_triangle_normal_impulse_tests
 target_link_libraries(kyoto_coupled_triangle_normal_impulse_tests PRIVATE kyoto_contact)
 add_test(NAME two_finite_mass_triangle_normal_impulse_balance
          COMMAND kyoto_coupled_triangle_normal_impulse_tests)
+
+# Pass 29B: coupled finite-mass neo-Hookean volumetric bodies.
+add_executable(kyoto_coupled_fem_contact_tests
+               tests/coupled_fem_contact_tests.cpp)
+target_link_libraries(kyoto_coupled_fem_contact_tests PRIVATE kyoto_contact)
+add_test(NAME synchronized_two_body_FEM_contact_and_rollback
+         COMMAND kyoto_coupled_fem_contact_tests)
