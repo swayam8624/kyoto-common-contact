@@ -12,6 +12,7 @@
 #include "kyoto/rounded_relative_triangle_certificate.hpp"
 #include "kyoto/nonincident_self_contact.hpp"
 #include "kyoto/typed_self_contact_response.hpp"
+#include "kyoto/initial_tet_separation.hpp"
 #include <optional>
 #include <vector>
 
@@ -26,13 +27,15 @@ struct CoupledFEMSettings {
     kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
+    bool initial_volume_audit{true}; // initial cross-body volume disjointness, not self-injectivity
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
 struct CoupledFEMStats {
     double integrated_dt{},normal_impulse{},contact_kinetic_change{};
     std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
         impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{},
-        rounded_directions{},rounded_projections{};
+        rounded_directions{},rounded_projections{},volume_box_tests{},volume_certificates{},
+        volume_directions{},volume_projections{};
     SelfContactStats self_a{},self_b{}; // separate internal impulses, not cross-body transfer
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
@@ -89,6 +92,52 @@ inline void validate_body(const Body& b){
             throw std::invalid_argument("invalid coupled FEM face");
     }
     (void)b.evaluate();
+}
+// A surface-only audit cannot detect a fully contained closed volume.
+// Every cross-body tet pair must have disjoint AABBs or a verified
+// strict separating plane. Nonincident self-volume injectivity is
+// a separate problem; incident cells intentionally share boundaries.
+inline bool initial_cross_volume_safe(const Body& a,const Body& b,CoupledFEMStats& stats){
+    using kyoto::geometry::Tetrahedron;
+    struct Box{V3 lo,hi;};
+    auto extend=[](Box& box,V3 p){
+        box.lo={std::min(box.lo.x,p.x),std::min(box.lo.y,p.y),std::min(box.lo.z,p.z)};
+        box.hi={std::max(box.hi.x,p.x),std::max(box.hi.y,p.y),std::max(box.hi.z,p.z)};
+    };
+    auto separated=[](const Box& x,const Box& y){
+        return x.hi.x<y.lo.x||y.hi.x<x.lo.x||x.hi.y<y.lo.y||y.hi.y<x.lo.y||
+               x.hi.z<y.lo.z||y.hi.z<x.lo.z;
+    };
+    auto body_box=[&](const Body& body){
+        Box box{body.nodes.at(0).x,body.nodes.at(0).x};
+        for(const auto& n:body.nodes)extend(box,n.x);
+        return box;
+    };
+    ++stats.volume_box_tests;
+    if(separated(body_box(a),body_box(b)))return true;
+    struct Entry{Tetrahedron p;Box box;};
+    auto entries=[&](const Body& body){
+        std::vector<Entry> out;out.reserve(body.tets.size());
+        for(const auto& t:body.tets){
+            Entry e{};e.box={body.nodes.at(t.n[0]).x,body.nodes.at(t.n[0]).x};
+            for(int i=0;i<4;++i){
+                const auto p=body.nodes.at(t.n[i]).x;
+                e.p[i]={p.x,p.y,p.z};extend(e.box,p);
+            }
+            out.push_back(e);
+        }
+        return out;
+    };
+    const auto aa=entries(a),bb=entries(b);
+    for(const auto& x:aa)for(const auto& y:bb){
+        ++stats.volume_box_tests;
+        if(separated(x.box,y.box))continue;
+        ++stats.volume_certificates;
+        const auto cert=kyoto::geometry::certify_initial_tet_separation(x.p,y.p);
+        stats.volume_directions+=cert.directions;stats.volume_projections+=cert.projections;
+        if(!cert.separated)return false;
+    }
+    return true;
 }
 inline Triangle3 positions(const Body& b,const Face& f){
     return {b.nodes[f[0]].x,b.nodes[f[1]].x,b.nodes[f[2]].x};
@@ -298,8 +347,10 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     } guard{warm};
     warm.bind(c.external_self_candidates);
     auto& auditor_a=warm.first();auto& auditor_b=warm.second();
-    // Verify initial cross-surface separation; volume disjointness and
-    // self-validity are explicit caller preconditions, not inferred here.
+    // Initial cross-volume disjointness is checked unless explicitly disabled.
+    // Self-validity and complete boundary topology remain caller preconditions.
+    if(c.initial_volume_audit&&!initial_cross_volume_safe(sa,sb,total))
+        throw std::runtime_error("initial coupled volumes overlap or cannot be certified disjoint");
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
         throw std::runtime_error("initial coupled surfaces violate skin");
     std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
