@@ -1,0 +1,36 @@
+name: Pass 53 automatic contact discovery
+on:
+  push:
+    branches: [research/pass53-auto-contact-discovery]
+  pull_request:
+    paths:
+      - 'tools/pass53*'
+      - '.github/workflows/pass53-auto-contact-discovery.yml'
+  workflow_dispatch:
+jobs:
+  physics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: python tools/pass53_discovery.py discovery
+      - run: python tools/pass53_controls.py controls
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass53-${{ matrix.os }}
+          path: |
+            discovery/
+            controls/
+          if-no-files-found: error

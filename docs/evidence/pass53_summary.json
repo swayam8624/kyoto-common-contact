@@ -1,0 +1,70 @@
+{
+  "scope": "Independent implicit FEM, automatically discovered contact constraints from unresolved whole-mesh trial certificates. Local Linux execution; sufficient certificates, not universal contact-response convergence.",
+  "total_steps": 670,
+  "enabled_certified_steps": 350,
+  "enabled_unresolved": 0,
+  "disabled_steps": 320,
+  "disabled_overlap_states": 184,
+  "contact_active_enabled_steps": 18,
+  "simultaneous_contact_steps": 6,
+  "exhausted_budget_rejections": 6,
+  "input_state_preserved": true,
+  "stationary_steps": 30,
+  "stationary_false_activations": 0,
+  "max_cells": 8,
+  "main": {
+    "steps": 480,
+    "enabled_steps": 240,
+    "enabled_pair_checks": 2800,
+    "recomputed_trials": 12,
+    "overlap_states_disabled": {
+      "edge": 62,
+      "vertex": 62,
+      "disjoint": 30
+    },
+    "automatically_discovered": {
+      "edge": [
+        [
+          0,
+          3,
+          2
+        ]
+      ],
+      "vertex": [
+        [
+          0,
+          6,
+          1
+        ],
+        [
+          1,
+          6,
+          1
+        ],
+        [
+          1,
+          7,
+          1
+        ]
+      ],
+      "disjoint": [
+        [
+          0,
+          1,
+          0
+        ]
+      ]
+    }
+  },
+  "triple": {
+    "steps": 160,
+    "enabled_steps": 80,
+    "disabled_overlap_states": 30,
+    "simultaneous_steps": 6
+  },
+  "source_blobs": {
+    "discovery": "f797fe05103dd6394378aac8cf6db8a052e28c38",
+    "controls": "133d0e1a726c6a375564b22d960713405adfa5ed"
+  },
+  "limitations": "Small fixtures with 2–8 cells. Pair identities are discovered, fixture initial geometry and velocities prescribed. Frictionless, no guaranteed resolution of all possible mesh configurations, no general performance claim. Discovery is not yet combined with Pass 49 adaptive macrostep transaction. Previous original native-backend comparison and cross-platform workflows remain queued."
+}
