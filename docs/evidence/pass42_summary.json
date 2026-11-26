@@ -1,0 +1,54 @@
+{
+  "scope": "Local executed independent implicit FEM, exact cross-body region separation only; no same-body response or arbitrary CCD claim",
+  "controls": 205,
+  "steps": 128,
+  "region_intervals": 608,
+  "certified": 608,
+  "max_depth": 0,
+  "margin_m": 0.0005,
+  "min_j": 0.9479709286742356,
+  "min_gap_m": 0.001500000018163243,
+  "max_momentum_error": 4.024447939818753e-10,
+  "max_kkt": 9.515877558314179e-11,
+  "scenes": [
+    {
+      "scene": 0,
+      "cells": 48,
+      "contact_steps": 25,
+      "intervals": 96
+    },
+    {
+      "scene": 1,
+      "cells": 48,
+      "contact_steps": 12,
+      "intervals": 128
+    },
+    {
+      "scene": 2,
+      "cells": 102,
+      "contact_steps": 12,
+      "intervals": 192
+    },
+    {
+      "scene": 3,
+      "cells": 60,
+      "contact_steps": 0,
+      "intervals": 192
+    }
+  ],
+  "environment": {
+    "python": "3.13.5",
+    "platform": "x86_64",
+    "casadi": "3.7.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0"
+  },
+  "sha256": {
+    "pass42_region_certificate.py": "7519adf86ddcd539627d535f1970ffa5f853c7437eb4187530a5d3365d65b271",
+    "pass42_physical_replay.py": "bfbe5920a529cbe2e834bac02e2b367f02430a85f1f188e5c4f9a79b08de1292",
+    "physical/certified.csv": "91688563dc40b73e6984cb71fe89d82d5437f37887936753c6795e167b933f45",
+    "physical/regions.json": "db2f763d9b31a9a8603ef57ea2faa6772cde4e7cf2476e8dcd3c9faf00799c25",
+    "physical/trajectory.txt": "0ef3ddd437664a469989136a04dbcbd6da3fd06f889177b1043533e6a73cf028",
+    "physical/physical.csv": "a3157d452b7e5e033cc0ee537138ab711daaa080f752db02ed1867b221f619f7"
+  }
+}
