@@ -1,0 +1,51 @@
+{
+  "scope": "Local matched live implicit FEM, runtime duration parameter; comparison to Pass55 bounded model cache; exact gate unchanged.",
+  "matched_blocks": 4,
+  "matched_runs": 8,
+  "physical_leaves": 132,
+  "fresh_recertified_pair_intervals": 138880,
+  "unresolved": 0,
+  "discrete_decision_parity": true,
+  "schedule_parity": true,
+  "max_position_difference_m": 5.551115123125783e-17,
+  "max_velocity_difference_m_s": 3.3306690738754696e-15,
+  "vertex": {
+    "ratios": [
+      1.638044897935415,
+      1.4699234715985234
+    ],
+    "geomean": 1.5517089427490822,
+    "retained_models": [
+      8,
+      2
+    ]
+  },
+  "replica8": {
+    "ratios": [
+      1.281992859817309,
+      1.1477430225952945
+    ],
+    "geomean": 1.2130121021128781,
+    "retained_models": [
+      9,
+      3
+    ]
+  },
+  "equal_block_geomean": 1.371948150081269,
+  "controls": {
+    "duration_reuse": true,
+    "late_rollback": true,
+    "depth_one_recovery": "failed",
+    "depth_three_recovery": "passed",
+    "capacity": 1,
+    "peak": 1,
+    "evictions": 11
+  },
+  "limitations": "One incomplete replica timing block excluded; reverse-order rerun completed. No bitwise physical parity, no measured RSS, no new 78/120/156-cell live timing, no cross-platform validation. Pair identity still specializes compiled model. Two matched blocks per fixture are preliminary timing evidence.",
+  "source_blobs": {
+    "parametric": "7c6e9ebcc1734faabee474f66250d772a34626b7",
+    "benchmark": "f3d1886e13e28fb495ba315d4c1118a81c8d6558",
+    "controls": "7c15d076204017c20efcad7adf1023891488d08e",
+    "audit": "801ee04e3b0225aeb18c674b61d746f7f038a3e3"
+  }
+}
