@@ -1,0 +1,36 @@
+name: Pass 49 adaptive independent FEM
+on:
+  push:
+    branches: [research/pass49-adaptive-independent-fem]
+  pull_request:
+    paths:
+      - 'tools/pass49*'
+      - '.github/workflows/pass49-adaptive-independent-fem.yml'
+  workflow_dispatch:
+jobs:
+  adaptive:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: python tools/pass49_adaptive.py adaptive-results
+      - run: python tools/pass49_aggressive.py aggressive-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass49-${{ matrix.os }}
+          path: |
+            adaptive-results/
+            aggressive-results/
+          if-no-files-found: error
