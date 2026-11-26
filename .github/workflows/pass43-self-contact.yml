@@ -1,0 +1,37 @@
+name: Pass 43 independent same-body contact
+on:
+  push:
+    branches: [research/pass43-independent-self-contact]
+    paths:
+      - 'tools/pass43*'
+      - '.github/workflows/pass43-self-contact.yml'
+  pull_request:
+    paths:
+      - 'tools/pass43*'
+      - '.github/workflows/pass43-self-contact.yml'
+  workflow_dispatch:
+jobs:
+  physics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: python tools/pass43_self_contact.py pass43-results
+      - run: python tools/pass43_audit.py pass43-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass43-${{ matrix.os }}
+          path: pass43-results/
+          if-no-files-found: error

@@ -1,0 +1,66 @@
+{
+  "scope": "Restricted connected-body disjoint-node region pair; local implicit neo-Hookean FEM. Not general self-contact or whole-body injectivity.",
+  "steps": 200,
+  "scene_count": 5,
+  "tetrahedra_per_scene": 78,
+  "nodes_per_scene": 56,
+  "enabled_contact_steps": 52,
+  "enabled_region_path_certificates": 120,
+  "enabled_unresolved": 0,
+  "disabled_overlap_witnesses": 68,
+  "disabled_unresolved": 68,
+  "continuous_orientation_certificates": 15600,
+  "orientation_unresolved": 0,
+  "exhaustive_swept_aabb_pair_checks": 1006800,
+  "sap_candidate_mismatches": 0,
+  "skin_m": [
+    0,
+    0.0005
+  ],
+  "min_enabled_endpoint_J": 0.7269383983822528,
+  "min_enabled_region_gap_m": 0.0008000000210130163,
+  "exact_region_margin_m": 0.0002,
+  "source_git_blobs": {
+    "tools/pass43_self_contact.py": "b9fe42eab1d7e86f3f6e243a8e00ff0641b6fde9",
+    "tools/pass43_audit.py": "1390f7e4684d1383a15b33d5f72252b248779692"
+  },
+  "scenes": [
+    {
+      "scene": 0,
+      "enabled": true,
+      "active_steps": 26,
+      "overlap_steps": 0,
+      "min_gap_m": 0.0008000000210130163
+    },
+    {
+      "scene": 1,
+      "enabled": false,
+      "active_steps": 0,
+      "overlap_steps": 34,
+      "min_gap_m": -0.02025079524271681
+    },
+    {
+      "scene": 2,
+      "enabled": true,
+      "active_steps": 26,
+      "overlap_steps": 0,
+      "min_gap_m": 0.0008000000211317894
+    },
+    {
+      "scene": 3,
+      "enabled": false,
+      "active_steps": 0,
+      "overlap_steps": 34,
+      "min_gap_m": -0.0202507952427168
+    },
+    {
+      "scene": 4,
+      "enabled": true,
+      "stationary": true,
+      "active_steps": 0,
+      "overlap_steps": 0,
+      "min_gap_m": 0.019999999994997353
+    }
+  ],
+  "notes": "IPOPT issued an intermediate trial NaN warning and recovered; all accepted steps converged. Exact interior witnesses prove true tetrahedral overlap. Swept AABB parity uses identical floating bounds and does not prove exact padded geometry. Positive orientation alone does not establish global injectivity. Raw local archive includes all trajectories, witnesses, CSVs and logs. No measured acceleration."
+}
