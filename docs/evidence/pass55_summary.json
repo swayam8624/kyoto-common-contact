@@ -1,0 +1,51 @@
+{
+  "scope": "Local bounded compiled-model cache and rejected sparse-sweep alternative",
+  "matched_live_blocks": 8,
+  "matched_live_runs": 16,
+  "matched_live_leaves": 260,
+  "matched_live_pair_intervals": 142464,
+  "parity": "bitwise state/velocity and exact clocks and discovery receipts within every completed matched block",
+  "vertex": {
+    "four_entry_ratio": 0.6682245282995192,
+    "four_entry_blocks": 2,
+    "twelve_entry_ratio": 1.0077263114847494,
+    "twelve_entry_blocks": 4,
+    "base_models": 8,
+    "four_entry_models": 4,
+    "twelve_entry_models": 8
+  },
+  "replica8": {
+    "four_entry_ratio": 0.6902378916936358,
+    "twelve_entry_ratio": 1.0870754020986402,
+    "blocks_per_capacity": 1,
+    "base_models": 9,
+    "four_entry_models": 4,
+    "twelve_entry_models": 9
+  },
+  "sweep": {
+    "steps": 61,
+    "pairs": 201635,
+    "receipt_mismatches": 0,
+    "ratios": [
+      0.9648287947478882,
+      0.9346990022478486,
+      0.9508417542761315,
+      0.9166775319627443,
+      0.923917114354919
+    ],
+    "scope": "single sequential replay per arm, excludes construction; slower, not promoted"
+  },
+  "controls": {
+    "invalid_capacities": 4,
+    "late_rollback": true,
+    "recovery": true,
+    "cap_one_evictions": 3
+  },
+  "source_blobs": {
+    "bounded": "24eaf868eee0045112f9859b2c5ab8d7815007aa",
+    "benchmark": "85aca04d3efd68f974ae1cb428db3a23da5097fa",
+    "sweep": "29e316646443be49f7b810359ad0dcd33ca7b95f",
+    "replay": "e9bd1575124e89209baa0f1dbdf2de008d67e678"
+  },
+  "limitations": "Two timed-out live campaigns; complete matched blocks only. No live 78/120/156-cell timing results. Twelve is experimental capacity, no RSS claim. Plane memoization had zero hits. No new reliable speedup. Earlier archived schedules differ from current environment, matched fresh arms agree. Prior macOS jobs still queued."
+}
