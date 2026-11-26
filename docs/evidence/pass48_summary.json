@@ -1,0 +1,53 @@
+{
+  "scope": "Locally executed exact integer fixed-axis region witness and fresh independent FEM integration; restricted disjoint-region scope",
+  "controls": {
+    "total": 662,
+    "accepted": 50,
+    "rejected_or_unknown": 612,
+    "mismatch": 0
+  },
+  "physical_witnesses": 128,
+  "accepted_fixed_axis": 121,
+  "fallback": 7,
+  "gate_steps": 64,
+  "witness_geomean": 4.9498837379479195,
+  "gate_geomean_vs_pass46": 1.7964624311479458,
+  "scenes": [
+    {
+      "scene": 0,
+      "witness": 5.059704206428328,
+      "gate": 1.552153536181643
+    },
+    {
+      "scene": 2,
+      "witness": 5.111856158277961,
+      "gate": 1.713536906811657
+    },
+    {
+      "scene": 4,
+      "witness": 4.689010897092611,
+      "gate": 2.1798483268709314
+    }
+  ],
+  "live": {
+    "scene": 2,
+    "cells": 120,
+    "steps_per_arm": 16,
+    "active_steps": 5,
+    "region_certificates": 48,
+    "orientation_certificates": 1920,
+    "unresolved": 0,
+    "bitwise_states": true,
+    "byte_identical_csv": true,
+    "reference_ns": 8615024182,
+    "optimized_ns": 7500344305,
+    "min_j": 0.8221039146348232,
+    "min_gap": 0.0008000000437427685
+  },
+  "source_blobs": {
+    "region": "00cd7e07bb27bc563d82342c2e8fac5e2ade9bc5",
+    "replay": "1222ef22aa6765132d272f04aaa150510b0e9ba1",
+    "live": "260f97b484a28c3699bcb7c7856b7b28ab2e893b"
+  },
+  "limitations": "Recursive exact fallback unchanged. Live timings single sequential run each; no reliable whole-solver speedup claim. Original 11-backend Pass 47, stock IPC, Metal and cross-platform CI remain unverified."
+}
