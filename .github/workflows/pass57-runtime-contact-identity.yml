@@ -1,0 +1,51 @@
+name: Pass 57 runtime contact identity
+on:
+  push:
+    branches: [research/pass57-runtime-contact-identity]
+  pull_request:
+    paths:
+      - 'tools/pass57*'
+      - '.github/workflows/pass57-runtime-contact-identity.yml'
+  workflow_dispatch:
+jobs:
+  validation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          python tools/pass57_controls.py
+          python tools/pass57_benchmark.py vertex57 vertex --blocks 2
+          python tools/pass57_benchmark.py replica57 replica8 --blocks 1
+          python tools/pass57_benchmark.py replica57_reverse replica8 --blocks 1 --reverse
+          python tools/pass57_sparsity.py > sparsity57.json
+          python tools/pass57_audit.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('audit.json').read_text())
+          assert len(rows)==4
+          assert all(r['position_error']<1e-10 and r['velocity_error']<1e-8 for r in rows)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass57-${{ matrix.os }}
+          path: |
+            vertex57/
+            replica57/
+            replica57_reverse/
+            sparsity57.json
+            audit.json
+          if-no-files-found: error
