@@ -6,6 +6,7 @@ on:
     paths:
       - 'apps/pass60*'
       - 'tools/pass60*'
+      - 'tests/pass60*'
       - '.github/workflows/pass60-metal.yml'
   workflow_dispatch:
 permissions:
@@ -26,6 +27,8 @@ jobs:
       - run: |
           g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass60_host_replay.cpp -o pass60_host
           ./pass60_host archived/inputs > scalar.csv
+          g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/pass60_kernel_controls.cpp -o pass60_controls
+          ./pass60_controls > kernel_controls.json
           python3 tools/pass60_audit.py scalar.csv archived/native.csv --out scalar.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -34,6 +37,7 @@ jobs:
           path: |
             scalar.csv
             scalar.json
+            kernel_controls.json
           if-no-files-found: error
   metal:
     runs-on: macos-latest
