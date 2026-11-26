@@ -1,0 +1,45 @@
+name: Pass 45 transactional independent FEM
+on:
+  push:
+    branches: [research/pass45-transactional-independent-fem]
+  workflow_dispatch:
+jobs:
+  transaction:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: python tools/pass45_transaction.py
+      - run: python tools/pass44_scaled_contact.py reference 16 2
+      - run: python tools/pass45_live.py gated 16 2
+      - run: |
+          python - <<'PY'
+          import numpy as np
+          import json
+          from pathlib import Path
+          a=np.load('reference/scene2.npz')
+          b=np.load('gated/scene2.npz')
+          assert np.array_equal(a['states'],b['states'])
+          s=json.loads(Path('gated/summary.json').read_text())[0]
+          assert s['transaction_steps']==16 and s['unresolved']==0
+          print('PASS bitwise physical parity and transaction completion')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass45-${{ matrix.os }}
+          path: |
+            reference/
+            gated/
+          if-no-files-found: error
