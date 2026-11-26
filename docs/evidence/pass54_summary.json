@@ -1,0 +1,87 @@
+{
+  "scope": "Locally executed adaptive automatic contact discovery, frictionless implicit FEM, whole-mesh sufficient certificates and atomic macrostep publication.",
+  "cases": [
+    {
+      "name": "edge",
+      "cells": 4,
+      "macros": 5,
+      "leaves": 10,
+      "active": 2,
+      "pairs": 60,
+      "max_discovered": 1
+    },
+    {
+      "name": "vertex_rotated",
+      "cells": 8,
+      "macros": 5,
+      "leaves": 20,
+      "active": 2,
+      "pairs": 560,
+      "max_discovered": 3
+    },
+    {
+      "name": "replica8",
+      "cells": 64,
+      "macros": 5,
+      "leaves": 19,
+      "active": 2,
+      "pairs": 38304,
+      "max_discovered": 24
+    },
+    {
+      "name": "u78",
+      "cells": 78,
+      "macros": 4,
+      "leaves": 7,
+      "active": 4,
+      "pairs": 21021,
+      "max_discovered": 89
+    },
+    {
+      "name": "comb120_rotated",
+      "cells": 120,
+      "macros": 4,
+      "leaves": 8,
+      "active": 2,
+      "pairs": 57120,
+      "max_discovered": 12
+    },
+    {
+      "name": "u156_retry",
+      "cells": 156,
+      "macros": 4,
+      "leaves": 7,
+      "active": 4,
+      "pairs": 84630,
+      "max_discovered": 275
+    }
+  ],
+  "main_macrosteps": 27,
+  "main_leaves": 67,
+  "total_committed_leaves": 71,
+  "active_leaves": 16,
+  "discovery_retries": 16,
+  "rejected_macro_trials": 40,
+  "pair_intervals": 201695,
+  "fresh_archive_reaudit_pair_intervals": 201695,
+  "unresolved_accepted": 0,
+  "bitwise_main_reference_parity_cases": 6,
+  "rollback_controls": 2,
+  "recovery_controls": 2,
+  "source_blobs": {
+    "adaptive": "f2f1d4e5381fcbdb849549df2be6433b2cee8bfd",
+    "verify": "0d38c42e3ff97f84e89a9c43797ba769699a53a9",
+    "reaudit": "f539cb2eeb17e2050a27d225e89f946443704876"
+  },
+  "native_pass47": {
+    "ubuntu_gcc_job": "success",
+    "run_id": 45748198198,
+    "job_id": 139669297468,
+    "artifact_id": 15087213071,
+    "rows": 36300,
+    "matched_groups": 3300,
+    "macos_job": "queued",
+    "note": "Verified CI job and logs; raw native timing artifact not analyzed here."
+  },
+  "limitations": "First 156-cell attempt completed forward macrosteps but timed out during independent replay, excluded; second full run passed. Compiled NLP cache unbounded. Single host local tests; no arbitrary physical accuracy, convergence or performance claim. Metal and stock IPC not validated. Pass54 cross-platform CI pending."
+}
