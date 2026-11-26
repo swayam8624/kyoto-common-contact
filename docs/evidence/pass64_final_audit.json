@@ -1,0 +1,103 @@
+{
+  "scope": "Final frozen CPU evidence audit; no claim of independent OS, laboratory, GPU or whole-solver IPC superiority",
+  "frozen_parent": "9eb246767cb4ad9ca1a7cfb1beb669e0116f95a5",
+  "selected": {
+    "native_query": {
+      "path": "include/kyoto/fused_axis_sap.hpp",
+      "blob": "9ef6d5f6e2c7945e23e84754f90d5c9b1ff2ed84"
+    },
+    "physical_reference": {
+      "path": "tools/pass56_parametric.py",
+      "blob": "7c6e9ebcc1734faabee474f66250d772a34626b7"
+    },
+    "mesh_gate": {
+      "path": "tools/pass50_mesh_gate.py",
+      "blob": "6f37016ca521d71dcc95e00b7e0aad9ad8818a22"
+    },
+    "note": "Separate validated CPU query and independent physical code paths; not a new integrated solver benchmark."
+  },
+  "archive_audit": {
+    "archives": 19,
+    "zip_crc_pass": 19,
+    "listed_hashes_matched": 753,
+    "limitations": "Pass42 lacks original internal manifest; Pass59 input-only manifest; older archive hashes are integrity, not independent provenance."
+  },
+  "native_artifacts": {
+    "ids": [
+      15087213071,
+      15100385729,
+      15101505043,
+      15100079563,
+      15100748655
+    ],
+    "sha256_verified": 5,
+    "rows": 125820,
+    "csv_byte_parity": true
+  },
+  "local_reproduction": {
+    "physical_cases": 12,
+    "bitwise_trajectory_parity": 12,
+    "decision_receipts_equal": 12,
+    "rollback_controls": 12,
+    "macrosteps": 96,
+    "accepted_leaves": 211,
+    "fresh_pair_checks": 3155,
+    "statistics_byte_identical": true,
+    "png_pixel_identical": 12,
+    "svg_regenerated": 12,
+    "verified_source_blobs": 7,
+    "ablation": {
+      "blocks": 50,
+      "replays": 100,
+      "pair_checks": 178456,
+      "non_timing_receipts_equal": true,
+      "retained_proposals": 2528,
+      "cold_proposals": 15648,
+      "equal_case_speedup": 3.286630681526461,
+      "replica64_speedup": 5.557335770134046
+    }
+  },
+  "ci": {
+    "pass58": {
+      "run": 45783326412,
+      "ubuntu_all_three": "success",
+      "u156_reverse_repetition": "success",
+      "u156_memory_ratios": [
+        1.0063705453114118,
+        1.003418005463796
+      ],
+      "u156_speed_ratios": [
+        0.6365474643256195,
+        0.6097628270597677
+      ]
+    },
+    "pass59": {
+      "run": 45783966923,
+      "ubuntu": "success",
+      "macos": "queued"
+    },
+    "pass60": {
+      "run": 45785649005,
+      "scalar": "success",
+      "metal": "queued"
+    },
+    "pass61": {
+      "run": 45786247596,
+      "gcc": "success",
+      "clang": "success",
+      "stock": "success",
+      "physical": "success"
+    }
+  },
+  "claims": {
+    "original_fused_vs_stock_ipc": 1.9771778277480097,
+    "heldout_fused_vs_stock_ipc": 3.3311843603361253,
+    "scope": "Paid broad-phase query, tested suites; fixed-suite confidence only. Dense 8-copy original loses to IPC, small held-out exhaustive competitive; no universal superiority, physical accuracy or statistical population claim."
+  },
+  "archive": {
+    "filename": "kyoto_pass64_final_evidence.zip",
+    "sha256": "9061f4af40866fdf8c255ea626b3bef6915165fc443120d814c39ac0800af2d6",
+    "audit_script_blob": "e3065138e62ef78fd335ccf3f332bc01135a75ba"
+  },
+  "status": "CPU research cycle frozen within tested scope; actual Metal and native macOS unverified; no main merge."
+}
