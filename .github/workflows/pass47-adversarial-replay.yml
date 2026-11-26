@@ -2,6 +2,11 @@ name: Pass 47 original broad-phase adversarial replay
 on:
   push:
     branches: [research/pass47-adversarial-comparison]
+  pull_request:
+    paths:
+      - 'apps/pass47_repository_replay.cpp'
+      - 'tools/pass47_export_inputs.py'
+      - '.github/workflows/pass47-adversarial-replay.yml'
   workflow_dispatch:
 jobs:
   native:
