@@ -1,0 +1,73 @@
+{
+  "scope": "Runtime contact identities via symbolic gather; exact mesh gate unchanged. Experimental alternative not promoted.",
+  "matched_blocks": 4,
+  "matched_runs": 8,
+  "accepted_leaves": 132,
+  "recertified_pair_intervals": 138880,
+  "unresolved": 0,
+  "schedule_and_decision_parity": true,
+  "max_position_error_m": 7.444132116285473e-16,
+  "max_velocity_error_m_s": 6.084022174945858e-14,
+  "vertex": {
+    "ratios": [
+      1.573646477842593,
+      1.151804801082517
+    ],
+    "geomean": 1.346303668711369,
+    "models": [
+      2,
+      2
+    ]
+  },
+  "replica8": {
+    "ratios": [
+      0.3926681487545154,
+      0.3948425366597179
+    ],
+    "geomean": 0.3937538417840622,
+    "models": [
+      3,
+      3
+    ],
+    "jac_nnz": [
+      1224,
+      13608
+    ],
+    "hess_nnz": [
+      2664,
+      8832
+    ]
+  },
+  "controls": {
+    "different_identity_solves": 4,
+    "bitwise_state_parity": true,
+    "model_compiles": [
+      2,
+      1
+    ],
+    "rollback": true,
+    "recovery": true
+  },
+  "prior_ci": {
+    "pass55_ubuntu_all_five": "success",
+    "run_id": 45777515119,
+    "pass56_comb120_ubuntu": "success",
+    "pass56_run_id": 45778121645,
+    "comb120_models": [
+      5,
+      4
+    ],
+    "comb120_ratios": [
+      1.0128774700456817,
+      1.0677066890151605
+    ]
+  },
+  "limitations": "Two matched blocks per geometry; no general timing or memory claim. Dynamic indexing densifies derivatives and regresses larger fixture; retain Pass56 specialized identities for scalable default. No new connected 78/120/156-cell timings for Pass57. macOS and hardware gates outstanding.",
+  "source_blobs": {
+    "identity": "01de5fecb82f0f82e53d512ab23f4a931ee93164",
+    "benchmark": "b66535967cb853b58996fe57f75236c6c0a906a1",
+    "controls": "41baa873d151c54a46d459059ec103b1d1bb61e0",
+    "sparsity": "f4ff556c949b94864206b8d3b3560b5e608888fe",
+    "audit": "9f7ca78e835faee24419ef3ec67c04aa51ab4e17"
+  }
+}
