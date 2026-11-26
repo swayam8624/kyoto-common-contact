@@ -1,0 +1,40 @@
+name: Pass 44 scaled connected-body physical contact
+on:
+  push:
+    branches: [research/pass44-scaled-self-contact]
+  workflow_dispatch:
+jobs:
+  physics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          python tools/pass44_scaled_contact.py u_enabled 32 0
+          python tools/pass44_scaled_contact.py u_disabled 32 1
+          python tools/pass44_scaled_contact.py comb_enabled 24 2
+          python tools/pass44_scaled_contact.py comb_disabled 24 3
+          python tools/pass44_scaled_contact.py comb_static 8 4
+          mkdir completed
+          cp u_*/scene*.npz comb_*/scene*.npz completed/
+          python tools/pass44_audit.py completed
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass44-${{ matrix.os }}
+          path: |
+            u_*/
+            comb_*/
+            completed/
+          if-no-files-found: error
