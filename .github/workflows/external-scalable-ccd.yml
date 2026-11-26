@@ -1,0 +1,81 @@
+name: External Scalable CCD evaluation
+on:
+  push:
+    branches: [research/external-scalable-ccd]
+  pull_request:
+    paths:
+      - 'tools/external_ccd*'
+      - 'apps/external*'
+      - '.github/workflows/external-scalable-ccd.yml'
+  workflow_dispatch:
+jobs:
+  labelled_queries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Continuous-Collision-Detection/Sample-Scalable-CCD-Data
+          ref: d1de594b017d98b37be67f02f74e541e74804109
+          path: external-data
+          persist-credentials: false
+          sparse-checkout: |
+            /*/queries/
+            /*/mma_bool/
+          sparse-checkout-cone-mode: false
+      - run: |
+          g++ -std=c++23 -O2 -ffp-contract=off -fno-fast-math -Iinclude apps/external_ccd_query_check.cpp -o query_check
+          python3 tools/external_ccd_queries.py external-data ./query_check query-results
+          git -C external-data rev-parse HEAD > query-results/data-revision.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: external-labelled-queries
+          path: query-results/
+  scene_comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Continuous-Collision-Detection/Sample-Scalable-CCD-Data
+          ref: d1de594b017d98b37be67f02f74e541e74804109
+          path: external-data
+          persist-credentials: false
+          sparse-checkout: |
+            /*/frames/
+          sparse-checkout-cone-mode: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Continuous-Collision-Detection/Scalable-CCD
+          ref: 049d8af986c9cc115e013df7c8af791c2a513dcc
+          path: external-upstream
+          persist-credentials: false
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libtbb-dev libeigen3-dev libspdlog-dev
+          python3 -m venv .external-venv
+          .external-venv/bin/pip install numpy==2.3.5 plyfile==1.1.3
+          .external-venv/bin/python tools/external_ccd_export.py external-data external-inputs
+          cmake -S tools/external_ccd -B external-build -DCMAKE_BUILD_TYPE=Release -DUPSTREAM_DIR="$PWD/external-upstream"
+          cmake --build external-build --parallel 2
+          mkdir -p external-results
+          git -C external-upstream rev-parse HEAD > external-results/upstream-revision.txt
+          git -C external-data rev-parse HEAD > external-results/data-revision.txt
+          lscpu > external-results/environment.txt
+          for p in external-inputs/*.txt; do
+            name="$(basename "$p" .txt)"
+            scope="${name##*_}"
+            for threads in 1 2; do
+              ./external-build/kyoto_external "$p" "$scope" "$threads" > "external-results/${name}_${threads}.csv"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: external-scene-comparison
+          path: |
+            external-inputs/
+            external-results/
