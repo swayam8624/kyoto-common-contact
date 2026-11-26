@@ -1,0 +1,42 @@
+name: Pass 58 fresh-process memory and performance
+on:
+  push:
+    branches: [research/pass58-large-mesh-memory]
+  pull_request:
+    paths:
+      - 'tools/pass58*'
+      - '.github/workflows/pass58-memory.yml'
+  workflow_dispatch:
+jobs:
+  paired:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        geometry: [u78, comb120, u156]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          kind=${{ matrix.geometry }}
+          python tools/pass58_worker.py "${kind}_0_base" "$kind" base
+          python tools/pass58_worker.py "${kind}_0_sparse" "$kind" sparse
+          python tools/pass58_worker.py "${kind}_1_sparse" "$kind" sparse
+          python tools/pass58_worker.py "${kind}_1_base" "$kind" base
+          python tools/pass58_audit.py . --kinds "$kind"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass58-${{ matrix.os }}-${{ matrix.geometry }}
+          path: |
+            ${{ matrix.geometry }}_*/
+            audit58.json
+          if-no-files-found: error
