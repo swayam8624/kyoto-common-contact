@@ -1,0 +1,37 @@
+name: Pass 42 exact region path audit
+on:
+  push:
+    branches: [research/pass42-exact-region-path]
+    paths:
+      - 'tools/pass42*'
+      - '.github/workflows/pass42-exact-region-path.yml'
+  pull_request:
+    paths:
+      - 'tools/pass42*'
+      - '.github/workflows/pass42-exact-region-path.yml'
+  workflow_dispatch:
+jobs:
+  certificate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: python tools/pass42_region_certificate.py --self-test
+      - run: python tools/pass42_physical_replay.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass42-${{ matrix.os }}
+          path: physical/
+          if-no-files-found: error
