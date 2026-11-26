@@ -10,9 +10,11 @@ import numpy as np
 
 def det(a,b,c):
     return a[0]*(b[1]*c[2]-b[2]*c[1])-a[1]*(b[0]*c[2]-b[2]*c[0])+a[2]*(b[0]*c[1]-b[1]*c[0])
+
 def columns(x):
     a=[tuple(Q(float(y)) for y in r) for r in x]
     return [tuple(i-j for i,j in zip(a[k],a[0])) for k in (1,2,3)]
+
 def orientation(a,b,depth=10):
     # 3 times cubic Bernstein coefficients of det((1-t)A+tB).
     u,v,w=columns(a);p,q,r=columns(b)
