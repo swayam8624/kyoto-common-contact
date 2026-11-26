@@ -1,0 +1,113 @@
+{
+  "scope": "Locally executed independent FEM, exact dyadic whole tetrahedron mesh certification of linear paths, selected shared-edge and shared-vertex physical response, timestep refinement and balanced full solver timings",
+  "pass50": {
+    "archived_pair_intervals": 180210,
+    "first_fixed_axis_unresolved": 26,
+    "after_exact_fallback_unresolved": 0,
+    "archived": {
+      "aabb_culled": 144279,
+      "disjoint_certified": 13541,
+      "shared_vertex": 10966,
+      "shared_edge": 7774,
+      "shared_face": 3650
+    },
+    "fresh_leaves": 15,
+    "fresh_pair_intervals": 141750,
+    "fresh_unresolved": 0,
+    "fresh_bitwise_parity": true,
+    "overlap_controls_rejected": 4,
+    "legitimate_shared_controls_accepted": 3,
+    "tunnelling_control_rejected": true,
+    "shared_contact": {
+      "edge": {
+        "enabled_steps": 80,
+        "disabled_steps": 80,
+        "active_steps": 4,
+        "enabled_overlap": 0,
+        "disabled_overlap": 62
+      },
+      "vertex": {
+        "enabled_steps": 80,
+        "disabled_steps": 80,
+        "active_steps": 4,
+        "enabled_overlap": 0,
+        "disabled_overlap": 62
+      },
+      "enabled_unresolved": 0,
+      "margin_m": 0.0004
+    }
+  },
+  "pass51": {
+    "scenes": 2,
+    "steps": 120,
+    "timestep_ms": [
+      4,
+      2,
+      1,
+      0.5
+    ],
+    "time_ms": 16,
+    "reference_ms": 0.5,
+    "final_coordinate_rms_mm": {
+      "thick_u": [
+        0.4795869017394113,
+        0.2443870977925841,
+        0.09150759899605374,
+        0
+      ],
+      "comb": [
+        0.17167338436699114,
+        0.09826470863160704,
+        0.04064037020555839,
+        0
+      ]
+    },
+    "final_velocity_rms_m_s": {
+      "thick_u": [
+        0.12975209706585294,
+        0.0754655760370554,
+        0.03388174369097048,
+        0
+      ],
+      "comb": [
+        0.12871813679458047,
+        0.08286094744871658,
+        0.026558392896977468,
+        0
+      ]
+    },
+    "whole_mesh_pair_intervals": 1153800,
+    "unresolved": 0
+  },
+  "pass52": {
+    "scenes": 2,
+    "arms": 3,
+    "blocks_per_scene": 3,
+    "steps_per_run": 4,
+    "timed_runs": 18,
+    "timed_steps": 72,
+    "warmup_runs": 6,
+    "state_and_receipt_parity": true,
+    "integer_speed_ratio": {
+      "thick_u": 1.1034664895333473,
+      "comb": 1.060651471963638,
+      "equal_scene_geomean": 1.0818471964127343
+    },
+    "whole_mesh_speed_ratio": {
+      "thick_u": 0.4382357512740392,
+      "comb": 0.7167652445441857,
+      "equal_scene_geomean": 0.5604570950839517
+    },
+    "scope": "Includes gate construction and physical integration; excludes common FEM model setup; whole mesh has stronger scope"
+  },
+  "source_blobs": {
+    "mesh": "6f37016ca521d71dcc95e00b7e0aad9ad8818a22",
+    "live": "93571ee725c0356a92a6fb505315251aeccda076",
+    "replay": "3f7d3afba00f24452f059fdeccf8881b64528bf9",
+    "edge": "189c331b4dde243849a5654d7667ef93550bed6b",
+    "vertex": "6ffc2b18c531949f6809298a44ea1151931d40e3",
+    "convergence": "11e89f990c928846134d08fa2b7ae273dae174d0",
+    "benchmark": "f939fed74c31754200df39080d6fbbcd44e506cd"
+  },
+  "limitations": "Certificate is sufficient, not complete; all tested mesh pairs certified, not universal collision response. Shared contact constraints selected for two fixtures, no dynamic discovery of arbitrary new contacts. Finest solution numerical reference only. Timing one Linux host, 3 matched blocks per geometry, no general statistical claim. Original production 11-backend CI and stock IPC/real Metal solver integration remain unverified. Raw local evidence distributed in archive."
+}
