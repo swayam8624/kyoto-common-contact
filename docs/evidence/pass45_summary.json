@@ -1,0 +1,28 @@
+{
+  "scope": "Restricted transactional independent implicit FEM, all declared disjoint region pairs; no universal same-body injectivity or adaptive retry",
+  "scene": 2,
+  "cells": 120,
+  "nodes": 84,
+  "regions": 4,
+  "pairs": 3,
+  "steps": 16,
+  "active_steps": 5,
+  "orientation_certificates": 1920,
+  "region_certificates": 48,
+  "unresolved": 0,
+  "standalone_rejected_controls": 6,
+  "standalone_valid_commits": 2,
+  "live_injected_rejections": 2,
+  "rollback_verified": true,
+  "trajectory_bitwise_equal_to_pass44": true,
+  "transaction_time": "1152921504606847/72057594037927936",
+  "min_j": 0.8221039146348232,
+  "min_gap": 0.0008000000437427685,
+  "max_momentum_error": 3.9726625818651804e-11,
+  "max_kkt": 4.115048194495253e-11,
+  "source_blobs": {
+    "transaction": "342db1d15a98b4d949d30e7b17fdd336cd7aeea1",
+    "live": "9cc2254ab51a72eccfdf59be156c83ec5407d4b3"
+  },
+  "limitations": "Single-threaded in-process gate; does not certify adjacent or within-region collisions, no automatic reintegration after unsafe trial, not a measured acceleration. Cross-platform CI pending."
+}
