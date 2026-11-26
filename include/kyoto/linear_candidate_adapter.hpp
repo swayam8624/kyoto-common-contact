@@ -6,6 +6,8 @@
 // A change of row order/connectivity/epoch invalidates the retained BVH.
 // No physical response, nonlinear CCD, or additional filters are implied.
 #include "kyoto/refit_feature_hierarchy.hpp"
+#include "kyoto/cached_axis_sap.hpp"
+#include "kyoto/fused_axis_sap.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -17,13 +19,25 @@ namespace kyoto::contact::atlas {
 using IndexedEdge = std::array<std::size_t,2>;
 using IndexedFace = std::array<std::size_t,3>;
 
+// External candidate producers receive the same validated universal
+// collision mesh, including outward spatial padding. This optional
+// hook is deliberately audit-only: a backend must match exhaustive
+// canonical candidates before any result may reach a physical solver.
+using ExternalCandidateProducer = f::Result (*)(const f::Mesh&);
+
 class LinearCandidateAdapter {
     // Retained full-refit baseline; selective or frontier optimizations
     // should be compared separately, not silently change this boundary.
     RefitHierarchy hierarchy_;
+    persistent::CachedAxisSweep cached_sap_;
+    bool use_cached_sap_{};
+    bool spatial_first_{};
+    bool use_fused_{};
+    persistent::FusedAxisSweep fused_;
 public:
-    std::size_t rebuilds() const { return hierarchy_.rebuilds(); }
-    std::size_t refits() const { return hierarchy_.refits(); }
+    explicit LinearCandidateAdapter(bool cached_sap=false,bool spatial_first=false,bool fused=false):cached_sap_(spatial_first),use_cached_sap_(cached_sap),spatial_first_(spatial_first),use_fused_(fused){if((spatial_first&&!cached_sap)||(fused&&(!cached_sap||!spatial_first)))throw std::invalid_argument("spatial-first requires cached SAP");}
+    std::size_t rebuilds() const { return use_fused_?fused_.rebuilds():use_cached_sap_?cached_sap_.rebuilds():hierarchy_.rebuilds(); }
+    std::size_t refits() const { return use_fused_?fused_.warm_frames():use_cached_sap_?cached_sap_.warm_frames():hierarchy_.refits(); }
 
     f::Result query(std::span<const Vec3> start,
                     std::span<const Vec3> end,
@@ -31,7 +45,8 @@ public:
                     std::span<const IndexedFace> faces,
                     std::uint64_t epoch=1,
                     double per_vertex_padding=0.0,
-                    bool exhaustive_reference=false) {
+                    bool exhaustive_reference=false,
+                    ExternalCandidateProducer external=nullptr) {
         if(start.size()!=end.size() || epoch==0 ||
            !std::isfinite(per_vertex_padding) || per_vertex_padding<0)
             throw std::invalid_argument("invalid indexed linear motion");
@@ -67,9 +82,18 @@ public:
         // Query state belongs to this adapter alone. If any exception
         // occurs during a hierarchy mutation, discard its caches so
         // the next valid call cannot observe a partly updated tree.
+        if(external){
+            const auto built=f::build(mesh);
+            auto result=external(mesh);
+            f::normalize(result);
+            const auto truth=f::exhaustive(built);
+            if(result.pairs!=truth.pairs)
+                throw std::runtime_error("external candidate producer differs from exhaustive contract");
+            return result;
+        }
         if(exhaustive_reference)return f::exhaustive(mesh);
-        try { return hierarchy_.query(mesh); }
-        catch(...) { hierarchy_=RefitHierarchy{}; throw; }
+        try { return use_fused_?fused_.query(mesh):use_cached_sap_?cached_sap_.query(mesh):hierarchy_.query(mesh); }
+        catch(...) { hierarchy_=RefitHierarchy{};cached_sap_=persistent::CachedAxisSweep{spatial_first_};fused_=persistent::FusedAxisSweep{}; throw; }
     }
 };
 } // namespace kyoto::contact::atlas

@@ -507,13 +507,13 @@ public:
                             bool span_descent=false,
                             bool prechecked_children=false)
         :selective_boxes_(dense_motion_fast_path),
-         retain_feature_lookup_(retain_feature_lookup),
+         selective_motion_(selective_motion),
+         span_descent_(span_descent),
+         prechecked_children_(prechecked_children),
          maintain_pair_cut_(maintain_pair_cut),
          compact_separated_vf_(compact_separated_vf),
          frontier_budget_factor_(frontier_budget_factor),
-         selective_motion_(selective_motion),
-         span_descent_(span_descent),
-         prechecked_children_(prechecked_children){
+         retain_feature_lookup_(retain_feature_lookup){
         if(frontier_budget_factor_<1||frontier_budget_factor_>8)
             throw std::invalid_argument("frontier budget factor must be 1..8");
         if(selective_motion_&&!retain_feature_lookup_)

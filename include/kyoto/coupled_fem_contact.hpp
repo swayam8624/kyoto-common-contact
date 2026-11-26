@@ -12,6 +12,9 @@
 #include "kyoto/rounded_relative_triangle_certificate.hpp"
 #include "kyoto/nonincident_self_contact.hpp"
 #include "kyoto/typed_self_contact_response.hpp"
+#include "kyoto/initial_tet_separation.hpp"
+#include "kyoto/cross_cell_sweep.hpp"
+#include "kyoto/volume_boundary_topology.hpp"
 #include <optional>
 #include <vector>
 
@@ -23,15 +26,24 @@ struct CoupledFEMSettings {
     std::size_t max_leaves{10000};
     double min_dt{1e-10};
     bool hierarchy{false};
+    kyoto::contact::atlas::ExternalCandidateProducer external_self_candidates{}; // audited only
+    bool fast_relative_projection{false}; // identical scalar-product interval specialization
+    bool reuse_cross_geometry{false}; // cache witnesses only within one impulse call
+    bool fused_self_sap{false}; // optional fused active-list spatial-first sweep
+    bool spatial_first_self_sap{false}; // test overlap before incident/mask filtering
+    bool cached_self_sap{false}; // optional topology-cached axis SAP for typed self contact
     bool typed_self_contact{false}; // opt-in VF/EE response and safety
     bool nonincident_self_contact{false}; // restricted opt-in; no adjacent-feature guarantee
+    bool initial_cross_sweep{false}; // exact same cross-volume predicate, bipartite sweep
+    bool initial_volume_audit{true}; // initial cross-body volume disjointness, not self-injectivity
     bool rounded_surface{true}; // conditional IEEE safety gate; false is legacy control
 };
 struct CoupledFEMStats {
     double integrated_dt{},normal_impulse{},contact_kinetic_change{};
     std::size_t accepted_leaves{},rejected_geometry{},rejected_tets{},
         impulse_updates{},box_tests{},certificate_tests{},interval_nodes{},orientation_nodes{},
-        rounded_directions{},rounded_projections{};
+        rounded_directions{},rounded_projections{},volume_box_tests{},volume_certificates{},
+        volume_directions{},volume_projections{};
     SelfContactStats self_a{},self_b{}; // separate internal impulses, not cross-body transfer
     V3 impulse_on_a{};
     double min_j{std::numeric_limits<double>::infinity()};
@@ -44,6 +56,33 @@ struct CoupledFEMLeaf {
     double dt{};
     unsigned depth{};
     CoupledFEMStats receipt;
+};
+// Caller-owned optional warm state. The context caches only candidate
+// topology and hierarchy data; it never owns committed physical bodies.
+// A failed macrostep clears both auditors, so no rejected geometry can
+// be mistaken for a previously accepted source. Not thread-safe.
+class CoupledFEMContext {
+    std::optional<TypedSelfAuditor> a_,b_;
+    kyoto::contact::atlas::ExternalCandidateProducer external_{};
+    bool cached_sap_{};
+    bool spatial_first_{};
+    bool fused_{};
+public:
+    void reset() noexcept {a_.reset();b_.reset();external_=nullptr;cached_sap_=false;spatial_first_=false;fused_=false;}
+    void bind(kyoto::contact::atlas::ExternalCandidateProducer p,bool cached_sap=false,bool spatial_first=false,bool fused=false){
+        if(!a_||!b_||p!=external_||cached_sap_!=cached_sap||spatial_first_!=spatial_first||fused_!=fused){reset();a_.emplace(p,cached_sap,spatial_first,fused);b_.emplace(p,cached_sap,spatial_first,fused);external_=p;cached_sap_=cached_sap;spatial_first_=spatial_first;fused_=fused;}
+    }
+    TypedSelfAuditor& first(){return a_.value();}
+    TypedSelfAuditor& second(){return b_.value();}
+    std::size_t mapping_rebuilds()const{
+        return (a_?a_->mapping_rebuilds():0)+(b_?b_->mapping_rebuilds():0);
+    }
+    std::size_t hierarchy_rebuilds()const{
+        return (a_?a_->hierarchy_rebuilds():0)+(b_?b_->hierarchy_rebuilds():0);
+    }
+    std::size_t hierarchy_refits()const{
+        return (a_?a_->hierarchy_refits():0)+(b_?b_->hierarchy_refits():0);
+    }
 };
 namespace coupled_detail {
 using Face = std::array<std::size_t,3>;
@@ -63,7 +102,69 @@ inline void validate_body(const Body& b){
         for(auto i:f)if(i>=b.nodes.size())
             throw std::invalid_argument("invalid coupled FEM face");
     }
+    // Surface CCD is meaningful only when the complete volume boundary
+    // is represented. Winding of supplied triangles is immaterial for
+    // this two-sided contact solver; tetrahedron incidence must agree.
+    std::vector<kyoto::geometry::CellRow> cells;cells.reserve(b.tets.size());
+    for(const auto& t:b.tets)cells.push_back(t.n);
+    (void)kyoto::geometry::validate_volume_boundary_topology(
+        b.nodes.size(),cells,b.surface_faces);
     (void)b.evaluate();
+}
+// A surface-only audit cannot detect a fully contained closed volume.
+// Every cross-body tet pair must have disjoint AABBs or a verified
+// strict separating plane. Nonincident self-volume injectivity is
+// a separate problem; incident cells intentionally share boundaries.
+inline bool initial_cross_volume_safe(const Body& a,const Body& b,CoupledFEMStats& stats,bool sweep=false){
+    using kyoto::geometry::Tetrahedron;
+    struct Box{V3 lo,hi;};
+    auto extend=[](Box& box,V3 p){
+        box.lo={std::min(box.lo.x,p.x),std::min(box.lo.y,p.y),std::min(box.lo.z,p.z)};
+        box.hi={std::max(box.hi.x,p.x),std::max(box.hi.y,p.y),std::max(box.hi.z,p.z)};
+    };
+    auto separated=[](const Box& x,const Box& y){
+        return x.hi.x<y.lo.x||y.hi.x<x.lo.x||x.hi.y<y.lo.y||y.hi.y<x.lo.y||
+               x.hi.z<y.lo.z||y.hi.z<x.lo.z;
+    };
+    auto body_box=[&](const Body& body){
+        Box box{body.nodes.at(0).x,body.nodes.at(0).x};
+        for(const auto& n:body.nodes)extend(box,n.x);
+        return box;
+    };
+    ++stats.volume_box_tests;
+    if(separated(body_box(a),body_box(b)))return true;
+    struct Entry{Tetrahedron p;Box box;};
+    auto entries=[&](const Body& body){
+        std::vector<Entry> out;out.reserve(body.tets.size());
+        for(const auto& t:body.tets){
+            Entry e{};e.box={body.nodes.at(t.n[0]).x,body.nodes.at(t.n[0]).x};
+            for(int i=0;i<4;++i){
+                const auto p=body.nodes.at(t.n[i]).x;
+                e.p[i]={p.x,p.y,p.z};extend(e.box,p);
+            }
+            out.push_back(e);
+        }
+        return out;
+    };
+    const auto aa=entries(a),bb=entries(b);
+    auto certify=[&](const Entry& x,const Entry& y){
+        ++stats.volume_certificates;
+        const auto cert=kyoto::geometry::certify_initial_tet_separation(x.p,y.p);
+        stats.volume_directions+=cert.directions;stats.volume_projections+=cert.projections;
+        return cert.separated;
+    };
+    if(sweep){
+        auto boxes=[](const auto& entries){std::vector<kyoto::geometry::SweptCellBox> out;out.reserve(entries.size());
+            for(const auto& e:entries)out.push_back({{e.box.lo.x,e.box.lo.y,e.box.lo.z},{e.box.hi.x,e.box.hi.y,e.box.hi.z}});
+            return out;};
+        const auto candidates=kyoto::geometry::cross_cell_candidates(boxes(aa),boxes(bb));
+        stats.volume_box_tests+=candidates.overlap_tests;
+        for(const auto& [i,j]:candidates.pairs)if(!certify(aa[i],bb[j]))return false;
+    }else for(const auto& x:aa)for(const auto& y:bb){
+        ++stats.volume_box_tests;
+        if(!separated(x.box,y.box)&&!certify(x,y))return false;
+    }
+    return true;
 }
 inline Triangle3 positions(const Body& b,const Face& f){
     return {b.nodes[f[0]].x,b.nodes[f[1]].x,b.nodes[f[2]].x};
@@ -116,8 +217,32 @@ inline void impulses(Body& a,Body& b,const CoupledFEMSettings& c,
     std::optional<StaticFaceHierarchy> tree;
     if(c.hierarchy)tree.emplace(boxes);
     std::vector<std::size_t> rows;
-    for(unsigned it=0;it<c.impulse_iterations;++it)
-        for(const auto& f:a.surface_faces){
+    struct Witness {std::size_t i,j;RigidFaceContact near;};
+    std::vector<Witness> witnesses;
+    auto apply=[&](const Face& f,const Face& g,const RigidFaceContact& near){
+        auto sa=state(a,f),sb=state(b,g);
+        const auto r=apply_two_triangle_normal_impulse(sa,sb,
+            near.deformable_weights,near.rigid_weights,c.restitution);
+        if(r.normal_impulse==0.)return;
+        for(int k=0;k<3;++k){
+            a.nodes[f[k]].v=sa.v[k];b.nodes[g[k]].v=sb.v[k];
+            a.nodes[f[k]].last_normal_impulse+=r.normal_impulse*near.deformable_weights[k];
+            b.nodes[g[k]].last_normal_impulse+=r.normal_impulse*near.rigid_weights[k];
+        }
+        ++stats.impulse_updates;
+        stats.normal_impulse+=r.normal_impulse;
+        stats.contact_kinetic_change+=r.predicted_kinetic_change;
+        stats.impulse_on_a+=r.impulse_on_a;
+    };
+    // Positions are immutable inside this call. Reuse geometry only,
+    // never velocity-dependent impulses; preserve sequential face order.
+    for(unsigned it=0;it<c.impulse_iterations;++it){
+        if(c.reuse_cross_geometry&&it>0){
+            for(const auto& w:witnesses)apply(a.surface_faces[w.i],b.surface_faces[w.j],w.near);
+            continue;
+        }
+        for(std::size_t i=0;i<a.surface_faces.size();++i){
+            const auto& f=a.surface_faces[i];
             const auto ta=positions(a,f);
             collect_static_face_rows(bounding(ta),activation,boxes,
                 tree?&*tree:nullptr,rows,stats.box_tests);
@@ -125,23 +250,12 @@ inline void impulses(Body& a,Body& b,const CoupledFEMSettings& c,
                 const auto& g=b.surface_faces[j];
                 const auto near=triangle_triangle_closest(ta,positions(b,g));
                 if(near.distance>activation)continue;
-                if(!(near.distance>c.skin))
-                    throw std::runtime_error("coupled FEM source violates skin");
-                auto sa=state(a,f),sb=state(b,g);
-                const auto r=apply_two_triangle_normal_impulse(sa,sb,
-                    near.deformable_weights,near.rigid_weights,c.restitution);
-                if(r.normal_impulse==0.)continue;
-                for(int k=0;k<3;++k){
-                    a.nodes[f[k]].v=sa.v[k];b.nodes[g[k]].v=sb.v[k];
-                    a.nodes[f[k]].last_normal_impulse+=r.normal_impulse*near.deformable_weights[k];
-                    b.nodes[g[k]].last_normal_impulse+=r.normal_impulse*near.rigid_weights[k];
-                }
-                ++stats.impulse_updates;
-                stats.normal_impulse+=r.normal_impulse;
-                stats.contact_kinetic_change+=r.predicted_kinetic_change;
-                stats.impulse_on_a+=r.impulse_on_a;
+                if(!(near.distance>c.skin))throw std::runtime_error("coupled FEM source violates skin");
+                if(c.reuse_cross_geometry&&c.impulse_iterations>1)witnesses.push_back({i,j,near});
+                apply(f,g,near);
             }
         }
+    }
 }
 inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& b1,
                       const CoupledFEMSettings& c,CoupledFEMStats& stats){
@@ -167,7 +281,7 @@ inline bool swept_safe(const Body& a0,const Body& a1,const Body& b0,const Body& 
             ++stats.certificate_tests;
             if(c.rounded_surface){
                 const auto cert=certify_rounded_relative_triangle_pair(
-                    path,paths[j],c.skin,c.interval_depth);
+                    path,paths[j],c.skin,c.interval_depth,c.fast_relative_projection);
                 stats.interval_nodes+=cert.nodes;
                 stats.rounded_directions+=cert.directions;
                 stats.rounded_projections+=cert.interval_projections;
@@ -211,8 +325,10 @@ inline bool self_safety(const Body& a0,const Body& a1,const Body& b0,const Body&
                         TypedSelfAuditor& auditor_a,TypedSelfAuditor& auditor_b){
     if(c.typed_self_contact){
         auto check=[&](TypedSelfAuditor& auditor,const Body& before,const Body& after,SelfContactStats& stats){
-            const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy);
+            const auto r=auditor.audit(before,after,c.skin,c.interval_depth,!c.hierarchy,c.fast_relative_projection);
             stats.certificate_tests+=r.certificates;stats.projections+=r.projections;
+            stats.box_tests+=r.box_tests;stats.incident_exclusions+=r.incident_rejections;
+            stats.interval_nodes+=r.interval_nodes;
             return r.separated;
         };
         return check(auditor_a,a0,a1,s.self_a)&&check(auditor_b,b0,b1,s.self_b);
@@ -246,9 +362,10 @@ inline void accumulate(CoupledFEMStats& a,const CoupledFEMStats& b){
 
 inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
                                       const CoupledFEMSettings& c={},
-                                      std::vector<CoupledFEMLeaf>* trace=nullptr){
+                                      std::vector<CoupledFEMLeaf>* trace=nullptr,
+                                      CoupledFEMContext* context=nullptr){
     using namespace coupled_detail;
-    if(&a==&b||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
+    if(&a==&b||(c.fused_self_sap&&(!c.cached_self_sap||!c.spatial_first_self_sap))||(c.spatial_first_self_sap&&!c.cached_self_sap)||(c.cached_self_sap&&(!c.typed_self_contact||!c.hierarchy||c.external_self_candidates))||(c.external_self_candidates&&!c.typed_self_contact)||(c.typed_self_contact&&c.nonincident_self_contact)||!(std::isfinite(dt)&&dt>0&&std::isfinite(c.skin)&&c.skin>0&&
          std::isfinite(c.activation_width)&&c.activation_width>=0&&
          std::isfinite(c.skin+c.activation_width)&&std::isfinite(c.restitution)&&
          c.restitution>=0&&c.restitution<=1&&c.impulse_iterations>=1&&
@@ -261,9 +378,19 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
         throw std::invalid_argument("coupled bodies have different clocks");
     Body sa=a,sb=b;
     CoupledFEMStats total;
-    TypedSelfAuditor auditor_a,auditor_b; // retained within macrostep, revalidated every query
-    // Verify initial cross-surface separation; volume disjointness and
-    // self-validity are explicit caller preconditions, not inferred here.
+    CoupledFEMContext local_context;
+    auto& warm=context?*context:local_context;
+    struct ResetOnFailure {
+        CoupledFEMContext& value;
+        bool committed{};
+        ~ResetOnFailure(){if(!committed)value.reset();}
+    } guard{warm};
+    warm.bind(c.external_self_candidates,c.cached_self_sap,c.spatial_first_self_sap,c.fused_self_sap);
+    auto& auditor_a=warm.first();auto& auditor_b=warm.second();
+    // Initial cross-volume disjointness is checked unless explicitly disabled.
+    // Combinatorial boundary is validated; geometric self-injectivity remains a caller precondition.
+    if(c.initial_volume_audit&&!initial_cross_volume_safe(sa,sb,total,c.initial_cross_sweep))
+        throw std::runtime_error("initial coupled volumes overlap or cannot be certified disjoint");
     if(!swept_safe(sa,sa,sb,sb,c,total)||!self_safety(sa,sa,sb,sb,c,total,auditor_a,auditor_b))
         throw std::runtime_error("initial coupled surfaces violate skin");
     std::vector<double> ia(a.nodes.size()),ib(b.nodes.size());
@@ -322,6 +449,7 @@ inline CoupledFEMStats step_coupled_fem(Body& a,Body& b,double dt,
     // Single publication point for both bodies, after every leaf passed.
     a=std::move(sa);b=std::move(sb);
     if(trace)trace->swap(staged_trace); // replace only after successful macro-step
+    guard.committed=true;
     return total;
 }
 } // namespace kyoto::solid

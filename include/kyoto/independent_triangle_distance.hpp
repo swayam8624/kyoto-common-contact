@@ -96,6 +96,23 @@ inline IndependentTriangleNearest independent_triangle_distance(
             }
         }
     }
+    // Near a Voronoi boundary cancellation in 1-v-u can produce a
+    // tiny negative coefficient. Repair only roundoff-sized excursions;
+    // reject larger excursions instead of silently accepting a bad stencil.
+    constexpr double slack=64*std::numeric_limits<double>::epsilon();
+    bool repair=false;
+    for(double x:w){
+        if(!std::isfinite(x)||x < -slack||x > 1+slack)
+            throw std::runtime_error("invalid Voronoi barycentric weight");
+        repair|=x<0||x>1;
+    }
+    if(repair){
+        for(auto& x:w)x=std::clamp(x,0.,1.);
+        const double sum=w[0]+w[1]+w[2];
+        if(!(std::isfinite(sum)&&sum>0))throw std::runtime_error("invalid repaired barycentrics");
+        for(auto& x:w)x/=sum;
+        q=a+ab*w[1]+ac*w[2];
+    }
     const double distance=norm(q-p);
     if(!(std::isfinite(distance)&&finite(q)))
         throw std::runtime_error("independent triangle distance invalid");

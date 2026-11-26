@@ -7,24 +7,26 @@
 #include <stdexcept>
 namespace kyoto::solid::fixtures {
 inline void fixture_require(bool ok,const char* why){if(!ok)throw std::runtime_error(why);}
-inline Body u_solid(){
+inline Body u_solid(unsigned width_cells=1,double gap=.0025,double speed=.1){
+    if(width_cells<1||width_cells>64||!std::isfinite(gap)||gap<=0.||!std::isfinite(speed)||speed<0.)
+        throw std::invalid_argument("invalid connected U scale fixture");
     Body b;b.material.gravity=0.;b.material.damping=0.;b.material.young=12000.;
-    const double xs[]={0.,.1,.1025,.2025},ys[]={0.,.1},zs[]={0.,.1,.3};
+    const double xs[]={0.,.1,.1+gap,.2+gap},zs[]={0.,.1,.3};
     std::map<std::array<int,3>,std::size_t> ids;
     auto node=[&](int i,int j,int k){
         const std::array<int,3> key{i,j,k};
         const auto found=ids.find(key);
         if(found!=ids.end())return found->second;
         const auto id=b.nodes.size();ids.emplace(key,id);
-        const V3 p{xs[i],ys[j],zs[k]};
-        const V3 v{k==2?(i<=1?.1:-.1):0.,0.,0.};
+        const V3 p{xs[i],.1*double(j),zs[k]};
+        const V3 v{k==2?(i<=1?speed:-speed):0.,0.,0.};
         b.nodes.push_back({p,p,v,0.,0.});return id;
     };
-    for(int k=0;k<2;++k)for(int i=0;i<3;++i){
+    for(int k=0;k<2;++k)for(int j=0;j<int(width_cells);++j)for(int i=0;i<3;++i){
         if(k==1&&i==1)continue;
-        const auto a=node(i,0,k),c=node(i,1,k),d=node(i+1,1,k),e=node(i,0,k+1),
-                   f=node(i+1,0,k+1),g=node(i,1,k+1),h=node(i+1,1,k+1),
-                   q=node(i+1,0,k);
+        const auto a=node(i,j,k),c=node(i,j+1,k),d=node(i+1,j+1,k),e=node(i,j,k+1),
+                   f=node(i+1,j,k+1),g=node(i,j+1,k+1),h=node(i+1,j+1,k+1),
+                   q=node(i+1,j,k);
         b.add_tet({a,q,d,h});b.add_tet({a,d,c,h});b.add_tet({a,c,g,h});
         b.add_tet({a,g,e,h});b.add_tet({a,e,f,h});b.add_tet({a,f,q,h});
     }
@@ -48,7 +50,7 @@ inline Body u_solid(){
         }
         change=seen.size()!=old;
     }
-    fixture_require(seen.size()==b.nodes.size()&&b.tets.size()==30,"fixture not connected");
+    fixture_require(seen.size()==b.nodes.size()&&b.tets.size()==30*width_cells,"fixture not connected");
     return b;
 }
 inline Body remote(){

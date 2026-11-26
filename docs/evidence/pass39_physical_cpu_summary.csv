@@ -1,0 +1,13 @@
+compiler,tets,regime,exhaustive_over_sap_geomean
+GCC,48,free,1.316277
+GCC,48,impact,1.286915
+GCC,120,free,1.597618
+GCC,120,impact,1.766465
+GCC,192,free,1.961350
+GCC,192,impact,2.173567
+Clang,48,free,1.150620
+Clang,48,impact,1.250712
+Clang,120,free,1.495082
+Clang,120,impact,1.617169
+Clang,192,free,1.840034
+Clang,192,impact,1.872933

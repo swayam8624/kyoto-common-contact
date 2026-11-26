@@ -1,0 +1,60 @@
+name: Pass 37 physical CPU scaling
+on:
+  pull_request:
+    branches: [validation/sca-pass34-base]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  cpu-scaling:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_pass37_cpu_physical_scaling --parallel 2
+      - run: |
+          mkdir -p results/pass37
+          uname -a > results/pass37/environment.txt
+          c++ --version >> results/pass37/environment.txt
+          git rev-parse HEAD >> results/pass37/environment.txt
+          ./build/kyoto_pass37_cpu_physical_scaling results/pass37 16
+          python3 tools/summarize_pass37_scaling.py results/pass37/matched_cpu_candidate_scaling.csv results/pass37/paired_summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass37-cpu-physical-scaling-${{ matrix.os }}
+          path: results/pass37/
+          if-no-files-found: warn
+  metal-scaling:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target kyoto_pass37_metal_physical_scaling --parallel 2
+      - run: |
+          mkdir -p results/pass37-metal
+          uname -a > results/pass37-metal/environment.txt
+          c++ --version >> results/pass37-metal/environment.txt
+          git rev-parse HEAD >> results/pass37-metal/environment.txt
+          status=0
+          ./build/kyoto_pass37_metal_physical_scaling results/pass37-metal 16 || status=$?
+          if [ "$status" -eq 77 ]; then
+            echo 'SKIPPED: no Metal device; no GPU result' | tee results/pass37-metal/DEVICE_UNAVAILABLE.txt
+          else
+            exit "$status"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass37-metal-physical-scaling
+          path: results/pass37-metal/
+          if-no-files-found: warn

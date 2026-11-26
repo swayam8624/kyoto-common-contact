@@ -1,13 +1,11 @@
 name: Pass 34 connected physical IPC CCD audit
 on:
-  push:
-    branches: [research/spacetime-contact-atlas]
-    paths:
-      - 'include/kyoto/**'
-      - 'apps/pass34_connected_ipc_audit.cpp'
-      - 'CMakeLists.txt'
-      - '.github/workflows/pass34-connected-ipc.yml'
+  pull_request:
+    branches: [validation/sca-pass34-base]
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -25,3 +23,11 @@ jobs:
           name: pass34-native-connected-ipc-receipts
           path: build-ipc/pass34-connected-ipc/
           if-no-files-found: warn
+  official-native-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build-ipc -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON -DIPC_TOOLKIT_WITH_SIMD=OFF
+      - run: cmake --build build-ipc --target kyoto_official_ipc_native_backend_tests --parallel 2
+      - run: ctest --test-dir build-ipc -R pinned_IPC_LBVH_inside_native_typed_FEM --no-tests=error --output-on-failure -V
