@@ -1,0 +1,32 @@
+{
+  "scope": "Independent C++23 reference implementations, not original repository backends. Archived Pass 44 physical trajectories plus transformed replicas, not fresh FEM integration.",
+  "rows": 15000,
+  "matched_groups": 3000,
+  "configurations": 17,
+  "distinct_frames_per_compiler": 300,
+  "max_features": 3952,
+  "max_candidates": 26030,
+  "within_compiler_vector_mismatches": 0,
+  "cross_compiler_candidate_count_mismatches": 0,
+  "gcc": {
+    "exhaustive_over_arm": {
+      "exhaustive": 1,
+      "fused_axis": 2.5609490172100795,
+      "persistent_axis": 2.693879262779164,
+      "rebuilt_axis": 2.405773166467587,
+      "rebuilt_x": 2.314068660408555
+    },
+    "fused_wins_vs_persistent": 3
+  },
+  "clang": {
+    "exhaustive_over_arm": {
+      "exhaustive": 1,
+      "fused_axis": 2.4166627652923145,
+      "persistent_axis": 2.6465065226562667,
+      "rebuilt_axis": 2.262621865044435,
+      "rebuilt_x": 2.1516553979868775
+    },
+    "fused_wins_vs_persistent": 0
+  },
+  "limitations": "Local independent comparison only. Raw source and receipts provided in conversation ZIP. Original 11-backend replay driver and CI authored, not compiled here; stock IPC, real Metal and live whole-solver measurements remain separate open gates."
+}

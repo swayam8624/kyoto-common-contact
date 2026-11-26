@@ -1,0 +1,64 @@
+name: Pass 47 original broad-phase adversarial replay
+on:
+  push:
+    branches: [research/pass47-adversarial-comparison]
+  pull_request:
+    paths:
+      - 'apps/pass47_repository_replay.cpp'
+      - 'tools/pass47_export_inputs.py'
+      - '.github/workflows/pass47-adversarial-replay.yml'
+  workflow_dispatch:
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cxx: g++
+          - os: macos-latest
+            cxx: clang++
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          python tools/pass44_scaled_contact.py u_enabled 32 0
+          python tools/pass44_scaled_contact.py u_disabled 32 1
+          python tools/pass44_scaled_contact.py comb_enabled 24 2
+          python tools/pass44_scaled_contact.py comb_disabled 24 3
+          python tools/pass44_scaled_contact.py comb_static 8 4
+          mkdir completed
+          cp u_*/scene*.npz comb_*/scene*.npz completed/
+          python tools/pass47_export_inputs.py completed inputs
+      - run: ${{ matrix.cxx }} -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass47_repository_replay.cpp -o pass47_native
+      - run: ./pass47_native inputs > native.csv
+      - run: |
+          python - <<'PY'
+          import csv, collections
+          with open('native.csv') as f: rows=list(csv.DictReader(f))
+          assert len(rows)==36300, len(rows)
+          groups=collections.defaultdict(list)
+          for r in rows:
+              groups[tuple(r[k] for k in ('scene','width','regime','block','leaf'))].append(r)
+          assert len(groups)==3300
+          for g in groups.values():
+              assert len(g)==11 and len({r['arm'] for r in g})==11 and len({r['candidates'] for r in g})==1
+          print('PASS native 11-arm receipts')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass47-native-${{ matrix.os }}
+          path: |
+            native.csv
+            completed/
+            inputs/
+          if-no-files-found: error
