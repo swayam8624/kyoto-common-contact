@@ -1,0 +1,49 @@
+name: Pass 54 adaptive automatic contact discovery
+on:
+  push:
+    branches: [research/pass54-adaptive-discovery]
+  pull_request:
+    paths:
+      - 'tools/pass54*'
+      - '.github/workflows/pass54-adaptive-discovery.yml'
+  workflow_dispatch:
+jobs:
+  physics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          python tools/pass54_adaptive_discovery.py edge edge
+          python tools/pass54_adaptive_discovery.py vertex vertex --rot
+          python tools/pass54_adaptive_discovery.py replica8 replica8 --no-controls
+          python tools/pass54_adaptive_discovery.py u78 u78 --macros 4 --no-controls
+          python tools/pass54_adaptive_discovery.py comb120 comb120 --rot --macros 4 --no-controls
+          python tools/pass54_adaptive_discovery.py u156 u156 --macros 4 --no-controls
+          python tools/pass54_verify.py edge vertex replica8 u78 comb120 u156 > verification.json
+          python tools/pass54_reaudit.py reaudit.json edge vertex replica8 u78 comb120 u156
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass54-${{ matrix.os }}
+          path: |
+            edge/
+            vertex/
+            replica8/
+            u78/
+            comb120/
+            u156/
+            verification.json
+            reaudit.json
+          if-no-files-found: error
