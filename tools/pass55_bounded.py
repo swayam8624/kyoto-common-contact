@@ -33,6 +33,7 @@ class BoundedDurationModel(DurationModel):
         if key in self._planes:self.plane_hits+=1;return self._planes[key]
         self.plane_misses+=1;r=super().plane(x,key);self._planes[key]=r;return r
     def solve(self,x,v,duration,budget):
+        # All discovery retries start at this same x. Never reuse across steps.
         self.dt=float(duration);self.cache=self.models.view(duration);self._planes={}
         try:return self.step(x,v,True,budget=budget)
         finally:self._planes=None
