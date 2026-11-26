@@ -1,0 +1,78 @@
+{
+  "scope": "Five locally completed independent implicit FEM scenarios, restricted disjoint region pairs",
+  "steps": 120,
+  "enabled_certified_region_intervals": 128,
+  "disabled_overlap_states": 38,
+  "orientation_checks": 16704,
+  "orientation_unresolved": 0,
+  "pair_checks": 2052096,
+  "candidate_mismatches": 0,
+  "region_margin_m": 0.0002,
+  "scenes": [
+    {
+      "id": 0,
+      "cells": 156,
+      "nodes": 84,
+      "steps": 32,
+      "enabled": true,
+      "active_steps": 23,
+      "certified": 32,
+      "unresolved": 0,
+      "overlap_states": 0,
+      "min_j": 0.7184866588669181,
+      "min_gap_m": 0.0008000000080682079
+    },
+    {
+      "id": 1,
+      "cells": 156,
+      "nodes": 84,
+      "steps": 32,
+      "enabled": false,
+      "certified": 6,
+      "unresolved": 26,
+      "overlap_states": 26
+    },
+    {
+      "id": 2,
+      "cells": 120,
+      "nodes": 84,
+      "steps": 24,
+      "enabled": true,
+      "active_steps": 13,
+      "certified": 72,
+      "unresolved": 0,
+      "overlap_states": 0,
+      "min_j": 0.7620883998360929,
+      "min_gap_m": 0.0008000000437427685
+    },
+    {
+      "id": 3,
+      "cells": 120,
+      "nodes": 84,
+      "steps": 24,
+      "enabled": false,
+      "certified": 46,
+      "unresolved": 26,
+      "overlap_states": 12
+    },
+    {
+      "id": 4,
+      "cells": 120,
+      "nodes": 84,
+      "steps": 8,
+      "enabled": true,
+      "stationary": true,
+      "active_steps": 0,
+      "certified": 24,
+      "unresolved": 0,
+      "overlap_states": 0
+    }
+  ],
+  "initial_comb_attempt": "Timed out after 21 steps; excluded from completed totals. Separately completed moving 24-step and stationary 8-step comb campaigns.",
+  "source_blobs": {
+    "original": "f2b9feaf40d0756d76e265b9d3dd3d989d3c3fa7",
+    "hint": "c80b0a2a937ab40594b6023b7f880138e11c24df",
+    "audit": "32738b7e7a43225357c71a34fbbc7b2df5ac3193"
+  },
+  "limitations": "No general whole-body self-contact or acceleration claim; no cross-platform CI confirmation."
+}
