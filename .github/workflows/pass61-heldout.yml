@@ -1,0 +1,80 @@
+name: Pass 61 held-out adversarial validation
+on:
+  push:
+    branches: [research/pass61-heldout-adversarial]
+  pull_request:
+    paths:
+      - 'apps/pass61*'
+      - 'tools/pass61*'
+      - '.github/workflows/pass61-heldout.yml'
+  workflow_dispatch:
+jobs:
+  physical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5 scipy==1.17.0 casadi==3.7.2
+      - run: |
+          python tools/pass61_physical.py physical61
+          python tools/pass61_controls.py > controls61.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('physical61/summary.json').read_text())
+          assert len(rows)==12 and all(r['completed']==r['requested']==8 for r in rows)
+          assert len(json.loads(Path('controls61.json').read_text()))==12
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass61-physical
+          path: |
+            physical61/
+            controls61.json
+          if-no-files-found: error
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        cxx: [g++, clang++]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          ${{ matrix.cxx }} -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass61_heldout.cpp -o pass61_native
+          ./pass61_native > heldout.csv
+          python3 tools/pass61_audit.py heldout.csv --arms 11 --out heldout.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass61-native-${{ matrix.cxx == 'g++' && 'gcc' || 'clang' }}
+          path: |
+            heldout.csv
+            heldout.json
+          if-no-files-found: error
+  stock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cmake -S . -B build61 -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON
+          cmake --build build61 --target kyoto_pass61_stock --parallel 2
+          ./build61/kyoto_pass61_stock > stock61.csv
+          python3 tools/pass61_audit.py stock61.csv --arms 12 --out stock61.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass61-stock
+          path: |
+            stock61.csv
+            stock61.json
+          if-no-files-found: error
