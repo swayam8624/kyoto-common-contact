@@ -269,7 +269,7 @@ def write_dashboard(out,manifest,figures=None):
         figures=[p.relative_to(out).as_posix() for p in sorted((out/'graphs').glob('*.svg'))]
     # Offline dashboard uses only local relative URLs and escaped strings.
     stage_rows=''.join(f'<tr><td>{html.escape(k)}</td><td>{html.escape(v["status"])}</td><td>{v.get("seconds",0):.2f}</td></tr>' for k,v in manifest['stages'].items())
-    geometry=[p.relative_to(out).as_posix() for p in sorted((out/'geometry').glob('*.png'))]+[p.relative_to(out).as_posix() for p in sorted((out/'geometry').glob('*.gif'))]
+    geometry=[p.relative_to(out).as_posix() for folder in ('geometry','automatic_geometry') for pattern in ('*.png','*.gif') for p in sorted((out/folder).glob(pattern))]
     figures=list(figures)+geometry
     images=''.join(f'<figure><img src="{html.escape(p)}" loading="lazy" alt="{html.escape(Path(p).stem)}"><figcaption>{html.escape(Path(p).stem.replace("_"," "))}</figcaption></figure>' for p in figures)
     tables=[]

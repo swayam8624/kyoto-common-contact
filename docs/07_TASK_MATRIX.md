@@ -1648,3 +1648,39 @@ Default output: output/research-final-<timestamp>; raw data, manifest,
 index.html, graphs, geometry, logs, SHA256SUMS, research-evidence.zip.
 Nonzero exit means at least one declared gate failed/blocked or reduced
 scope. A complete campaign validates only the declared experiments.
+
+## Pass 41B — automatic convex-region contact constraints
+
+- [x] Independent CasADi/IPOPT implicit neo-Hookean FEM, deterministic
+  convex-region construction from tetrahedral face connectivity and
+  geometry. Greedy hull-volume merge heuristic, all-node hull constraints,
+  initial separating axes from face normals and edge-cross-edge axes,
+  dynamically optimized unit normals and planes. No prescribed region IDs
+  or contact directions. Four cases: U/convex insert, L/concave elbow,
+  U/concave elbow, stationary L/elbow control. Region pairings 3x1,
+  2x2, 3x2, 2x2; 48/48/60/48 total tetrahedra.
+- [x] All 128 implicit steps converged; 33 simultaneous-contact steps,
+  stationary control inactive. Minimum J 0.948659975809519,
+  maximum momentum error 7.516697131282062e-10 kg m/s,
+  maximum stationarity residual 9.394450231373874e-11.
+- [x] Actual strict GCC/Clang C++23 direct builds and replay using the
+  upstream Tight Inclusion numerical library (local logging shim) at
+  zero and .0005 m clearance. 2,291,200 exhaustive CCD checks and 62,245
+  exact swept volume pair certificates per compiler; no possible events,
+  unresolved certificates, or missing candidates. Fused SAP and rebuilt
+  SAP both match exhaustive candidate vectors. Byte-identical replay
+  SHA256 29111776e7f218f839d96b2ffdb2068e97253093ad3cf92481a7016c028c43d5.
+  The automatic trajectory is regenerated and audited by both stock
+  IPC wrapper and direct CCD in the single final Mac campaign.
+- [x] Actual automatic motion impact/control GIF and topology/volume
+  plots generated, included in dashboard. All six runner Python tests
+  pass again after fifth independent family integrated. Earlier local
+  CMake subset build passed three targeted tests; complete stock
+  dependency configuration and new device bridge remain final Mac gates.
+- Limit: convex hull constraints may overconstrain deformed regions;
+  region merging is a geometric heuristic, not a general collision
+  proof. Exact post-step replay validates these recorded paths only.
+  No automatic within-body self-contact response claim for this
+  independent integrator. Native solver still covers tested self-contact.
+  The paid common benchmark remains its original 22 physical workloads;
+  automatic family is separately audited, not included in those timings.

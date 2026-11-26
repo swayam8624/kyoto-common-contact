@@ -807,3 +807,14 @@ if(Python3_Interpreter_FOUND)
   add_test(NAME final_campaign_fail_closed_receipt_validation
            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_final_campaign.py)
 endif()
+
+# Geometry-derived independent contact replay with exact and upstream CCD.
+if(KYOTO_WITH_OFFICIAL_IPC AND KYOTO_WITH_EXACT_SELF_VOLUME AND TARGET tight_inclusion::tight_inclusion)
+  add_executable(kyoto_pass41_automatic_replay apps/pass41_automatic_replay.cpp)
+  target_link_libraries(kyoto_pass41_automatic_replay PRIVATE kyoto_contact tight_inclusion::tight_inclusion)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(kyoto_pass41_automatic_replay PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(kyoto_pass41_automatic_replay PRIVATE /fp:strict)
+  endif()
+endif()

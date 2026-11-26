@@ -2,7 +2,7 @@
 """One-command Kyoto research campaign. Build, execute, validate, plot, archive.
 
 The default is the full width-64 campaign, stock pinned IPC, physical Metal,
-all registered CTest regressions, four independent dynamics families, and
+all registered CTest regressions, five independent dynamics families, and
 paid benchmarks. No previously archived measurement is silently reused.
 A failed/blocked stage cannot become a success via report generation.
 Run in a clean tracked checkout; generated output is always a new folder.
@@ -233,7 +233,8 @@ class Campaign:
         independent=[('two_body','pass40_ipopt_contact.py','kyoto_pass40_ipopt_replay','ipopt_receipts.csv',6,None),
                      ('three_body','pass40_three_body_contact.py','kyoto_pass40_three_body_replay','ipopt_receipts.csv',4,'active_pairs'),
                      ('adaptive','pass40_adaptive_contact.py','kyoto_pass40_three_body_replay','ipopt_receipts.csv',4,'active_pairs'),
-                     ('nonconvex','pass40_nonconvex_contact.py','kyoto_pass40_nonconvex_replay','receipts.csv',4,'active_planes')]
+                     ('nonconvex','pass40_nonconvex_contact.py','kyoto_pass40_nonconvex_replay','receipts.csv',4,'active_planes'),
+                     ('automatic','pass41_automatic_contact.py','kyoto_pass40_nonconvex_replay','receipts.csv',4,'active_pairs')]
         paths={}
         for name,script,target,csvname,scenes,active in independent:
             dst=self.raw(name);trajectory=dst/'trajectory.txt';receipt=dst/csvname
@@ -247,6 +248,9 @@ class Campaign:
                 self.block(name+'_replay','independent generator did not pass');continue
             paths[name]=trajectory
             self.app(name+'_replay',target,build if ipc and exact else None,[trajectory],self.raw(name+'_replay.csv'),lambda p:self.record(name+'_replay',report.replay(p,scenes)))
+        if 'automatic' in paths:
+            self.app('automatic_direct_replay','kyoto_pass41_automatic_replay',build if ipc and exact else None,[paths['automatic']],self.raw('automatic_direct_replay.csv'),lambda p:self.record('automatic_direct_replay',report.replay(p,4)))
+        else:self.block('automatic_direct_replay','automatic trajectory unavailable')
         if all(k in paths for k in ('adaptive','three_body','nonconvex')):
             # A native-only fallback still measures all eleven methods, but
             # cannot claim the official IPC arm or complete stock campaign.
@@ -272,6 +276,9 @@ class Campaign:
         if py and 'nonconvex' in paths:
             self.run('nonconvex_geometry',[py,self.source/'tools/render_closeout_geometry.py',paths['nonconvex'],self.out/'geometry'],validate=lambda _:report.require((self.out/'geometry/impact_vs_control.gif').stat().st_size>0,'animation missing'))
         else:self.block('nonconvex_geometry','independent trajectory or Python unavailable')
+        if py and 'automatic' in paths:
+            self.run('automatic_geometry',[py,self.source/'tools/render_closeout_geometry.py',paths['automatic'],self.out/'automatic_geometry'],validate=lambda _:report.require((self.out/'automatic_geometry/impact_vs_control.gif').stat().st_size>0,'automatic animation missing'))
+        else:self.block('automatic_geometry','automatic trajectory or Python unavailable')
         return py
 
     def finish(self,py,interrupted=False):
