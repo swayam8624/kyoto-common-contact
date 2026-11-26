@@ -1,0 +1,77 @@
+{
+  "scope": "Local independent implicit FEM, declared disjoint region pairs, exact stored linear paths, no universal injectivity or truncation-error bound",
+  "adaptive": {
+    "scenes": 2,
+    "macrosteps": 8,
+    "requested_duration_ms_per_scene": 16,
+    "displacement_rejections": 7,
+    "leaves": 15,
+    "bitwise_reference_per_leaf": true
+  },
+  "injected": {
+    "geometric_rejections": 6,
+    "recovery_scenarios": 2,
+    "recovery_leaves": 4,
+    "late_rollback_scenarios": 2,
+    "committed_leaves_in_failed_macrosteps": 0
+  },
+  "committed": {
+    "leaves": 19,
+    "orientation": 2604,
+    "region_paths": 39,
+    "contact_active": 11,
+    "min_j": 0.7635912130790808,
+    "min_clearance_m": 0.0008000000147035877
+  },
+  "aggressive": {
+    "cases": 6,
+    "completed": 6,
+    "leaves": 10,
+    "orientation": 1344,
+    "region_paths": 22,
+    "natural_unresolved_region_path": 1,
+    "solver_invalid_number_rejections": 3,
+    "zero_budget_rollbacks": 3,
+    "bitwise_reference_every_leaf": true,
+    "cases_detail": [
+      {
+        "scene": 0,
+        "dt_ms": 16,
+        "leaves": 1
+      },
+      {
+        "scene": 0,
+        "dt_ms": 32,
+        "leaves": 1
+      },
+      {
+        "scene": 0,
+        "dt_ms": 64,
+        "leaves": 2,
+        "reason": "unresolved disjoint-region path"
+      },
+      {
+        "scene": 2,
+        "dt_ms": 16,
+        "leaves": 1
+      },
+      {
+        "scene": 2,
+        "dt_ms": 32,
+        "leaves": 2,
+        "reason": "solver:Invalid_Number_Detected"
+      },
+      {
+        "scene": 2,
+        "dt_ms": 64,
+        "leaves": 3,
+        "reason": "solver:Invalid_Number_Detected twice"
+      }
+    ]
+  },
+  "source_blobs": {
+    "adaptive": "4c66f845f53226500b48aeb2923a53e1689eb668",
+    "aggressive": "79c734333b4049517fb2350941d058db7eae6768"
+  },
+  "limitations": "Unresolved region certificate is not proof of collision. IPOPT invalid numerical trial warnings retained. Displacement cap heuristic, no accuracy convergence claim. Single-threaded transaction, no generalized adjacent/within-region contact. Cross-platform CI pending."
+}
