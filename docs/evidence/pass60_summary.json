@@ -1,0 +1,34 @@
+{
+  "pass59_stock": {
+    "run_id": 45783966923,
+    "artifact_id": 15100385729,
+    "sha256": "320a58b7925327e51ccb7ed764ec428fe07d3cef6c244505564029bf443d9214",
+    "rows": 43200,
+    "matched_groups": 3600,
+    "configurations": 17,
+    "frames": 300,
+    "exact_candidate_parity": true,
+    "archive_counts_match": true,
+    "independent_summary_byte_identical": true,
+    "fused_vs_ipc_geomean": 1.9771778277480097,
+    "fused_wins": 16,
+    "physical_geomean": 2.5478828581717754,
+    "eight_copy_dense_ratio": 0.8637816427184735
+  },
+  "pass60_local": {
+    "scope": "Standalone extraction of production CPU/shared shader arithmetic, no Metal execution. Both GCC and Clang produce identical output.",
+    "enclosures": 112204,
+    "range_rejections": 87826,
+    "packed_words": 681048,
+    "tiled_words": 5622,
+    "exact_hits": 18198,
+    "conservative_extras": 218808,
+    "mismatches": 0,
+    "source_sha256": "a795fcf1b3d8116eae252e50530a6afd01b6d4d75d41b4be8902dc46a15c6124"
+  },
+  "metal": {
+    "status": "unverified",
+    "workflow_run_id": 45785361338,
+    "scope": "Hardware-only replay of 300 archived frames and 3 precision controls, raw masks versus scalar words, canonical vector parity, native coupled physical solver and rollback controls. No device or skip is failure."
+  }
+}

@@ -1,0 +1,75 @@
+name: Pass 60 actual Metal and scalar parity
+on:
+  push:
+    branches: [research/pass60-metal-device-validation]
+  pull_request:
+    paths:
+      - 'apps/pass60*'
+      - 'tools/pass60*'
+      - 'tests/pass60*'
+      - '.github/workflows/pass60-metal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  scalar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: pass47-native-ubuntu-latest
+          run-id: 45748198198
+          github-token: ${{ github.token }}
+          path: archived
+      - run: |
+          g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude apps/pass60_host_replay.cpp -o pass60_host
+          ./pass60_host archived/inputs > scalar.csv
+          g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Werror -ffp-contract=off -fno-fast-math -Iinclude tests/pass60_kernel_controls.cpp -o pass60_controls
+          ./pass60_controls > kernel_controls.json
+          python3 tools/pass60_audit.py scalar.csv archived/native.csv --out scalar.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass60-scalar-only
+          path: |
+            scalar.csv
+            scalar.json
+            kernel_controls.json
+          if-no-files-found: error
+  metal:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: pass47-native-ubuntu-latest
+          run-id: 45748198198
+          github-token: ${{ github.token }}
+          path: archived
+      - name: Build Objective-C++ hardware-only replay and solver bridge
+        run: |
+          clang++ -std=c++23 -O2 -fobjc-arc -ffp-contract=off -fno-fast-math -Iinclude apps/pass60_metal_replay.mm -framework Foundation -framework Metal -o pass60_metal
+          clang++ -std=c++23 -O2 -fobjc-arc -ffp-contract=off -fno-fast-math -Iinclude apps/pass40_metal_solver_bridge.mm -framework Foundation -framework Metal -o pass60_bridge
+          clang++ -std=c++23 -O2 -fobjc-arc -ffp-contract=off -fno-fast-math -Iinclude apps/pass40_metal_tiled_mask.mm -framework Foundation -framework Metal -o pass60_bench
+      - name: Real device parity and full solver bridge; no skip accepted
+        run: |
+          ./pass60_metal archived/inputs metal_device.txt > metal.csv
+          ./pass60_bridge bridge 16 2> bridge.log
+          ./pass60_bench benchmark 16
+          python3 tools/pass60_audit.py metal.csv archived/native.csv --device metal_device.txt --bridge bridge --bridge-log bridge.log --width 16 --out metal.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass60-real-metal
+          path: |
+            metal.csv
+            metal_device.txt
+            metal.json
+            bridge/
+            bridge.log
+            benchmark/
+          if-no-files-found: error
