@@ -818,3 +818,16 @@ if(KYOTO_WITH_OFFICIAL_IPC AND KYOTO_WITH_EXACT_SELF_VOLUME AND TARGET tight_inc
     target_compile_options(kyoto_pass41_automatic_replay PRIVATE /fp:strict)
   endif()
 endif()
+
+# Pass 59: twelve-arm comparison on the identical archived physical inputs.
+# IPC remains the pinned external upstream toolkit; never substitute a shim.
+if(KYOTO_WITH_OFFICIAL_IPC)
+  add_executable(kyoto_pass59_stock_ipc apps/pass47_repository_replay.cpp)
+  target_compile_definitions(kyoto_pass59_stock_ipc PRIVATE KYOTO_PASS41_IPC)
+  target_link_libraries(kyoto_pass59_stock_ipc PRIVATE kyoto_contact ipc::toolkit)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(kyoto_pass59_stock_ipc PRIVATE -ffp-contract=off -fno-fast-math)
+  elseif(MSVC)
+    target_compile_options(kyoto_pass59_stock_ipc PRIVATE /fp:strict)
+  endif()
+endif()

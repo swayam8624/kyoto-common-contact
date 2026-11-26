@@ -1,0 +1,74 @@
+{
+  "scope": "Analysis of executed original Pass47 Ubuntu GCC candidate replay, paid broad-phase query only",
+  "source": {
+    "run_id": 45748198198,
+    "job_id": 139669297468,
+    "artifact_id": 15087213071,
+    "sha256": "a14a5502bff335169fd9e33a2c5758f54b1ebb50eabf5ee304b68b055e9c5840",
+    "verified": true
+  },
+  "rows": 36300,
+  "matched_groups": 3300,
+  "configurations": 17,
+  "frames": 300,
+  "max_candidates": 26030,
+  "max_features": 3952,
+  "candidate_count_mismatches": 0,
+  "exact_vector_check": "Original C++ executable enforced exact vector parity",
+  "audit_controls_rejected": 5,
+  "geomean_vs_exhaustive": {
+    "exhaustive": 1,
+    "rebuilt_sap": 1.6526623918120389,
+    "rebuilt_bvh": 1.0991937092722384,
+    "retained_refit": 2.245327818737313,
+    "retained_frontier": 2.304568178289991,
+    "persistent_x": 1.7730088415783554,
+    "adaptive_axis": 1.2370786984815327,
+    "persistent_axis": 1.8155566890051429,
+    "cached_axis": 2.0797373361705764,
+    "spatial_first": 2.455571681473112,
+    "fused": 2.603419877670893
+  },
+  "fused_vs_persistent_axis": 1.4339513017891332,
+  "fused_wins": 14,
+  "fused_wins_vs_persistent": 17,
+  "other_wins": {
+    "retained_frontier": [
+      "replica4_dense",
+      "replica8_dense"
+    ],
+    "rebuilt_sap": [
+      "reversal_topology"
+    ]
+  },
+  "fused_by_family": {
+    "physical": {
+      "configurations": 10,
+      "vs_exhaustive": 2.218853852938097,
+      "vs_persistent_axis": 1.4971665792440878
+    },
+    "sparse": {
+      "configurations": 3,
+      "vs_exhaustive": 6.3234633251872525,
+      "vs_persistent_axis": 1.5281313583217904
+    },
+    "dense": {
+      "configurations": 3,
+      "vs_exhaustive": 2.3366810120768458,
+      "vs_persistent_axis": 1.2798373005484407
+    }
+  },
+  "source_blobs": {
+    "analyze": "5a6f9c97219005819fdf42bf70a4cdbe42a5a283",
+    "controls": "8a964516ad88fc0c83d32d70dc871062a7ba340f"
+  },
+  "stock_ipc": {
+    "pinned_commit": "19bcab7e1f5a0d2addfcd28513422ff248ea504e",
+    "run_id": 45783966923,
+    "status": "Ubuntu dependency build in progress at last verification; macOS queued",
+    "expected_rows": 43200,
+    "expected_matched_groups": 3600,
+    "measured_timing": null
+  },
+  "limitations": "One original native Ubuntu campaign, no fresh local C++ timing; no stock IPC result yet. No full solver speedup or cross-platform generalization. Local upstream clone blocked by DNS."
+}

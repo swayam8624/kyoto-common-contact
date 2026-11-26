@@ -1,0 +1,56 @@
+name: Pass 59 pinned stock IPC final comparison
+on:
+  push:
+    branches: [research/pass59-final-backend-comparison]
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'tools/pass59*'
+      - '.github/workflows/pass59-stock-ipc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  comparison:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: pass47-native-ubuntu-latest
+          run-id: 45748198198
+          github-token: ${{ github.token }}
+          path: archived
+      - name: Record environment
+        run: |
+          uname -a > environment.txt
+          cmake --version >> environment.txt
+          c++ --version >> environment.txt
+          if [ "$(uname)" = Linux ]; then lscpu >> environment.txt; else sysctl -n machdep.cpu.brand_string >> environment.txt || true; fi
+          python3 -c 'import os; print("logical CPUs:",os.cpu_count())' >> environment.txt
+          echo 'Default toolkit threading; no artificial serial shim. Timings compare paid query only.' >> environment.txt
+      - name: Build official pinned IPC Toolkit
+        run: |
+          cmake -S . -B build59 -DCMAKE_BUILD_TYPE=Release -DKYOTO_WITH_OFFICIAL_IPC=ON
+          cmake --build build59 --target kyoto_pass59_stock_ipc kyoto_official_ipc_lbvh_tests --parallel 2
+      - name: Upstream adapter correctness gate
+        run: ctest --test-dir build59 -R '^pinned_official_ipc_lbvh_feature_coverage$' --output-on-failure
+      - name: Identical archived physical inputs and twelve-arm comparison
+        run: |
+          ./build59/kyoto_pass59_stock_ipc archived/inputs > stock.csv
+          python3 tools/pass59_analyze.py stock.csv --arms 12 --reference archived/native.csv --out stock_summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass59-stock-${{ matrix.os }}
+          path: |
+            stock.csv
+            stock_summary.json
+            environment.txt
+          if-no-files-found: error
