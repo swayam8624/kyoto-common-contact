@@ -1,0 +1,43 @@
+{
+  "scope": "Local exact dyadic integer orientation and full validation-check replay; no new physics integration or GPU result.",
+  "controls": {
+    "total": 2448,
+    "accepted": 897,
+    "rejected_or_unresolved": 1551,
+    "mismatches": 0
+  },
+  "orientation": {
+    "unique_checks": 16704,
+    "timed_checks": 133632,
+    "geomean": 16.59114243687734,
+    "scenes": [
+      17.879429933960377,
+      17.2856907978596,
+      16.781600373004938,
+      16.756565077513585,
+      14.465141248758687
+    ]
+  },
+  "gate": {
+    "steps": 64,
+    "geomean": 6.398964870032159,
+    "scenes": [
+      8.858738812864129,
+      4.795515993779731,
+      6.167681472773028
+    ],
+    "rejected_controls": 6,
+    "valid_commits": 2
+  },
+  "source_blobs": {
+    "orientation": "3ca988294a751ad2cfa5da729b500252094f4cf5",
+    "benchmark": "7b520185601592224d067015953a559f3e8eb97d",
+    "gate": "ddd6cf9477c2ee9b3bb4c420f498b37f1509ded2"
+  },
+  "environment": {
+    "platform": "Linux x86_64",
+    "python": "3.13.5",
+    "numpy": "2.3.5"
+  },
+  "timing": "Two counterbalanced ABBA/BAAB blocks per scene; stage includes coordinate conversion; gate excludes common precomputed hints, physical integration and commit. Raw timings and archived input trajectories in supplied evidence ZIP. Cross-platform timing and fresh solver integration pending."
+}

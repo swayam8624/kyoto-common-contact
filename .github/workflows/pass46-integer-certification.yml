@@ -1,0 +1,20 @@
+name: Pass 46 exact integer orientation parity
+on:
+  push:
+    branches: [research/pass46-integer-certification]
+  workflow_dispatch:
+jobs:
+  controls:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install numpy==2.3.5
+      - run: |
+          PYTHONPATH=tools python -c "from pass46_benchmark import controls; r=controls(); print(r); assert r['controls']==2448"
