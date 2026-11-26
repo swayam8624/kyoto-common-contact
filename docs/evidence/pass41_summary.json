@@ -1,0 +1,85 @@
+{
+  "scope": "CPU-native 11-arm common benchmark; no stock IPC timing in local environment; exact transaction width16 complete; timings measured in Linux VM",
+  "common": {
+    "gcc": {
+      "rows": 51304,
+      "groups": 4664,
+      "scenes": 22,
+      "arms": [
+        "exhaustive",
+        "rebuilt_sap",
+        "rebuilt_bvh",
+        "retained_refit",
+        "retained_frontier",
+        "persistent_x",
+        "adaptive_axis",
+        "persistent_axis",
+        "cached_axis",
+        "spatial_first",
+        "fused"
+      ],
+      "baseline": "persistent_axis",
+      "paired_geomean": {
+        "exhaustive": 0.5805132037454961,
+        "rebuilt_sap": 0.6942746522681947,
+        "rebuilt_bvh": 0.48772161145680937,
+        "retained_refit": 1.0088271813807344,
+        "retained_frontier": 0.9886857149501113,
+        "persistent_x": 0.661941478523744,
+        "adaptive_axis": 0.7015184732309601,
+        "persistent_axis": 1.0,
+        "cached_axis": 1.0366545071599842,
+        "spatial_first": 1.194486965302508,
+        "fused": 1.389063789338571
+      }
+    },
+    "clang": {
+      "rows": 51304,
+      "groups": 4664,
+      "scenes": 22,
+      "arms": [
+        "exhaustive",
+        "rebuilt_sap",
+        "rebuilt_bvh",
+        "retained_refit",
+        "retained_frontier",
+        "persistent_x",
+        "adaptive_axis",
+        "persistent_axis",
+        "cached_axis",
+        "spatial_first",
+        "fused"
+      ],
+      "baseline": "persistent_axis",
+      "paired_geomean": {
+        "exhaustive": 0.6085465724425917,
+        "rebuilt_sap": 0.7190274152503251,
+        "rebuilt_bvh": 0.47267777196268074,
+        "retained_refit": 1.050002010008743,
+        "retained_frontier": 1.0490634945631205,
+        "persistent_x": 0.6896370945960246,
+        "adaptive_axis": 0.7021988812571318,
+        "persistent_axis": 1.0,
+        "cached_axis": 1.058460976830777,
+        "spatial_first": 1.135972336840606,
+        "fused": 1.2994214677445508
+      }
+    }
+  },
+  "exact": {
+    "gcc": {
+      "steps": 52,
+      "leaves": 52,
+      "leaf_exact_pairs": 191558,
+      "initial_exact_pairs": 189348,
+      "median_guard_over_native": 18.901392993782473
+    },
+    "clang": {
+      "steps": 52,
+      "leaves": 52,
+      "leaf_exact_pairs": 191558,
+      "initial_exact_pairs": 189348,
+      "median_guard_over_native": 21.2335735673
+    }
+  }
+}

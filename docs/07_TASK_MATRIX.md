@@ -1578,3 +1578,73 @@ New actual Mac solver bridge (unrun here):
     ./build-metal/kyoto_pass40_metal_solver_bridge /tmp/kyoto-metal-bridge 64
 
 Raw host receipts: docs/evidence/pass40_tiled_solver_host_gcc_clang.csv.
+
+## Pass 41 — integrated exact reference gate, unified baseline and one-command closeout
+
+- [x] New opt-in exact_coupled_transaction::step stages the native bodies and leaves,
+  independently certifies the initial combined tetrahedral complex and every
+  provisional accepted linear leaf, then publishes both bodies/trace only if
+  all certificates pass. Reset the warm context on any failure. Native
+  timestep subdivision and physics remain unchanged; an unresolved exact
+  path rejects the entire macrostep rather than being silently accepted.
+- [x] Actual strict GCC/Clang C++23 -O2, warnings-as-errors, no fast math.
+  Complete width-16 campaigns (nine workloads including rotated U near and
+  separated and cross torus); 52 accepted macrosteps/leaves per compiler,
+  191,558 exact leaf pair certificates and 189,348 initial certificates each,
+  2,423 self and 1,073 cross impulses. Compared complete state and leaf parity.
+  Deliberate same-body crossing with native self-contact disabled is accepted
+  by ordinary native path but rejected by exact gate, as is initial contained
+  tetrahedron; rollback preserves state/trace, then valid step recovers.
+  GCC width64 attempt timed out after width64 separated; NOT a completed
+  width64 exact gate. Median exact/native cost at width<=16 18.90x GCC,
+  21.23x Clang: stronger expensive reference, not acceleration.
+- [x] Unified common benchmark: eleven native CPU arms on identical fresh
+  accepted native U snapshots and archived independently generated fixed,
+  adaptive, and nonconvex trajectories. All five native widths/two regimes,
+  12 independent and 10 native physical workloads, 424 distinct accepted
+  leaves, 11 order-balanced blocks, 51,304 timed observations and 4,664
+  matched groups per compiler; full exhaustive candidate-vector parity.
+  Fused/persistent-axis paired block-sum geometric mean 1.389064x GCC,
+  1.299421x Clang; spatial-first 1.194487/1.135972, retained refit
+  1.008827/1.050002. Fused ranks first in this aggregate; do not infer
+  every-scene superiority. Exact paid query boundary includes candidate
+  build/refit, filter, normalize; excludes source physical integration.
+  Added optional twelfth arm against stock pinned IPC LBVH on the same
+  dense-ID canonical contract; stock-arm compilation and measurement
+  must be performed by the final Mac campaign, not credited locally.
+  Compressed raw timing CSVs and exact receipts committed with verified Git
+  hashes. Cross-platform performance remains workload-specific.
+- [x] Replace old partial runner with tools/run_final_campaign.py.
+  Fresh default width64, stock IPC + exact CMake build with Boost propagation,
+  all registered CTests, independent solver generation and stock replay
+  (two-body, three-body fixed, adaptive, prescribed concave decomposition),
+  common paid comparison, full-solver timings, exact transaction and long
+  audits, previous optimization controls, physical Metal four-arm query and
+  guarded Metal producer integration, actual nonconvex geometry outputs,
+  terminal tables, SVG/PNG charts, offline dashboard, SHA256 and ZIP.
+  No intermediate operator commands. Blocked hardware/dependency, skipped
+  tests, incomplete CSV, bad pair/step counts or timeout cannot be promoted
+  to pass. If scientific packages missing, isolated local venv only.
+  Stock configuration failure still allows native/exact fallback; overall
+  completion stays false. No global package install or source checkout edits.
+- [x] Actual six Python unit tests pass (process failure, skip, timeout,
+  validator rejection, duplicate/ragged/missing receipt, ZIP integrity and
+  SHA256). Actual measured data report renders nine figures in PNG and SVG,
+  terminal paired ratios and summary, and actual nonconvex 33-frame
+  impact/control GIF, shared-volume-scale map and original topology.
+  The full new Mac runner itself has not been executed in this Linux VM:
+  no Metal device and no stock oneTBB dependency checkout. CMake target
+  registration is authored; direct native GCC/Clang apps executed.
+  Earlier operator-reported Mac query/stock replay measurements are retained;
+  full device-bridge validation and current unified stock IPC timing remain
+  new final campaign gates. The concave external solver still uses a prescribed
+  decomposition; no arbitrary automatic nonconvex or universal safety claim.
+
+Single command from clean repository root (Mac):
+    git switch research/spacetime-contact-atlas && git pull --ff-only && caffeinate -dims python3 tools/run_final_campaign.py
+
+Optional --parallel N, --timeout SECONDS, --output PATH, --no-install.
+Default output: output/research-final-<timestamp>; raw data, manifest,
+index.html, graphs, geometry, logs, SHA256SUMS, research-evidence.zip.
+Nonzero exit means at least one declared gate failed/blocked or reduced
+scope. A complete campaign validates only the declared experiments.
