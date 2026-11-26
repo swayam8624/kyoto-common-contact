@@ -1,0 +1,78 @@
+{
+  "scope": "Frozen Pass56 physical solver on newly seeded small 2–8 tetrahedron fixtures; no new algorithm or tolerance changes.",
+  "seeds": [
+    61013,
+    61027,
+    61031,
+    61043
+  ],
+  "cases": 12,
+  "macrosteps_requested": 96,
+  "macrosteps_completed": 96,
+  "accepted_leaves": 211,
+  "rejected_trials": 115,
+  "active_leaves": 47,
+  "fresh_recertified_pairs": 3155,
+  "unresolved_accepted": 0,
+  "by_kind": {
+    "edge": {
+      "cases": 4,
+      "leaves": 38,
+      "pairs": 228,
+      "active": 7,
+      "rejected": 6
+    },
+    "vertex": {
+      "cases": 4,
+      "leaves": 102,
+      "pairs": 2856,
+      "active": 8,
+      "rejected": 70
+    },
+    "disjoint": {
+      "cases": 4,
+      "leaves": 71,
+      "pairs": 71,
+      "active": 32,
+      "rejected": 39
+    }
+  },
+  "controls": {
+    "rejected": 12,
+    "rollback": 12,
+    "recovered": 12,
+    "recovery_leaves": 50,
+    "reasons": [
+      "displacement budget",
+      "unresolved after discovery"
+    ]
+  },
+  "source_blobs": {
+    "physical": "1c39cb53d7e4b091054309db6e43254dcba828bb",
+    "controls": "682c6b3ab18f8b22df544ed91645a42697e88716"
+  },
+  "native_heldout": {
+    "planned_frames": 120,
+    "configurations": 20,
+    "regimes": [
+      "sparse",
+      "dense_masks",
+      "topology_shear",
+      "large_offset",
+      "subnormal"
+    ],
+    "status": "CI submitted, local clone blocked by DNS"
+  },
+  "prior_pass60": {
+    "run_id": 45785649005,
+    "scalar": "success",
+    "archived_frames": 300,
+    "precision_controls": 3,
+    "packed_dispatches": 926,
+    "tiled_dispatches": 606,
+    "packed_words": 3705674,
+    "tiled_words": 725216,
+    "metal": "queued"
+  },
+  "limitations": "No arbitrary-scale robustness, independent physical accuracy or timing claim. Synthetic cubic broad-phase cases are not physically integrated. Actual GPU hardware still unverified."
+}
