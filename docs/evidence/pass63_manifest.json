@@ -1,0 +1,41 @@
+{
+  "scope": "Measured experimental figures only; no new simulation or timing runs",
+  "figure_count": 12,
+  "formats": [
+    "SVG vector",
+    "PNG 300 dpi"
+  ],
+  "timing_rows": {
+    "native47": 36300,
+    "stock59": 43200,
+    "held_gcc": 14520,
+    "held_clang": 14520,
+    "held_stock": 17280,
+    "total": 125820
+  },
+  "input_artifact_ids": [
+    15087213071,
+    15100385729,
+    15101505043,
+    15100079563,
+    15100748655
+  ],
+  "renderer_blob": "472bfa3b866e0a03e3ba6a2a19c64bb76e6ee77f",
+  "figure_names": [
+    "01_backend_ranking",
+    "02_fixed_suite_intervals",
+    "03_original_heatmap",
+    "04_heldout_heatmap",
+    "05_replica_scaling",
+    "06_paired_distributions",
+    "07_witness_ablation",
+    "08_memory_tradeoff",
+    "09_u156_trajectory",
+    "10_contact_incidence",
+    "11_constraint_adjacency",
+    "12_adaptive_rejections"
+  ],
+  "archive_sha256": "03f79a881e32a1392247e6d854ade15c8a40762ac13585f7d4319fe35b572e87",
+  "validation": "All 12 PNGs decoded and report 300 dpi; all 12 SVGs XML parsed; contact incidence sums twice pair counts; exact receipt durations yield final 16 ms; all inputs and outputs in archive checksum manifest; renderer matches GitHub blob.",
+  "limitations": "Figures use existing raw Linux evidence. Two heatmaps have independent color scales. Discovered constraint incidence is not physical pressure, force or penetration. Fixed-suite uncertainty is not population inference. Actual Metal queued."
+}
