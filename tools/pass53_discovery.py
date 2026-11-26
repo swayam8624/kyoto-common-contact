@@ -48,7 +48,7 @@ class Model:
             if len(s)==2:cons.append(ca.dot(q,trial[:,s[1]]-trial[:,s[0]])/dt);lo.append(0.);hi.append(0.)
             cons.append(ca.sumsqr(q));lo.append(1.);hi.append(1.)
         count=len(cons);cons.extend(js);lo.extend([.1]*len(js));hi.extend([np.inf]*len(js));z=ca.vertcat(*z);p=ca.vertcat(*p);g=ca.vertcat(*cons)
-        solver=ca.nlpsol('step','ipopt',{'x':z,'p':p,'f':obj,'g':g},{'ipopt.print_level':0,'ipopt.sb':'yes','print_time':False,'ipopt.tol':1e-10,'ipopt.constr_viol_tol':1e-10,'ipopt.acceptable_tol':1e-9,'ipopt.bound_relax_factor':0.,'ipopt.max_iter':200});grad=ca.Function('grad',[z,p],[ca.gradient(obj,z),ca.jacobian(g,z)]);self.cache[keys]=(solver,grad,np.array(lo),np.array(hi),count,force);return self.cache[keys]
+        solver=ca.nlpsol('step','ipopt',{'x':z,'p':p,'f':obj,'g':g},{'ipopt.print_level':0,'ipopt.sb':'yes','print_time':False,'ipopt.tol':1e-10,'ipopt.constr_viol_tol':1e-10,'ipopt.bound_relax_factor':0.,'ipopt.max_iter':200});grad=ca.Function('grad',[z,p],[ca.gradient(obj,z),ca.jacobian(g,z)]);self.cache[keys]=(solver,grad,np.array(lo),np.array(hi),count,force);return self.cache[keys]
     def trial(self,x,v,keys):
         solver,grad,lo,hi,count,force=self.build(keys);guess=list(v.ravel());par=list(x.ravel())+list(v.ravel())
         for k in keys:
