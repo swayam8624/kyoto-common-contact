@@ -1,0 +1,77 @@
+{
+  "scope": "Five actual native timing datasets, paired block sums, log ratios, fixed-suite timing bootstrap and cluster sensitivity; new controlled gate-only cache ablation",
+  "observations": 125820,
+  "heldout_observations": 46320,
+  "heldout_ci": {
+    "run_id": 45786247596,
+    "gcc": "success",
+    "clang": "success",
+    "stock": "success",
+    "physical": "success",
+    "artifact_ids": [
+      15101505043,
+      15100079563,
+      15100748655
+    ],
+    "digest_verified": true
+  },
+  "statistical": {
+    "original_stock": {
+      "fused_vs_ipc": 1.9771778277480094,
+      "fixed_suite_interval": [
+        1.9689328091315634,
+        1.9852108909964856
+      ],
+      "wins": 16,
+      "configurations": 17,
+      "source_clusters": 5,
+      "cluster_equal_weight_ratio": 2.3110815534865545,
+      "leave_one_cluster_out": [
+        2.2387725115900357,
+        2.540744902968178
+      ],
+      "sign_p_unadjusted": 0.0625
+    },
+    "heldout_stock": {
+      "fused_vs_ipc": 3.3311843603361253,
+      "fixed_suite_interval": [
+        3.1492331403598697,
+        3.4769906016120076
+      ],
+      "wins": 20,
+      "configurations": 20,
+      "seed_clusters": 4,
+      "leave_one_cluster_out": [
+        3.3158503989513406,
+        3.353852619111238
+      ],
+      "sign_p_unadjusted": 0.125
+    },
+    "heldout_fused_vs_exhaustive": {
+      "gcc": 0.7755855074403797,
+      "clang": 0.8245918877599838,
+      "stock": 1.2073554662631212
+    },
+    "caveat": "Bootstrap intervals describe repeat timing on fixed suite only. Few deliberately selected clusters; sign tests exploratory and unadjusted, no 5% significance claim. Different compiler/job timings are not direct causal compiler comparisons."
+  },
+  "ablation": {
+    "factor": "retained verified separating-axis hints versus clear before every interval",
+    "cases": 13,
+    "matched_blocks": 50,
+    "gate_replays": 100,
+    "interval_evaluations": 1764,
+    "pair_checks": 178456,
+    "certificate_receipt_parity": true,
+    "retained_proposals": 2528,
+    "cold_proposals": 15648,
+    "equal_case_ratio": 3.32651556923929,
+    "small_equal_case_ratio": 3.203678593519488,
+    "replica64_ratio": 5.224888337025212,
+    "limitation": "Gate-only replay, not solver speed. Small disjoint cases neutral; initial concurrent interrupted attempts excluded, final sequential blocks counterbalanced."
+  },
+  "source_blobs": {
+    "stats": "6ebaec78ee35171deda236767ed89300ad361c9a",
+    "ablation": "14f6b4ca3f502be86f3417fa569c2a24bcc611ea"
+  },
+  "hardware": "Metal remains queued; no actual GPU result claimed."
+}
