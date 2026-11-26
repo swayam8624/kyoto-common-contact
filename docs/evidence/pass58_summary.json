@@ -1,0 +1,66 @@
+{
+  "scope": "Fresh-process paid physical solve and OS high-water RSS; shared elastic graph and sparse KKT residual versus Pass56",
+  "blocks": 5,
+  "runs": 10,
+  "leaves": 74,
+  "recertified_pairs": 481824,
+  "unresolved": 0,
+  "bitwise_positions_velocities": true,
+  "decision_parity": true,
+  "geometry": {
+    "u78": {
+      "blocks": 2,
+      "speed_geomean": 0.6198569089351522,
+      "rss_geomean": 0.8634945874870927,
+      "base_peak_rss_bytes": [
+        726781952,
+        726925312
+      ],
+      "sparse_peak_rss_bytes": [
+        627585024,
+        627683328
+      ]
+    },
+    "comb120": {
+      "blocks": 2,
+      "speed_geomean": 0.6526440049587304,
+      "rss_geomean": 0.733281094043818,
+      "base_peak_rss_bytes": [
+        635097088,
+        635125760
+      ],
+      "sparse_peak_rss_bytes": [
+        465731584,
+        465698816
+      ]
+    },
+    "u156": {
+      "blocks": 1,
+      "speed_geomean": 0.613868262408333,
+      "rss_geomean": 0.9946473756839543,
+      "base_peak_rss_bytes": [
+        1445523456
+      ],
+      "sparse_peak_rss_bytes": [
+        1437786112
+      ],
+      "base_ns": 52506090639,
+      "sparse_ns": 85533157282
+    }
+  },
+  "separate_instrumented_profile": {
+    "u78_total_s": 18.602,
+    "trial_cumulative_s": 12.009,
+    "mesh_gate_cumulative_s": 6.588,
+    "recursive_certificate_cumulative_s": 5.299,
+    "build_cumulative_s": 3.586,
+    "note": "Nested inclusive times; not additive, not uninstrumented timing."
+  },
+  "decision": "Do not promote shared graph variant to general default; retain Pass56. RSS benefits limited to 78/120-cell tests.",
+  "source_blobs": {
+    "sparse": "3c2e547c51e83c3b3181b491ca62860cf9647072",
+    "worker": "d743f0d9435a78edf38c484ff769a259edcb9b90",
+    "audit": "66b5de8ee5170d405055d2d6aa1bf17a9c806ac2"
+  },
+  "limitations": "Single local Linux host; two counterbalanced blocks each for 78/120 and one completed block for 156. Reverse-order 156 repetition not started locally due execution cost. CI requires two blocks per geometry. Peak RSS includes interpreter and native solver, not exclusively compiled model memory. No new acceleration claim. Pass56 all three larger Ubuntu jobs passed, native macOS pending."
+}
