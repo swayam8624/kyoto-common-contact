@@ -1,0 +1,58 @@
+name: Gaia independent CPU baseline
+on:
+  pull_request:
+    paths:
+      - 'research/gaia-ci/**'
+      - '.github/workflows/gaia-independent-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeigen3-dev libtbb-dev libembree-dev libomp-dev clang ninja-build
+          dpkg-query -W libeigen3-dev libtbb-dev libembree-dev libomp-dev
+      - name: Clone exact upstream revisions
+        run: |
+          git init gaia-upstream
+          git -C gaia-upstream remote add origin https://github.com/AnkaChan/Gaia.git
+          git -C gaia-upstream fetch --depth 1 origin c229692045465a76233f9fba9197fb22bbfb3694
+          git -C gaia-upstream checkout --detach FETCH_HEAD
+          git -C gaia-upstream submodule update --init Simulator/3rdParty/CuMatrix Simulator/3rdParty/MeshFrame2
+          test "$(git -C gaia-upstream/Simulator/3rdParty/CuMatrix rev-parse HEAD)" = bb2aaefcceee8cf294c8b98648733caa9fb6b22f
+          test "$(git -C gaia-upstream/Simulator/3rdParty/MeshFrame2 rev-parse HEAD)" = 6e4bad91f616bb9709d661c16abc01cc792e75c9
+      - name: Apply CPU-only patches
+        run: |
+          mkdir -p receipts
+          python3 research/gaia-ci/port_cpu.py gaia-upstream
+          git -C gaia-upstream diff > receipts/gaia.patch
+          git -C gaia-upstream/Simulator/3rdParty/CuMatrix diff > receipts/cumatrix.patch
+          git -C gaia-upstream/Simulator/3rdParty/MeshFrame2 diff > receipts/meshframe.patch
+          git -C gaia-upstream submodule status > receipts/submodules.txt
+      - name: Build original detector
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -S research/gaia-ci -B gaia-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DGAIA_SOURCE="$PWD/gaia-upstream" 2>&1 | tee receipts/configure.log
+          cmake --build gaia-build --parallel 2 -- -k 0 2>&1 | tee receipts/build.log
+      - name: Execute original callback smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 research/gaia-ci/fixtures.py fixtures
+          for n in 4 8 12; do
+            for sim in 1 2; do
+              gaia-build/gaia_probe "fixtures/grid${n}_0.obj" "fixtures/grid${n}_1.obj" "$sim" 2>&1 | tee "receipts/grid${n}_sim${sim}.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gaia-baseline-receipts
+          path: receipts/
