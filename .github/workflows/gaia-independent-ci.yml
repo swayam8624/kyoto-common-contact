@@ -35,6 +35,33 @@ jobs:
           git -C gaia-upstream/Simulator/3rdParty/CuMatrix diff > receipts/cumatrix.patch
           git -C gaia-upstream/Simulator/3rdParty/MeshFrame2 diff > receipts/meshframe.patch
           git -C gaia-upstream submodule status > receipts/submodules.txt
+      - name: Export self-contained Linux source and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transfer/gaia/Simulator/3rdParty transfer/packages
+          cp -a gaia-upstream/Simulator/Modules transfer/gaia/Simulator/
+          cp -a gaia-upstream/Simulator/3rdParty/CuMatrix/CuMatrix transfer/gaia/Simulator/3rdParty/
+          mkdir -p transfer/gaia/Simulator/3rdParty/MeshFrame2
+          cp -a gaia-upstream/Simulator/3rdParty/MeshFrame2/MeshFrame transfer/gaia/Simulator/3rdParty/MeshFrame2/
+          # Restore the CuMatrix directory layout expected by the target.
+          mv transfer/gaia/Simulator/3rdParty/CuMatrix transfer/gaia/Simulator/3rdParty/CuMatrix-headers
+          mkdir transfer/gaia/Simulator/3rdParty/CuMatrix
+          mv transfer/gaia/Simulator/3rdParty/CuMatrix-headers transfer/gaia/Simulator/3rdParty/CuMatrix/CuMatrix
+          cp -a research/gaia-ci transfer/harness
+          cp -a receipts transfer/receipts
+          cd transfer/packages
+          for pkg in libeigen3-dev libtbb-dev libtbb12 libtbbmalloc2 libtbbbind-2-5 libembree-dev libembree3-3 libomp-14-dev libomp5-14; do
+            if dpkg-query -W "$pkg" >/dev/null 2>&1; then
+              apt-get download "$pkg"
+            fi
+          done
+          cd ../..
+          tar -czf gaia-linux-source-and-deps.tar.gz transfer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaia-linux-source-and-deps
+          path: gaia-linux-source-and-deps.tar.gz
       - name: Build original detector
         shell: bash
         run: |
