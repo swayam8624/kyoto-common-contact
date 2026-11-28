@@ -8,6 +8,20 @@ on:
 permissions:
   contents: read
 jobs:
+  legacy-embree-runtime:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Fetch Embree 3.12.2 transitive TBB runtime
+        run: |
+          sudo apt-get update
+          mkdir -p runtime
+          cd runtime
+          apt-get download libtbb2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: embree-legacy-tbb-runtime
+          path: runtime/
   baseline:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
