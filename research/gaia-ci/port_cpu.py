@@ -68,3 +68,32 @@ def io(s):
     return s[:i]+'#ifdef _WIN32\n'+s[i:]+'\n#else\n'+a+'\n std::error_code ec; if(std::filesystem::is_directory(folderName,ec)) return false; ec.clear(); std::filesystem::create_directories(folderName,ec); return bool(ec) || !std::filesystem::is_directory(folderName,ec);\n}\n#endif\n'
 edit(mf/'Utility/IO.cpp',io)
 edit(m/'TriMesh/TriMesh.cpp',lambda s:rep(s,'<MeshFrame/Utility/STR.h>','<MeshFrame/Utility/Str.h>'))
+
+# The upstream Windows source uses case-insensitive paths. Resolve known Eigen
+# casing and local quoted headers on the case-sensitive Linux filesystem.
+for directory in (m,mf):
+    for p in directory.rglob('*'):
+        if p.suffix not in ('.h','.hpp','.cpp','.inl','.cuh','.cu'):continue
+        s=p.read_text(errors='surrogateescape')
+        t=re.sub(r'(#\s*include\s*[<"])Eigen/core([>"])',r'\1Eigen/Core\2',s)
+        def casefix(match):
+            name=match[2]
+            cur=p.parent
+            if not name.startswith(('.', '..')) and '/' not in name and not (cur/name).exists():
+                pass
+            for part in name.split('/'):
+                if part=='..':cur=cur.parent;continue
+                if part=='.':continue
+                target=cur/part
+                if target.exists():cur=target;continue
+                if not cur.is_dir():return match[0]
+                candidates=[x for x in cur.iterdir() if x.name.casefold()==part.casefold()]
+                if len(candidates)!=1:return match[0]
+                cur=candidates[0]
+            if cur.is_file():
+                import os
+                n=os.path.relpath(cur,p.parent).replace(os.sep,'/')
+                if not (p.parent/name).exists():return match[1]+n+'"'
+            return match[0]
+        t=re.sub(r'(^\s*#\s*include\s*")([^"\n]+)"',casefix,t,flags=re.M)
+        if t!=s:p.write_text(t,errors='surrogateescape')

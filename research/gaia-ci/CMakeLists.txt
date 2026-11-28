@@ -9,8 +9,15 @@ find_package(OpenMP REQUIRED)
 set(M "${GAIA_SOURCE}/Simulator/Modules")
 set(D "${GAIA_SOURCE}/Simulator/3rdParty")
 find_package(MeshFrame2 CONFIG REQUIRED PATHS "${D}/MeshFrame2/MeshFrame/cmake" NO_DEFAULT_PATH)
+option(KYOTO_COMPARE "Build the strict callback comparison" OFF)
+set(PROBE_MAIN baseline.cpp)
+if(KYOTO_COMPARE)
+  set(PROBE_MAIN)
+  add_library(kyoto_selector SHARED frozen/selector.cpp)
+  set_target_properties(kyoto_selector PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
+endif()
 add_executable(gaia_probe
-  baseline.cpp
+  ${PROBE_MAIN}
   "${M}/CollisionDetector/ClothContactDetector.cpp"
   "${M}/CollisionDetector/TriMeshCollisionGeometry.cpp"
   "${M}/CollisionDetector/CollisionGeometry.cpp"

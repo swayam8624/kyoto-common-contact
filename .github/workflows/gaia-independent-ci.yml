@@ -16,7 +16,7 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libeigen3-dev libtbb-dev libembree-dev libomp-dev clang ninja-build
+          sudo apt-get install -y libeigen3-dev libtbb-dev libembree-dev libomp-dev libboost-dev clang ninja-build
           dpkg-query -W libeigen3-dev libtbb-dev libembree-dev libomp-dev
       - name: Clone exact upstream revisions
         run: |
@@ -51,6 +51,34 @@ jobs:
               gaia-build/gaia_probe "fixtures/grid${n}_0.obj" "fixtures/grid${n}_1.obj" "$sim" 2>&1 | tee "receipts/grid${n}_sim${sim}.log"
             done
           done
+      - name: Verify frozen source and patch original detector
+        run: |
+          cd research/gaia-ci
+          test "$(git hash-object frozen/external.hpp)" = 1bb7e384ae5922ad77d42d907009b431fb8132ae
+          test "$(git hash-object frozen/feature_pairs.hpp)" = 88f677e85e0e5be4ed04bf225cfd650787a3f99d
+          test "$(git hash-object frozen/selector.cpp)" = a8860282df55a2d2c3443f4d3b8a0df0a658254a
+          test "$(git hash-object frozen/tree.hpp)" = ca213be15f4390bdffe379bf13ed09c37eb6d759
+          test "$(git hash-object gaia_bridge.hpp)" = 996a030925aad0cefc93ac6a3528527eb654d38d
+          test "$(git hash-object gaia_probe.inc)" = 73b0ce25bafee173d6a6b7df26eb337287e42bed
+          python3 prepare_gaia.py ../../gaia-upstream
+      - name: Build frozen selector and actual callback comparison
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -S research/gaia-ci -B gaia-compare -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DGAIA_SOURCE="$PWD/gaia-upstream" -DKYOTO_COMPARE=ON 2>&1 | tee receipts/compare-configure.log
+          cmake --build gaia-compare --parallel 2 -- -k 0 2>&1 | tee receipts/compare-build.log
+      - name: Strict original versus modified Gaia
+        shell: bash
+        run: |
+          set -o pipefail
+          export KYOTO_SELECTOR_LIBRARY="$PWD/gaia-compare/libkyoto_selector.so"
+          failed=0
+          for n in 4 8 12; do
+            for sim in 1 2; do
+              gaia-compare/gaia_probe "fixtures/grid${n}_0.obj" "fixtures/grid${n}_1.obj" "$sim" "receipts/compare_grid${n}_sim${sim}" 2>&1 | tee "receipts/compare_grid${n}_sim${sim}.log" || failed=1
+            done
+          done
+          exit "$failed"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
